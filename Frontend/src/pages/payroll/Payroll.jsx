@@ -15,6 +15,7 @@ import {
   useBulkGeneratePayroll,
   useListPayrolls,
   useUpdatePayrollStatus,
+  useDeletePayroll,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -320,16 +321,12 @@ function useEmployeeDirectory() {
       _id: e._id,
       name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.empid || e.uid,
       uid: e.uid,
-      empid: e.empid,
-      department: e.department,
       model: e.type === "manager" ? "Manager" : "User",
     }));
     const admins = (adminData?.admins || []).map((a) => ({
       _id: a._id,
       name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.empid || a.uid,
       uid: a.uid,
-      empid: a.empid,
-      department: a.department,
       model: "Admin",
     }));
     const all = [...users, ...admins];
@@ -345,7 +342,7 @@ function useEmployeeDirectory() {
 
 function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
-  if (person) return `${person.name} (${person.empid || person.uid})`;
+  if (person) return `${person.name} (${person.uid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
@@ -1141,7 +1138,7 @@ function StructuresTab({ notify, directory }) {
           <Field label="Employee">
             <Select value={form.employee} onChange={(e) => setForm((p) => ({ ...p, employee: e.target.value }))} disabled={directory.loading}>
               <option value="">{directory.loading ? "Loading…" : "Select employee"}</option>
-              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
             </Select>
           </Field>
           <Field label="Fixed Annual CTC (₹)">
@@ -1309,7 +1306,7 @@ function GenerateTab({ notify, directory }) {
             <Field label="Employee">
               <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
                 <option value="">Select employee</option>
-                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
               </Select>
             </Field>
             <Field label="Month">
@@ -1606,9 +1603,8 @@ function PayslipModal({ payroll, directory, onClose }) {
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
-  const employeeId = snap.employeeId || person?.empid || person?.uid || "—";
-  const rawDept = snap.department || person?.department;
-  const department = DEPT_FULL_FORMS[rawDept] || rawDept || "—";
+  const employeeId = snap.employeeId || person?.uid || "—";
+  const department = snap.department || "—";
   const designation = snap.designation || "—";
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
@@ -1705,6 +1701,7 @@ function RecordsTab({ notify, directory }) {
     status: filters.status || undefined,
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
+  const { mutate: removePayroll } = useDeletePayroll();
   const [selected, setSelected] = useState(null);
 
   const payrolls = data?.payrolls || [];
@@ -1717,6 +1714,15 @@ function RecordsTab({ notify, directory }) {
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
+  };
+
+  const handleDelete = (p) => {
+    if (p.status !== "generated") return;
+    if (!window.confirm("Delete this payroll record? This cannot be undone.")) return;
+    removePayroll(p._id, {
+      onSuccess: () => notify("Payroll record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
   };
 
   return (
@@ -1777,8 +1783,8 @@ function RecordsTab({ notify, directory }) {
                           downloadPayslip({
                             payroll: p,
                             name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
-                            employeeId: snap.employeeId || person?.empid || person?.uid || "—",
-                            department: DEPT_FULL_FORMS[rawDept] || rawDept || "—",
+                            employeeId: snap.employeeId || person?.uid || "—",
+                            department: snap.department || "—",
                             designation: snap.designation || "—",
                             orgName: p.organisationSnapshot?.name || "",
                           });
@@ -1790,8 +1796,13 @@ function RecordsTab({ notify, directory }) {
                     )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
                     {p.status === "approved" && <GhostButton onClick={() => handleStatus(p._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
-                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}
-                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")}>Resume</GhostButton>}
+                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")} style={{ marginRight: 8 }}>Hold</GhostButton>}
+                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Resume</GhostButton>}
+                    {p.status === "generated" && (
+                      <GhostButton onClick={() => handleDelete(p)} style={{ color: C.red, borderColor: C.red }}>
+                        Delete
+                      </GhostButton>
+                    )}
                   </td>
                 </tr>
               ))}
