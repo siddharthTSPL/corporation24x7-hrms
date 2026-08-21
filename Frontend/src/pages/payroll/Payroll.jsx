@@ -72,6 +72,16 @@ const MONTH_NAMES = [
 ];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Short department code -> full display name (mirrors DEPT_FULL_FORMS used
+// in EmployeeTable.js, so payslips show "Human Resources" instead of "HR").
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
 function daysInMonthClient(month, year) {
   return new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
 }
@@ -308,14 +318,18 @@ function useEmployeeDirectory() {
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
       _id: e._id,
-      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.uid,
+      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.empid || e.uid,
       uid: e.uid,
+      empid: e.empid,
+      department: e.department,
       model: e.type === "manager" ? "Manager" : "User",
     }));
     const admins = (adminData?.admins || []).map((a) => ({
       _id: a._id,
-      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.uid,
+      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.empid || a.uid,
       uid: a.uid,
+      empid: a.empid,
+      department: a.department,
       model: "Admin",
     }));
     const all = [...users, ...admins];
@@ -331,7 +345,7 @@ function useEmployeeDirectory() {
 
 function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
-  if (person) return `${person.name} (${person.uid})`;
+  if (person) return `${person.name} (${person.empid || person.uid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
@@ -1592,8 +1606,9 @@ function PayslipModal({ payroll, directory, onClose }) {
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
-  const employeeId = snap.employeeId || person?.uid || "—";
-  const department = snap.department || "—";
+  const employeeId = snap.employeeId || person?.empid || person?.uid || "—";
+  const rawDept = snap.department || person?.department;
+  const department = DEPT_FULL_FORMS[rawDept] || rawDept || "—";
   const designation = snap.designation || "—";
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
@@ -1758,11 +1773,12 @@ function RecordsTab({ notify, directory }) {
                         onClick={() => {
                           const snap = p.employeeSnapshot || {};
                           const person = directory.byId.get(String(p.employee));
+                          const rawDept = snap.department || person?.department;
                           downloadPayslip({
                             payroll: p,
                             name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
-                            employeeId: snap.employeeId || person?.uid || "—",
-                            department: snap.department || "—",
+                            employeeId: snap.employeeId || person?.empid || person?.uid || "—",
+                            department: DEPT_FULL_FORMS[rawDept] || rawDept || "—",
                             designation: snap.designation || "—",
                             orgName: p.organisationSnapshot?.name || "",
                           });
