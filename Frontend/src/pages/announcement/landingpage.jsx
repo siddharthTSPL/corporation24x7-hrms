@@ -9,7 +9,7 @@ import {
   FiUsers, FiStar, FiBarChart2,
   FiLogOut, FiSettings, FiMessageSquare
 } from 'react-icons/fi'
-import { FaXTwitter } from "react-icons/fa6";
+import { FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import {
@@ -722,78 +722,129 @@ function Features() {
 }
 
 function Pricing() {
+  const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
+
   const plans = [
-    { name: 'Basic', desc: 'Perfect for small teams getting started', price: '₹47', features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)'] },
-    { name: 'Advance', desc: 'For growing businesses that need more. Everything in Starter +', price: '₹119', popular: true, features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)'] },
     {
-  name: 'Enterprise',
-  desc: 'Ultimate power and flexibility. Everything in Growth +',
-  price: 'Custom',
-  features: [
-    'Multi-company support',
-    'Role-based permissions',
-    'SSO',
-    'API access',
-    'Custom integrations',
-    'Dedicated account manager',
-  ],
-}
+      name: 'Basic',
+      desc: 'Perfect for small teams getting started',
+      monthlyPrice: 47,
+      yearlyPrice: Math.round(47 * 0.8),
+      suffix: '/mo/user',
+      features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
+    },
+    {
+      name: 'Advance',
+      desc: 'For growing businesses that need more. Everything in Starter +',
+      monthlyPrice: 119,
+      yearlyPrice: Math.round(119 * 0.8),
+      suffix: '/mo/user',
+      popular: true,
+      features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)']
+    },
+    {
+      name: 'Enterprise',
+      desc: 'Ultimate power and flexibility. Everything in Growth +',
+      monthlyPrice: null,
+      yearlyPrice: null,
+      suffix: '',
+      features: [
+        'Multi-company support',
+        'Role-based permissions',
+        'SSO',
+        'API access',
+        'Custom integrations',
+        'Dedicated account manager',
+      ],
+    }
   ]
+
   const badges = [
     { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
     { icon: <FiLink size={20} />, label: 'Easy Integration', desc: 'Seamlessly integrates with your favorite tools.' },
     { icon: <FiActivity size={20} />, label: '99.9% Uptime', desc: 'Reliable performance you can count on.' },
     { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
   ]
+
   return (
     <section id="pricing" className="scroll-anchor bg-white pt-8 pb-9">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <div className="text-center mb-16">
+          <div className="text-center mb-10">
             <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(28px,3.2vw,42px)]">
               Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
-            <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed">
+            <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed mb-8">
               Choose the perfect TorchX Talent plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
+
+            {/* Monthly / Yearly Toggle */}
+            <div className="inline-flex items-center gap-3 bg-[#FDF4F8] border border-[#EAC7D7] rounded-full px-3 py-2">
+              <span className={`text-sm font-ui font-semibold px-2 ${billing === 'monthly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
+                Monthly
+              </span>
+              <button
+                type="button"
+                onClick={() => setBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
+                className="relative w-12 h-6 rounded-full bg-[#7A004B] transition-colors duration-300 shrink-0"
+                aria-label="Toggle billing period"
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${
+                    billing === 'yearly' ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-ui font-semibold px-2 flex items-center gap-1.5 ${billing === 'yearly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
+                Yearly
+                <span className="text-[10px] bg-[#7A004B] text-white font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-center mb-6 pt-5">
-            {plans.map(p => (
-              <div
-                key={p.name}
-                className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] transition-transform duration-300 ${
-                  p.popular ? 'lg:scale-[1.045] relative z-[5]' : 'hover:scale-[1.02]'
-                }`}
-              >
-                {p.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[2]">
-                    <span className="bg-[#7A004B] text-white text-[11px] font-ui font-bold px-5 py-1.5 rounded-full whitespace-nowrap tracking-wide">Most Popular</span>
+            {plans.map(p => {
+              const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
+              return (
+                <div
+                  key={p.name}
+                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] transition-transform duration-300 ${
+                    p.popular ? 'lg:scale-[1.045] relative z-[5]' : 'hover:scale-[1.02]'
+                  }`}
+                >
+                  {p.popular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[2]">
+                      <span className="bg-[#7A004B] text-white text-[11px] font-ui font-bold px-5 py-1.5 rounded-full whitespace-nowrap tracking-wide">Most Popular</span>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-lg font-display font-bold text-[#111] mb-1.5">{p.name}</div>
+                    <div className="text-xs font-body text-[#999] leading-relaxed">{p.desc}</div>
                   </div>
-                )}
-                <div>
-                  <div className="text-lg font-display font-bold text-[#111] mb-1.5">{p.name}</div>
-                  <div className="text-xs font-body text-[#999] leading-relaxed">{p.desc}</div>
+                  <div>
+                    <span className="text-[38px] font-display font-extrabold text-[#111]">
+                      {price !== null ? `₹${price}` : 'Custom'}
+                    </span>
+                    {price !== null && (
+                      <span className="text-sm font-body text-[#999] ml-1">{p.suffix}</span>
+                    )}
+                  </div>
+                  <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
+                    {p.features.map(f => (
+                      <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
+                        <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                  <a
+                    href="https://torchxsuite.com/signup"
+                    className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033] text-center no-underline inline-block"
+                  >
+                    Start Free Trial
+                  </a>
                 </div>
-                <div>
-                  <span className="text-[38px] font-display font-extrabold text-[#111]">{p.price}</span>
-                  
-                </div>
-                <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
-                  {p.features.map(f => (
-                    <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
-                      <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />{f}
-                    </li>
-                  ))}
-                </ul>
-             <a   
-  href="https://torchxsuite.com/signup"
-  className="mt-auto w-full py-3 rounded-full text-sm font-ui font-bold cursor-pointer bg-[#7A004B] text-white border-none transition-all hover:bg-[#5a0033] text-center no-underline inline-block"
->
-  Start Free Trial
-</a>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 mb-6 border-2 border-[#7A004B]">
@@ -838,18 +889,17 @@ function Pricing() {
               </div>
             </div>
             <a
-             href="tel:+917454098820 "
-  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
->
-  Talk To Expert
-</a>
+              href="tel:+917454098820"
+              className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
+            >
+              Talk To Expert
+            </a>
           </div>
         </motion.div>
       </Wrap>
     </section>
   )
 }
-
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
@@ -1049,10 +1099,10 @@ function Footer() {
     ] },
   ]
   const socials = [
-    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/103362190/admin/dashboard/', label: 'LinkedIn' },
+    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/torchx-talent/', label: 'LinkedIn' },
     { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
     { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
-    { icon: <FiMail />, href: '#', label: 'Email' },
+    { icon: <FaYoutube />,  href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
   ]
   const [activeDoc, setActiveDoc] = useState(null)
 
