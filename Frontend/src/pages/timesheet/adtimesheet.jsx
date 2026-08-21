@@ -125,8 +125,8 @@ function fmtRate(rate, currency) {
 
 function TorchXLogo() {
   return (
-    <div className="flex items-center gap-2.5 flex-shrink-0 min-w-0">
-      <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-[0_2px_8px_rgba(115,0,66,0.15)] flex-shrink-0">
+    <div className="flex items-center gap-2.5 shrink-0 min-w-0">
+      <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-[0_2px_8px_rgba(115,0,66,0.15)] shrink-0">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
           <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.9" />
           <circle cx="10" cy="8" r="2" fill="white" />
@@ -143,7 +143,7 @@ function TorchXLogo() {
 function Badge({ status }) {
   const s = STATUS_STYLE[status] || { text: "text-gray-400", bg: "bg-gray-50", label: status };
   return (
-    <span className={`${s.text} ${s.bg} rounded-md text-[10px] font-bold tracking-wide px-2 py-1 uppercase whitespace-nowrap flex-shrink-0`}>
+    <span className={`${s.text} ${s.bg} rounded-md text-[10px] font-bold tracking-wide px-2 py-1 uppercase whitespace-nowrap shrink-0`}>
       {s.label}
     </span>
   );
@@ -159,7 +159,7 @@ function Chip({ color = "brand", children }) {
     gray: "text-gray-400 bg-gray-100",
   };
   return (
-    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap flex-shrink-0`}>
+    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
       {children}
     </span>
   );
@@ -167,7 +167,7 @@ function Chip({ color = "brand", children }) {
 
 function PriorityChip({ priority }) {
   return (
-    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap flex-shrink-0`}>
+    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
       {priority}
     </span>
   );
@@ -175,7 +175,7 @@ function PriorityChip({ priority }) {
 
 function JobChip({ status }) {
   return (
-    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-400 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap flex-shrink-0`}>
+    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-400 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
       {status.replace(/_/g, " ")}
     </span>
   );
@@ -191,10 +191,10 @@ function Card({ children, className = "" }) {
 
 function StatCard({ label, value, color = "text-[#730042]", sub }) {
   return (
-    <Card className="px-4 sm:px-[22px] py-4 sm:py-5">
-      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5 truncate">{label}</div>
-      <div className={`text-xl sm:text-[28px] font-black ${color} truncate`}>{value}</div>
-      {sub && <div className="text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
+    <Card className="px-3 sm:px-[22px] py-3.5 sm:py-5">
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2 sm:mb-2.5 truncate">{label}</div>
+      <div className={`text-lg sm:text-[28px] font-black ${color} truncate`}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -212,11 +212,11 @@ function Modal({ open, onClose, title, children }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
-        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 flex-shrink-0 min-w-0">
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0 min-w-0">
           <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer flex-shrink-0"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer shrink-0"
           >×</button>
         </div>
         <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
@@ -234,7 +234,7 @@ function Field({ label, children }) {
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] transition-colors min-h-[44px]";
+const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]";
 
 function Input({ label, ...props }) {
   return (
@@ -256,11 +256,11 @@ function Sel({ label, children, ...props }) {
 
 function Btn({ children, variant = "primary", onClick, disabled, className = "" }) {
   const variants = {
-    primary: "bg-[#730042] text-white border border-transparent",
-    ghost: "bg-transparent text-gray-700 border-[1.5px] border-gray-200",
-    danger: "bg-red-50 text-red-600 border-[1.5px] border-red-200",
-    success: "bg-emerald-50 text-emerald-600 border-[1.5px] border-emerald-200",
-    amber: "bg-amber-50 text-amber-600 border-[1.5px] border-amber-200",
+    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white border border-transparent shadow-sm hover:shadow-md hover:brightness-110",
+    ghost: "bg-transparent text-gray-700 border-[1.5px] border-gray-200 hover:bg-gray-50",
+    danger: "bg-red-50 text-red-600 border-[1.5px] border-red-200 hover:bg-red-100",
+    success: "bg-emerald-50 text-emerald-600 border-[1.5px] border-emerald-200 hover:bg-emerald-100",
+    amber: "bg-amber-50 text-amber-600 border-[1.5px] border-amber-200 hover:bg-amber-100",
   };
   return (
     <button
@@ -321,7 +321,7 @@ function JobDetailModal({ jobId, open, onClose }) {
             <div className="min-w-0">
               <div className="flex items-center justify-between mb-1.5 gap-2">
                 <span className="text-[11px] text-gray-400">Progress</span>
-                <span className={cn("text-[11px] font-bold flex-shrink-0", job.overrun_flagged ? "text-red-600" : "text-gray-600")}>
+                <span className={cn("text-[11px] font-bold shrink-0", job.overrun_flagged ? "text-red-600" : "text-gray-600")}>
                   {Math.round((job.logged_hours_cache / job.estimated_hours) * 100)}%
                 </span>
               </div>
@@ -423,7 +423,7 @@ function TimerWidget({ jobs }) {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
             </span>
           )}
-          <span className={`${isRunning ? "text-white/90" : "text-gray-400"} text-[11px] font-bold uppercase tracking-wide flex-shrink-0`}>
+          <span className={`${isRunning ? "text-white/90" : "text-gray-400"} text-[11px] font-bold uppercase tracking-wide shrink-0`}>
             {isRunning ? "Timer Running" : isPaused ? "Timer Paused" : "No Active Timer"}
           </span>
           {timer?.job?.title && (
@@ -519,11 +519,11 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
             <div key={iso} className={`px-3.5 py-3 min-w-0 ${isToday ? "bg-[#730042]/[0.04]" : ""}`}>
               <div className="flex items-center justify-between mb-2 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide flex-shrink-0">{DAY_NAMES[i]}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide shrink-0">{DAY_NAMES[i]}</span>
                   <span className={`text-sm font-extrabold ${isToday ? "text-[#730042]" : "text-gray-900"}`}>{d.getDate()}</span>
                 </div>
                 {mins > 0 && (
-                  <span className="text-[10px] font-bold text-[#730042] bg-[#730042]/[0.07] rounded px-1.5 py-0.5 flex-shrink-0">{fmtDuration(mins)}</span>
+                  <span className="text-[10px] font-bold text-[#730042] bg-[#730042]/[0.07] rounded px-1.5 py-0.5 shrink-0">{fmtDuration(mins)}</span>
                 )}
               </div>
               {logs.length > 0 && (
@@ -546,33 +546,33 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
         })}
       </div>
 
-      <div className="hidden lg:block overflow-x-auto">
-        <div className="grid grid-cols-7 border-b border-gray-200 min-w-[560px]">
+      <div className="hidden lg:block min-w-0">
+        <div className="grid grid-cols-7 border-b border-gray-200">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const isToday = iso === today;
             const mins = weekDays[iso]?.totalMinutes || 0;
             return (
-              <div key={iso} className={`px-2 pt-3 pb-2.5 text-center ${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.07]" : ""}`}>
+              <div key={iso} className={`px-2 pt-3 pb-2.5 text-center min-w-0 ${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.07]" : ""}`}>
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
                 <div className={`text-xl font-extrabold mt-1 ${isToday ? "text-[#730042]" : "text-gray-900"}`}>{d.getDate()}</div>
                 {mins > 0
-                  ? <div className="mt-1.5 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.07] rounded px-1 py-0.5 whitespace-nowrap">{fmtDuration(mins)}</div>
+                  ? <div className="mt-1.5 text-[10px] font-bold text-[#730042] bg-[#730042]/[0.07] rounded px-1 py-0.5 truncate">{fmtDuration(mins)}</div>
                   : <div className="mt-1.5 h-[18px]" />}
               </div>
             );
           })}
         </div>
-        <div className="grid grid-cols-7 min-w-[560px] min-h-[160px]">
+        <div className="grid grid-cols-7 min-h-[160px]">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const logs = weekDays[iso]?.logs || [];
             const isToday = iso === today;
             return (
-              <div key={iso} className={`${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.02]" : ""} px-1.5 py-2 flex flex-col gap-1`}>
+              <div key={iso} className={`${i < 6 ? "border-r border-gray-200" : ""} ${isToday ? "bg-[#730042]/[0.02]" : ""} px-1.5 py-2 flex flex-col gap-1 min-w-0`}>
                 {logs.map((log) => (
                   <div key={log._id} title={`${log.job?.title || "—"} · ${fmtDuration(log.duration_minutes)}`}
-                    className={`${log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-600" : "bg-[#730042]/[0.07] border-[#730042]/20 border-l-[3px] border-l-[#730042]"} border rounded-md px-[7px] py-1.5 cursor-default`}>
+                    className={`${log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-600" : "bg-[#730042]/[0.07] border-[#730042]/20 border-l-[3px] border-l-[#730042]"} border rounded-md px-[7px] py-1.5 cursor-default min-w-0`}>
                     <div className="text-[11px] font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">{log.job?.title || "—"}</div>
                     <div className={`text-[10px] font-semibold mt-0.5 ${log.billable ? "text-emerald-600" : "text-[#730042]"}`}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
@@ -781,16 +781,16 @@ export default function AdminTimesheet() {
   }, []);
 
   return (
-    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F4F5F9] font-sans flex flex-col overflow-hidden">
+    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F8F7FB] font-sans flex flex-col overflow-hidden">
     <header className="w-full bg-white border-b border-gray-200 shadow-sm shrink-0 z-20">
-  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8">
-    <div className="flex items-center h-14 sm:h-16 gap-3">
+  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 min-w-0">
+    <div className="flex items-center h-14 sm:h-16 gap-3 min-w-0">
 
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <TorchXLogo />
       </div>
 
-      <div className="hidden md:block w-px h-8 bg-gray-200 flex-shrink-0" />
+      <div className="hidden md:block w-px h-8 bg-gray-200 shrink-0" />
 
       <div className="flex-1 min-w-0 overflow-hidden">
         <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
@@ -798,7 +798,7 @@ export default function AdminTimesheet() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`relative flex-shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm transition-all border-b-2 ${
+              className={`relative shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm transition-all border-b-2 ${
                 tab === t.id
                   ? "bg-[#730042]/10 text-[#730042] font-semibold border-[#730042]"
                   : "text-gray-700 border-transparent hover:bg-gray-100"
@@ -818,12 +818,12 @@ export default function AdminTimesheet() {
 
      
      
-<div className="flex-shrink-0">
+<div className="shrink-0">
   <button
     onClick={() => setJobModal(true)}
     className="
       flex items-center justify-center gap-2
-      bg-[#730042] hover:bg-[#5b0034]
+      bg-gradient-to-r from-[#730042] to-[#8f0050] hover:brightness-110
       text-white font-medium
       rounded-lg
       px-3 py-2
@@ -832,10 +832,11 @@ export default function AdminTimesheet() {
       whitespace-nowrap
       transition-all
       min-h-[40px]
+      shadow-sm
     "
   >
     <span className="text-base font-bold leading-none">+</span>
-    <span>Create Job</span>
+    <span className="hidden xs:inline">Create Job</span>
   </button>
 </div>
 
@@ -843,11 +844,11 @@ export default function AdminTimesheet() {
   </div>
 </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 w-full min-w-0">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 w-full min-w-0">
 
         {tab === "overview" && (
           <div className="flex flex-col gap-5 min-w-0">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-2.5 lg:gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 lg:gap-3.5">
               <StatCard label="Jobs Created" value={createdJobs.length} color="text-[#730042]" />
               <StatCard label="Pending Approvals" value={approvals.length} color="text-amber-600" />
               <StatCard label="Overrun Risk" value={overrunJobs.length} color="text-red-600" sub="≥75% estimate used" />
@@ -864,7 +865,7 @@ export default function AdminTimesheet() {
                 {approvals.slice(0, 3).map((ts) => (
                   <div key={ts._id} className="px-4 sm:px-[22px] py-3 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-3.5 min-w-0">
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                      <div className="w-9 h-9 bg-[#730042]/[0.07] rounded-[10px] flex items-center justify-center text-[13px] font-extrabold text-[#730042] flex-shrink-0">
+                      <div className="w-9 h-9 bg-[#730042]/[0.07] rounded-[10px] flex items-center justify-center text-[13px] font-extrabold text-[#730042] shrink-0">
                         {(ts.owner?.f_name?.[0] || "?")}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -872,7 +873,7 @@ export default function AdminTimesheet() {
                         <div className="text-[11px] text-gray-400 truncate">Week of {fmtDate(ts.week_start)} · {fmtDuration(ts.total_minutes)}</div>
                       </div>
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0">
+                    <div className="flex gap-1.5 shrink-0">
                       <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Approve</Btn>
                       <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })} className="flex-1 sm:flex-none">Reject</Btn>
                     </div>
@@ -892,7 +893,7 @@ export default function AdminTimesheet() {
               <div className="px-4 sm:px-[22px] py-3.5 border-b border-gray-200">
                 <span className="text-sm font-bold text-gray-900">Jobs by Status</span>
               </div>
-              <div className="px-4 sm:px-[22px] py-4 grid grid-cols-1 lg:grid-cols-5 gap-2.5">
+              <div className="px-4 sm:px-[22px] py-4 grid grid-cols-2 lg:grid-cols-5 gap-2.5">
                 {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => {
                   const count = createdJobs.filter((j) => j.status === s).length;
                   const block = JOB_STATUS_BLOCK[s];
@@ -932,7 +933,7 @@ export default function AdminTimesheet() {
                   {assignedJobs.map((j) => (
                     <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-start gap-3.5">
                       <div className="flex gap-3.5 flex-1 min-w-0">
-                        <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
+                        <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} shrink-0`} />
                         <div className="flex-1 min-w-0">
                           <button
                             className="text-sm font-bold text-gray-900 hover:text-[#730042] transition-colors text-left mb-1.5"
@@ -947,18 +948,18 @@ export default function AdminTimesheet() {
                             {j.estimated_hours > 0 && <Chip color="blue">{j.logged_hours_cache}h / {j.estimated_hours}h</Chip>}
                           </div>
                           {j.estimated_hours > 0 && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <div className="w-24 sm:w-[120px] h-1 bg-gray-50 rounded-full">
+                            <div className="mt-2 flex items-center gap-2 min-w-0">
+                              <div className="w-20 sm:w-[120px] h-1 bg-gray-50 rounded-full shrink-0">
                                 <div className={`h-full rounded-full ${j.overrun_flagged ? "bg-red-600" : "bg-[#730042]"}`} style={{ width: `${Math.min(100, (j.logged_hours_cache / j.estimated_hours) * 100)}%` }} />
                               </div>
-                              <span className={`text-[10px] ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>
+                              <span className={`text-[10px] shrink-0 ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>
                                 {Math.round((j.logged_hours_cache / j.estimated_hours) * 100)}% used
                               </span>
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1.5 flex-shrink-0 sm:self-start">
+                      <div className="flex gap-1.5 shrink-0 sm:self-start">
                         <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
                         {!["completed", "cancelled"].includes(j.status) && (
                           <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
@@ -984,7 +985,7 @@ export default function AdminTimesheet() {
                   return (
                     <Card key={j._id} className="px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-start gap-3.5">
                       <div className="flex gap-3.5 flex-1 min-w-0">
-                        <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} flex-shrink-0`} />
+                        <div className={`w-1 rounded ${JOB_STATUS_DOT[j.status] || "bg-gray-400"} shrink-0`} />
                         <div className="flex-1 min-w-0">
                           <button
                             className="text-sm font-bold text-gray-900 hover:text-[#730042] transition-colors text-left mb-1.5 break-words"
@@ -1006,17 +1007,17 @@ export default function AdminTimesheet() {
                           </div>
                           {j.estimated_hours > 0 && (
                             <div className="mt-2 flex items-center gap-2 min-w-0">
-                              <div className="w-20 sm:w-[120px] h-1 bg-gray-50 rounded-full flex-shrink-0">
+                              <div className="w-20 sm:w-[120px] h-1 bg-gray-50 rounded-full shrink-0">
                                 <div className={`h-full rounded-full ${j.overrun_flagged ? "bg-red-600" : "bg-[#730042]"}`} style={{ width: `${Math.min(100, (j.logged_hours_cache / j.estimated_hours) * 100)}%` }} />
                               </div>
-                              <span className={`text-[10px] flex-shrink-0 ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>
+                              <span className={`text-[10px] shrink-0 ${j.overrun_flagged ? "text-red-600" : "text-gray-400"}`}>
                                 {Math.round((j.logged_hours_cache / j.estimated_hours) * 100)}% used
                               </span>
                             </div>
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap flex-shrink-0 sm:self-start">
+                      <div className="flex gap-1.5 flex-wrap shrink-0 sm:self-start">
                         <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
                         <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
                         {!["completed", "cancelled"].includes(j.status) && (
@@ -1049,7 +1050,7 @@ export default function AdminTimesheet() {
                   <Card key={ts._id} className="px-4 sm:px-6 py-5">
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                       <div className="flex gap-3.5 min-w-0">
-                        <div className="w-10 h-10 sm:w-[42px] sm:h-[42px] bg-[#730042]/[0.07] rounded-xl flex items-center justify-center text-base font-extrabold text-[#730042] flex-shrink-0">
+                        <div className="w-10 h-10 sm:w-[42px] sm:h-[42px] bg-[#730042]/[0.07] rounded-xl flex items-center justify-center text-base font-extrabold text-[#730042] shrink-0">
                           {ts.owner?.f_name?.[0] || "?"}
                         </div>
                         <div className="min-w-0">
@@ -1067,7 +1068,7 @@ export default function AdminTimesheet() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-wrap flex-shrink-0">
+                      <div className="flex gap-2 flex-wrap shrink-0">
                         <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved by Admin" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Approve</Btn>
                         <Btn variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to SuperAdmin" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Forward to SA</Btn>
                         <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })} className="flex-1 sm:flex-none">Reject</Btn>
@@ -1113,7 +1114,7 @@ export default function AdminTimesheet() {
                         return (
                           <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
                             <div className="flex items-center gap-2 mb-2 min-w-0">
-                              <div className="w-7 h-7 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] flex-shrink-0">
+                              <div className="w-7 h-7 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] shrink-0">
                                 {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
                               </div>
                               <span className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</span>
@@ -1138,38 +1139,36 @@ export default function AdminTimesheet() {
                       })}
                     </div>
 
-                    <div className="hidden lg:block overflow-x-auto">
-                      <div className="min-w-[480px]">
-                        <div className="flex items-center gap-2.5 mb-2.5 pl-11">
-                          {DAY_NAMES.map((d) => (
-                            <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>
-                          ))}
-                        </div>
-                        {heatmap.map((row, i) => {
-                          const dayKeys = Array.from({ length: 7 }, (_, d) => {
-                            const dt = new Date(weekStart);
-                            dt.setDate(dt.getDate() + d);
-                            return dt.toISOString().slice(0, 10);
-                          });
-                          return (
-                            <div key={i} className="flex items-center gap-2.5 mb-2">
-                              <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] flex-shrink-0">
-                                {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
-                              </div>
-                              {dayKeys.map((dk) => {
-                                const pct = row.days[dk]?.loadPercent || 0;
-                                const bg = pct === 0 ? "bg-gray-50" : pct < 60 ? "bg-emerald-100" : pct < 90 ? "bg-amber-100" : "bg-red-100";
-                                const col = pct === 0 ? "text-gray-400" : pct < 60 ? "text-emerald-600" : pct < 90 ? "text-amber-600" : "text-red-600";
-                                return (
-                                  <div key={dk} title={`${pct}%`} className={`flex-1 h-[34px] ${bg} rounded-lg flex items-center justify-center text-[10px] font-bold ${col}`}>
-                                    {pct > 0 ? `${pct}%` : "—"}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
+                    <div className="hidden lg:block min-w-0">
+                      <div className="flex items-center gap-2.5 mb-2.5 pl-11">
+                        {DAY_NAMES.map((d) => (
+                          <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>
+                        ))}
                       </div>
+                      {heatmap.map((row, i) => {
+                        const dayKeys = Array.from({ length: 7 }, (_, d) => {
+                          const dt = new Date(weekStart);
+                          dt.setDate(dt.getDate() + d);
+                          return dt.toISOString().slice(0, 10);
+                        });
+                        return (
+                          <div key={i} className="flex items-center gap-2.5 mb-2">
+                            <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">
+                              {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
+                            </div>
+                            {dayKeys.map((dk) => {
+                              const pct = row.days[dk]?.loadPercent || 0;
+                              const bg = pct === 0 ? "bg-gray-50" : pct < 60 ? "bg-emerald-100" : pct < 90 ? "bg-amber-100" : "bg-red-100";
+                              const col = pct === 0 ? "text-gray-400" : pct < 60 ? "text-emerald-600" : pct < 90 ? "text-amber-600" : "text-red-600";
+                              return (
+                                <div key={dk} title={`${pct}%`} className={`flex-1 h-[34px] ${bg} rounded-lg flex items-center justify-center text-[10px] font-bold ${col}`}>
+                                  {pct > 0 ? `${pct}%` : "—"}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -1190,7 +1189,7 @@ export default function AdminTimesheet() {
                       <div className="text-[13px] font-semibold text-gray-900 truncate">{j.title}</div>
                       <div className="text-[11px] text-gray-400">{j.logged_hours_cache}h / {j.estimated_hours}h</div>
                     </div>
-                    <span className={`text-[13px] font-extrabold flex-shrink-0 ${j.riskPercent >= 100 ? "text-red-600" : "text-amber-600"}`}>{j.riskPercent}%</span>
+                    <span className={`text-[13px] font-extrabold shrink-0 ${j.riskPercent >= 100 ? "text-red-600" : "text-amber-600"}`}>{j.riskPercent}%</span>
                   </div>
                 ))}
               </Card>
@@ -1235,15 +1234,15 @@ export default function AdminTimesheet() {
             <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 sm:gap-5 min-w-0">
               <TimerWidget jobs={assignedJobs} />
               <div className="flex flex-col gap-3.5 min-w-0">
-                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   {[
                     { label: "Total", value: fmtDuration(totalWeekMins), color: "text-[#730042]" },
                     { label: "Billable", value: fmtDuration(prodData?.billableMinutes || 0), color: "text-emerald-600" },
                     { label: "Capacity", value: `${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}%`, color: "text-blue-600" },
                   ].map((s) => (
-                    <Card key={s.label} className="px-2.5 sm:px-[18px] py-3.5 sm:py-4">
+                    <Card key={s.label} className="px-2 sm:px-[18px] py-3 sm:py-4">
                       <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5 truncate">{s.label}</div>
-                      <div className={`text-base sm:text-[22px] font-black ${s.color} truncate`}>{s.value}</div>
+                      <div className={`text-sm sm:text-[22px] font-black ${s.color} truncate`}>{s.value}</div>
                     </Card>
                   ))}
                 </div>
@@ -1300,7 +1299,7 @@ export default function AdminTimesheet() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 flex-shrink-0">Week of</span>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
                 <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto" />
               </div>
             </div>
@@ -1409,7 +1408,7 @@ export default function AdminTimesheet() {
                         <div className="text-xs text-gray-400 break-all">{ts.owner?.work_email} · Week of {fmtDate(ts.week_start)}</div>
                         {ts.remarks && <div className="text-xs text-gray-700 italic mt-1.5 break-words">"{ts.remarks}"</div>}
                       </div>
-                      <div className="flex gap-4 flex-shrink-0">
+                      <div className="flex gap-4 shrink-0 flex-wrap">
                         <div className="text-right">
                           <div className="text-base sm:text-lg font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
                           <div className="text-[11px] text-gray-400">total</div>
@@ -1466,7 +1465,7 @@ export default function AdminTimesheet() {
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] flex-shrink-0" />
+            <input type="checkbox" checked={jobForm.billable} onChange={(e) => setJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] shrink-0" />
             <span className="text-[13px] text-gray-700">Billable job</span>
           </label>
           <div className="flex flex-col sm:flex-row gap-2 justify-end">
@@ -1500,7 +1499,7 @@ export default function AdminTimesheet() {
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day is counted as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] flex-shrink-0" />
+            <input type="checkbox" checked={editJobForm.billable} onChange={(e) => setEditJobForm((p) => ({ ...p, billable: e.target.checked }))} className="w-[15px] h-[15px] accent-[#730042] shrink-0" />
             <span className="text-[13px] text-gray-700">Billable job</span>
           </label>
           <div className="flex flex-col sm:flex-row gap-2 justify-end">

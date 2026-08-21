@@ -15,6 +15,7 @@ import {
   useBulkGeneratePayroll,
   useListPayrolls,
   useUpdatePayrollStatus,
+  useDeletePayroll,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -67,6 +68,17 @@ const CALC_TYPES = [
 
 const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
 const MODELS = ["User", "Manager", "Admin"];
+const DEPARTMENT_LABEL = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+function departmentLabel(code) {
+  if (!code || code === "—") return code || "—";
+  return DEPARTMENT_LABEL[code] || code;
+}
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -476,14 +488,16 @@ function useEmployeeDirectory() {
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
       _id: e._id,
-      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.uid,
+      name: `${e.f_name || ""} ${e.l_name || ""}`.trim() || e.empid || e.uid,
       uid: e.uid,
+      empid: e.empid || e.uid,
       model: e.type === "manager" ? "Manager" : "User",
     }));
     const admins = (adminData?.admins || []).map((a) => ({
       _id: a._id,
-      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.uid,
+      name: `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.empid || a.uid,
       uid: a.uid,
+      empid: a.empid || a.uid,
       model: "Admin",
     }));
     const all = [...users, ...admins];
@@ -499,7 +513,7 @@ function useEmployeeDirectory() {
 
 function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
-  if (person) return `${person.name} (${person.uid})`;
+  if (person) return `${person.name} (${person.empid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
@@ -1295,7 +1309,7 @@ function StructuresTab({ notify, directory }) {
           <Field label="Employee">
             <Select value={form.employee} onChange={(e) => setForm((p) => ({ ...p, employee: e.target.value }))} disabled={directory.loading}>
               <option value="">{directory.loading ? "Loading…" : "Select employee"}</option>
-              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+              {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
             </Select>
           </Field>
           <Field label="Fixed Annual CTC (₹)">
@@ -1463,7 +1477,7 @@ function GenerateTab({ notify, directory }) {
             <Field label="Employee">
               <Select value={single.employee} onChange={(e) => setSingle((p) => ({ ...p, employee: e.target.value }))}>
                 <option value="">Select employee</option>
-                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.uid})</option>)}
+                {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
               </Select>
             </Field>
             <Field label="Month">
@@ -1699,7 +1713,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
   <div class="grid">
     <div><span class="lbl">Employee: </span>${name}</div>
     <div><span class="lbl">Employee ID: </span>${employeeId}</div>
-    <div><span class="lbl">Department: </span>${department}</div>
+    <div><span class="lbl">Department: </span>${departmentLabel(department)}</div>
     <div><span class="lbl">Designation: </span>${designation}</div>
     <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
     <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
@@ -1760,7 +1774,7 @@ function PayslipModal({ payroll, directory, onClose }) {
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
-  const employeeId = snap.employeeId || person?.uid || "—";
+  const employeeId = snap.employeeId || person?.empid || "—";
   const department = snap.department || "—";
   const designation = snap.designation || "—";
   const att = payroll.attendance || {};
@@ -1792,7 +1806,7 @@ function PayslipModal({ payroll, directory, onClose }) {
         <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
           <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
           <PayslipRow label="Employee ID" value={employeeId} />
-          <PayslipRow label="Department" value={department} />
+          <PayslipRow label="Department" value={departmentLabel(department)} />
           <PayslipRow label="Designation" value={designation} />
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
@@ -1848,6 +1862,52 @@ function PayslipModal({ payroll, directory, onClose }) {
   );
 }
 
+function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfirm, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onCancel}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="p-5 sm:p-6"
+        style={{ background: "#fff", borderRadius: 16, maxWidth: 380, width: "100%", textAlign: "center" }}
+      >
+        <div
+          style={{
+            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 14px",
+            background: C.redBg, display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h16M9 7V4h6v3m1 0l-.8 12.4A2 2 0 0114.2 21H9.8a2 2 0 01-2-1.6L7 7" stroke={C.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h3 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 700, color: C.text }}>{title}</h3>
+        <p style={{ margin: "0 0 20px", fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{message}</p>
+        <div className="flex gap-2.5">
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`,
+              background: "#fff", color: C.text, fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: "10px 14px", borderRadius: 10, border: "none",
+              background: C.red, color: "#fff", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecordsTab({ notify, directory }) {
   const now = new Date();
   const [filters, setFilters] = useState({ month: "", year: String(now.getFullYear()), employeeModel: "", status: "" });
@@ -1858,8 +1918,8 @@ function RecordsTab({ notify, directory }) {
     status: filters.status || undefined,
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
+  const { mutate: removePayroll } = useDeletePayroll();
   const [selected, setSelected] = useState(null);
-  const [exporting, setExporting] = useState(false);
 
   const payrolls = data?.payrolls || [];
 
@@ -1871,23 +1931,6 @@ function RecordsTab({ notify, directory }) {
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
-  };
-
-  const handleExport = () => {
-    if (!payrolls.length) {
-      notify("No payroll records available for export", "error");
-      return;
-    }
-
-    try {
-      setExporting(true);
-      downloadPayrollWorkbook({ payrolls, directory, filters });
-      notify("Payroll sheet exported", "success");
-    } catch (err) {
-      notify(getErrorMessage(err), "error");
-    } finally {
-      setExporting(false);
-    }
   };
 
   return (
@@ -1957,7 +2000,7 @@ function RecordsTab({ notify, directory }) {
                           downloadPayslip({
                             payroll: p,
                             name: snap.name || person?.name || resolveName(directory, p.employee, p.employeeModel),
-                            employeeId: snap.employeeId || person?.uid || "—",
+                            employeeId: snap.employeeId || person?.empid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
                             orgName: p.organisationSnapshot?.name || "",
@@ -1970,8 +2013,13 @@ function RecordsTab({ notify, directory }) {
                     )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
                     {p.status === "approved" && <GhostButton onClick={() => handleStatus(p._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
-                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")}>Hold</GhostButton>}
-                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")}>Resume</GhostButton>}
+                    {p.status !== "on_hold" && p.status !== "paid" && <GhostButton onClick={() => handleStatus(p._id, "on_hold")} style={{ marginRight: 8 }}>Hold</GhostButton>}
+                    {p.status === "on_hold" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Resume</GhostButton>}
+                    {p.status === "generated" && (
+                      <GhostButton onClick={() => handleDelete(p)} style={{ color: C.red, borderColor: C.red }}>
+                        Delete
+                      </GhostButton>
+                    )}
                   </td>
                   </tr>
                 );
@@ -1982,6 +2030,17 @@ function RecordsTab({ notify, directory }) {
       )}
 
       <PayslipModal payroll={selected} directory={directory} onClose={() => setSelected(null)} />
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        title="Delete this payroll record?"
+        message={
+          confirmTarget
+            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
+            : ""
+        }
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </Card>
   );
 }

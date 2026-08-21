@@ -4042,7 +4042,7 @@ const getAllAdminsForOrg = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
 
     const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
-      .select("uid f_name l_name work_email role department designation office_location organisation_id")
+      .select("empid uid f_name l_name work_email role department designation office_location organisation_id")
       .lean();
 
     return res.status(200).json({

@@ -13,6 +13,7 @@ const {
   listPayrolls,
   getPayslip,
   updatePayrollStatus,
+  deletePayroll,
 } = require("../controllers/payroll.controller");
 
 // Salary structure: set CTC once (auto-computes breakup from current policy),
@@ -30,5 +31,6 @@ payrollrouter.post("/generate/bulk", adminauthmiddleware, asyncHandler(bulkGener
 payrollrouter.get("/", adminauthmiddleware, asyncHandler(listPayrolls));
 payrollrouter.get("/payslip", adminauthmiddleware, asyncHandler(getPayslip));
 payrollrouter.patch("/:id/status", adminauthmiddleware, asyncHandler(updatePayrollStatus));
+payrollrouter.delete("/:id", adminauthmiddleware, asyncHandler(deletePayroll));
 
 module.exports = payrollrouter;
