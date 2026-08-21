@@ -6,6 +6,7 @@ import LandingPage from "./pages/announcement/landingpage";
 
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
+const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
 
 const ComingSoon = lazy(() => import("./components/ComingSoon"));
 
@@ -174,6 +175,12 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
+
+          {/* Public — opened from a companion sign-in link generated on a
+              different, already-logged-in browser. No session required to
+              land here; it creates one on THIS browser via the link's
+              short-lived token. */}
+          <Route path="/companion-login" element={<CompanionLogin />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
               It authenticates itself with its own long-lived kiosk token,

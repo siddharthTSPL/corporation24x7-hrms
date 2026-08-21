@@ -32,3 +32,8 @@ export const unifiedResetPassword = async ({ newPassword, confirmPassword }) => 
   const res = await api.post('auth/forgot-password/reset-password', { newPassword, confirmPassword });
   return res.data;
 };
+
+export const dismissWelcomeMessage = async () => {
+  const res = await api.post('auth/dismiss-welcome');
+  return res.data;
+};

@@ -205,6 +205,13 @@ const DEFAULT_CLAIM_FILTERS = {
   sortBy: "newest", // newest | oldest | amount_desc | amount_asc
 };
 
+// Submitter roles a claim can come from. Kept as a fixed list (rather than
+// deriving purely from the currently loaded claims) so the Role dropdown
+// always offers every possible role, even when the current data set happens
+// to only contain claims from one of them (e.g. Review Queue showing only
+// Manager submissions right now shouldn't hide the Employee/Admin options).
+const SUBMITTER_ROLES = ["Employee", "Manager", "Admin"];
+
 function getUniqueValues(claims, key) {
   return Array.from(new Set((claims || []).map((c) => c?.[key]).filter(Boolean))).sort((a, b) =>
     String(a).localeCompare(String(b))
@@ -421,6 +428,58 @@ function Modal({ title, onClose, children, width = 460 }) {
   );
 }
 
+// Shows already-uploaded attachments as removable chips (used inside the
+// claim form when editing a draft, so a person can swap out or drop a
+// document without re-attaching everything else).
+function AttachmentChipList({ items, color, bg, onRemove }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+      {items.map((item, i) => (
+        <span
+          key={item.fileId || i}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color,
+            background: bg,
+            padding: "4px 6px 4px 10px",
+            borderRadius: 6,
+          }}
+        >
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color, textDecoration: "none" }}
+            title="Open attachment"
+          >
+            📎 {item.originalName || `File ${i + 1}`}
+          </a>
+          <button
+            type="button"
+            onClick={() => onRemove(item.fileId)}
+            title="Remove attachment"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color,
+              fontWeight: 700,
+              fontSize: 13,
+              lineHeight: 1,
+              padding: 0,
+            }}
+          >
+            ✕
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Apply / Edit claim form
 // ---------------------------------------------------------------------------
@@ -438,6 +497,13 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
   });
   const [receipts, setReceipts] = useState([]);
   const [supportingDocuments, setSupportingDocuments] = useState([]);
+  // Attachments already saved on the claim (only relevant when editing).
+  // Removing one here just marks it for deletion — nothing is sent to the
+  // server until Save/Submit is pressed, so a person can undo a removal.
+  const [existingReceipts, setExistingReceipts] = useState(initial?.receipts || []);
+  const [existingSupportingDocuments, setExistingSupportingDocuments] = useState(
+    initial?.supportingDocuments || [],
+  );
   const [error, setError] = useState("");
 
   const update = (key) => (e) => {
@@ -445,14 +511,36 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
     setForm((f) => ({ ...f, [key]: val }));
   };
 
+  const removeExistingReceipt = (fileId) =>
+    setExistingReceipts((list) => list.filter((r) => r.fileId !== fileId));
+  const removeExistingSupportingDocument = (fileId) =>
+    setExistingSupportingDocuments((list) => list.filter((r) => r.fileId !== fileId));
+
   const buildFormData = (status) => {
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.append(k, v));
     fd.append("status", status);
     receipts.forEach((f) => fd.append("receipts", f));
     supportingDocuments.forEach((f) => fd.append("supportingDocuments", f));
+    if (initial) {
+      // Tell the backend which previously-attached files were removed, so
+      // it can drop them from the claim (and delete them from storage).
+      const removedReceiptIds = (initial.receipts || [])
+        .filter((r) => !existingReceipts.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      const removedSupportingDocumentIds = (initial.supportingDocuments || [])
+        .filter((r) => !existingSupportingDocuments.some((e) => e.fileId === r.fileId))
+        .map((r) => r.fileId)
+        .filter(Boolean);
+      if (removedReceiptIds.length) fd.append("removeReceiptIds", JSON.stringify(removedReceiptIds));
+      if (removedSupportingDocumentIds.length)
+        fd.append("removeSupportingDocumentIds", JSON.stringify(removedSupportingDocumentIds));
+    }
     return fd;
   };
+
+  const totalReceiptsAfterSave = existingReceipts.length + receipts.length;
 
   const handleSubmit = (status) => async () => {
     setError("");
@@ -465,7 +553,7 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
         setError("Expense date, amount, and description are required.");
         return;
       }
-      if (!initial && receipts.length === 0) {
+      if (totalReceiptsAfterSave === 0) {
         setError("Attach at least one receipt/invoice to submit.");
         return;
       }
@@ -526,16 +614,19 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial}>
-          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
-          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} file(s) selected</span>}
-          {initial?.receipts?.length > 0 && (
-            <span style={{ fontSize: 12, color: C.muted }}>{initial.receipts.length} already attached</span>
+        <Field label="Upload Receipt(s) / Invoice(s)" required={!initial && existingReceipts.length === 0}>
+          {existingReceipts.length > 0 && (
+            <AttachmentChipList items={existingReceipts} color={C.brand} bg={C.brandLight} onRemove={removeExistingReceipt} />
           )}
+          <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setReceipts(Array.from(e.target.files || []))} />
+          {receipts.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{receipts.length} new file(s) to add</span>}
         </Field>
         <Field label="Supporting Documents">
+          {existingSupportingDocuments.length > 0 && (
+            <AttachmentChipList items={existingSupportingDocuments} color={C.blue} bg={C.blueBg} onRemove={removeExistingSupportingDocument} />
+          )}
           <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setSupportingDocuments(Array.from(e.target.files || []))} />
-          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} file(s) selected</span>}
+          {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} new file(s) to add</span>}
         </Field>
       </div>
 
@@ -634,7 +725,7 @@ function ClaimDetail({ claim }) {
 // ---------------------------------------------------------------------------
 // Claims table
 // ---------------------------------------------------------------------------
-function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
+function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyText }) {
   if (!claims?.length) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center", color: C.muted, fontSize: 14 }}>
@@ -671,7 +762,15 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
               <td style={{ padding: "10px 12px", fontWeight: 600 }}>{fmtMoney(c.amountClaimed, c.currency)}</td>
               <td style={{ padding: "10px 12px" }}><StatusBadge status={c.status} /></td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>
-                <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                <div style={{ display: "inline-flex", gap: 6 }}>
+                  <Btn variant="outline" onClick={() => onView(c)} style={{ padding: "5px 12px" }}>View</Btn>
+                  {(c.status === "draft" || c.status === "submitted") && onEdit && (
+                    <Btn variant="outline" onClick={() => onEdit(c)} style={{ padding: "5px 12px" }}>Edit</Btn>
+                  )}
+                  {(c.status === "draft" || c.status === "submitted") && onDelete && (
+                    <Btn variant="red" onClick={() => onDelete(c)} style={{ padding: "5px 12px" }}>Delete</Btn>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -689,7 +788,13 @@ function ClaimsTable({ claims, onView, showSubmitter, emptyText }) {
 // values.
 // ---------------------------------------------------------------------------
 function FilterBar({ claims, filters, onChange }) {
-  const roles = useMemo(() => getUniqueValues(claims, "submitterModel"), [claims]);
+  // Role options: fixed list ∪ anything unexpected found in the data, so the
+  // dropdown always shows all roles but still surfaces any extra value the
+  // backend sends that isn't one of the three standard roles.
+  const roles = useMemo(() => {
+    const extra = getUniqueValues(claims, "submitterModel").filter((r) => !SUBMITTER_ROLES.includes(r));
+    return [...SUBMITTER_ROLES, ...extra];
+  }, [claims]);
   const departments = useMemo(() => getUniqueValues(claims, "department"), [claims]);
   const designations = useMemo(() => getUniqueValues(claims, "designation"), [claims]);
   const currencies = useMemo(() => getUniqueValues(claims, "currency"), [claims]);
@@ -957,9 +1062,9 @@ export default function ReimbursementBase({
   };
 
   const handleDelete = async (claim) => {
-    if (!window.confirm(`Delete draft claim ${claim.claimNumber}?`)) return;
+    if (!window.confirm(`Delete claim ${claim.claimNumber}?`)) return;
     await deleteMutation.mutateAsync(claim._id);
-    flash("Draft deleted.");
+    flash("Claim deleted.");
   };
 
   const statusFilteredAll = useMemo(() => {
@@ -974,6 +1079,12 @@ export default function ReimbursementBase({
     () => applyClaimFilters(statusFilteredAll, allClaimsFilters),
     [statusFilteredAll, allClaimsFilters]
   );
+  const allClaimsActiveFilterCount = countActiveClaimFilters(allClaimsFilters);
+  const allClaimsSummaryAmount = useMemo(() => claimAmountSummary(filteredAll), [filteredAll]);
+  const selectedReviewLabel = reviewFilter ? STATUS_META[reviewFilter].label : "All";
+  const allClaimsSummaryLabel = allClaimsActiveFilterCount
+    ? `Filtered Total${selectedReviewLabel !== "All" ? ` (${selectedReviewLabel})` : ""}`
+    : `${selectedReviewLabel} Total`;
 
   // "Review Queue" tab: same filter bar applied to the pending list.
   const filteredPending = useMemo(
@@ -1081,7 +1192,13 @@ export default function ReimbursementBase({
                     </Btn>
                   </div>
                 )}
-                <ClaimsTable claims={my} onView={(c) => { setViewClaim(c); setViewIsReview(false); }} emptyText="You haven't submitted any claims yet." />
+                <ClaimsTable
+                  claims={my}
+                  onView={(c) => { setViewClaim(c); setViewIsReview(false); }}
+                  onEdit={(c) => setEditClaim(c)}
+                  onDelete={handleDelete}
+                  emptyText="You haven't submitted any claims yet."
+                />
               </div>
             )}
           </>
@@ -1093,24 +1210,20 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {pending.length > 0 && (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12, color: C.muted }}>
-                        Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
-                      </span>
-                      <Btn
-                        variant="outline"
-                        onClick={() => handleExportClaims(filteredPending, "review-queue")}
-                        disabled={!filteredPending.length}
-                        style={{ background: "#fff", color: C.brand }}
-                      >
-                        Export CSV
-                      </Btn>
-                    </div>
-                    <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
-                  </>
-                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    Showing {filteredPending.length} of {pending.length} pending claim{pending.length === 1 ? "" : "s"}
+                  </span>
+                  <Btn
+                    variant="outline"
+                    onClick={() => handleExportClaims(filteredPending, "review-queue")}
+                    disabled={!filteredPending.length}
+                    style={{ background: "#fff", color: C.brand }}
+                  >
+                    Export CSV
+                  </Btn>
+                </div>
+                <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
                 <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
               </div>
             )}
@@ -1161,10 +1274,10 @@ export default function ReimbursementBase({
                     borderRadius: 999,
                   }}
                 >
-                  {selectedReviewBucket.label}: {selectedReviewBucket.totalAmount}
+                  {allClaimsSummaryLabel}: {allClaimsSummaryAmount}
                 </span>
                 <span style={{ fontSize: 12, color: C.muted }}>
-                  {selectedReviewBucket.count} claim{selectedReviewBucket.count === 1 ? "" : "s"}
+                  {filteredAll.length} claim{filteredAll.length === 1 ? "" : "s"}
                 </span>
               </div>
             </div>
@@ -1188,14 +1301,10 @@ export default function ReimbursementBase({
                 </button>
               ))}
             </div>
-            {all.length > 0 && (
-              <>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
-                  Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
-                </div>
-                <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
-              </>
-            )}
+            <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
+              Showing {filteredAll.length} of {statusFilteredAll.length} claim{statusFilteredAll.length === 1 ? "" : "s"}
+            </div>
+            <FilterBar claims={statusFilteredAll} filters={allClaimsFilters} onChange={setAllClaimsFilters} />
             {reviewQueue.all?.isLoading ? (
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
@@ -1208,7 +1317,7 @@ export default function ReimbursementBase({
       {viewClaim && !viewIsReview && (
         <Modal title={`Claim ${viewClaim.claimNumber}`} onClose={() => { setViewClaim(null); setViewIsReview(false); }} width={520}>
           <ClaimDetail claim={viewClaim} />
-          {viewClaim.status === "draft" && (
+          {(viewClaim.status === "draft" || viewClaim.status === "submitted") && (
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
               <Btn variant="red" onClick={() => { handleDelete(viewClaim); setViewClaim(null); }}>Delete</Btn>
               <Btn variant="outline" onClick={() => { setEditClaim(viewClaim); setViewClaim(null); }}>Edit &amp; Submit</Btn>
