@@ -65,6 +65,7 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   console.log("[Agent] Another TorchX Attendance instance is already running.");
   app.quit();
+  process.exit(0);
 }
 
 // ============================================================
@@ -153,6 +154,70 @@ let isTracking = false;
 let tokenServer = null;
 
 let isQuitting = false;
+
+// ============================================================
+// PROTOCOL URL HANDLING (torchx-agent://)
+// ============================================================
+
+function findAgentUrlInArgs(args) {
+  return args.find((arg) => arg.startsWith("torchx-agent://"));
+}
+
+function parseAgentUrl(raw) {
+  if (!raw || !raw.startsWith("torchx-agent://")) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(raw);
+
+    const action = (parsedUrl.hostname || parsedUrl.pathname.replace(/^\/+/, "")).toLowerCase();
+
+    if (action === "set-token") {
+      const token = parsedUrl.searchParams.get("token");
+
+      return token ? { action: "set-token", token } : null;
+    }
+
+    if (action === "clear-token") {
+      return { action: "clear-token" };
+    }
+  } catch (err) {
+    log("[Agent] Failed to parse protocol URL:", err.message);
+  }
+
+  return null;
+}
+
+function handleAgentUrl(raw) {
+  const parsed = parseAgentUrl(raw);
+
+  if (!parsed) {
+    return false;
+  }
+
+  if (parsed.action === "set-token") {
+    store.set("token", parsed.token);
+
+    log("[Agent] Token received via protocol.");
+
+    startTracking();
+
+    return true;
+  }
+
+  if (parsed.action === "clear-token") {
+    store.delete("token");
+
+    stopTracking();
+
+    log("[Agent] Token cleared via protocol.");
+
+    return true;
+  }
+
+  return false;
+}
 
 // ============================================================
 // SYSTEM IDLE STATUS
@@ -610,10 +675,20 @@ function startTokenServer() {
       log(`[Agent] ERROR: Port ${AGENT_PORT} is already in use.`);
 
       log(
-        "[Agent] This usually means another TorchX Attendance instance is running.",
+        "[Agent] Another TorchX Attendance instance owns this port. Shutting this duplicate down.",
       );
 
       log(`[Agent] Current process PID: ${process.pid}`);
+
+      isQuitting = true;
+
+      stopTracking();
+
+      tokenServer = null;
+
+      app.quit();
+
+      setTimeout(() => process.exit(0), 500);
     } else {
       log("[Agent] Token server error:", err.message);
     }
@@ -664,7 +739,29 @@ if (gotSingleInstanceLock) {
 
     log(`[Agent] Node: ${process.versions.node}`);
 
+    log(`[Agent] argv: ${JSON.stringify(process.argv)}`);
+
     log("==================================================");
+
+    // --------------------------------------------------------
+    // PROTOCOL CLIENT REGISTRATION
+    // --------------------------------------------------------
+
+    try {
+      if (process.defaultApp) {
+        if (process.argv.length >= 2) {
+          app.setAsDefaultProtocolClient("torchx-agent", process.execPath, [
+            path.resolve(process.argv[1]),
+          ]);
+        }
+      } else {
+        app.setAsDefaultProtocolClient("torchx-agent");
+      }
+
+      log("[Agent] Protocol client registered for torchx-agent://");
+    } catch (err) {
+      log("[Agent] Failed to register protocol client:", err.message);
+    }
 
     // --------------------------------------------------------
     // PREVENT SYSTEM SUSPENSION
@@ -715,21 +812,31 @@ if (gotSingleInstanceLock) {
     startTokenServer();
 
     // --------------------------------------------------------
-    // SAVED TOKEN
+    // LAUNCH URL (cold start via torchx-agent:// protocol)
     // --------------------------------------------------------
 
-    const savedToken = store.get("token");
+    const launchUrl = findAgentUrlInArgs(process.argv);
 
-    if (savedToken) {
-      log("[Agent] Saved token found.");
-
-      log("[Agent] Resuming tracking.");
-
-      startTracking();
+    if (launchUrl && handleAgentUrl(launchUrl)) {
+      log("[Agent] Token applied from cold-start protocol launch.");
     } else {
-      log("[Agent] No token, waiting for login...");
+      // --------------------------------------------------------
+      // SAVED TOKEN
+      // --------------------------------------------------------
 
-      updateTray("stopped");
+      const savedToken = store.get("token");
+
+      if (savedToken) {
+        log("[Agent] Saved token found.");
+
+        log("[Agent] Resuming tracking.");
+
+        startTracking();
+      } else {
+        log("[Agent] No token, waiting for login...");
+
+        updateTray("stopped");
+      }
     }
 
     log("[Agent] Initialization completed.");
@@ -739,13 +846,21 @@ if (gotSingleInstanceLock) {
   // SECOND INSTANCE
   // ==========================================================
 
-  app.on("second-instance", () => {
+  app.on("second-instance", (event, commandLine) => {
     log("[Agent] Second launch detected.");
+
+    log(`[Agent] commandLine: ${JSON.stringify(commandLine)}`);
+
+    const launchUrl = findAgentUrlInArgs(commandLine);
+
+    if (launchUrl && handleAgentUrl(launchUrl)) {
+      log("[Agent] Protocol call handled by existing instance, no window opened.");
+
+      return;
+    }
 
     log("[Agent] Existing instance will continue running.");
 
-    // Open dashboard when user tries
-    // to launch the EXE again.
     openApp();
   });
 
