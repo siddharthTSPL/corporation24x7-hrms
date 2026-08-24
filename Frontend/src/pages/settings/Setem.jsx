@@ -259,8 +259,10 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
     setUploading(true);
     setUploadError("");
     try {
-      const formData = new FormData();
+     const formData = new FormData();
       formData.append("file", file);
+      formData.append("title", label);
+      formData.append("fileType", "personal");
       const res = await uploadDocument(formData);
       const url =
         res?.url ||
@@ -268,6 +270,8 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
         res?.document?.url ||
         res?.data?.document?.url ||
         res?.fileUrl ||
+        res?.document?.fileUrl ||
+        res?.data?.document?.fileUrl ||
         res?.data?.fileUrl;
       if (!url) {
         console.warn("Upload response did not contain a recognizable URL field:", res);
