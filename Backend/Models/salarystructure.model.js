@@ -25,7 +25,7 @@ const salaryStructureSchema = new mongoose.Schema(
     employeeModel: {
       type: String,
       required: true,
-      enum: ["User", "Manager", "Admin"],
+      enum: ["User", "Manager", "Admin", "SuperAdmin"],
     },
 
     ctc: { type: Number, required: true, min: 0 }, // annual, in rupees
