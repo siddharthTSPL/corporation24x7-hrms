@@ -98,6 +98,10 @@ function fmtINR(n) {
   }).format(num);
 }
 
+function roundINR(n) {
+  return Math.round(Number(n) || 0);
+}
+
 function getErrorMessage(err) {
   return err?.response?.data?.message || err?.message || "Something went wrong";
 }
@@ -241,9 +245,9 @@ function Badge({ children, color, bg }) {
   );
 }
 
-// Inner sub-tab strip used inside Statutory Components / Salary Components /
-// Claims & Declarations — mirrors Zoho's secondary tab row (e.g. EPF | ESI |
-// Professional Tax | ...).
+
+
+
 function SubTabs({ items, active, onChange }) {
   return (
     <div className="flex items-center gap-1 flex-wrap mb-5" style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -497,7 +501,7 @@ function PayScheduleTab({ notify }) {
 }
 
 
-// ---------- Statutory Components (EPF / ESI / Professional Tax / LWF / Statutory Bonus) ----------
+
 
 const STATUTORY_SUBTABS = [
   { key: "epf", label: "EPF" },
@@ -686,7 +690,7 @@ function StatutoryTab({ notify }) {
   );
 }
 
-// ---------- Salary Components (Earnings / Deductions / Benefits / Reimbursements) ----------
+
 
 function emptyComponentForm(category) {
   return {
@@ -697,10 +701,7 @@ function emptyComponentForm(category) {
 }
 
 function ComponentValueFields({ value, onChange, disabled, onUnlock }) {
-  // A component still flagged isBalancing always absorbs whatever gross is
-  // left over — its calculationType/formula is never actually used, so
-  // don't offer a dropdown that would look editable but silently do
-  // nothing. Offer a one-click way to convert it into a normal component.
+
   if (value.isBalancing) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
@@ -749,9 +750,7 @@ function ComponentsTab({ notify }) {
   useEffect(() => {
     if (data?.policy) {
       const policy = JSON.parse(JSON.stringify(data.policy));
-      // Stable client-side key = the name this component was saved under,
-      // so renaming the "name" field in the input doesn't lose track of
-      // which server-side record to PUT/rename.
+
       policy.allowances = (policy.allowances || []).map((a) => ({ ...a, _key: a.name }));
       setForm(policy);
     }
@@ -799,8 +798,7 @@ function ComponentsTab({ notify }) {
     );
   };
 
-  // Natural order (whatever order they were added in) — nothing is forced
-  // to the top.
+
   const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
 
   const handleField = (key, patch) => {
@@ -840,9 +838,7 @@ function ComponentsTab({ notify }) {
     );
   };
 
-  // Converts a legacy locked/auto-balancing component (e.g. an old "Special
-  // Allowance") into a normal one, so its calculation type/formula actually
-  // takes effect from then on.
+
   const handleUnlock = (a) => {
     updateAllowance(
       { name: a._key, data: { isBalancing: false } },
@@ -1023,7 +1019,7 @@ function ComponentsTab({ notify }) {
   );
 }
 
-// ---------- Claims & Declarations ----------
+
 
 const CLAIMS_SUBTABS = [
   { key: "fbp", label: "Flexible Benefit Plan" },
@@ -1230,8 +1226,7 @@ function GenerateTab({ notify, directory }) {
 
   const numOrUndef = (v) => (v === "" || v === null || v === undefined ? undefined : Number(v));
 
-  // Keep Calendar/Working Days sensible defaults when month/year change,
-  // unless the admin already typed something different in by hand.
+
   const handleMonthYear = (field, value) => {
     setSingle((p) => {
       const next = { ...p, [field]: value };
@@ -1435,18 +1430,18 @@ function PayslipSection({ title, children }) {
   );
 }
 
-// Turns a camelCase field name into a readable label when we don't have a
-// nicer override for it, e.g. "otherEarnings" -> "Other Earnings". This is
-// what lets a brand-new field the backend starts sending show up on the
-// payslip with a sane label, with zero frontend changes needed.
+
+
+
+
 function humanizeKey(key) {
   const spaced = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-// Nicer labels for known fields; anything not listed here falls back to
-// humanizeKey() automatically, so unknown/future fields still get a
-// reasonable label instead of being skipped.
+
+
+
 const EARNINGS_LABELS = { other: "Other Earnings" };
 const DEDUCTIONS_LABELS = {
   pf: "Employee PF",
@@ -1460,28 +1455,28 @@ const DEDUCTIONS_LABELS = {
 };
 const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
 
-// Aggregate/derived fields that shouldn't appear as their own line item
-// (they're either shown as the section's Total row, or they're the sum of
-// components we already itemize elsewhere, e.g. `benefits` = total of
-// breakup.benefitComponents).
+
+
+
+
 const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];
 const DEDUCTIONS_EXCLUDE = ["lossOfPay", "components", "totalDeductions"];
 
-// Reads every numeric, non-zero field off a payroll sub-object (earnings /
-// deductions / employerContribution) and turns it into a {label, amount}
-// row — no fixed list of field names, so anything the backend starts
-// filling in (a new manual-entry field, a new statutory line, etc.) shows
-// up on the payslip automatically instead of needing a matching JSX row
-// added by hand every time.
+
+
+
+
+
+
 function dynamicRows(obj, excludeKeys, labelOverrides) {
   return Object.entries(obj || {})
     .filter(([key, value]) => !excludeKeys.includes(key) && typeof value === "number" && value !== 0)
     .map(([key, value]) => ({ label: labelOverrides[key] || humanizeKey(key), amount: value }));
 }
 
-// Builds the full set of Earnings / Deductions / Employer Contribution line
-// items for one payroll record. Used by both the on-screen PayslipModal and
-// the downloadable/print HTML, so the two never drift out of sync.
+
+
+
 function getPayslipLineItems(payroll) {
   const breakup = payroll.breakup || {};
 
@@ -1504,10 +1499,10 @@ function getPayslipLineItems(payroll) {
   return { earnings, deductions, employerContribution };
 }
 
-// Opens a print-formatted payslip in a new tab (via a Blob URL, not
-// document.write — see note below) and triggers the browser's print
-// dialog, where "Save as PDF" gives a real downloadable file — no extra
-// PDF library/dependency needed.
+
+
+
+
 function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
@@ -1577,18 +1572,13 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
 </body>
 </html>`;
 
-  // Open via a Blob URL rather than window.open("") + document.write().
-  // The write-into-blank-tab approach breaks (leaves an empty "about:blank"
-  // tab) on browsers that enforce Cross-Origin-Opener-Policy, which severs
-  // the reference to the new tab right after it opens. A Blob URL is a real,
-  // same-document navigation target, so it always renders.
+
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const win = window.open(url, "_blank");
 
   if (!win) {
-    // Popup blocked entirely — fall back to a direct file download so the
-    // person still gets their payslip.
+
     const link = document.createElement("a");
     link.href = url;
     link.download = `Payslip - ${name} - ${period}.html`;
@@ -1597,7 +1587,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
     document.body.removeChild(link);
   }
 
-  // Release the blob once the tab/download has had time to load it.
+
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
@@ -1635,7 +1625,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           </div>
         </div>
 
-        {/* Employee details */}
+        {}
         <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
           <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
           <PayslipRow label="Employee ID" value={employeeId} />
@@ -1644,7 +1634,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
 
-        {/* Attendance */}
+        {}
         <PayslipSection title="Attendance">
           <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
           <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
@@ -1652,7 +1642,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
         </PayslipSection>
 
-        {/* Earnings */}
+        {}
         <PayslipSection title="Earnings">
           {earnings.map((r, i) => (
             <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1661,7 +1651,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
         </PayslipSection>
 
-        {/* Deductions */}
+        {}
         <PayslipSection title="Deductions">
           {deductions.map((r, i) => (
             <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1670,13 +1660,13 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
         </PayslipSection>
 
-        {/* Net pay */}
+        {}
         <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
 
-        {/* Employer contributions */}
+        {}
         <PayslipSection title="Employer Contributions">
           {employerContribution.map((r, i) => (
             <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1741,22 +1731,14 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
-// Computes what's actually been paid and what's still outstanding for a
-// payroll record. A record only counts as "Paid" once its status is paid;
-// generated/approved/on_hold records are fully outstanding.
+
 function getPaidAndBalance(p) {
-  const total = Number(p.netSalary) || 0;
+  const total = roundINR(p.netSalary);
   const paid = p.status === "paid" ? total : 0;
   const balance = total - paid;
   return { total, paid, balance };
 }
 
-// Builds one export row per payroll record with every earning / deduction /
-// employer-contribution component as its own column. The column set is the
-// union across ALL records, so employees whose components differ still line
-// up correctly (missing components show as blank instead of breaking the
-// sheet). Reuses getPayslipLineItems() so the export never drifts out of
-// sync with what the payslip itself shows.
 function buildPayrollExportRows(payrolls, directory) {
   const perRecord = payrolls.map((p) => {
     const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
@@ -1769,9 +1751,9 @@ function buildPayrollExportRows(payrolls, directory) {
       employeeId: snap.employeeId || person?.empid || "—",
       department: departmentLabel(snap.department || person?.department || "—"),
       designation: snap.designation || person?.designation || "—",
-      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
-      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
-      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, roundINR(e.amount)])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, roundINR(d.amount)])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, roundINR(c.amount)])),
       earnings, deductions, employerContribution,
       total, paid, balance,
     };
@@ -1795,22 +1777,20 @@ function buildPayrollExportRows(payrolls, directory) {
     r.name, r.employeeId, r.department, r.designation,
     MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
     ...earningKeys.map((k) => r.earnMap[k] ?? ""),
-    r.p.earnings?.totalEarnings ?? "",
+    roundINR(r.p.earnings?.totalEarnings),
     ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
-    r.p.deductions?.totalDeductions ?? "",
+    roundINR(r.p.deductions?.totalDeductions),
     ...employerKeys.map((k) => r.empMap[k] ?? ""),
     r.total, r.paid, r.balance,
   ]);
 
-  // Grand-total row: sums every amount column across all filtered records.
-  // Only added to the CSV, not shown in the on-screen table.
   const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
   const totalsRow = [
     "TOTAL", "", "", "", "", "", "",
     ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
-    sumOf((r) => r.p.earnings?.totalEarnings),
+    sumOf((r) => roundINR(r.p.earnings?.totalEarnings)),
     ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
-    sumOf((r) => r.p.deductions?.totalDeductions),
+    sumOf((r) => roundINR(r.p.deductions?.totalDeductions)),
     ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
     sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
   ];
@@ -1818,21 +1798,16 @@ function buildPayrollExportRows(payrolls, directory) {
   return [header, ...rows, totalsRow];
 }
 
-// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
-// only when the value contains a comma, quote, or newline.
 function csvEscape(val) {
   const s = String(val ?? "");
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
-// Builds the full payroll sheet CSV (every component as its own column)
-// and triggers a browser download. No extra library needed — CSV opens
-// directly in Excel/Google Sheets.
 function exportPayrollCSV(payrolls, directory) {
   const table = buildPayrollExportRows(payrolls, directory);
   const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
-  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1860,9 +1835,6 @@ function RecordsTab({ notify, directory }) {
 
   const payrolls = data?.payrolls || [];
 
-  // Aggregate Total / Paid / Balance across whatever is currently filtered.
-  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
-  // filters above change and useListPayrolls refetches).
   const summary = useMemo(() => {
     return payrolls.reduce(
       (acc, p) => {
@@ -1923,7 +1895,7 @@ function RecordsTab({ notify, directory }) {
             <option value="on_hold">On Hold</option>
           </Select>
           <button
-           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-auto ml-auto"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto sm:ml-auto"
             style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
             onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
@@ -2148,5 +2120,5 @@ export default function Payroll() {
       </div>
     </div>
   );
-  
+
 }
