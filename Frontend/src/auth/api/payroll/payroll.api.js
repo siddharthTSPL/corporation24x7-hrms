@@ -19,7 +19,7 @@ api.interceptors.response.use(
   },
 );
 
-// ── Payroll Policy (org-wide) ───────────────────────────────────────────────
+
 
 export const getPayrollPolicy = async () => {
   const res = await api.get("admin/payroll/policy");
@@ -51,7 +51,7 @@ export const removePayrollAllowance = async (name) => {
   return res.data;
 };
 
-// ── Pay Schedule (fixed org-wide run schedule) ──────────────────────────────
+
 
 export const getPaySchedule = async () => {
   const res = await api.get("admin/payroll/pay-schedule");
@@ -63,7 +63,7 @@ export const setPaySchedule = async (data) => {
   return res.data;
 };
 
-// ── Salary Structure ────────────────────────────────────────────────────────
+
 
 export const setEmployeeCTC = async (data) => {
   const res = await api.post("admin/payroll/structure", data);
@@ -85,7 +85,7 @@ export const reapplyPolicy = async (employee) => {
   return res.data;
 };
 
-// ── Payroll generation ──────────────────────────────────────────────────────
+
 
 export const generatePayroll = async (data) => {
   const res = await api.post("admin/payroll/generate", data);
@@ -97,7 +97,7 @@ export const bulkGeneratePayroll = async (data) => {
   return res.data;
 };
 
-// ── Retrieval ────────────────────────────────────────────────────────────────
+
 
 export const listPayrolls = async (params) => {
   const res = await api.get("admin/payroll", { params });
@@ -116,5 +116,15 @@ export const updatePayrollStatus = async (id, status) => {
 
 export const deletePayroll = async (id) => {
   const res = await api.delete(`admin/payroll/${id}`);
+  return res.data;
+};
+
+export const bulkUpdatePayrollStatus = async (ids, status) => {
+  const res = await api.patch("admin/payroll/bulk/status", { ids, status });
+  return res.data;
+};
+
+export const bulkDeletePayroll = async (ids) => {
+  const res = await api.post("admin/payroll/bulk/delete", { ids });
   return res.data;
 };

@@ -33,6 +33,7 @@ const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.ut
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
+const PROFILE_EXCLUDE = EXCLUDE.replace(" -createdAt", "");
 
 // Walks up a manager's reporting chain (manager -> manager -> ... -> admin)
 // to find the admin they - and therefore their reports - ultimately sit
@@ -1085,6 +1086,7 @@ const addmanager = async (req, res, next) => {
       work_email: work_email.toLowerCase().trim(),
       gender, marital_status, password, personal_contact, e_contact,
       role, office_location, designation,
+      date_of_joining: new Date(),
     });
  
     await incrementActiveUserCount(organisation_id);
@@ -1233,6 +1235,7 @@ const addemployee = async (req, res, next) => {
       gender, marital_status, password, personal_contact, e_contact,
       role, office_location, designation, department,
       Under_manager: Under_manager || null,
+      date_of_joining: new Date(),
     });
  
     await incrementActiveUserCount(organisation_id);
@@ -1400,7 +1403,7 @@ const getperticularemployee = async (req, res, next) => {
         path: "Under_manager",
         select: "uid f_name l_name work_email role",
       })
-      .select(EXCLUDE)
+      .select(PROFILE_EXCLUDE)
       .lean(),
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
@@ -1446,7 +1449,7 @@ const getperticularemanager = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   const [manager, leaveBalance, reviews] = await Promise.all([
-    Managermodel.findOne({ _id: uid, organisation_id }).select(EXCLUDE).lean(),
+    Managermodel.findOne({ _id: uid, organisation_id }).select(PROFILE_EXCLUDE).lean(),
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id })
