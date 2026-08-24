@@ -22,6 +22,7 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
+import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
 const C = {
   brand: "#CD166E",
@@ -66,8 +67,8 @@ const CALC_TYPES = [
   { key: "formula", label: "Custom Formula" },
 ];
 
-const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
-const MODELS = ["User", "Manager", "Admin"];
+const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin (You)" };
+const MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 const DEPARTMENT_LABEL = {
   OPR: "Operations",
   BPO: "Business Process Outsourcing",
@@ -317,6 +318,10 @@ function GhostButton({ children, ...rest }) {
 function useEmployeeDirectory() {
   const { data: empData, isLoading: empLoading } = useGetAllEmployee();
   const { data: adminData, isLoading: adminLoading } = useGetAllAdmins();
+  const { data: auth } = useAuth();
+
+  const isSuperAdmin = auth?.role === "superadmin";
+  const me = auth?.data?.superAdmin;
 
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
@@ -333,15 +338,33 @@ function useEmployeeDirectory() {
       empid: a.empid || a.uid,
       model: "Admin",
     }));
-    const all = [...users, ...admins];
+    // A SuperAdmin has no roster to fetch — it's a single person, the org
+    // owner. Only a logged-in SuperAdmin sees themself here so they can
+    // build their own salary structure/payroll, same flow as everyone else.
+    const superAdmins = isSuperAdmin && me?._id
+      ? [{
+          _id: me._id,
+          name: `${me.f_name || ""} ${me.l_name || ""}`.trim() || "Super Admin",
+          uid: "OWNER",
+          empid: "OWNER",
+          model: "SuperAdmin",
+        }]
+      : [];
+
+    const all = [...users, ...admins, ...superAdmins];
     const byId = new Map(all.map((p) => [String(p._id), p]));
     const byModel = {
       User: all.filter((p) => p.model === "User"),
       Manager: all.filter((p) => p.model === "Manager"),
       Admin: all.filter((p) => p.model === "Admin"),
+      SuperAdmin: superAdmins,
     };
-    return { byId, byModel, loading: empLoading || adminLoading };
-  }, [empData, adminData]);
+    // Admins/Managers/Employees never see "Super Admin" as a selectable
+    // employee type — only the SuperAdmin themself can build their own payroll.
+    const visibleModels = isSuperAdmin ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
+
+    return { byId, byModel, visibleModels, loading: empLoading || adminLoading };
+  }, [empData, adminData, isSuperAdmin, me]);
 }
 
 function resolveName(directory, id, fallbackModel) {
@@ -1136,7 +1159,7 @@ function StructuresTab({ notify, directory }) {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Employee">
@@ -1160,7 +1183,7 @@ function StructuresTab({ notify, directory }) {
         right={
           <Select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} style={{ maxWidth: 160 }}>
             <option value="">All Types</option>
-            {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+            {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
           </Select>
         }
       >
@@ -1304,7 +1327,7 @@ function GenerateTab({ notify, directory }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end mb-5">
             <Field label="Employee Type">
               <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-                {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+                {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
               </Select>
             </Field>
             <Field label="Employee">
@@ -1379,7 +1402,7 @@ function GenerateTab({ notify, directory }) {
         <form onSubmit={handleBulk} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={bulk.employeeModel} onChange={(e) => setBulk((p) => ({ ...p, employeeModel: e.target.value }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Month">
@@ -1913,7 +1936,7 @@ function RecordsTab({ notify, directory }) {
           <TextInput type="number" value={filters.year} onChange={(e) => setFilters((p) => ({ ...p, year: e.target.value }))} style={{ maxWidth: 100 }} />
           <Select value={filters.employeeModel} onChange={(e) => setFilters((p) => ({ ...p, employeeModel: e.target.value }))} style={{ maxWidth: 140 }}>
             <option value="">All Types</option>
-            {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+            {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
           </Select>
           <Select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} style={{ maxWidth: 140 }}>
             <option value="">All Statuses</option>
