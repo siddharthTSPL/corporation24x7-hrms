@@ -18,9 +18,11 @@ import {
   getPayslip,
   updatePayrollStatus,
   deletePayroll,
+  bulkUpdatePayrollStatus,
+  bulkDeletePayroll,
 } from "../../api/payroll/payroll.api";
 
-// ── Policy ───────────────────────────────────────────────────────────────────
+
 
 export const useGetPayrollPolicy = () => {
   return useQuery({
@@ -82,7 +84,7 @@ export const useRemovePayrollAllowance = () => {
   });
 };
 
-// ── Pay Schedule ─────────────────────────────────────────────────────────────
+
 
 export const useGetPaySchedule = () => {
   return useQuery({
@@ -104,7 +106,7 @@ export const useSetPaySchedule = () => {
   });
 };
 
-// ── Salary Structure ─────────────────────────────────────────────────────────
+
 
 export const useListSalaryStructures = (params) => {
   return useQuery({
@@ -145,7 +147,7 @@ export const useReapplyPolicy = () => {
   });
 };
 
-// ── Payroll generation ────────────────────────────────────────────────────────
+
 
 export const useGeneratePayroll = () => {
   const queryClient = useQueryClient();
@@ -167,7 +169,7 @@ export const useBulkGeneratePayroll = () => {
   });
 };
 
-// ── Retrieval ──────────────────────────────────────────────────────────────────
+
 
 export const useListPayrolls = (params) => {
   return useQuery({
@@ -202,6 +204,26 @@ export const useDeletePayroll = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id) => deletePayroll(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+export const useBulkUpdatePayrollStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, status }) => bulkUpdatePayrollStatus(ids, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+export const useBulkDeletePayroll = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids) => bulkDeletePayroll(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
     },
