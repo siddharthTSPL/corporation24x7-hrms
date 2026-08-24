@@ -729,16 +729,14 @@ function Pricing() {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
       monthlyPrice: 47,
-      yearlyPrice: Math.round(47 * 0.8),
-      suffix: '/mo/user',
+      yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
       features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
     },
     {
       name: 'Advance',
       desc: 'For growing businesses that need more. Everything in Starter +',
       monthlyPrice: 119,
-      yearlyPrice: Math.round(119 * 0.8),
-      suffix: '/mo/user',
+      yearlyPrice: Math.round(119 * 12 * 0.83), // 17% off on annual total
       popular: true,
       features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)']
     },
@@ -747,7 +745,6 @@ function Pricing() {
       desc: 'Ultimate power and flexibility. Everything in Growth +',
       monthlyPrice: null,
       yearlyPrice: null,
-      suffix: '',
       features: [
         'Multi-company support',
         'Role-based permissions',
@@ -797,7 +794,15 @@ function Pricing() {
               </button>
               <span className={`text-sm font-ui font-semibold px-2 flex items-center gap-1.5 ${billing === 'yearly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
                 Yearly
-                <span className="text-[10px] bg-[#7A004B] text-white font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-opacity duration-300 ${
+                    billing === 'yearly'
+                      ? 'bg-[#7A004B] text-white opacity-100'
+                      : 'bg-[#7A004B] text-white opacity-40'
+                  }`}
+                >
+                  Save 17%
+                </span>
               </span>
             </div>
           </div>
@@ -805,6 +810,7 @@ function Pricing() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-center mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
+              const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
               return (
                 <div
                   key={p.name}
@@ -826,7 +832,7 @@ function Pricing() {
                       {price !== null ? `₹${price}` : 'Custom'}
                     </span>
                     {price !== null && (
-                      <span className="text-sm font-body text-[#999] ml-1">{p.suffix}</span>
+                      <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
                     )}
                   </div>
                   <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
