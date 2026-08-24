@@ -19,7 +19,8 @@ import {
   FaShieldAlt,
   FaUsersCog,
   FaLock,
-  FaMoneyCheckAlt,
+  FaFileInvoiceDollar,  
+  FaFileSignature,       
   FaClipboardCheck,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
@@ -44,8 +45,8 @@ const superAdminMenu = [
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt />, blurb: "Access documents uploaded by teams across organisations." },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide." },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
-  { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaMoneyCheckAlt />, blurb: "Oversee payroll runs across every organisation." },
-  { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaMoneyCheckAlt />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
+  { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
+  { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees." },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
 ];
@@ -66,8 +67,8 @@ const adminMenu = [
   { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets." },
-  { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt />, blurb: "Run payroll and manage payslips." },
-  { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaMoneyCheckAlt />, blurb: "Review claims from employees and managers, and submit your own." },
+  { name: "Payroll",       path: "/payroll",             icon: <FaFileInvoiceDollar />, blurb: "Run payroll and manage payslips." },
+  { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaFileSignature />, blurb: "Review claims from employees and managers, and submit your own." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
@@ -83,7 +84,7 @@ const managerMenu = [
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees." },
   { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets." },
-  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
@@ -99,7 +100,7 @@ const employeeMenu = [
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet." },
-  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
@@ -152,17 +153,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     return item.permissionGroup.some((p) => can(p));
   };
 
-  // Built straight from the role's own menu so the tour never drifts out of
-  // sync with what's actually in the sidebar. Items hidden by a permission
-  // gate are left out — HelpTour also self-skips if a target ever vanishes
-  // mid-tour (e.g. permissions load in late).
-  //
-  // Each menu item contributes at least one step (pointing at its sidebar
-  // entry). Items that carry a `pageStep` (Announcement, Leave, TorchX
-  // Voice) contribute a second step right after it — that one sets `path`,
-  // so HelpTour navigates into the actual page and spotlights the real
-  // control (the "New Announcement" button, the "Apply Leave" tab, etc.)
-  // instead of only describing it from the sidebar.
+
   const tourSteps = [
     {
       selector: '[data-tour="sidebar-brand"]',
