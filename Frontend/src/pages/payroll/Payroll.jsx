@@ -17,6 +17,8 @@ import {
   useListPayrolls,
   useUpdatePayrollStatus,
   useDeletePayroll,
+  useBulkUpdatePayrollStatus,
+  useBulkDeletePayroll,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -1830,10 +1832,35 @@ function RecordsTab({ notify, directory }) {
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
   const { mutate: removePayroll } = useDeletePayroll();
+  const { mutate: bulkUpdateStatus, isPending: bulkStatusPending } = useBulkUpdatePayrollStatus();
+  const { mutate: bulkDelete, isPending: bulkDeletePending } = useBulkDeletePayroll();
   const [selected, setSelected] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const payrolls = data?.payrolls || [];
+
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters.month, filters.year, filters.employeeModel, filters.status]);
+
+  const allSelected = payrolls.length > 0 && selectedIds.size === payrolls.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(payrolls.map((p) => p._id)));
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const summary = useMemo(() => {
     return payrolls.reduce(
@@ -1869,6 +1896,35 @@ function RecordsTab({ notify, directory }) {
     setConfirmTarget(null);
     removePayroll(id, {
       onSuccess: () => notify("Payroll record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
+  };
+
+  const handleBulkStatus = (status) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    bulkUpdateStatus(
+      { ids, status },
+      {
+        onSuccess: (data) => {
+          notify(`${data.modified} record${data.modified === 1 ? "" : "s"} marked as ${status.replace("_", " ")}`, "success");
+          setSelectedIds(new Set());
+        },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const confirmBulkDelete = () => {
+    const ids = [...selectedIds];
+    setBulkDeleteOpen(false);
+    if (ids.length === 0) return;
+    bulkDelete(ids, {
+      onSuccess: (data) => {
+        const skippedNote = data.skippedCount ? `, ${data.skippedCount} skipped (not in Generated state)` : "";
+        notify(`${data.deletedCount} record${data.deletedCount === 1 ? "" : "s"} deleted${skippedNote}`, "success");
+        setSelectedIds(new Set());
+      },
       onError: (err) => notify(getErrorMessage(err), "error"),
     });
   };
@@ -1927,10 +1983,47 @@ function RecordsTab({ notify, directory }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
           </div>
         </div>
+        {selectedIds.size > 0 && (
+          <div
+            className="flex items-center gap-2 flex-wrap"
+            style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 10, background: C.brandLight }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.brandDark }}>
+              {selectedIds.size} selected
+            </span>
+            <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("approved")}>
+              Approve All
+            </GhostButton>
+            <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("on_hold")}>
+              Hold All
+            </GhostButton>
+            <GhostButton
+              disabled={bulkDeletePending}
+              onClick={() => setBulkDeleteOpen(true)}
+              style={{ color: C.red, borderColor: C.red }}
+            >
+              Delete All
+            </GhostButton>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ marginLeft: "auto", fontSize: 12.5, color: C.muted, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1060 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                <th style={{ padding: "6px 10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ padding: "6px 10px" }}>Employee</th>
                 <th style={{ padding: "6px 10px" }}>Period</th>
                 <th style={{ padding: "6px 10px" }}>Total</th>
@@ -1943,6 +2036,13 @@ function RecordsTab({ notify, directory }) {
             <tbody>
               {payrolls.map((p) => (
                 <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "8px 10px" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p._id)}
+                      onChange={() => toggleSelectOne(p._id)}
+                    />
+                  </td>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
                   {(() => {
@@ -2006,6 +2106,13 @@ function RecordsTab({ notify, directory }) {
         }
         onConfirm={confirmDelete}
         onCancel={() => setConfirmTarget(null)}
+      />
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title={`Delete ${selectedIds.size} selected record${selectedIds.size === 1 ? "" : "s"}?`}
+        message="Only records still in Generated state will actually be deleted — any selected record already approved, paid, or on hold will be skipped. This cannot be undone."
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
       />
     </Card>
   );
