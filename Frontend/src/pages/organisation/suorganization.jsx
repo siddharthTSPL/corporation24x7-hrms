@@ -638,6 +638,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Department",  getDepartmentName(person.department)],
       ["Designation", person.designation || "—"],
       ["Location",    person.office_location || "—"],
+      ["DOJ",         fmtDate(detailData?.manager?.date_of_joining ?? detailData?.manager?.createdAt ?? person.date_of_joining ?? person.createdAt)],
     ];
     return [
       ["Emp ID",      person.empid || "—"],
@@ -648,8 +649,9 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["Department",  getDepartmentName(person.department)],
       ["Designation", person.designation || "—"],
       ["Location",    person.office_location || "—"],
+      ["DOJ",         fmtDate(detailData?.user?.date_of_joining ?? detailData?.user?.createdAt ?? person.date_of_joining ?? person.createdAt)],
     ];
-  }, [person, isSA, isAdmin, isManager]);
+  }, [person, detailData, isSA, isAdmin, isManager]);
 
   return (
     <>
