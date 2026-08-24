@@ -8,7 +8,8 @@ const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
 
-const EMPLOYEE_MODEL_MAP = { User, Manager, Admin };
+const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
+const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 
 // Snapshot of the org's display name, taken at generation time, so the
 // payslip keeps reading correctly even if the org is renamed later.
@@ -24,6 +25,20 @@ const getOrganisationSnapshot = async (organisation_id) => {
 const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   const Model = EMPLOYEE_MODEL_MAP[employeeModel];
   if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
+
+  // SuperAdmin has no empid/uid/department/designation fields (it's the org
+  // owner, not an onboarded employee) — snapshot with sensible defaults instead.
+  if (employeeModel === "SuperAdmin") {
+    const person = await Model.findById(employeeId).select("f_name l_name organisation_name").lean();
+    if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+    return {
+      name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
+      employeeId: "OWNER",
+      department: "Management",
+      designation: "Super Admin",
+    };
+  }
+
   const person = await Model.findById(employeeId).select("f_name l_name empid uid department designation").lean();
   if (!person) return { name: "", employeeId: "", department: "", designation: "" };
   return {
@@ -49,7 +64,7 @@ const setEmployeeCTC = async (req, res) => {
   if (!employee || !employeeModel || !ctc)
     return res.status(400).json({ success: false, message: "employee, employeeModel and ctc are required" });
 
-  if (!["User", "Manager", "Admin"].includes(employeeModel))
+  if (!ALLOWED_EMPLOYEE_MODELS.includes(employeeModel))
     return res.status(400).json({ success: false, message: "Invalid employeeModel" });
 
   if (ctc <= 0) return res.status(400).json({ success: false, message: "ctc must be greater than 0" });
@@ -285,7 +300,7 @@ const bulkGeneratePayroll = async (req, res) => {
   if (!month || !year) return res.status(400).json({ success: false, message: "month and year are required" });
 
   const model = employeeModel || "User";
-  if (!["User", "Manager", "Admin"].includes(model))
+  if (!ALLOWED_EMPLOYEE_MODELS.includes(model))
     return res.status(400).json({ success: false, message: "Invalid employeeModel" });
 
   const structures = await SalaryStructure.find({ organisation_id, employeeModel: model, isActive: true }).lean();
