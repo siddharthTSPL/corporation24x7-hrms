@@ -730,7 +730,7 @@ function Pricing() {
       desc: 'Perfect for small teams getting started',
       monthlyPrice: 47,
       yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
-      features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
+      features: ['Geo Tag Attendance and Live Map Tracking', 'Live Tracking of Employee Active and Idle Time','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
     },
     {
       name: 'Advance',
