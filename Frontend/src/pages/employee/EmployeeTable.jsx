@@ -929,36 +929,69 @@ function AssetReturnBlockedModal({ data, personName, onClose }) {
 
 function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismissBlock}){
   const [selected,setSelected]=useState(currentStatus||"working");
-  const [awaitingConfirm,setAwaitingConfirm]=useState(false);
+  const [step,setStep]=useState("select"); // select | noticeAsk | noticeDetails | confirm
+  const [noticePeriodAllowed,setNoticePeriodAllowed]=useState(null);
+  const [noticePeriodMonths,setNoticePeriodMonths]=useState("");
+  const [lastWorkingDay,setLastWorkingDay]=useState("");
 
   const isIrreversible = IRREVERSIBLE_STATUSES.includes(selected);
   const isAlreadyIrreversible = IRREVERSIBLE_STATUSES.includes(currentStatus);
   const noChange = selected === currentStatus;
 
+  const resetFlow=()=>{
+    setStep("select");
+    setNoticePeriodAllowed(null);
+    setNoticePeriodMonths("");
+    setLastWorkingDay("");
+  };
+
   const handleSelectChange=(e)=>{
     setSelected(e.target.value);
-    setAwaitingConfirm(false);
+    resetFlow();
     onDismissBlock&&onDismissBlock();
   };
 
   const handleUpdateClick=async ()=>{
     onDismissBlock&&onDismissBlock();
     if(isIrreversible){
-      setAwaitingConfirm(true);
+      setStep("noticeAsk");
     } else {
-      const ok = await onSave(selected);
+      const ok = await onSave({working_status:selected});
       if(!ok) setSelected(currentStatus||"working");
     }
   };
 
+  const handleNoticeChoice=(allowed)=>{
+    setNoticePeriodAllowed(allowed);
+    setStep(allowed?"noticeDetails":"confirm");
+  };
+
+  const handleNoticeDetailsContinue=()=>{
+    if(!noticePeriodMonths||!lastWorkingDay) return;
+    setStep("confirm");
+  };
+
+  const buildPayload=()=>{
+    if(noticePeriodAllowed){
+      return {
+        working_status:selected,
+        noticePeriodAllowed:true,
+        noticePeriodMonths:Number(noticePeriodMonths),
+        lastWorkingDay,
+      };
+    }
+    return {working_status:selected};
+  };
+
   const handleConfirm=async ()=>{
-    setAwaitingConfirm(false);
-    const ok = await onSave(selected);
-    if(!ok) setSelected(currentStatus||"working");
+    const payload=buildPayload();
+    const ok = await onSave(payload);
+    if(!ok){ setSelected(currentStatus||"working"); }
+    resetFlow();
   };
 
   const handleCancel=()=>{
-    setAwaitingConfirm(false);
+    resetFlow();
     setSelected(currentStatus||"working");
   };
 
@@ -995,22 +1028,80 @@ function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismi
         </div>
       )}
 
-      {awaitingConfirm ? (
+      {step==="noticeAsk" ? (
+        <div className="rounded-xl border border-[#F4C0D1] bg-white p-3">
+          <p className="text-xs font-bold text-[#730042] mb-1">Does your company allow a notice period?</p>
+          <p className="text-[11px] text-[#993556] mb-3 leading-relaxed">
+            Choose <strong>Yes</strong> to run a notice period first (normal payroll continues) before marking
+            this person <strong>{statusLabel}</strong>, or <strong>No</strong> to mark them {statusLabel} right away.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={()=>handleNoticeChoice(false)} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">
+              No, direct {statusLabel}
+            </button>
+            <button onClick={()=>handleNoticeChoice(true)} className="flex-1 py-2 rounded-lg text-white text-xs font-bold transition-all" style={{background:"#730042"}}>
+              Yes, notice period
+            </button>
+          </div>
+        </div>
+      ) : step==="noticeDetails" ? (
+        <div className="rounded-xl border border-[#F4C0D1] bg-white p-3">
+          <p className="text-xs font-bold text-[#730042] mb-3">Notice period details</p>
+          <label className="block text-[11px] font-semibold text-[#993556] mb-1">Notice period (months)</label>
+          <input
+            type="number"
+            min="1"
+            value={noticePeriodMonths}
+            onChange={(e)=>setNoticePeriodMonths(e.target.value)}
+            placeholder="e.g. 3"
+            className={`${inputCls} mb-3`}
+          />
+          <label className="block text-[11px] font-semibold text-[#993556] mb-1">Last working day (notice period end date)</label>
+          <input
+            type="date"
+            value={lastWorkingDay}
+            onChange={(e)=>setLastWorkingDay(e.target.value)}
+            className={`${inputCls} mb-3`}
+          />
+          <p className="text-[10px] text-[#993556] mb-3 leading-relaxed">
+            Employee stays <strong>Working</strong> and gets normal payroll till this date. On this date the
+            system will automatically mark them <strong>{statusLabel}</strong> and generate their Full &amp; Final
+            settlement for that last month.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={()=>setStep("noticeAsk")} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">Back</button>
+            <button
+              onClick={handleNoticeDetailsContinue}
+              disabled={!noticePeriodMonths||!lastWorkingDay}
+              className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all"
+              style={{background:"#730042"}}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      ) : step==="confirm" ? (
         <div className="rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
           <div className="flex items-start gap-2 mb-3">
             <FaExclamationTriangle size={14} className="text-[#DC2626] flex-shrink-0 mt-0.5"/>
             <div>
               <p className="text-xs font-bold text-[#991B1B]">This action cannot be undone</p>
               <p className="text-[11px] text-[#7F1D1D] mt-0.5 leading-relaxed">
-                Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
-                marked as inactive and cannot be set back to <strong>Working</strong>.
+                {noticePeriodAllowed ? (
+                  <>A <strong>{noticePeriodMonths}-month</strong> notice period will start now. On{" "}
+                  <strong>{new Date(lastWorkingDay).toDateString()}</strong> the employee will automatically be
+                  marked <strong>{statusLabel}</strong> and their F&amp;F will be generated.</>
+                ) : (
+                  <>Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
+                  marked as inactive and cannot be set back to <strong>Working</strong>.</>
+                )}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleCancel} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">Cancel</button>
             <button onClick={handleConfirm} disabled={loading} className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all" style={{background:"#DC2626"}}>
-              {loading?"Updating…":`Confirm ${statusLabel}`}
+              {loading?"Updating…":noticePeriodAllowed?"Start Notice Period":`Confirm ${statusLabel}`}
             </button>
           </div>
         </div>
