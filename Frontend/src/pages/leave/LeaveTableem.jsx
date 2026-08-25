@@ -379,6 +379,7 @@ const LeaveApplyTab = ({ employee, showToast }) => {
   const [form, setForm]             = useState(LEAVE_BLANK);
   const [errors, setErrors]         = useState({});
   const [editTarget, setEditTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data: historyData, isLoading: histLoading } = useGetAllLeaveHistory();
   const applyMut  = useApplyLeave();
@@ -445,12 +446,18 @@ const LeaveApplyTab = ({ employee, showToast }) => {
     });
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this leave application?")) return;
+  const handleDelete = (leave) => {
+    setDeleteTarget(leave);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget?._id) return;
     try {
-      await deleteMut.mutateAsync(id);
+      await deleteMut.mutateAsync(deleteTarget._id);
+      setDeleteTarget(null);
       showToast("Leave deleted", "info");
     } catch (err) {
+      setDeleteTarget(null);
       showToast(err?.response?.data?.message || err?.message || "Delete failed", "error");
     }
   };
@@ -534,7 +541,7 @@ const LeaveApplyTab = ({ employee, showToast }) => {
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                             Edit
                           </button>
-                          <button className={`${actionBtn} bg-[#FFF1F2] text-[#991B1B]`} onClick={() => handleDelete(leave._id)} disabled={deleteMut.isPending}>
+                          <button className={`${actionBtn} bg-[#FFF1F2] text-[#991B1B]`} onClick={() => handleDelete(leave)} disabled={deleteMut.isPending}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
                             Delete
                           </button>
@@ -548,6 +555,34 @@ const LeaveApplyTab = ({ employee, showToast }) => {
           </div>
         )}
       </SectionBox>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[rgba(28,16,40,0.45)] backdrop-blur-[3px] px-4">
+          <div className="w-full max-w-[420px] bg-white rounded-[20px] shadow-[0_20px_60px_rgba(28,16,40,0.22)] border border-[#EDE6F5] overflow-hidden">
+            <div className="px-5 sm:px-6 pt-6 pb-4">
+              <div className="w-11 h-11 rounded-[13px] bg-[#FFF1F2] text-[#BE123C] flex items-center justify-center mb-4">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                </svg>
+              </div>
+              <h3 className="text-[18px] font-semibold text-[#1C1028] font-['DM_Sans'] m-0">Delete Leave Request?</h3>
+              <p className="text-[13px] leading-[1.6] text-[#9B8BAE] mt-2 mb-0 font-['DM_Sans']">
+                This leave application will be permanently removed from your leave history.
+              </p>
+            </div>
+            <div className="px-5 sm:px-6 py-4 bg-[#FAF7FD] border-t border-[#F0EAF8] flex flex-col-reverse sm:flex-row justify-end gap-2">
+              <button type="button" className={btnSecondary} onClick={() => setDeleteTarget(null)} disabled={deleteMut.isPending}>
+                Cancel
+              </button>
+              <button type="button" className="w-full sm:w-auto px-[24px] py-[11px] rounded-[12px] text-[13px] font-semibold bg-[#BE123C] text-white border-none cursor-pointer shadow-[0_4px_14px_rgba(190,18,60,0.25)] transition-all duration-[180ms] hover:bg-[#9F1239] disabled:opacity-50 disabled:cursor-not-allowed font-['DM_Sans']" onClick={confirmDelete} disabled={deleteMut.isPending}>
+                {deleteMut.isPending ? "Deleting…" : "Delete Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
