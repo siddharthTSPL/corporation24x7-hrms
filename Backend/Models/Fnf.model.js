@@ -70,6 +70,7 @@ const fnfSchema = new mongoose.Schema(
       pf: { type: Number, default: 0 },
       professionalTax: { type: Number, default: 0 },
       tds: { type: Number, default: 0 },
+      recoveries: { type: Number, default: 0 },
       other: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
     },
