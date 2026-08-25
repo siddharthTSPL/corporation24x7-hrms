@@ -2395,70 +2395,6 @@ const applyleave = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
-const editleaveadmin = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.admin.organisation_id;
-
-  const leave = await AdminLeave.findOne({
-    _id: req.params.id,
-    organisation_id,
-    admin: req.admin._id,
-  });
-  if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status !== "pending_superadmin")
-    return next(
-      Object.assign(
-        new Error("Cannot edit leave that is already processed"),
-        { statusCode: 400 },
-      ),
-    );
-
-  const { leaveType, startDate, endDate, reason } = req.body;
-  if (startDate && endDate) {
-    const start = parseISTDateOnly(startDate);
-    const end = parseISTDateOnly(endDate);
-    if (end < start)
-      return next(
-        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
-      );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-  }
-  if (leaveType) leave.leaveType = leaveType;
-  if (reason) leave.reason = reason;
-  await leave.save();
-  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
-};
-
-const deleteleaveadmin = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.admin.organisation_id;
-
-  const leave = await AdminLeave.findOne({
-    _id: req.params.id,
-    organisation_id,
-    admin: req.admin._id,
-  });
-  if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status !== "pending_superadmin")
-    return next(
-      Object.assign(
-        new Error("Cannot delete leave that is already processed"),
-        { statusCode: 400 },
-      ),
-    );
-
-  await AdminLeave.findByIdAndDelete(req.params.id);
-  res.status(200).json({ success: true, message: "Leave deleted successfully" });
-};
-
 const getmyleavehistory = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -3852,7 +3788,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3873,6 +3809,42 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
 
     if (!existingUser)
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    // Notice period path: employee stays "working" (normal payroll keeps
+    // running for the notice-period months) — the actual status flip and
+    // FnF generation happen automatically on lastWorkingDay via the
+    // Noticeperiodautoexit cron. No asset check here since they haven't
+    // left yet.
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Usermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingUser.f_name} ${existingUser.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        employee: updated,
+      });
+    }
 
     const wasWorking = existingUser.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -3913,6 +3885,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
@@ -3944,7 +3917,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3965,6 +3938,37 @@ const setManagerWorkingStatus = async (req, res, next) => {
 
     if (!existingManager)
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Managermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingManager.f_name} ${existingManager.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        manager: updated,
+      });
+    }
 
     const wasWorking = existingManager.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -4005,6 +4009,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
@@ -4164,8 +4169,6 @@ module.exports = {
   acceptLeave,
   rejectLeave,
   applyleave,
-  editleaveadmin,
-  deleteleaveadmin,
   getmyleavehistory,
   noofemployee,
   createannouncement,
