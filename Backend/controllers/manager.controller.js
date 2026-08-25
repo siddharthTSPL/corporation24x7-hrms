@@ -510,6 +510,70 @@ const applyleavem = async (req, res, next) => {
   res.status(200).json({ message: "Leave request submitted to your reporting manager", leave });
 };
 
+const editleavem = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.manager.organisation_id;
+
+  const leave = await managerLeaveModel.findOne({
+    _id: req.params.id,
+    organisation_id,
+    manager: req.manager._id,
+  });
+  if (!leave)
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+    return next(
+      Object.assign(
+        new Error("Cannot edit leave that is already processed or forwarded"),
+        { statusCode: 400 },
+      ),
+    );
+
+  const { leaveType, startDate, endDate, reason } = req.body;
+  if (startDate && endDate) {
+    const start = parseISTDateOnly(startDate);
+    const end = parseISTDateOnly(endDate);
+    if (end < start)
+      return next(
+        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+      );
+    leave.startDate = start;
+    leave.endDate = end;
+    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  }
+  if (leaveType) leave.leaveType = leaveType;
+  if (reason) leave.reason = reason;
+  await leave.save();
+  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
+};
+
+const deleteleavem = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.manager.organisation_id;
+
+  const leave = await managerLeaveModel.findOne({
+    _id: req.params.id,
+    organisation_id,
+    manager: req.manager._id,
+  });
+  if (!leave)
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+ if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+    return next(
+      Object.assign(
+        new Error("Cannot delete leave that is already processed or forwarded"),
+        { statusCode: 400 },
+      ),
+    );
+
+  await managerLeaveModel.findByIdAndDelete(req.params.id);
+  res.status(200).json({ success: true, message: "Leave deleted successfully" });
+};
+
 
 const getforwardedleaves = async (req, res, next) => {
   if (!req.manager)
@@ -1773,6 +1837,8 @@ module.exports = {
   resetManagerPassword,
   getmyleaves,
   applyleavem,
+  editleavem,
+  deleteleavem,
   reviewtoemployee,
   getme,
   changepassword,

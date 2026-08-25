@@ -168,8 +168,8 @@ export const updatePermissions = async ({ id, data }) => {
 };
 
 
-export const setAdminWorkingStatus = async (id, working_status) => {
-  const res = await api.patch(`superadmin/admin/${id}/working-status`, { working_status });
+export const setAdminWorkingStatus = async (id, working_status, extra = {}) => {
+  const res = await api.patch(`superadmin/admin/${id}/working-status`, { working_status, ...extra });
   return res.data;
 };
 

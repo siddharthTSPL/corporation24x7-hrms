@@ -37,6 +37,8 @@ managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontr
 managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
 
 managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
+managerrouter.put("/editleavem/:id", managermiddleware, asyncHandler(managercontroller.editleavem));
+managerrouter.delete("/deleteleavem/:id", managermiddleware, asyncHandler(managercontroller.deleteleavem));
 managerrouter.get("/getmyleaves", managermiddleware, asyncHandler(managercontroller.getmyleaves));
 managerrouter.get("/myleavehistory", managermiddleware, asyncHandler(managercontroller.getmyleavehistory));
 managerrouter.post("/acceptleaverequest", managermiddleware, asyncHandler(managercontroller.acceptleaverequest));

@@ -20,6 +20,12 @@ import {
   useDeletePayroll,
   useBulkUpdatePayrollStatus,
   useBulkDeletePayroll,
+  useListEligibleForFnF,
+  useGenerateFnF,
+  useListFnF,
+  useUpdateFnF,
+  useUpdateFnFStatus,
+  useDeleteFnF,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -54,6 +60,7 @@ const TABS = [
   { key: "structures", label: "Salary Structures" },
   { key: "generate", label: "Generate Payroll" },
   { key: "records", label: "Payroll Records" },
+  { key: "fnf", label: "Full & Final" },
 ];
 
 const COMPONENT_CATEGORIES = [
@@ -2114,7 +2121,11 @@ function RecordsTab({ notify, directory }) {
                       onChange={() => toggleSelectOne(p._id, p.status)}
                     />
                   </td>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                    {p.employeeSnapshot?.name
+                      ? `${p.employeeSnapshot.name}${p.employeeSnapshot.employeeId ? ` (${p.employeeSnapshot.employeeId})` : ""}`
+                      : resolveName(directory, p.employee, p.employeeModel)}
+                  </td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
                   {(() => {
                     const { total, paid, balance } = getPaidAndBalance(p);
@@ -2172,7 +2183,7 @@ function RecordsTab({ notify, directory }) {
         title="Delete this payroll record?"
         message={
           confirmTarget
-            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
+            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${confirmTarget.employeeSnapshot?.name || resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
             : ""
         }
         onConfirm={confirmDelete}
@@ -2186,6 +2197,319 @@ function RecordsTab({ notify, directory }) {
         onCancel={() => setBulkDeleteOpen(false)}
       />
     </Card>
+  );
+}
+
+
+const EXIT_TYPE_LABEL = { resigned: "Resigned", fired: "Fired", terminated: "Terminated" };
+
+function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) {
+  const { mutate: generate, isPending: generating } = useGenerateFnF();
+  const { mutate: update, isPending: updating } = useUpdateFnF();
+
+  const [form, setForm] = useState({
+    lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+    otherEarnings: 0, deductions: 0, otherDeductions: 0, remarks: "",
+  });
+
+  useEffect(() => {
+    if (mode === "edit" && record) {
+      setForm({
+        lastWorkingDay: record.lastWorkingDay ? record.lastWorkingDay.slice(0, 10) : "",
+        leaveEncashment: record.settlement?.leaveEncashment || 0,
+        gratuity: record.settlement?.gratuity || 0,
+        bonus: record.settlement?.bonus || 0,
+        otherEarnings: record.settlement?.otherEarnings || 0,
+        deductions: record.settlement?.deductions || 0,
+        otherDeductions: record.settlement?.otherDeductions || 0,
+        remarks: record.remarks || "",
+      });
+    } else {
+      setForm({ lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0, otherEarnings: 0, deductions: 0, otherDeductions: 0, remarks: "" });
+    }
+  }, [mode, record, open]);
+
+  if (!open) return null;
+
+  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  const submit = () => {
+    if (mode === "generate") {
+      generate(
+        { employee: person._id, employeeModel: person.employeeModel, ...form },
+        {
+          onSuccess: () => { notify("Full & Final generated", "success"); onSaved(); },
+          onError: (err) => notify(getErrorMessage(err), "error"),
+        }
+      );
+    } else {
+      update(
+        { id: record._id, data: form },
+        {
+          onSuccess: () => { notify("Full & Final updated", "success"); onSaved(); },
+          onError: (err) => notify(getErrorMessage(err), "error"),
+        }
+      );
+    }
+  };
+
+  const pending = generating || updating;
+  const name = mode === "generate" ? person?.name : record?.employeeSnapshot?.name;
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: C.text }}>
+          {mode === "generate" ? "Generate Full & Final" : "Edit Full & Final"}
+        </h3>
+        <p style={{ margin: "0 0 16px", fontSize: 12.5, color: C.muted }}>{name}</p>
+
+        {mode === "generate" && (
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: C.muted, background: C.brandLight, padding: "8px 10px", borderRadius: 8 }}>
+            Pending salary from any unpaid regular payroll months is added in automatically. Fill in the rest below — everything stays editable until this is approved.
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Last Working Day">
+            <TextInput type="date" value={form.lastWorkingDay} onChange={set("lastWorkingDay")} />
+          </Field>
+          <Field label="Leave Encashment (₹)">
+            <TextInput type="number" value={form.leaveEncashment} onChange={set("leaveEncashment")} />
+          </Field>
+          <Field label="Gratuity (₹)">
+            <TextInput type="number" value={form.gratuity} onChange={set("gratuity")} />
+          </Field>
+          <Field label="Bonus (₹)">
+            <TextInput type="number" value={form.bonus} onChange={set("bonus")} />
+          </Field>
+          <Field label="Other Earnings (₹)">
+            <TextInput type="number" value={form.otherEarnings} onChange={set("otherEarnings")} />
+          </Field>
+          <Field label="Deductions / Recoveries (₹)">
+            <TextInput type="number" value={form.deductions} onChange={set("deductions")} />
+          </Field>
+          <Field label="Other Deductions (₹)">
+            <TextInput type="number" value={form.otherDeductions} onChange={set("otherDeductions")} />
+          </Field>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Field label="Remarks">
+            <textarea
+              value={form.remarks}
+              onChange={set("remarks")}
+              rows={2}
+              className="min-w-0"
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </Field>
+        </div>
+
+        <div className="flex gap-2.5" style={{ marginTop: 20 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: "#fff", color: C.text, fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <PrimaryButton loading={pending} onClick={submit} style={{ flex: 1 }}>
+            {mode === "generate" ? "Generate" : "Save Changes"}
+          </PrimaryButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FnFSlipModal({ fnf, onClose }) {
+  if (!fnf) return null;
+  const s = fnf.settlement || {};
+  const rows = [
+    ["Pending Salary", s.pendingSalary],
+    ["Leave Encashment", s.leaveEncashment],
+    ["Gratuity", s.gratuity],
+    ["Bonus", s.bonus],
+    ["Other Earnings", s.otherEarnings],
+    ["Deductions / Recoveries", -1 * (s.deductions || 0)],
+    ["Other Deductions", -1 * (s.otherDeductions || 0)],
+  ];
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 800, color: C.text }}>Full & Final Settlement</h3>
+        <p style={{ margin: "0 0 2px", fontSize: 13, color: C.text, fontWeight: 600 }}>{fnf.employeeSnapshot?.name} ({fnf.employeeSnapshot?.employeeId})</p>
+        <p style={{ margin: "0 0 16px", fontSize: 12, color: C.muted }}>
+          {EXIT_TYPE_LABEL[fnf.exitType] || fnf.exitType}{fnf.lastWorkingDay ? ` · Last working day ${new Date(fnf.lastWorkingDay).toLocaleDateString()}` : ""}
+        </p>
+        <div style={{ borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "10px 0" }}>
+          {rows.map(([label, amt]) => (
+            <div key={label} className="flex justify-between" style={{ fontSize: 13, padding: "4px 0", color: C.text }}>
+              <span>{label}</span>
+              <span style={{ fontWeight: 600, color: amt < 0 ? C.red : C.text }}>{fmtINR(amt)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between" style={{ padding: "12px 0 4px", fontSize: 15, fontWeight: 800 }}>
+          <span>Net Payable</span>
+          <span style={{ color: C.brandDark }}>{fmtINR(fnf.netPayable)}</span>
+        </div>
+        <div style={{ marginTop: 10 }}>{statusBadge(fnf.status)}</div>
+        {fnf.remarks && <p style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{fnf.remarks}</p>}
+      </div>
+    </div>
+  );
+}
+
+function FnFTab({ notify }) {
+  const { data: eligibleData, isLoading: eligibleLoading } = useListEligibleForFnF();
+  const [statusFilter, setStatusFilter] = useState("");
+  const { data: recordsData, isLoading: recordsLoading } = useListFnF({ status: statusFilter || undefined });
+
+  const { mutate: updateStatus } = useUpdateFnFStatus();
+  const { mutate: removeFnF } = useDeleteFnF();
+
+  const [formModal, setFormModal] = useState(null); // { mode: 'generate'|'edit', person?, record? }
+  const [viewSlip, setViewSlip] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+
+  const people = (eligibleData?.people || []).filter((p) => !p.fnfStatus);
+  const records = recordsData?.records || [];
+
+  const handleStatus = (id, status) => {
+    updateStatus(
+      { id, status },
+      {
+        onSuccess: () => notify(`Marked as ${status.replace("_", " ")}`, "success"),
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    const id = confirmTarget._id;
+    setConfirmTarget(null);
+    removeFnF(id, {
+      onSuccess: () => notify("Full & Final record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
+  };
+
+  return (
+    <>
+      <Card
+        title="Eligible for Full & Final"
+        subtitle="People whose working status is resigned, fired, or terminated — their regular monthly payroll no longer generates. Settle them here, once."
+      >
+        {eligibleLoading ? (
+          <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+        ) : people.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13 }}>No one is currently pending Full & Final settlement.</p>
+        ) : (
+          <div className="overflow-x-auto overscroll-x-contain -mx-1">
+            <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
+              <thead>
+                <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  <th style={{ padding: "6px 10px" }}>Name</th>
+                  <th style={{ padding: "6px 10px" }}>Type</th>
+                  <th style={{ padding: "6px 10px" }}>Exit Reason</th>
+                  <th style={{ padding: "6px 10px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((p) => (
+                  <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{p.name} ({p.employeeId})</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[p.employeeModel] || p.employeeModel}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <Badge color={C.red} bg={C.redBg}>{EXIT_TYPE_LABEL[p.workingStatus] || p.workingStatus}</Badge>
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <PrimaryButton onClick={() => setFormModal({ mode: "generate", person: p })} style={{ padding: "7px 14px", minHeight: 32, fontSize: 12.5 }}>
+                        Generate FnF
+                      </PrimaryButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Full & Final Records"
+        right={
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ maxWidth: 160 }}>
+            <option value="">All Statuses</option>
+            <option value="generated">Generated</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="on_hold">On Hold</option>
+          </Select>
+        }
+      >
+        {recordsLoading ? (
+          <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+        ) : records.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13 }}>No Full & Final records yet.</p>
+        ) : (
+          <div className="overflow-x-auto overscroll-x-contain -mx-1">
+            <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
+              <thead>
+                <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  <th style={{ padding: "6px 10px" }}>Name</th>
+                  <th style={{ padding: "6px 10px" }}>Exit Reason</th>
+                  <th style={{ padding: "6px 10px" }}>Net Payable</th>
+                  <th style={{ padding: "6px 10px" }}>Status</th>
+                  <th style={{ padding: "6px 10px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((f) => (
+                  <tr key={f._id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {f.employeeSnapshot?.name} ({f.employeeSnapshot?.employeeId})
+                    </td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{EXIT_TYPE_LABEL[f.exitType] || f.exitType}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(f.netPayable)}</td>
+                    <td style={{ padding: "8px 10px" }}>{statusBadge(f.status)}</td>
+                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                      <GhostButton onClick={() => setViewSlip(f)} style={{ marginRight: 8 }}>View</GhostButton>
+                      {f.status === "generated" && (
+                        <GhostButton onClick={() => setFormModal({ mode: "edit", record: f })} style={{ marginRight: 8 }}>Edit</GhostButton>
+                      )}
+                      {f.status === "generated" && <GhostButton onClick={() => handleStatus(f._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
+                      {f.status === "approved" && <GhostButton onClick={() => handleStatus(f._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
+                      {f.status !== "on_hold" && f.status !== "paid" && <GhostButton onClick={() => handleStatus(f._id, "on_hold")} style={{ marginRight: 8 }}>Hold</GhostButton>}
+                      {f.status === "on_hold" && <GhostButton onClick={() => handleStatus(f._id, "approved")} style={{ marginRight: 8 }}>Resume</GhostButton>}
+                      {f.status === "generated" && (
+                        <GhostButton onClick={() => setConfirmTarget(f)} style={{ color: C.red, borderColor: C.red }}>Delete</GhostButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <FnFFormModal
+        open={Boolean(formModal)}
+        mode={formModal?.mode}
+        person={formModal?.person}
+        record={formModal?.record}
+        notify={notify}
+        onClose={() => setFormModal(null)}
+        onSaved={() => setFormModal(null)}
+      />
+      <FnFSlipModal fnf={viewSlip} onClose={() => setViewSlip(null)} />
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        title="Delete this Full & Final record?"
+        message={confirmTarget ? `This will permanently delete the Full & Final settlement for ${confirmTarget.employeeSnapshot?.name}. This cannot be undone.` : ""}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </>
   );
 }
 
@@ -2211,6 +2535,9 @@ const TAB_ICONS = {
   ),
   records: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4V4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  fnf: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75M9 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   ),
 };
 
@@ -2294,6 +2621,7 @@ export default function Payroll() {
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
         {tab === "records" && <RecordsTab notify={notify} directory={directory} />}
+        {tab === "fnf" && <FnFTab notify={notify} />}
         </div>
       </div>
     </div>

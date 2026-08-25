@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAllLeaves, acceptLeave, rejectLeave, applyleave, getLeavehistory } from "../../api/adminapi/leave/ad.leave.api";
+import { getAllLeaves, acceptLeave, rejectLeave, applyleave, getLeavehistory, editMyLeave, deleteMyLeave } from "../../api/adminapi/leave/ad.leave.api";
 
 export const useGetForwardedLeaves = () => {
   return useQuery({
@@ -36,6 +36,28 @@ export const useAdminApplyLeave = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: applyleave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });
+    },
+  });
+};
+
+export const useAdminEditLeave = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: editMyLeave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
+      queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });
+    },
+  });
+};
+
+export const useAdminDeleteLeave = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMyLeave,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["AllLeaves"] });
       queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });

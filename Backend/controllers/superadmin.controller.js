@@ -2618,7 +2618,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.superAdmin._id;
 
     if (!working_status)
@@ -2639,6 +2639,37 @@ const setAdminWorkingStatus = async (req, res, next) => {
 
     if (!existingAdmin)
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await AdminModel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.superAdmin._id,
+              initiatedByModel: "SuperAdmin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingAdmin.f_name} ${existingAdmin.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        admin: updated,
+      });
+    }
 
     if (working_status !== "working") {
       const pendingAssets = await AssetModel.find({
@@ -2669,6 +2700,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(working_status !== "working" && { status: "inactive" }),
           ...(working_status === "working" && { status: "active" }),
         },

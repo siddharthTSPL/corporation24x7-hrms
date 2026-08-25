@@ -77,6 +77,16 @@ export const rejectForwardedLeave = async (data) => {
   );
   return res.data;
 };
+export const editLeaveManager = async ({ id, ...data }) => {
+  const res = await api.put(`manager/editleavem/${id}`, data);
+  return res.data;
+};
+
+export const deleteLeaveManager = async (id) => {
+  const res = await api.delete(`manager/deleteleavem/${id}`);
+  return res.data;
+};
+
 
 export const forwardLeaveUpChain = async (data) => {
   const res = await api.post(

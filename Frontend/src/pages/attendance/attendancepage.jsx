@@ -307,23 +307,21 @@ export default function AttendancePage() {
   const [checkoutResult,  setCheckoutResult]  = useState(null);
   const [locationError,   setLocationError]   = useState("");
   const [acquiringLocation, setAcquiringLocation] = useState(false);
+  const [bestAccuracy,    setBestAccuracy]    = useState(null);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showCompanionModal, setShowCompanionModal] = useState(false);
 
   const startCheckin = useCallback(() => {
     setLocationError("");
+    setBestAccuracy(null);
     clearError();
     if (!navigator.geolocation) { setLocationError("Geolocation not supported."); return; }
     setAcquiringLocation(true);
 
-    // A single getCurrentPosition() call can return the FIRST fix the device
-    // offers, which on laptops/phones without a quick GPS lock is often a
-    // WiFi/cell/IP-based estimate - that's what causes "Bareilly shows as
-    // Dehradun". So instead we watch for a few seconds and keep the most
-    // accurate (lowest accuracy-radius, in metres) reading seen.
-    const GOOD_ACCURACY_M = 50;       // this good -> stop early, no need to wait out the window
-    const MAX_ACCEPTABLE_ACCURACY_M = 1500; // worse than this -> treat as a bad network/IP fix, reject it
-    const WINDOW_MS = 12_000;
+    const GOOD_ACCURACY_M = 50;
+    const MAX_ACCEPTABLE_ACCURACY_M = 1500;
+    const WINDOW_MS = 30_000;
+    const GEOLOCATION_TIMEOUT_MS = 35_000;
 
     let watchId = null;
     let best = null;
@@ -352,15 +350,16 @@ export default function AttendancePage() {
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
-        if (!best || accuracy < best.accuracy) best = { latitude, longitude, accuracy };
+        if (!best || accuracy < best.accuracy) {
+          best = { latitude, longitude, accuracy };
+          setBestAccuracy(Math.round(accuracy));
+        }
         if (accuracy <= GOOD_ACCURACY_M) accept(best);
       },
       (err) => {
-        // A transient error shouldn't kill a watch that might still land a
-        // good fix - only permission-denied is fatal immediately.
         if (err.code === 1) reject("Location permission denied.");
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: WINDOW_MS }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: GEOLOCATION_TIMEOUT_MS }
     );
 
     setTimeout(() => {
@@ -371,7 +370,7 @@ export default function AttendancePage() {
         reject(
           best
             ? `Location isn't accurate enough (±${Math.round(best.accuracy)}m). Turn on precise/GPS location and disable any VPN, then try again.`
-            : "Could not get an accurate location. Turn on precise/GPS location and disable any VPN, then try again."
+            : "Couldn't get a GPS fix. Make sure precise/GPS location is on, you're not indoors or under a VPN, then try again."
         );
       }
     }, WINDOW_MS);
@@ -573,7 +572,9 @@ export default function AttendancePage() {
               disabled={isLoading || acquiringLocation}
               className="w-full text-white border-none rounded-2xl py-4 font-bold text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:-translate-y-0.5 active:translate-y-0"
               style={{ background: "linear-gradient(135deg, #7B1C3E 0%, #9B2554 100%)", boxShadow: "0 4px 18px rgba(123,28,62,0.28)" }}>
-              {acquiringLocation ? "📍 Getting precise location…" : isLoading ? "Checking in…" : "🟢 Check In"}
+              {acquiringLocation
+                ? (bestAccuracy != null ? `📍 Locking GPS… (±${bestAccuracy}m)` : "📍 Getting precise location…")
+                : isLoading ? "Checking in…" : "🟢 Check In"}
             </button>
           </div>
         )}

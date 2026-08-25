@@ -47,6 +47,17 @@ export const applyleave = async (data) => {
   return res.data;
 };
 
+export const editMyLeave = async ({ id, ...data }) => {
+  const res = await api.put(`admin/editleave/${id}`, data);
+  return res.data;
+};
+
+export const deleteMyLeave = async (id) => {
+  const res = await api.delete(`admin/deleteleave/${id}`);
+  return res.data;
+};
+
+
 export const getLeavehistory = async (id) => {
   const res = await api.get(`admin/getmyleavehistory`);
   return res.data;

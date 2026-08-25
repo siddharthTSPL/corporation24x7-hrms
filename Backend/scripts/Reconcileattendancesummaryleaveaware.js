@@ -9,10 +9,17 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion, resolveLeaveDayOverride } = require("../utils/leaveLwpDay.utils");
 require("dotenv").config();
 
 const CLI_APPLY = process.argv.includes("--apply");
+// --days=N restricts a run to only employees with recent activity, so you
+// can quickly re-check "just the last couple of days" instead of the whole
+// org/history. See the scoping block inside recomputeSummaries() for what
+// "recent" means and why a scoped employee still gets their WHOLE current+
+// previous month recomputed (not just N days).
+const daysArg = process.argv.find((a) => a.startsWith("--days="));
+const CLI_DAYS = daysArg ? parseInt(daysArg.split("=")[1], 10) : null;
 
 // Leave-aware, no-show-aware, join-date-aware rebuild of AttendanceSummary.
 //
@@ -104,6 +111,62 @@ const isOnApprovedLeave = (leaveMap, employeeId, role, date) => {
   return ranges.some((r) => date >= r.startDate && date <= r.endDate && !isDateInLwpPortion(r, date));
 };
 
+// Same shape as loadApprovedLeaveRanges above, but WITHOUT the
+// `leaveType: { $ne: "lwp" }` filter, and keeping leaveType on each range.
+// The no-record no-show sweep only ever needed to know "is this day
+// excused" (paid leave only), which is what loadApprovedLeaveRanges/
+// isOnApprovedLeave above still answer. But an approved LWP leave still
+// needs to override a checked-in/checked-out day's status (present/half_day
+// -> absent per the leave, just not "excused" from the count) - this is
+// the bug this file exists to fix: a day the employee checked in and
+// worked (so Attendance.status naturally computed as "present") must stop
+// being counted (and stop being DISPLAYED) as present the moment ANY
+// approved leave - paid or LWP - is approved for that date. See
+// resolveLeaveDayOverride in utils/leaveLwpDay.utils.js for the exact rule.
+const loadAllApprovedLeaveRangesWithType = async () => {
+  const map = new Map(); // "employeeId_role" -> [{startDate, endDate, lwpDays, leaveType}]
+
+  const addAll = (docs, empField, role) => {
+    docs.forEach((d) => {
+      const key = `${d[empField]}_${role}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push({
+        startDate: new Date(d.startDate),
+        endDate: new Date(d.endDate),
+        lwpDays: d.lwpDays || 0,
+        leaveType: d.leaveType,
+      });
+    });
+  };
+
+  const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
+    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] } })
+      .select("employee startDate endDate lwpDays leaveType").lean(),
+    ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] } })
+      .select("manager startDate endDate lwpDays leaveType").lean(),
+    AdminLeave.find({ status: "approved_superadmin" })
+      .select("admin startDate endDate lwpDays leaveType").lean(),
+  ]);
+
+  addAll(empLeaves, "employee", "employee");
+  addAll(mgrLeaves, "manager", "manager");
+  addAll(adminLeaves, "admin", "admin");
+
+  return map;
+};
+
+// Finds the approved leave (any type, including lwp) covering `date` for
+// this employee, if any, and returns resolveLeaveDayOverride's verdict for
+// it. Returns null when no leave covers the date - callers fall back to
+// the raw checkin/checkout-based Attendance.status in that case.
+const leaveOverrideForDate = (allLeaveMap, employeeId, role, date) => {
+  const ranges = allLeaveMap.get(`${employeeId}_${role}`);
+  if (!ranges) return null;
+  const leave = ranges.find((r) => date >= r.startDate && date <= r.endDate);
+  if (!leave) return null;
+  return resolveLeaveDayOverride(leave, date);
+};
+
 const bucketKey = (employee, role, year, month) => `${employee}_${role}_${year}_${month}`;
 
 const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id) => {
@@ -117,12 +180,52 @@ const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id
   return buckets.get(key);
 };
 
-const recomputeSummaries = async (apply = CLI_APPLY) => {
+const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
   const yesterday = startOfDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
-  const [allRecords, leaveMap] = await Promise.all([
+  // Scoping for --days=N: find employees who either (a) had a checkout in
+  // the last N days, or (b) had a leave APPROVED in the last N days (its
+  // startDate could be much older - this is exactly the "leave approved
+  // late" case this whole file exists to fix, so it must count as "recent
+  // activity" even if the leave's own dates aren't recent). Everyone else
+  // is left completely untouched by this run. A scoped employee still gets
+  // their whole current + previous IST month recomputed, never just the N
+  // days - AttendanceSummary is a monthly bucket and is always $set in
+  // full, so recomputing from a partial slice of the month would wipe out
+  // the rest of that month's already-correct numbers.
+  let scopeEmployeeRoles = null;
+  let scopeMonths = null;
+
+  if (sinceDays) {
+    const sinceDate = startOfDay(new Date(Date.now() - (sinceDays - 1) * 24 * 60 * 60 * 1000));
+    const [recentAttendance, recentEmpLeaves, recentMgrLeaves, recentAdminLeaves] = await Promise.all([
+      Attendance.find({ date: { $gte: sinceDate }, checkOut: { $exists: true } }).select("employee role").lean(),
+      Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
+      ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("manager").lean(),
+      AdminLeave.find({ status: "approved_superadmin", approvedAt: { $gte: sinceDate } }).select("admin").lean(),
+    ]);
+
+    scopeEmployeeRoles = new Set();
+    recentAttendance.forEach((r) => scopeEmployeeRoles.add(`${r.employee}_${r.role}`));
+    recentEmpLeaves.forEach((l) => scopeEmployeeRoles.add(`${l.employee}_employee`));
+    recentMgrLeaves.forEach((l) => scopeEmployeeRoles.add(`${l.manager}_manager`));
+    recentAdminLeaves.forEach((l) => scopeEmployeeRoles.add(`${l.admin}_admin`));
+
+    const now = new Date();
+    const thisMonth = getISTDateParts(now);
+    const prevMonth = getISTDateParts(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    scopeMonths = new Set([`${thisMonth.year}-${thisMonth.month}`, `${prevMonth.year}-${prevMonth.month}`]);
+
+    console.log(
+      `--days=${sinceDays}: scoped to ${scopeEmployeeRoles.size} employee(s) with activity ` +
+      `since ${sinceDate.toISOString().slice(0, 10)}, months ${[...scopeMonths].join(", ")}\n`
+    );
+  }
+
+  const [allRecords, leaveMap, allLeaveMap] = await Promise.all([
     Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id source").lean(),
     loadApprovedLeaveRanges(),
+    loadAllApprovedLeaveRangesWithType(),
   ]);
 
   console.log(`Found ${allRecords.length} attendance record(s) total`);
@@ -141,7 +244,18 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
   // it from weekOffHolidayDays/absentDays.
   const hasAnyRecord = new Set();
 
+  // Attendance._id -> corrected status, collected below whenever an
+  // approved leave overrides what checkin/checkout produced. Applied as a
+  // bulk update at the end (only when apply=true) so the raw Attendance
+  // record itself - not just the aggregated AttendanceSummary - reflects
+  // the leave everywhere it's read directly (e.g. the admin "Attendance
+  // History" modal, which shows Attendance.status as-is with no leave
+  // awareness of its own).
+  const statusCorrections = [];
+
   allRecords.forEach((r) => {
+    if (scopeEmployeeRoles && !scopeEmployeeRoles.has(`${r.employee}_${r.role}`)) return;
+
     if (r.checkOut || r.source !== "agent") {
       hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
     }
@@ -149,9 +263,33 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
     if (!r.checkOut) return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
 
     const { year, month } = getISTDateParts(r.date);
+    if (scopeMonths && !scopeMonths.has(`${year}-${month}`)) return;
+
     const d = startOfDay(r.date);
     const b = getOrCreateBucket(buckets, String(r.employee), r.role, year, month, r.organisation_id);
     b.totalWorkingMinutes += r.activeMinutes || 0;
+
+    // An approved leave (paid OR lwp) ALWAYS wins over whatever
+    // checkin/checkout worked out to, including "present" - someone who
+    // checked in, worked, and got auto-checked-out as present on a day a
+    // leave later got approved for must stop counting (and stop showing)
+    // as present. See resolveLeaveDayOverride for the exact rule; this is
+    // the fix for the "leave approved after checkout still shows Present"
+    // bug.
+    const override = leaveOverrideForDate(allLeaveMap, r.employee, r.role, d);
+
+    if (override) {
+      if (r.status !== override.status) {
+        statusCorrections.push({ _id: r._id, status: override.status });
+      }
+      if (override.status === "half_day") {
+        b.presentDays += 0.5;
+        if (!override.isPaidForThisDate) b.halfDays += 1;
+      } else if (!override.isPaidForThisDate) {
+        b.absentDays += 1;
+      }
+      return;
+    }
 
     const onLeave = (r.status === "half_day" || r.status === "absent")
       ? isOnApprovedLeave(leaveMap, r.employee, r.role, d)
@@ -175,7 +313,15 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
     // See the matching note in Marknoshowabsent.js: `status` is a login/
     // logout session flag, not an employment flag — working_status is the
     // field that actually tells us if this person is still employed.
-    const employees = await Model.find({ working_status: "working" })
+    const scopedIds = scopeEmployeeRoles
+      ? [...scopeEmployeeRoles].filter((k) => k.endsWith(`_${role}`)).map((k) => k.slice(0, -(`_${role}`.length)))
+      : null;
+    if (scopeEmployeeRoles && scopedIds.length === 0) continue; // no scoped employee of this role - skip the sweep entirely
+
+    const employees = await Model.find({
+      working_status: "working",
+      ...(scopedIds ? { _id: { $in: scopedIds } } : {}),
+    })
       .select("_id organisation_id date_of_joining createdAt")
       .lean();
 
@@ -186,11 +332,26 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
         continue;
       }
 
-      let cursor = startOfDay(effectiveJoinDate);
+      // When scoped (--days=N), only walk the current + previous IST month
+      // instead of the employee's entire tenure - the point of scoping is
+      // to make this run fast, and full-history no-show sweeping is the
+      // expensive part.
+      let cursor = scopeMonths
+        ? (() => {
+            const now = new Date();
+            const start = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+            const join = startOfDay(effectiveJoinDate);
+            return join > start ? join : start;
+          })()
+        : startOfDay(effectiveJoinDate);
       const end = yesterday;
       while (cursor <= end) {
         const key = `${emp._id}_${role}_${toISTKey(cursor)}`;
         const { year, month } = getISTDateParts(cursor);
+        if (scopeMonths && !scopeMonths.has(`${year}-${month}`)) {
+          cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+          continue;
+        }
         // Ensure a bucket exists for every month in the employee's tenure,
         // even if it ends up all zeros — this is what lets a stale/garbage
         // AttendanceSummary doc (e.g. from a pre-fix double-counted run)
@@ -256,6 +417,26 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
   }
 
   console.log(`\n${mismatches} employee-month summary(ies) ${apply ? "corrected" : "would be corrected"}.`);
+
+  // Fix the raw Attendance records themselves, not just the aggregated
+  // AttendanceSummary - anywhere that reads Attendance.status directly
+  // (e.g. the admin "Attendance History" modal / getAttendanceHistory)
+  // would otherwise keep showing "Present"/"Half Day" for a day an
+  // approved leave now covers, even after the summary numbers above are
+  // corrected.
+  console.log(
+    `\n${statusCorrections.length} attendance record(s) ${apply ? "corrected" : "would be corrected"} ` +
+    `to match an approved leave (present/half_day/absent overridden by the leave's own type).`
+  );
+  if (apply && statusCorrections.length) {
+    await Attendance.bulkWrite(
+      statusCorrections.map((c) => ({
+        updateOne: { filter: { _id: c._id }, update: { $set: { status: c.status } } },
+      })),
+      { ordered: false }
+    );
+  }
+
   if (!apply) console.log("\nDRY RUN — nothing was changed. Re-run with --apply to actually fix AttendanceSummary.");
 
   console.log(
@@ -273,7 +454,12 @@ const recomputeSummaries = async (apply = CLI_APPLY) => {
     "LeaveBalance.lwp for them was already charged once at approval time.\n" +
     "NOTE 4: This script's writes don't touch the NoShowLog collection, so " +
     "Marknoshowabsent.js's own per-day idempotency tracking is untouched and " +
-    "the next nightly cron run continues normally for new days going forward."
+    "the next nightly cron run continues normally for new days going forward.\n" +
+    "NOTE 5: A leave approved AFTER the employee already checked in/out for " +
+    "that day (e.g. approved the next morning) only gets picked up here on " +
+    "the next run of this script - it runs nightly via automatic/Nightlyreconcile.js " +
+    "(2 AM IST), so correction shows up within ~24h, same as absentDays/halfDays " +
+    "always have."
   );
 };
 

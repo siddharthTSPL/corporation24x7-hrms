@@ -122,6 +122,15 @@ const managerSchema = new mongoose.Schema(
       enum:["working","resigned","terminated","fired"],
       default:"working"
     },
+    noticePeriod: {
+      active: { type: Boolean, default: false },
+      exitType: { type: String, enum: ["resigned", "fired", "terminated", null], default: null },
+      months: { type: Number, default: null },
+      initiatedOn: { type: Date, default: null },
+      lastWorkingDay: { type: Date, default: null },
+      initiatedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+      initiatedByModel: { type: String, enum: ["Admin", "SuperAdmin", null], default: null },
+    },
 
     isVerified: { type: Boolean, default: false },
     isFirstLogin: { type: Boolean, default: true },
