@@ -56,6 +56,30 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
 
+// Basic org-owner (SuperAdmin) identity — Admin needs this to see "Super Admin"
+// as a selectable person for CTC/payroll, same as SuperAdmin already can for
+// themself. organisation_id === the SuperAdmin's own _id (see
+// adminOrSuperadmin.middleware.js), so this is always the caller's own org owner.
+const getOrgOwner = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+
+  const owner = await SuperAdmin.findById(organisation_id).select("f_name l_name organisation_name").lean();
+  if (!owner) return res.status(404).json({ success: false, message: "Organisation owner not found" });
+
+  res.status(200).json({
+    success: true,
+    owner: {
+      _id: owner._id,
+      f_name: owner.f_name || "",
+      l_name: owner.l_name || "",
+      organisation_name: owner.organisation_name || "",
+    },
+  });
+};
+
+
+
+
 const setEmployeeCTC = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom } = req.body;
@@ -522,6 +546,7 @@ const bulkDeletePayroll = async (req, res) => {
 };
 
 module.exports = {
+  getOrgOwner,
   setEmployeeCTC,
   reapplyPolicy,
   getSalaryStructure,
