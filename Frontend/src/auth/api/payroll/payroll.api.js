@@ -65,6 +65,11 @@ export const setPaySchedule = async (data) => {
 
 
 
+export const getOrgOwner = async () => {
+  const res = await api.get("admin/payroll/org-owner");
+  return res.data;
+};
+
 export const setEmployeeCTC = async (data) => {
   const res = await api.post("admin/payroll/structure", data);
   return res.data;
