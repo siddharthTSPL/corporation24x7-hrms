@@ -86,6 +86,7 @@ const payrollpolicyrouter = require('../routes/payrollpolicy.route');
 const fnfrouter = require('../routes/Fnf.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
 const notificationrouter = require('../routes/Notification.routes');
+const reviewrouter = require('../routes/review.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 // DEBUG — remove after fix
@@ -110,6 +111,7 @@ const routes = {
   fnfrouter,
   reimbursementrouter,
   notificationrouter,
+  reviewrouter,
 };
 Object.entries(routes).forEach(([name, r]) => {
   if (!r) console.error(`❌ UNDEFINED: ${name}`);
@@ -142,6 +144,7 @@ app.use('/admin/payroll/fnf', fnfrouter);
 app.use('/superadmin/payroll/fnf', fnfrouter);
 app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
+app.use('/review', reviewrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
