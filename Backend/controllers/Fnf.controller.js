@@ -1,4 +1,4 @@
-const FnF = require("../Models/fnf.model");
+const FnF = require("../Models/Fnf.model");
 const Payroll = require("../Models/payroll.model");
 const SalaryStructure = require("../Models/salarystructure.model");
 const User = require("../Models/user.model");
