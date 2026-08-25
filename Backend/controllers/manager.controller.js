@@ -10,7 +10,7 @@ const announcementmodel = require("../Models/announcement.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const Review = require("../Models/review.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
-const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
+const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = require("../utils/reviewWorkflow.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
@@ -219,6 +219,24 @@ const userunderme = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Managers who report to this manager (reporting_manager + reporting_manager_model
+// = "Manager") — used to pick who to review under "Review a Manager".
+const getSubManagers = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const subManagers = await managermodel
+    .find({
+      organisation_id: req.manager.organisation_id,
+      reporting_manager: req.manager._id,
+      reporting_manager_model: "Manager",
+    })
+    .select("-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt")
+    .lean();
+
+  res.status(200).json({ success: true, managers: subManagers });
 };
 
 const viewallleaves = async (req, res, next) => {
@@ -1109,72 +1127,151 @@ const reviewtoemployee = async (req, res, next) => {
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { employeeid, assignedDays, actualDays, behaviourScore, comment } = req.body;
-  if (!employeeid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
-    return next(Object.assign(new Error("employeeid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
+  const { employeeid } = req.body;
+  if (!employeeid)
+    return next(Object.assign(new Error("employeeid is required"), { statusCode: 400 }));
 
   const manager = req.manager;
   const organisation_id = manager.organisation_id;
   const employee = await usermodel
     .findOne({ _id: employeeid, Under_manager: manager._id, organisation_id })
-    .select("_id")
+    .select("designation department")
     .lean();
   if (!employee)
     return next(Object.assign(new Error("Employee not found under your management"), { statusCode: 404 }));
 
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
-
   try {
-    // Parameter 1: Task Submission (manager gives days, system computes % + rating + score)
-    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
+    const fields = buildReviewFields(req.body);
 
-    // Parameter 2: Behaviour & Ethics (manager gives score out of 10 directly)
-    const behaviourEthics = computeBehaviour(behaviourScore);
-
-    // Parameter 3: Attendance (fully automatic, from this month's AttendanceSummary)
-    const summary = await AttendanceSummary.findOne({
-      employee: employee._id,
-      role: "employee",
-      month,
-      year,
-    }).lean();
-    const attendance = computeAttendance({
-      presentDays: summary?.presentDays ?? 0,
-      halfDays: summary?.halfDays ?? 0,
-      absentDays: summary?.absentDays ?? 0,
-    });
-
-    const overall = computeOverall({
-      taskScore: taskSubmission.score,
-      behaviourScore: behaviourEthics.score,
-      attendanceScore: attendance.score,
-    });
-
-    const review = await Review.create({
-      organisation_id,
-      reviewerRole: manager.role,
-      reviewer: manager._id,
-      reviewerRoleModel: "Manager",
-      revieweeRole: "employee",
-      reviewee: employee._id,
-      revieweeRoleModel: "User",
-      taskSubmission,
-      behaviourEthics,
-      attendance,
-      overallScore: overall.score,
-      overallRating: overall.rating,
-      comment: comment || "",
-      monthYear,
-    });
+    const review = await createReviewOrThrow(
+      Review,
+      {
+        organisation_id,
+        reviewerRole: manager.role,
+        reviewer: manager._id,
+        reviewerRoleModel: "Manager",
+        revieweeRole: "employee",
+        reviewee: employee._id,
+        revieweeRoleModel: "User",
+        revieweeDepartment: fields.revieweeDepartment || employee.department || "",
+        revieweeDesignation: fields.revieweeDesignation || employee.designation || "",
+        ...fields,
+      },
+      "You have already reviewed this employee this month. You can submit again next month."
+    );
     res.status(201).json({ message: "Employee reviewed successfully", review });
   } catch (err) {
-    if (err.code === 11000)
-      return next(Object.assign(new Error("You have already reviewed this employee this month. You can submit again next month."), { statusCode: 400 }));
     next(err);
   }
+};
+
+// Manager reviewing a manager who reports to them (Manager -> Manager, per
+// the same reporting_manager/reporting_manager_model hierarchy used for
+// job assignment in utils/heirarchy.utils.js).
+const reviewtosubmanager = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { managerid } = req.body;
+  if (!managerid)
+    return next(Object.assign(new Error("managerid is required"), { statusCode: 400 }));
+
+  const manager = req.manager;
+  const organisation_id = manager.organisation_id;
+
+  const subManager = await managermodel
+    .findOne({
+      _id: managerid,
+      organisation_id,
+      reporting_manager: manager._id,
+      reporting_manager_model: "Manager",
+    })
+    .select("role designation department")
+    .lean();
+  if (!subManager)
+    return next(Object.assign(new Error("Manager not found under your management"), { statusCode: 404 }));
+
+  try {
+    const fields = buildReviewFields(req.body);
+
+    const review = await createReviewOrThrow(
+      Review,
+      {
+        organisation_id,
+        reviewerRole: manager.role,
+        reviewer: manager._id,
+        reviewerRoleModel: "Manager",
+        revieweeRole: subManager.role,
+        reviewee: subManager._id,
+        revieweeRoleModel: "Manager",
+        revieweeDepartment: fields.revieweeDepartment || subManager.department || "",
+        revieweeDesignation: fields.revieweeDesignation || subManager.designation || "",
+        ...fields,
+      },
+      "You have already reviewed this manager this month."
+    );
+    res.status(201).json({ message: "Manager reviewed successfully", review });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Step 2 — a Manager, when they are the *reviewee* (reviewed by Admin or by
+// the manager they report to), accepts or disputes that review.
+const respondToMyReview = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { reviewId, status, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await respondToReviewAsReviewee(Review, {
+      reviewId,
+      revieweeId: req.manager._id,
+      revieweeRoleModel: "Manager",
+      organisation_id: req.manager.organisation_id,
+      status,
+      comment,
+    });
+    res.status(200).json({ success: true, message: "Response recorded", review });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Reviews visible to this Manager: everything they've given, plus every
+// review for the employees/sub-managers under them.
+const getMyTeamReviews = async (req, res, next) => {
+  if (!req.manager)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const manager = req.manager;
+  const organisation_id = manager.organisation_id;
+  const { revieweeRoleModel, monthYear } = req.query;
+
+  const [subManagers, employees] = await Promise.all([
+    managermodel
+      .find({ organisation_id, reporting_manager: manager._id, reporting_manager_model: "Manager" })
+      .select("_id")
+      .lean(),
+    usermodel.find({ organisation_id, Under_manager: manager._id }).select("_id").lean(),
+  ]);
+
+  const revieweeIds = [manager._id, ...subManagers.map((m) => m._id), ...employees.map((u) => u._id)];
+
+  const filter = { organisation_id, reviewee: { $in: revieweeIds } };
+  if (revieweeRoleModel) filter.revieweeRoleModel = revieweeRoleModel;
+  if (monthYear) filter.monthYear = monthYear;
+
+  const reviews = await Review.find(filter)
+    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({ success: true, count: reviews.length, reviews });
 };
 
 const getme = async (req, res, next) => {
@@ -1820,6 +1917,7 @@ module.exports = {
   managerFirstLoginPasswordChange,
   managerUpdatePassword,
   userunderme,
+  getSubManagers,
   viewallleaves,
   acceptleaverequest,
   rejectleaverequest,
@@ -1840,6 +1938,9 @@ module.exports = {
   editleavem,
   deleteleavem,
   reviewtoemployee,
+  reviewtosubmanager,
+  respondToMyReview,
+  getMyTeamReviews,
   getme,
   changepassword,
   editprofilemanager,
