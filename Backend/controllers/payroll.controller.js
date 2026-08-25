@@ -11,6 +11,16 @@ const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/p
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 
+// Regular monthly payroll is only for currently-working people. Once someone
+// has resigned/been fired/terminated, their settlement moves to the
+// one-time Full & Final (FnF) flow instead — see fnf.controller.js.
+const getWorkingStatusMap = async (employeeModel, employeeIds) => {
+  const Model = EMPLOYEE_MODEL_MAP[employeeModel];
+  if (!Model || !employeeIds.length) return new Map();
+  const docs = await Model.find({ _id: { $in: employeeIds } }).select("working_status").lean();
+  return new Map(docs.map((d) => [String(d._id), d.working_status || "working"]));
+};
+
 
 
 
@@ -235,6 +245,14 @@ const generatePayroll = async (req, res) => {
   if (!structure)
     return res.status(400).json({ success: false, message: "Set this employee's CTC first (no salary structure found)" });
 
+  const workingStatusMap = await getWorkingStatusMap(employeeModel, [employee]);
+  if ((workingStatusMap.get(String(employee)) || "working") !== "working") {
+    return res.status(400).json({
+      success: false,
+      message: "This person has resigned/been terminated/fired. Generate their settlement from Full & Final (FnF) instead of regular payroll.",
+    });
+  }
+
   const policy = await getOrCreatePolicy(organisation_id);
 
   const role = employeeModel === "User" ? "employee" : employeeModel.toLowerCase();
@@ -327,6 +345,8 @@ const bulkGeneratePayroll = async (req, res) => {
   if (!structures.length)
     return res.status(200).json({ success: true, generated: 0, skipped: 0, message: "No salary structures found for this employeeModel" });
 
+  const workingStatusMap = await getWorkingStatusMap(model, structures.map((s) => s.employee));
+
   const policy = await getOrCreatePolicy(organisation_id);
   const role = model === "User" ? "employee" : model.toLowerCase();
   const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
@@ -354,6 +374,11 @@ const bulkGeneratePayroll = async (req, res) => {
   const skipped = [];
 
   for (const structure of structures) {
+    if ((workingStatusMap.get(String(structure.employee)) || "working") !== "working") {
+      skipped.push({ employee: structure.employee, reason: "resigned/terminated/fired — settle via Full & Final (FnF) instead" });
+      continue;
+    }
+
     if (!structure.breakup?.monthlyGross) {
       skipped.push({ employee: structure.employee, reason: "breakup missing, re-set CTC" });
       continue;
