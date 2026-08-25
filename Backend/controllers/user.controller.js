@@ -8,6 +8,7 @@ const announcementmodel = require("../Models/announcement.model");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const Review = require("../Models/review.model");
+const { respondToReviewAsReviewee } = require("../utils/reviewWorkflow.utils");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const Adminmodel = require("../Models/Admin.model");
@@ -1501,7 +1502,33 @@ const getPersonalDocuments = async (req, res, next) => {
     next(error);
   }
 };
+
+// Step 2 — an Employee accepts or disputes the review their manager gave them.
+const respondToMyReview = async (req, res, next) => {
+  if (!req.employee)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { reviewId, status, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await respondToReviewAsReviewee(Review, {
+      reviewId,
+      revieweeId: req.employee._id,
+      revieweeRoleModel: "User",
+      organisation_id: req.employee.organisation_id,
+      status,
+      comment,
+    });
+    res.status(200).json({ success: true, message: "Response recorded", review });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
+  respondToMyReview,
   verifyUserEmail,
   userlogin,
   userlogout,
