@@ -3788,7 +3788,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3809,6 +3809,42 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
 
     if (!existingUser)
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    // Notice period path: employee stays "working" (normal payroll keeps
+    // running for the notice-period months) — the actual status flip and
+    // FnF generation happen automatically on lastWorkingDay via the
+    // Noticeperiodautoexit cron. No asset check here since they haven't
+    // left yet.
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Usermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingUser.f_name} ${existingUser.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        employee: updated,
+      });
+    }
 
     const wasWorking = existingUser.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -3849,6 +3885,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
@@ -3880,7 +3917,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3901,6 +3938,37 @@ const setManagerWorkingStatus = async (req, res, next) => {
 
     if (!existingManager)
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Managermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingManager.f_name} ${existingManager.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        manager: updated,
+      });
+    }
 
     const wasWorking = existingManager.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -3941,6 +4009,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },

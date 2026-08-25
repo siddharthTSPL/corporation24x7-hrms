@@ -431,9 +431,9 @@ export const useSuperAdminInactiveUsers = () => {
 export const useSetAdminWorkingStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, working_status }) => {
+    mutationFn: async ({ id, working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay }) => {
       try {
-        return await setAdminWorkingStatus(id, working_status);
+        return await setAdminWorkingStatus(id, working_status, { noticePeriodAllowed, noticePeriodMonths, lastWorkingDay });
       } catch (err) {
         const payload = err?.response?.data || err?.data || err;
         throw payload;

@@ -21,6 +21,13 @@ import {
   deletePayroll,
   bulkUpdatePayrollStatus,
   bulkDeletePayroll,
+  listEligibleForFnF,
+  generateFnF,
+  listFnF,
+  getFnFSlip,
+  updateFnF,
+  updateFnFStatus,
+  deleteFnF,
 } from "../../api/payroll/payroll.api";
 
 
@@ -236,6 +243,81 @@ export const useBulkDeletePayroll = () => {
     mutationFn: (ids) => bulkDeletePayroll(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+
+
+// --- Full & Final (FnF) ---
+
+export const useListEligibleForFnF = () => {
+  return useQuery({
+    queryKey: ["fnf-eligible"],
+    queryFn: listEligibleForFnF,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useGenerateFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: generateFnF,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-eligible"] });
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useListFnF = (params) => {
+  return useQuery({
+    queryKey: ["fnf-records", params],
+    queryFn: () => listFnF(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useGetFnFSlip = (id, enabled) => {
+  return useQuery({
+    queryKey: ["fnf-slip", id],
+    queryFn: () => getFnFSlip(id),
+    enabled: Boolean(enabled && id),
+    staleTime: 0,
+  });
+};
+
+export const useUpdateFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => updateFnF(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useUpdateFnFStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }) => updateFnFStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useDeleteFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => deleteFnF(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-eligible"] });
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
     },
   });
 };
