@@ -306,7 +306,7 @@ export const useAdminActionOnLeave = () => {
 export const useSetEmployeeWorkingStatus = (id) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (working_status) => setEmployeeWorkingStatus(id, working_status),
+    mutationFn: (payload) => setEmployeeWorkingStatus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employee", id] });
@@ -319,7 +319,7 @@ export const useSetEmployeeWorkingStatus = (id) => {
 export const useSetManagerWorkingStatus = (id) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (working_status) => setManagerWorkingStatus(id, working_status),
+    mutationFn: (payload) => setManagerWorkingStatus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["managers"] });
