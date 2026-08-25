@@ -37,6 +37,8 @@ const {
   acceptLeave,
   rejectLeave,
   applyleave,
+  editleaveadmin,
+  deleteleaveadmin,
   getmyleavehistory,
   noofemployee,
   createannouncement,
@@ -233,6 +235,16 @@ adminrouter.get(
   asyncHandler(showallleaves),
 );
 adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.put(
+  "/editleave/:id",
+  adminauthmiddleware,
+  asyncHandler(editleaveadmin),
+);
+adminrouter.delete(
+  "/deleteleave/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteleaveadmin),
+);
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,
