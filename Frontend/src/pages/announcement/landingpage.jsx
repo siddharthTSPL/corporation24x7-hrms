@@ -727,7 +727,7 @@ function Pricing() {
       desc: 'Perfect for small teams getting started',
       monthlyPrice: 47,
       yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Live Map Tracking', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Performance Management','Assets Management','Team Documentation','Timesheet','Reimbursement','Grievance Management','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)','Email support (24/7)'],
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
       crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
@@ -747,7 +747,7 @@ function Pricing() {
       features: [
         'Free Smartphone gifthamper',
         'Face Attendence',
-        'Custom integrations',
+        'Custom Integrations',
         'SSO',
         'API access',
         'Two-factor authentication',
