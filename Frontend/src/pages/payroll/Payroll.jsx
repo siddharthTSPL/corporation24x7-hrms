@@ -9,6 +9,7 @@ import {
   useRemovePayrollAllowance,
   useGetPaySchedule,
   useSetPaySchedule,
+  useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
   useReapplyPolicy,
@@ -24,7 +25,6 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
-import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
 const C = {
   brand: "#CD166E",
@@ -69,7 +69,7 @@ const CALC_TYPES = [
   { key: "formula", label: "Custom Formula" },
 ];
 
-const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin (You)" };
+const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin" };
 const MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 const DEPARTMENT_LABEL = {
   OPR: "Operations",
@@ -324,10 +324,13 @@ function GhostButton({ children, ...rest }) {
 function useEmployeeDirectory() {
   const { data: empData, isLoading: empLoading } = useGetAllEmployee();
   const { data: adminData, isLoading: adminLoading } = useGetAllAdmins();
-  const { data: auth } = useAuth();
+  const { data: ownerData, isLoading: ownerLoading } = useGetOrgOwner();
 
-  const isSuperAdmin = auth?.role === "superadmin";
-  const me = auth?.data?.superAdmin;
+  // The org-owner (SuperAdmin) record now comes from a shared endpoint that
+  // both Admin and SuperAdmin tokens can call — so Admin can set CTC /
+  // generate payroll for the SuperAdmin too, same as SuperAdmin already could
+  // for themself.
+  const owner = ownerData?.owner;
 
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
@@ -345,12 +348,12 @@ function useEmployeeDirectory() {
       model: "Admin",
     }));
     // A SuperAdmin has no roster to fetch — it's a single person, the org
-    // owner. Only a logged-in SuperAdmin sees themself here so they can
-    // build their own salary structure/payroll, same flow as everyone else.
-    const superAdmins = isSuperAdmin && me?._id
+    // owner. Both Admin and SuperAdmin logins see them here so either can
+    // build the SuperAdmin's salary structure/payroll, same flow as everyone else.
+    const superAdmins = owner?._id
       ? [{
-          _id: me._id,
-          name: `${me.f_name || ""} ${me.l_name || ""}`.trim() || "Super Admin",
+          _id: owner._id,
+          name: `${owner.f_name || ""} ${owner.l_name || ""}`.trim() || "Super Admin",
           uid: "OWNER",
           empid: "OWNER",
           model: "SuperAdmin",
@@ -365,12 +368,12 @@ function useEmployeeDirectory() {
       Admin: all.filter((p) => p.model === "Admin"),
       SuperAdmin: superAdmins,
     };
-    // Admins/Managers/Employees never see "Super Admin" as a selectable
-    // employee type — only the SuperAdmin themself can build their own payroll.
-    const visibleModels = isSuperAdmin ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
+    // Both Admin and SuperAdmin can see "Super Admin" as a selectable
+    // employee type now — only shown once the owner record has loaded.
+    const visibleModels = superAdmins.length ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
 
-    return { byId, byModel, visibleModels, loading: empLoading || adminLoading };
-  }, [empData, adminData, isSuperAdmin, me]);
+    return { byId, byModel, visibleModels, loading: empLoading || adminLoading || ownerLoading };
+  }, [empData, adminData, owner, empLoading, adminLoading, ownerLoading]);
 }
 
 function resolveName(directory, id, fallbackModel) {
@@ -1650,7 +1653,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           </div>
         </div>
 
-        {}
         <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
           <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
           <PayslipRow label="Employee ID" value={employeeId} />
@@ -1659,7 +1661,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
 
-        {}
         <PayslipSection title="Attendance">
           <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
           <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
@@ -1667,7 +1668,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
         </PayslipSection>
 
-        {}
         <PayslipSection title="Earnings">
           {earnings.map((r, i) => (
             <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1676,7 +1676,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
         </PayslipSection>
 
-        {}
         <PayslipSection title="Deductions">
           {deductions.map((r, i) => (
             <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1685,13 +1684,11 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
         </PayslipSection>
 
-        {}
         <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
 
-        {}
         <PayslipSection title="Employer Contributions">
           {employerContribution.map((r, i) => (
             <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1763,6 +1760,19 @@ function getPaidAndBalance(p) {
   const balance = total - paid;
   return { total, paid, balance };
 }
+
+function isBulkSelectable(status) {
+  return Boolean(BULK_ACTIONS[status]);
+}
+
+// FIX: "approved" now also allows the "hold" bulk action, so selecting
+// approved rows shows "Hold All" — putting them into on_hold, from where
+// "Resume All" (approve) already worked correctly.
+const BULK_ACTIONS = {
+  generated: ["approve", "hold", "delete"],
+  on_hold: ["approve", "delete"],
+  approved: ["hold", "delete"],
+};
 
 function buildPayrollExportRows(payrolls, directory) {
   const perRecord = payrolls.map((p) => {
@@ -1864,19 +1874,43 @@ function RecordsTab({ notify, directory }) {
 
   const payrolls = data?.payrolls || [];
 
+  const selectableIds = useMemo(
+    () => payrolls.filter((p) => isBulkSelectable(p.status)).map((p) => p._id),
+    [payrolls]
+  );
 
   useEffect(() => {
     setSelectedIds(new Set());
   }, [filters.month, filters.year, filters.employeeModel, filters.status]);
 
-  const allSelected = payrolls.length > 0 && selectedIds.size === payrolls.length;
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const allowed = new Set(selectableIds);
+      const next = new Set([...prev].filter((id) => allowed.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [selectableIds]);
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
   const someSelected = selectedIds.size > 0 && !allSelected;
 
+  const selectedStatuses = [...selectedIds]
+    .map((id) => payrolls.find((row) => row._id === id)?.status)
+    .filter(Boolean);
+  const isPureOnHold = selectedStatuses.length > 0 && selectedStatuses.every((s) => s === "on_hold");
+  const selectedActions = selectedStatuses.length === 0
+    ? []
+    : selectedStatuses.reduce((common, status, idx) => {
+        const actions = BULK_ACTIONS[status] || [];
+        return idx === 0 ? actions : common.filter((a) => actions.includes(a));
+      }, []);
+
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? new Set() : new Set(payrolls.map((p) => p._id)));
+    setSelectedIds(allSelected ? new Set() : new Set(selectableIds));
   };
 
-  const toggleSelectOne = (id) => {
+  const toggleSelectOne = (id, status) => {
+    if (!isBulkSelectable(status)) return;
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1944,7 +1978,7 @@ function RecordsTab({ notify, directory }) {
     if (ids.length === 0) return;
     bulkDelete(ids, {
       onSuccess: (data) => {
-        const skippedNote = data.skippedCount ? `, ${data.skippedCount} skipped (not in Generated state)` : "";
+        const skippedNote = data.skippedCount ? `, ${data.skippedCount} skipped` : "";
         notify(`${data.deletedCount} record${data.deletedCount === 1 ? "" : "s"} deleted${skippedNote}`, "success");
         setSelectedIds(new Set());
       },
@@ -2014,19 +2048,30 @@ function RecordsTab({ notify, directory }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: C.brandDark }}>
               {selectedIds.size} selected
             </span>
-            <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("approved")}>
-              Approve All
-            </GhostButton>
-            <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("on_hold")}>
-              Hold All
-            </GhostButton>
-            <GhostButton
-              disabled={bulkDeletePending}
-              onClick={() => setBulkDeleteOpen(true)}
-              style={{ color: C.red, borderColor: C.red }}
-            >
-              Delete All
-            </GhostButton>
+            {selectedActions.includes("approve") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("approved")}>
+                {isPureOnHold ? "Resume All" : "Approve All"}
+              </GhostButton>
+            )}
+            {selectedActions.includes("hold") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("on_hold")}>
+                Hold All
+              </GhostButton>
+            )}
+            {selectedActions.includes("delete") && (
+              <GhostButton
+                disabled={bulkDeletePending}
+                onClick={() => setBulkDeleteOpen(true)}
+                style={{ color: C.red, borderColor: C.red }}
+              >
+                Delete All
+              </GhostButton>
+            )}
+            {selectedActions.length === 0 && (
+              <span style={{ fontSize: 12.5, color: C.muted }}>
+                No common bulk action for this mix of statuses
+              </span>
+            )}
             <button
               onClick={() => setSelectedIds(new Set())}
               style={{ marginLeft: "auto", fontSize: 12.5, color: C.muted, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}
@@ -2043,6 +2088,7 @@ function RecordsTab({ notify, directory }) {
                   <input
                     type="checkbox"
                     checked={allSelected}
+                    disabled={selectableIds.length === 0}
                     ref={(el) => { if (el) el.indeterminate = someSelected; }}
                     onChange={toggleSelectAll}
                   />
@@ -2063,7 +2109,9 @@ function RecordsTab({ notify, directory }) {
                     <input
                       type="checkbox"
                       checked={selectedIds.has(p._id)}
-                      onChange={() => toggleSelectOne(p._id)}
+                      disabled={!isBulkSelectable(p.status)}
+                      title={!isBulkSelectable(p.status) ? "Paid records can't be bulk-selected" : ""}
+                      onChange={() => toggleSelectOne(p._id, p.status)}
                     />
                   </td>
                   <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
@@ -2133,7 +2181,7 @@ function RecordsTab({ notify, directory }) {
       <ConfirmDialog
         open={bulkDeleteOpen}
         title={`Delete ${selectedIds.size} selected record${selectedIds.size === 1 ? "" : "s"}?`}
-        message="Only records still in Generated state will actually be deleted — any selected record already approved, paid, or on hold will be skipped. This cannot be undone."
+        message="This will permanently delete the selected payroll records. This cannot be undone."
         onConfirm={confirmBulkDelete}
         onCancel={() => setBulkDeleteOpen(false)}
       />

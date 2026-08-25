@@ -4,6 +4,7 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
 
 const {
+  getOrgOwner,
   setEmployeeCTC,
   reapplyPolicy,
   getSalaryStructure,
@@ -19,6 +20,8 @@ const {
 } = require("../controllers/payroll.controller");
 
 
+
+payrollrouter.get("/org-owner", adminauthmiddleware, asyncHandler(getOrgOwner));
 
 payrollrouter.post("/structure", adminauthmiddleware, asyncHandler(setEmployeeCTC));
 payrollrouter.get("/structure", adminauthmiddleware, asyncHandler(listSalaryStructures));

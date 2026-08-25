@@ -1,5 +1,5 @@
 const Shift = require("../Models/shift.model");
-const ShiftAssignment = require("../Models/shiftAssignment.model");
+const ShiftAssignment = require("../Models/Shiftassignment.model");
 const { ensureDefaultShift, getShiftDurationMinutes } = require("../utils/shift.utils");
 
 
