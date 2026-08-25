@@ -27,6 +27,22 @@ function ratingColor(rating) {
   return "#B0233A";
 }
 
+const STATUS_LABEL = {
+  submitted: "Awaiting response",
+  reviewee_accepted: "Accepted",
+  reviewee_disputed: "Disputed",
+  hr_approved: "HR Approved",
+  hr_rejected: "HR Rejected",
+};
+
+const STATUS_COLOR = {
+  submitted: "#B8860B",
+  reviewee_accepted: "#1E7A3D",
+  reviewee_disputed: "#B0233A",
+  hr_approved: "#1E7A3D",
+  hr_rejected: "#B0233A",
+};
+
 function formatDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", {
@@ -42,15 +58,13 @@ function buildCsvRows(reviews) {
     revieweeEmail: getEmail(r.reviewee),
     revieweeRole: r.revieweeRole ?? "",
     monthYear: r.monthYear ?? "",
-    taskPercentage: r.taskSubmission?.percentage ?? "",
-    taskRating: r.taskSubmission?.rating ?? "",
-    behaviourScore: r.behaviourEthics?.score ?? "",
-    behaviourRating: r.behaviourEthics?.rating ?? "",
-    attendancePercentage: r.attendance?.percentage ?? "",
-    attendanceRating: r.attendance?.rating ?? "",
     overallScore: r.overallScore ?? "",
     overallRating: r.overallRating ?? "",
-    comment: r.comment ?? "",
+    status: STATUS_LABEL[r.status] ?? r.status ?? "",
+    recommendation: r.recommendation ?? "",
+    revieweeResponse: r.revieweeAcceptance?.status ?? "",
+    hrDecision: r.hrAcknowledgement?.status ?? "",
+    reviewerComments: r.reviewerComments ?? "",
     reviewedBy: getFullName(r.reviewer),
     reviewedOn: formatDate(r.createdAt),
   }));
@@ -61,15 +75,13 @@ const CSV_COLUMNS = [
   { key: "revieweeEmail", label: "Email" },
   { key: "revieweeRole", label: "Role" },
   { key: "monthYear", label: "Month" },
-  { key: "taskPercentage", label: "Task %" },
-  { key: "taskRating", label: "Task Rating" },
-  { key: "behaviourScore", label: "Behaviour Score" },
-  { key: "behaviourRating", label: "Behaviour Rating" },
-  { key: "attendancePercentage", label: "Attendance %" },
-  { key: "attendanceRating", label: "Attendance Rating" },
   { key: "overallScore", label: "Overall Score" },
   { key: "overallRating", label: "Overall Rating" },
-  { key: "comment", label: "Comment" },
+  { key: "status", label: "Status" },
+  { key: "recommendation", label: "Recommendation" },
+  { key: "revieweeResponse", label: "Reviewee Response" },
+  { key: "hrDecision", label: "HR Decision" },
+  { key: "reviewerComments", label: "Reviewer Comments" },
   { key: "reviewedBy", label: "Reviewed By" },
   { key: "reviewedOn", label: "Reviewed On" },
 ];
@@ -159,15 +171,6 @@ export default function ReviewHistoryPanel({
               boxShadow: "0 3px 12px rgba(139,26,74,0.3)",
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path
-                d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9"
-                stroke="#fff"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
             Export CSV
           </button>
         </div>
@@ -175,13 +178,7 @@ export default function ReviewHistoryPanel({
 
       <div className="p-3 sm:p-4">
         {isLoading && (
-          <div className="text-[#9B7A8A] text-sm py-6 px-2 flex items-center gap-2 justify-center">
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke={BRAND.mutedText} strokeWidth="2" opacity="0.3" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke={BRAND.mutedText} strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Loading reviews…
-          </div>
+          <div className="text-[#9B7A8A] text-sm py-6 px-2 text-center">Loading reviews…</div>
         )}
 
         {isError && (
@@ -207,7 +204,7 @@ export default function ReviewHistoryPanel({
 
         {!isLoading && !isError && filtered.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[13px] min-w-[860px]">
+            <table className="w-full border-collapse text-[13px] min-w-[820px]">
               <thead>
                 <tr style={{ background: BRAND.accentLight }}>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
@@ -217,16 +214,13 @@ export default function ReviewHistoryPanel({
                     Month
                   </th>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Task
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Behaviour
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Attendance
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
                     Overall
+                  </th>
+                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
+                    Status
+                  </th>
+                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
+                    Recommendation
                   </th>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
                     Reviewed By
@@ -251,24 +245,20 @@ export default function ReviewHistoryPanel({
                       {r.monthYear}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.taskSubmission?.rating) }}>
-                        {r.taskSubmission?.percentage}% · {r.taskSubmission?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.behaviourEthics?.rating) }}>
-                        {r.behaviourEthics?.score}/10 · {r.behaviourEthics?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.attendance?.rating) }}>
-                        {r.attendance?.percentage}% · {r.attendance?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
                       <span className="font-semibold" style={{ color: ratingColor(r.overallRating) }}>
-                        {r.overallScore}/10 · {r.overallRating}
+                        {r.overallScore}/5 · {r.overallRating}
                       </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className="text-[11px] font-medium py-0.5 px-2 rounded-full whitespace-nowrap"
+                        style={{ background: `${STATUS_COLOR[r.status] ?? BRAND.mutedText}18`, color: STATUS_COLOR[r.status] ?? BRAND.mutedText }}
+                      >
+                        {STATUS_LABEL[r.status] ?? r.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
+                      {r.recommendation ?? "—"}
                     </td>
                     <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
                       {getFullName(r.reviewer)}
