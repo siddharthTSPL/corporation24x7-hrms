@@ -8,6 +8,7 @@ import {
   removePayrollAllowance,
   getPaySchedule,
   setPaySchedule,
+  getOrgOwner,
   setEmployeeCTC,
   listSalaryStructures,
   getSalaryStructure,
@@ -107,6 +108,15 @@ export const useSetPaySchedule = () => {
 };
 
 
+
+export const useGetOrgOwner = () => {
+  return useQuery({
+    queryKey: ["payroll-org-owner"],
+    queryFn: getOrgOwner,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
 
 export const useListSalaryStructures = (params) => {
   return useQuery({
