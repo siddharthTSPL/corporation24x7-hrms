@@ -438,9 +438,15 @@ function PermissionEditor({ permissions, onChange }) {
 function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [step, setStep] = useState(1);
+  const [noticePeriodAllowed, setNoticePeriodAllowed] = useState(null);
+  const [noticePeriodMonths, setNoticePeriodMonths] = useState("");
+  const [lastWorkingDay, setLastWorkingDay] = useState("");
 
   useEffect(() => {
-    if (open) { setSelectedStatus(""); setStep(1); }
+    if (open) {
+      setSelectedStatus(""); setStep(1);
+      setNoticePeriodAllowed(null); setNoticePeriodMonths(""); setLastWorkingDay("");
+    }
   }, [open]);
 
   if (!open || !admin) return null;
@@ -450,11 +456,29 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
 
   const handleNext = () => {
     if (!selectedStatus) return;
+    setStep("noticeAsk");
+  };
+
+  const handleNoticeChoice = (allowed) => {
+    setNoticePeriodAllowed(allowed);
+    setStep(allowed ? "noticeDetails" : 2);
+  };
+
+  const handleNoticeDetailsContinue = () => {
+    if (!noticePeriodMonths || !lastWorkingDay) return;
     setStep(2);
   };
 
   const handleConfirm = () => {
-    onConfirm({ id: admin._id, working_status: selectedStatus });
+    onConfirm({
+      id: admin._id,
+      working_status: selectedStatus,
+      ...(noticePeriodAllowed ? {
+        noticePeriodAllowed: true,
+        noticePeriodMonths: Number(noticePeriodMonths),
+        lastWorkingDay,
+      } : {}),
+    });
   };
 
   return (
@@ -503,6 +527,59 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
             </>
           )}
 
+          {step === "noticeAsk" && (
+            <>
+              <p className="text-[13px] font-bold text-[#0d0209] mb-1">Does your company allow a notice period?</p>
+              <p className="text-[12px] text-[#7a5568] mb-4 leading-relaxed">
+                Choose <strong>Yes</strong> to run a notice period first (normal payroll continues) before marking{" "}
+                <strong>{name}</strong> as <strong style={{ color: meta.color }}>{meta.label}</strong>, or <strong>No</strong> to mark them {meta.label} right away.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNoticeChoice(false)}
+                  className="flex-1 px-3 py-3 rounded-xl border-2 border-[#e8d5e2] text-[13px] font-semibold text-[#0d0209] hover:border-[#730042] transition-all"
+                >
+                  No, direct {meta.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNoticeChoice(true)}
+                  className="flex-1 px-3 py-3 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition-all"
+                >
+                  Yes, notice period
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "noticeDetails" && (
+            <>
+              <p className="text-[13px] font-bold text-[#0d0209] mb-3">Notice period details</p>
+              <label className="block text-[11px] font-semibold text-[#7a5568] mb-1">Notice period (months)</label>
+              <input
+                type="number"
+                min="1"
+                value={noticePeriodMonths}
+                onChange={(e) => setNoticePeriodMonths(e.target.value)}
+                placeholder="e.g. 3"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] mb-3 focus:outline-none focus:border-[#730042]"
+              />
+              <label className="block text-[11px] font-semibold text-[#7a5568] mb-1">Last working day (notice period end date)</label>
+              <input
+                type="date"
+                value={lastWorkingDay}
+                onChange={(e) => setLastWorkingDay(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] mb-3 focus:outline-none focus:border-[#730042]"
+              />
+              <p className="text-[11px] text-[#7a5568] leading-relaxed">
+                {name} stays <strong>Working</strong> and gets normal payroll till this date. On this date the system
+                will automatically mark them <strong style={{ color: meta.color }}>{meta.label}</strong> and generate
+                their Full &amp; Final settlement for that last month.
+              </p>
+            </>
+          )}
+
           {step === 2 && (
             <>
               <div className="flex items-start gap-3 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl mb-4 sm:mb-5">
@@ -526,13 +603,23 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
                   </span>
                 </div>
               </div>
+              {noticePeriodAllowed && (
+                <p className="text-[11px] text-red-700 mt-2 font-medium">
+                  Notice period: {noticePeriodMonths} month(s), last working day {new Date(lastWorkingDay).toDateString()}.
+                </p>
+              )}
             </>
           )}
         </div>
 
         <div className="px-4 sm:px-6 pb-4 sm:pb-5 flex gap-2 sm:gap-3">
           <button
-            onClick={step === 1 ? onClose : () => setStep(1)}
+            onClick={
+              step === 1 ? onClose
+              : step === "noticeAsk" ? () => setStep(1)
+              : step === "noticeDetails" ? () => setStep("noticeAsk")
+              : () => setStep(noticePeriodAllowed ? "noticeDetails" : "noticeAsk")
+            }
             className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors min-h-[44px]"
           >
             {step === 1 ? "Cancel" : "Back"}
@@ -545,6 +632,21 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
             >
               Continue <FaChevronRight size={9} />
             </button>
+          ) : step === "noticeDetails" ? (
+            <button
+              onClick={handleNoticeDetailsContinue}
+              disabled={!noticePeriodMonths || !lastWorkingDay}
+              className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              Continue <FaChevronRight size={9} />
+            </button>
+          ) : step === "noticeAsk" ? (
+            <button
+              disabled
+              className="flex-1 px-3 sm:px-5 py-2.5 rounded-xl bg-[#f3e6ee] text-[#c499b4] text-[13px] font-semibold min-h-[44px] cursor-not-allowed"
+            >
+              Choose above
+            </button>
           ) : (
             <button
               onClick={handleConfirm}
@@ -552,7 +654,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
               className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-red-600 text-white text-[13px] font-semibold hover:bg-red-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               <FaCheck size={10} />
-              {loading ? "Updating…" : "Confirm"}
+              {loading ? "Updating…" : noticePeriodAllowed ? "Start Notice Period" : "Confirm"}
             </button>
           )}
         </div>
