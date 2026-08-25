@@ -109,6 +109,14 @@ const adminSchema = new mongoose.Schema(
       default: "admin",
     },
 
+    // Set only by SuperAdmin. When true, this Admin can give the final
+    // "HR Acknowledgement" approval on any performance review in the
+    // organisation. Multiple admins can hold this flag at once.
+    isHR: {
+      type: Boolean,
+      default: false,
+    },
+
     designation: {
       type: String,
       required: true,
