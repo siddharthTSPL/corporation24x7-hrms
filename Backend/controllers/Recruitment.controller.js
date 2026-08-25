@@ -1,558 +1,235 @@
-const Reimbursement = require("../Models/reimbursement.model");
-const imagekit = require("../utils/imagekit.utils");
-
-const ALLOWED_TYPES = [
-  "Travel",
-  "Food",
-  "Medical",
-  "Internet",
-  "Office Supplies",
-  "Training",
-  "Other",
-];
+const HiringRequisition = require("../Models/Hiringrequisition.model");
+const Candidate = require("../Models/candidate.model");
 
 const err = (message, statusCode = 400) => Object.assign(new Error(message), { statusCode });
 
-// Accepts a JSON-stringified array, a real array, a comma-separated string,
-// or a single value (multipart forms only send strings) and always returns
-// a clean array of ids to remove.
-const parseIdList = (val) => {
-  if (val === undefined || val === null || val === "") return [];
-  if (Array.isArray(val)) return val.filter(Boolean);
-  try {
-    const parsed = JSON.parse(val);
-    if (Array.isArray(parsed)) return parsed.filter(Boolean);
-  } catch {
-    // not JSON — fall through to comma-split below
+const REQUISITION_FIELDS = [
+  "job_title",
+  "department",
+  "openings",
+  "employment_type",
+  "experience_required",
+  "skills_required",
+  "salary_range",
+  "priority",
+  "work_mode",
+  "job_description",
+  "hiring_reason",
+  "expected_joining_date",
+];
+
+const createRequisition = async (req, res) => {
+  const data = {};
+  for (const field of REQUISITION_FIELDS) {
+    if (req.body[field] !== undefined) data[field] = req.body[field];
   }
-  return String(val)
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-};
+  if (!data.job_title || !data.department || !data.openings || !data.employment_type || !data.work_mode || !data.hiring_reason)
+    throw err("job_title, department, openings, employment_type, work_mode and hiring_reason are required");
 
-// Deletes the given attachment sub-docs from ImageKit (best-effort — a
-// storage-provider hiccup shouldn't block the claim edit) and returns the
-// remaining attachments that were NOT requested for removal.
-const removeAttachments = async (attachments = [], idsToRemove = []) => {
-  if (!idsToRemove.length) return attachments;
-  const toRemove = attachments.filter((a) => idsToRemove.includes(a.fileId));
-  await Promise.all(
-    toRemove.map((a) =>
-      a.fileId
-        ? imagekit.deleteFile(a.fileId).catch(() => {})
-        : Promise.resolve(),
-    ),
-  );
-  return attachments.filter((a) => !idsToRemove.includes(a.fileId));
-};
-
-// True only when the actor (employee/manager/admin) has filled in every
-// bank field needed to actually pay out a reimbursement.
-const hasBankDetails = (actor) =>
-  !!(
-    actor?.bank_name?.trim() &&
-    actor?.account_holder_name?.trim() &&
-    actor?.account_number?.trim() &&
-    actor?.ifsc_code?.trim()
-  );
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// Uploads whatever multer put on req.files["receipts"] / req.files["supportingDocuments"]
-// to ImageKit and returns the attachment sub-docs — mirrors uploaddocument.controller.js.
-const uploadAttachments = async (files = []) => {
-  const uploaded = [];
-  for (const file of files) {
-    const fileBase64 = file.buffer.toString("base64");
-    const res = await imagekit.upload({
-      file: fileBase64,
-      fileName: file.originalname,
-      folder: "/reimbursements",
-      useUniqueFileName: true,
-    });
-    uploaded.push({
-      url: res.url,
-      fileId: res.fileId,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      sizeKb: Math.round(res.size / 1024),
-    });
-  }
-  return uploaded;
-};
-
-// Builds the snapshot + actor fields shared by every "apply" handler, given
-// the authenticated actor (req.employee / req.manager / req.admin) and which
-// model it maps to.
-const buildActorSnapshot = (actor, model) => ({
-  submittedBy: actor._id,
-  submitterModel: model,
-  organisation_id: actor.organisation_id,
-  employeeName: `${actor.f_name} ${actor.l_name}`,
-  empid: actor.empid,
-  department: actor.department,
-  designation: actor.designation,
-  email: actor.work_email,
-  reportingManager: model === "User" ? actor.Under_manager || null : null,
-  bankAccount: {
-    bankName: actor.bank_name || "",
-    accountHolderName: actor.account_holder_name || "",
-    accountNumber: actor.account_number || "",
-    ifscCode: actor.ifsc_code || "",
-  },
-});
-
-const validateClaimBody = (body) => {
-  const { reimbursementType, expenseDate, amountClaimed, description } = body;
-  if (!reimbursementType || !ALLOWED_TYPES.includes(reimbursementType))
-    return "A valid reimbursementType is required";
-  if (!expenseDate) return "expenseDate is required";
-  if (amountClaimed === undefined || Number(amountClaimed) <= 0)
-    return "amountClaimed must be a positive number";
-  if (!description) return "description is required";
-  return null;
-};
-
-// Shared "apply" logic used by employee/manager/admin apply handlers.
-const createClaim = async ({ actor, model, body, files, asDraft }) => {
-  const validationError = validateClaimBody(body);
-  if (!asDraft && validationError) throw err(validationError);
-
-  if (!asDraft && !hasBankDetails(actor))
-    throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
-
-  const receipts = await uploadAttachments(files?.receipts);
-  const supportingDocuments = await uploadAttachments(files?.supportingDocuments);
-
-  if (!asDraft && receipts.length === 0)
-    throw err("At least one receipt/invoice must be attached to submit a claim");
-
-  const claim = await Reimbursement.create({
-    ...buildActorSnapshot(actor, model),
-    reimbursementType: body.reimbursementType,
-    expenseDate: body.expenseDate,
-    amountClaimed: body.amountClaimed,
-    currency: body.currency || "INR",
-    description: body.description,
-    project: body.project || "",
-    costCenter: body.costCenter || "",
-    paymentMethod: body.paymentMethod || "Bank Transfer",
-    reimbursementPolicyAcknowledged: !!body.reimbursementPolicyAcknowledged,
-    employeeSignature: body.employeeSignature || "",
-    receipts,
-    supportingDocuments,
-    status: asDraft ? "draft" : "submitted",
+  const requisition = await HiringRequisition.create({
+    ...data,
+    organisation_id: req.manager.organisation_id,
+    requested_by: req.manager._id,
   });
-
-  return claim;
+  res.status(201).json({ success: true, message: "Hiring requisition submitted", requisition });
 };
 
-const updateClaim = async ({ actor, model, id, body, files }) => {
-  const claim = await Reimbursement.findOne({
-    _id: id,
-    organisation_id: actor.organisation_id,
-    submittedBy: actor._id,
-    submitterModel: model,
-  });
-  if (!claim) throw err("Reimbursement claim not found", 404);
-  if (claim.status !== "draft")
-    throw err("Only a draft claim can be edited", 400);
-
-  const editable = [
-    "reimbursementType",
-    "expenseDate",
-    "amountClaimed",
-    "currency",
-    "description",
-    "project",
-    "costCenter",
-    "paymentMethod",
-    "employeeSignature",
-  ];
-  editable.forEach((field) => {
-    if (body[field] !== undefined) claim[field] = body[field];
-  });
-  if (body.reimbursementPolicyAcknowledged !== undefined)
-    claim.reimbursementPolicyAcknowledged = !!body.reimbursementPolicyAcknowledged;
-
-  // Remove any existing receipts/supporting documents the person asked to
-  // detach (identified by their ImageKit fileId) before adding replacements,
-  // so a "swap the receipt" edit is a single update call.
-  const removeReceiptIds = parseIdList(body.removeReceiptIds);
-  const removeSupportingDocumentIds = parseIdList(body.removeSupportingDocumentIds);
-  claim.receipts = await removeAttachments(claim.receipts, removeReceiptIds);
-  claim.supportingDocuments = await removeAttachments(
-    claim.supportingDocuments,
-    removeSupportingDocumentIds,
-  );
-
-  const newReceipts = await uploadAttachments(files?.receipts);
-  const newSupportingDocuments = await uploadAttachments(files?.supportingDocuments);
-  if (newReceipts.length) claim.receipts.push(...newReceipts);
-  if (newSupportingDocuments.length) claim.supportingDocuments.push(...newSupportingDocuments);
-
-  if (body.status === "submitted") {
-    const validationError = validateClaimBody(claim.toObject());
-    if (validationError) throw err(validationError);
-    if (!hasBankDetails(actor))
-      throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
-    if (claim.receipts.length === 0)
-      throw err("At least one receipt/invoice must be attached to submit a claim");
-    // Re-snapshot bank details in case they were added/changed after the
-    // draft was first saved.
-    claim.bankAccount = {
-      bankName: actor.bank_name || "",
-      accountHolderName: actor.account_holder_name || "",
-      accountNumber: actor.account_number || "",
-      ifscCode: actor.ifsc_code || "",
-    };
-    claim.status = "submitted";
-  }
-
-  await claim.save();
-  return claim;
+const getMyRequisitions = async (req, res) => {
+  const requisitions = await HiringRequisition.find({
+    organisation_id: req.manager.organisation_id,
+    requested_by: req.manager._id,
+  }).sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: requisitions.length, requisitions });
 };
 
-const deleteClaim = async ({ actor, model, id }) => {
-  const claim = await Reimbursement.findOne({
-    _id: id,
-    organisation_id: actor.organisation_id,
-    submittedBy: actor._id,
-    submitterModel: model,
-  });
-  if (!claim) throw err("Reimbursement claim not found", 404);
-  if (claim.status !== "draft")
-    throw err("Only a draft claim can be deleted", 400);
-  await claim.deleteOne();
+const getAllRequisitions = async (req, res) => {
+  const requisitions = await HiringRequisition.find({ organisation_id: req.admin.organisation_id })
+    .populate("requested_by", "f_name l_name work_email")
+    .sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: requisitions.length, requisitions });
 };
 
-const listMyClaims = async ({ actor, model }) => {
-  return Reimbursement.find({
-    organisation_id: actor.organisation_id,
-    submittedBy: actor._id,
-    submitterModel: model,
-    isDeleted: false,
+const getPendingRequisitions = async (req, res) => {
+  const requisitions = await HiringRequisition.find({
+    organisation_id: req.admin.organisation_id,
+    status: "PENDING",
   })
-    .sort({ createdAt: -1 })
-    .populate("reportingManager", "f_name l_name work_email personal_contact")
-    .lean();
+    .populate("requested_by", "f_name l_name work_email")
+    .sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: requisitions.length, requisitions });
 };
 
-// Admin reviews claims raised by User/Manager. SuperAdmin can review claims
-// raised by Admin, Manager, or Employee — i.e. everything org-wide.
-// `approverModel` may be a single role string or an array of roles.
-const listQueueForApprover = async ({ organisation_id, approverModel, status }) => {
-  const query = { organisation_id, isDeleted: false };
-  query.approverModel = Array.isArray(approverModel) ? { $in: approverModel } : approverModel;
-  if (status) query.status = status;
-  return Reimbursement.find(query)
-    .sort({ createdAt: -1 })
-    .populate("reportingManager", "f_name l_name work_email personal_contact")
-    .lean();
+const getRequisitionById = async (req, res) => {
+  const requisition = await HiringRequisition.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  }).populate("requested_by", "f_name l_name work_email");
+  if (!requisition) throw err("Requisition not found", 404);
+  res.status(200).json({ success: true, requisition });
 };
 
-const decideClaim = async ({
-  organisation_id,
-  id,
-  decision,
-  actorId,
-  actorModel,
-  comments,
-  reason,
-  allowedApproverModels,
-}) => {
-  const claim = await Reimbursement.findOne({ _id: id, organisation_id });
-  if (!claim) throw err("Reimbursement claim not found", 404);
-  if (!allowedApproverModels.includes(claim.approverModel))
-    throw err("You are not authorized to act on this claim", 403);
-  if (claim.status !== "submitted")
-    throw err(`Cannot ${decision} a claim that is not pending review`, 400);
+const findRequisitionForAdmin = async (req) => {
+  const requisition = await HiringRequisition.findOne({
+    _id: req.params.id,
+    organisation_id: req.admin.organisation_id,
+  });
+  if (!requisition) throw err("Requisition not found", 404);
+  return requisition;
+};
 
-  if (decision === "approve") {
-    claim.status = "approved";
-    claim.approvedBy = actorId;
-    claim.approvedByModel = actorModel;
-    claim.approvedAt = new Date();
-    claim.approverComments = comments || "";
-  } else {
-    claim.status = "rejected";
-    claim.rejectedBy = actorId;
-    claim.rejectedByModel = actorModel;
-    claim.rejectedAt = new Date();
-    claim.rejectionReason = reason || "";
+const approveRequisition = async (req, res) => {
+  const requisition = await findRequisitionForAdmin(req);
+  requisition.status = "APPROVED";
+  requisition.approved_by = req.admin._id;
+  requisition.approved_at = new Date();
+  if (req.body.admin_comment !== undefined) requisition.admin_comment = req.body.admin_comment;
+  await requisition.save();
+  res.status(200).json({ success: true, message: "Requisition approved", requisition });
+};
+
+const rejectRequisition = async (req, res) => {
+  const requisition = await findRequisitionForAdmin(req);
+  requisition.status = "REJECTED";
+  requisition.admin_comment = req.body.admin_comment || "";
+  await requisition.save();
+  res.status(200).json({ success: true, message: "Requisition rejected", requisition });
+};
+
+const holdRequisition = async (req, res) => {
+  const requisition = await findRequisitionForAdmin(req);
+  requisition.status = "ON_HOLD";
+  if (req.body.admin_comment !== undefined) requisition.admin_comment = req.body.admin_comment;
+  await requisition.save();
+  res.status(200).json({ success: true, message: "Requisition put on hold", requisition });
+};
+
+const requestRevision = async (req, res) => {
+  const requisition = await findRequisitionForAdmin(req);
+  if (!req.body.admin_comment) throw err("admin_comment is required to request revision");
+  requisition.status = "REVISION_REQUIRED";
+  requisition.admin_comment = req.body.admin_comment;
+  await requisition.save();
+  res.status(200).json({ success: true, message: "Revision requested", requisition });
+};
+
+const CANDIDATE_FIELDS = [
+  "requisition_id",
+  "full_name",
+  "email",
+  "phone",
+  "resume_url",
+  "experience",
+  "current_company",
+  "skills",
+  "source",
+];
+
+const addCandidate = async (req, res) => {
+  const data = {};
+  for (const field of CANDIDATE_FIELDS) {
+    if (req.body[field] !== undefined) data[field] = req.body[field];
   }
+  if (!data.requisition_id || !data.full_name || !data.email)
+    throw err("requisition_id, full_name and email are required");
 
-  await claim.save();
-  return claim;
-};
-
-const markPaid = async ({ organisation_id, id, actorId, actorModel, paymentReference, financeNotes, allowedApproverModels }) => {
-  const claim = await Reimbursement.findOne({ _id: id, organisation_id });
-  if (!claim) throw err("Reimbursement claim not found", 404);
-  if (!allowedApproverModels.includes(claim.approverModel))
-    throw err("You are not authorized to act on this claim", 403);
-  if (claim.status !== "approved")
-    throw err("Only an approved claim can be marked as paid", 400);
-
-  claim.status = "paid";
-  claim.paidBy = actorId;
-  claim.paidByModel = actorModel;
-  claim.paidAt = new Date();
-  claim.paymentReference = paymentReference || "";
-  if (financeNotes !== undefined) claim.financeNotes = financeNotes;
-
-  await claim.save();
-  return claim;
-};
-
-// ---------------------------------------------------------------------------
-// Employee (User) handlers
-// ---------------------------------------------------------------------------
-
-const employeeApply = async (req, res) => {
-  const claim = await createClaim({
-    actor: req.employee,
-    model: "User",
-    body: req.body,
-    files: req.files,
-    asDraft: req.body.status === "draft",
-  });
-  res.status(201).json({ success: true, message: "Reimbursement claim submitted", reimbursement: claim });
-};
-
-const employeeUpdate = async (req, res) => {
-  const claim = await updateClaim({ actor: req.employee, model: "User", id: req.params.id, body: req.body, files: req.files });
-  res.status(200).json({ success: true, message: "Reimbursement claim updated", reimbursement: claim });
-};
-
-const employeeDelete = async (req, res) => {
-  await deleteClaim({ actor: req.employee, model: "User", id: req.params.id });
-  res.status(200).json({ success: true, message: "Reimbursement claim deleted" });
-};
-
-const employeeGetMy = async (req, res) => {
-  const reimbursements = await listMyClaims({ actor: req.employee, model: "User" });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
-};
-
-// ---------------------------------------------------------------------------
-// Manager handlers (Manager's own claims — reviewed by Admin, same as Employee)
-// ---------------------------------------------------------------------------
-
-const managerApply = async (req, res) => {
-  const claim = await createClaim({
-    actor: req.manager,
-    model: "Manager",
-    body: req.body,
-    files: req.files,
-    asDraft: req.body.status === "draft",
-  });
-  res.status(201).json({ success: true, message: "Reimbursement claim submitted", reimbursement: claim });
-};
-
-const managerUpdate = async (req, res) => {
-  const claim = await updateClaim({ actor: req.manager, model: "Manager", id: req.params.id, body: req.body, files: req.files });
-  res.status(200).json({ success: true, message: "Reimbursement claim updated", reimbursement: claim });
-};
-
-const managerDelete = async (req, res) => {
-  await deleteClaim({ actor: req.manager, model: "Manager", id: req.params.id });
-  res.status(200).json({ success: true, message: "Reimbursement claim deleted" });
-};
-
-const managerGetMy = async (req, res) => {
-  const reimbursements = await listMyClaims({ actor: req.manager, model: "Manager" });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
-};
-
-// ---------------------------------------------------------------------------
-// Admin handlers
-//   - Admin's own claims escalate to SuperAdmin (apply/update/delete/getMy)
-//   - Admin reviews Employee + Manager claims (pending/all/approve/reject/markPaid)
-// ---------------------------------------------------------------------------
-
-const adminApply = async (req, res) => {
-  const claim = await createClaim({
-    actor: req.admin,
-    model: "Admin",
-    body: req.body,
-    files: req.files,
-    asDraft: req.body.status === "draft",
-  });
-  res.status(201).json({ success: true, message: "Reimbursement claim submitted", reimbursement: claim });
-};
-
-const adminUpdate = async (req, res) => {
-  const claim = await updateClaim({ actor: req.admin, model: "Admin", id: req.params.id, body: req.body, files: req.files });
-  res.status(200).json({ success: true, message: "Reimbursement claim updated", reimbursement: claim });
-};
-
-const adminDelete = async (req, res) => {
-  await deleteClaim({ actor: req.admin, model: "Admin", id: req.params.id });
-  res.status(200).json({ success: true, message: "Reimbursement claim deleted" });
-};
-
-const adminGetMy = async (req, res) => {
-  const reimbursements = await listMyClaims({ actor: req.admin, model: "Admin" });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
-};
-
-const adminGetPending = async (req, res) => {
-  const reimbursements = await listQueueForApprover({
+  const requisition = await HiringRequisition.findOne({
+    _id: data.requisition_id,
     organisation_id: req.admin.organisation_id,
-    approverModel: "Admin",
-    status: "submitted",
   });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
-};
+  if (!requisition) throw err("Requisition not found", 404);
 
-// Every Employee/Manager claim regardless of status — admin's full ledger.
-const adminGetAll = async (req, res) => {
-  const reimbursements = await listQueueForApprover({
+  const candidate = await Candidate.create({
+    ...data,
     organisation_id: req.admin.organisation_id,
-    approverModel: "Admin",
-    status: req.query.status,
+    added_by: req.admin._id,
   });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
+  res.status(201).json({ success: true, message: "Candidate added", candidate });
 };
 
-const adminApprove = async (req, res) => {
-  const claim = await decideClaim({
+const getCandidatesByRequisition = async (req, res) => {
+  const candidates = await Candidate.find({
+    requisition_id: req.params.requisition_id,
     organisation_id: req.admin.organisation_id,
-    id: req.body.id,
-    decision: "approve",
-    actorId: req.admin._id,
-    actorModel: "Admin",
-    comments: req.body.comments,
-    allowedApproverModels: ["Admin"],
-  });
-  res.status(200).json({ success: true, message: "Reimbursement claim approved", reimbursement: claim });
+  }).sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: candidates.length, candidates });
 };
 
-const adminReject = async (req, res) => {
-  const claim = await decideClaim({
+const getCandidateById = async (req, res) => {
+  const candidate = await Candidate.findOne({
+    _id: req.params.id,
     organisation_id: req.admin.organisation_id,
-    id: req.body.id,
-    decision: "reject",
-    actorId: req.admin._id,
-    actorModel: "Admin",
-    reason: req.body.reason,
-    allowedApproverModels: ["Admin"],
-  });
-  res.status(200).json({ success: true, message: "Reimbursement claim rejected", reimbursement: claim });
+  }).populate("requisition_id", "job_title department");
+  if (!candidate) throw err("Candidate not found", 404);
+  res.status(200).json({ success: true, candidate });
 };
 
-const adminMarkPaid = async (req, res) => {
-  const claim = await markPaid({
+const findCandidateForAdmin = async (req, idParam = "id") => {
+  const candidate = await Candidate.findOne({
+    _id: req.params[idParam],
     organisation_id: req.admin.organisation_id,
-    id: req.body.id,
-    actorId: req.admin._id,
-    actorModel: "Admin",
-    paymentReference: req.body.paymentReference,
-    financeNotes: req.body.financeNotes,
-    allowedApproverModels: ["Admin"],
   });
-  res.status(200).json({ success: true, message: "Reimbursement claim marked as paid", reimbursement: claim });
+  if (!candidate) throw err("Candidate not found", 404);
+  return candidate;
 };
 
-// ---------------------------------------------------------------------------
-// SuperAdmin handlers
-//   - Reviews Admin claims (pending/approve/reject/markPaid)
-//   - Can see every claim in the org: Employee, Manager, and Admin
-// ---------------------------------------------------------------------------
-
-const superadminGetPending = async (req, res) => {
-  const reimbursements = await listQueueForApprover({
-    organisation_id: req.superAdmin._id,
-    // SuperAdmin can act on every claim in the org, not just claims raised
-    // by Admins — so the pending queue spans both approver buckets.
-    approverModel: ["SuperAdmin", "Admin"],
-    status: "submitted",
-  });
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
+const updateCandidateStage = async (req, res) => {
+  const candidate = await findCandidateForAdmin(req);
+  const { current_stage, rejection_reason, offered_salary, joining_date, overall_feedback } = req.body;
+  if (!current_stage) throw err("current_stage is required");
+  candidate.current_stage = current_stage;
+  if (rejection_reason !== undefined) candidate.rejection_reason = rejection_reason;
+  if (offered_salary !== undefined) candidate.offered_salary = offered_salary;
+  if (joining_date !== undefined) candidate.joining_date = joining_date;
+  if (overall_feedback !== undefined) candidate.overall_feedback = overall_feedback;
+  await candidate.save();
+  res.status(200).json({ success: true, message: "Candidate stage updated", candidate });
 };
 
-// Org-wide visibility across all three submitter roles, any status.
-const superadminGetAll = async (req, res) => {
-  const query = { organisation_id: req.superAdmin._id, isDeleted: false };
-  if (req.query.status) query.status = req.query.status;
-  if (req.query.submitterModel) query.submitterModel = req.query.submitterModel;
+const scheduleInterview = async (req, res) => {
+  const candidate = await findCandidateForAdmin(req);
+  const { round_type, scheduled_at, next_stage } = req.body;
+  if (!round_type || !scheduled_at) throw err("round_type and scheduled_at are required");
 
-  const reimbursements = await Reimbursement.find(query)
-    .sort({ createdAt: -1 })
-    .populate("reportingManager", "f_name l_name work_email personal_contact")
-    .lean();
-  res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
+  candidate.interview_rounds.push({
+    round_number: candidate.interview_rounds.length + 1,
+    round_type,
+    scheduled_at,
+    conducted_by: req.body.conducted_by || null,
+  });
+  if (next_stage) candidate.current_stage = next_stage;
+  await candidate.save();
+  res.status(201).json({ success: true, message: "Interview scheduled", candidate });
 };
 
-const superadminApprove = async (req, res) => {
-  const claim = await decideClaim({
-    organisation_id: req.superAdmin._id,
-    id: req.body.id,
-    decision: "approve",
-    actorId: req.superAdmin._id,
-    actorModel: "SuperAdmin",
-    comments: req.body.comments,
-    // SuperAdmin is the org-wide override approver: can act on Admin's own
-    // claims (approverModel "SuperAdmin") as well as Manager/Employee
-    // claims that normally go to an Admin (approverModel "Admin"). Admin
-    // itself stays restricted to only ["Admin"] — never Admin-submitted
-    // claims — see adminApprove/adminReject/adminMarkPaid below.
-    allowedApproverModels: ["SuperAdmin", "Admin"],
-  });
-  res.status(200).json({ success: true, message: "Reimbursement claim approved", reimbursement: claim });
-};
+const submitInterviewFeedback = async (req, res) => {
+  const candidate = await findCandidateForAdmin(req, "candidateId");
+  const round = candidate.interview_rounds.id(req.params.roundId);
+  if (!round) throw err("Interview round not found", 404);
 
-const superadminReject = async (req, res) => {
-  const claim = await decideClaim({
-    organisation_id: req.superAdmin._id,
-    id: req.body.id,
-    decision: "reject",
-    actorId: req.superAdmin._id,
-    actorModel: "SuperAdmin",
-    reason: req.body.reason,
-    allowedApproverModels: ["SuperAdmin", "Admin"],
-  });
-  res.status(200).json({ success: true, message: "Reimbursement claim rejected", reimbursement: claim });
-};
+  const { feedback, score, outcome } = req.body;
+  if (feedback !== undefined) round.feedback = feedback;
+  if (score !== undefined) round.score = score;
+  if (outcome !== undefined) round.outcome = outcome;
+  round.conducted_by = req.admin._id;
 
-const superadminMarkPaid = async (req, res) => {
-  const claim = await markPaid({
-    organisation_id: req.superAdmin._id,
-    id: req.body.id,
-    actorId: req.superAdmin._id,
-    actorModel: "SuperAdmin",
-    paymentReference: req.body.paymentReference,
-    financeNotes: req.body.financeNotes,
-    allowedApproverModels: ["SuperAdmin", "Admin"],
-  });
-  res.status(200).json({ success: true, message: "Reimbursement claim marked as paid", reimbursement: claim });
+  await candidate.save();
+  res.status(200).json({ success: true, message: "Interview feedback submitted", candidate });
 };
 
 module.exports = {
-  employeeApply,
-  employeeUpdate,
-  employeeDelete,
-  employeeGetMy,
-  managerApply,
-  managerUpdate,
-  managerDelete,
-  managerGetMy,
-  adminApply,
-  adminUpdate,
-  adminDelete,
-  adminGetMy,
-  adminGetPending,
-  adminGetAll,
-  adminApprove,
-  adminReject,
-  adminMarkPaid,
-  superadminGetPending,
-  superadminGetAll,
-  superadminApprove,
-  superadminReject,
-  superadminMarkPaid,
+  createRequisition,
+  getMyRequisitions,
+  getAllRequisitions,
+  getPendingRequisitions,
+  getRequisitionById,
+  approveRequisition,
+  rejectRequisition,
+  holdRequisition,
+  requestRevision,
+  addCandidate,
+  getCandidatesByRequisition,
+  getCandidateById,
+  updateCandidateStage,
+  scheduleInterview,
+  submitInterviewFeedback,
 };
