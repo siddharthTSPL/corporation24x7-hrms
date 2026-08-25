@@ -9,6 +9,7 @@ import {
   useRemovePayrollAllowance,
   useGetPaySchedule,
   useSetPaySchedule,
+  useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
   useReapplyPolicy,
@@ -24,7 +25,6 @@ import {
   useGetAllEmployee,
   useGetAllAdmins,
 } from "../../auth/server-state/adminother/adminother.hook";
-import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 
 const C = {
   brand: "#CD166E",
@@ -69,7 +69,7 @@ const CALC_TYPES = [
   { key: "formula", label: "Custom Formula" },
 ];
 
-const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin (You)" };
+const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin" };
 const MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 const DEPARTMENT_LABEL = {
   OPR: "Operations",
@@ -324,10 +324,13 @@ function GhostButton({ children, ...rest }) {
 function useEmployeeDirectory() {
   const { data: empData, isLoading: empLoading } = useGetAllEmployee();
   const { data: adminData, isLoading: adminLoading } = useGetAllAdmins();
-  const { data: auth } = useAuth();
+  const { data: ownerData, isLoading: ownerLoading } = useGetOrgOwner();
 
-  const isSuperAdmin = auth?.role === "superadmin";
-  const me = auth?.data?.superAdmin;
+  // The org-owner (SuperAdmin) record now comes from a shared endpoint that
+  // both Admin and SuperAdmin tokens can call — so Admin can set CTC /
+  // generate payroll for the SuperAdmin too, same as SuperAdmin already could
+  // for themself.
+  const owner = ownerData?.owner;
 
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
@@ -345,12 +348,12 @@ function useEmployeeDirectory() {
       model: "Admin",
     }));
     // A SuperAdmin has no roster to fetch — it's a single person, the org
-    // owner. Only a logged-in SuperAdmin sees themself here so they can
-    // build their own salary structure/payroll, same flow as everyone else.
-    const superAdmins = isSuperAdmin && me?._id
+    // owner. Both Admin and SuperAdmin logins see them here so either can
+    // build the SuperAdmin's salary structure/payroll, same flow as everyone else.
+    const superAdmins = owner?._id
       ? [{
-          _id: me._id,
-          name: `${me.f_name || ""} ${me.l_name || ""}`.trim() || "Super Admin",
+          _id: owner._id,
+          name: `${owner.f_name || ""} ${owner.l_name || ""}`.trim() || "Super Admin",
           uid: "OWNER",
           empid: "OWNER",
           model: "SuperAdmin",
@@ -365,12 +368,12 @@ function useEmployeeDirectory() {
       Admin: all.filter((p) => p.model === "Admin"),
       SuperAdmin: superAdmins,
     };
-    // Admins/Managers/Employees never see "Super Admin" as a selectable
-    // employee type — only the SuperAdmin themself can build their own payroll.
-    const visibleModels = isSuperAdmin ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
+    // Both Admin and SuperAdmin can see "Super Admin" as a selectable
+    // employee type now — only shown once the owner record has loaded.
+    const visibleModels = superAdmins.length ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
 
-    return { byId, byModel, visibleModels, loading: empLoading || adminLoading };
-  }, [empData, adminData, isSuperAdmin, me]);
+    return { byId, byModel, visibleModels, loading: empLoading || adminLoading || ownerLoading };
+  }, [empData, adminData, owner, empLoading, adminLoading, ownerLoading]);
 }
 
 function resolveName(directory, id, fallbackModel) {
