@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import {
   useGetForwardedLeaves,
   useAcceptLeave,
   useRejectLeave,
   useAdminApplyLeave,
+  useAdminEditLeave,
+  useAdminDeleteLeave,
   useAdminGetMyLeaveHistory,
 } from "../../auth/server-state/adminleave/adminleave.hook";
 import {
@@ -282,6 +284,69 @@ const Toast = ({ toast }) => {
         {toast.type === "info"    && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 4v4M5 3v.5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>}
       </div>
       <span className="break-words">{toast.message}</span>
+    </div>
+  );
+};
+
+
+const LeaveActionModal = ({ dialog, onClose, onConfirm }) => {
+  if (!dialog?.open) return null;
+  const isError = dialog.type === "error";
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center px-4"
+      style={{ background: "rgba(28,16,40,0.46)", backdropFilter: "blur(5px)" }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !dialog.loading) onClose(); }}
+    >
+      <div
+        className="w-full max-w-[460px] rounded-[22px] bg-white shadow-[0_24px_70px_rgba(28,16,40,0.24)] border border-[#E8DDF0] overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="leave-action-dialog-title"
+      >
+        <div className="px-5 sm:px-6 pt-6 pb-4 flex items-start gap-3">
+          <div
+            className="w-11 h-11 rounded-[14px] flex items-center justify-center shrink-0"
+            style={{ background: isError ? "#FEF2F2" : "#FFF7ED" }}
+          >
+            {isError ? (
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="#DC2626" strokeWidth="1.7" />
+                <path d="M12 7.5v5M12 16v.5" stroke="#DC2626" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3.5l8 3.2v5.7c0 4.1-2.7 7-8 8.1-5.3-1.1-8-4-8-8.1V6.7l8-3.2Z" stroke="#C2410C" strokeWidth="1.6" />
+                <path d="M12 8v4M12 15.5v.5" stroke="#C2410C" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 id="leave-action-dialog-title" className="m-0 text-[17px] font-bold text-[#1C1028] font-['DM_Sans']">
+              {dialog.title}
+            </h3>
+            <p className="m-0 mt-1.5 text-[13px] leading-[1.65] text-[#75647F] font-['DM_Sans'] break-words">
+              {dialog.message}
+            </p>
+          </div>
+        </div>
+        <div className="px-5 sm:px-6 py-4 bg-[#FCFAFE] border-t border-[#F0EAF8] flex justify-end gap-2.5">
+          {isError ? (
+            <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-[11px] text-[13px] font-semibold text-white bg-gradient-to-br from-[#6B1A4A] to-[#9B2458] border-none cursor-pointer shadow-[0_4px_14px_rgba(107,26,74,0.25)]">
+              Got it
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={onClose} disabled={dialog.loading} className="px-5 py-2.5 rounded-[11px] text-[13px] font-semibold text-[#6B1A4A] bg-[#F4EEF9] border-[1.5px] border-[#DFD0EC] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                Cancel
+              </button>
+              <button type="button" onClick={onConfirm} disabled={dialog.loading} className="px-5 py-2.5 rounded-[11px] text-[13px] font-semibold text-white bg-gradient-to-br from-[#6B1A4A] to-[#9B2458] border-none cursor-pointer shadow-[0_4px_14px_rgba(107,26,74,0.22)] disabled:opacity-50 disabled:cursor-not-allowed">
+                {dialog.loading ? "Deleting…" : "Delete Leave"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -744,9 +809,14 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
 const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   const [form, setForm]     = useState({ leaveType: "el", startDate: "", endDate: "", reason: "" });
   const [errors, setErrors] = useState({});
+  const [editTarget, setEditTarget] = useState(null);
+  const [leaveDialog, setLeaveDialog] = useState(null);
+  const formSectionRef = useRef(null);
 
   const { data: rawHistory, isLoading: histLoading, refetch } = useAdminGetMyLeaveHistory();
-  const applyMut = useAdminApplyLeave();
+  const applyMut  = useAdminApplyLeave();
+  const editMut   = useAdminEditLeave();
+  const deleteMut = useAdminDeleteLeave();
   const history  = Array.isArray(rawHistory?.leave) ? rawHistory.leave : Array.isArray(rawHistory) ? rawHistory : [];
 
   const PAGE_SIZE = 5;
@@ -780,13 +850,66 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   const handleSubmit = async () => {
     if (!validate()) return;
     try {
-      await applyMut.mutateAsync(form);
-      showToast("Leave request submitted", "success");
+      if (editTarget) {
+        await editMut.mutateAsync({ id: editTarget._id, ...form });
+        showToast("Leave updated successfully", "success");
+      } else {
+        await applyMut.mutateAsync(form);
+        showToast("Leave request submitted", "success");
+      }
+      setLeaveDialog(null);
       setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" });
+      setEditTarget(null);
       setErrors({});
       refetch();
     } catch (err) {
-      showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
+      const message = err?.response?.data?.message || err?.message || "Something went wrong";
+      if (/processed|forwarded|cannot edit|cannot delete/i.test(message)) {
+        setLeaveDialog({ open:true, type:"error", title:"Leave can’t be changed", message });
+      } else {
+        showToast(message, "error");
+      }
+    }
+  };
+
+  const openEdit = (leave) => {
+    setEditTarget(leave);
+    setForm({
+      leaveType: leave.leaveType,
+      startDate: new Date(leave.startDate).toISOString().split("T")[0],
+      endDate:   new Date(leave.endDate).toISOString().split("T")[0],
+      reason:    leave.reason,
+    });
+    requestAnimationFrame(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const handleDelete = async (id) => {
+    setLeaveDialog({
+      open:true, type:"confirm", title:"Delete this leave?",
+      message:"This leave request will be removed from your leave history. This action can’t be undone.",
+      loading:false, id,
+    });
+  };
+
+  const confirmDeleteLeave = async () => {
+    const id = leaveDialog?.id;
+    if (!id) return;
+    setLeaveDialog((d) => ({...d, loading:true}));
+    try {
+      await deleteMut.mutateAsync(id);
+      setLeaveDialog(null);
+      showToast("Leave deleted", "info");
+      refetch();
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || "Delete failed";
+      if (/processed|forwarded|cannot edit|cannot delete/i.test(message)) {
+        setLeaveDialog({open:true,type:"error",title:"Leave can’t be changed",message});
+      } else {
+        setLeaveDialog(null);
+        showToast(message, "error");
+      }
     }
   };
 
@@ -795,7 +918,8 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
 
   return (
     <div className="w-full">
-      <SectionBox title="New Leave Request">
+      <div ref={formSectionRef}>
+      <SectionBox title={editTarget ? "Edit Leave Request" : "New Leave Request"}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
           <FormField label="Leave Type" error={errors.leaveType}>
             <select
@@ -845,23 +969,35 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         </FormField>
         <p className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-1 mb-4">{form.reason.length}/500 chars (min 10)</p>
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5">
-          <button
-            onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setErrors({}); }}
-            className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
-            style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
-          >
-            Clear
-          </button>
+          {editTarget && (
+            <button
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setEditTarget(null); setErrors({}); }}
+              className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
+              style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
+            >
+              Cancel Edit
+            </button>
+          )}
+          {!editTarget && (
+            <button
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setErrors({}); }}
+              className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
+              style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
+            >
+              Clear
+            </button>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={applyMut.isPending}
+            disabled={applyMut.isPending || editMut.isPending}
             className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-semibold text-white cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 min-h-[44px]"
             style={{ background: "linear-gradient(135deg,#6B1A4A,#9B2458)", boxShadow: "0 4px 16px rgba(107,26,74,0.35)" }}
           >
-            {applyMut.isPending ? "Submitting…" : "Submit Request →"}
+            {applyMut.isPending || editMut.isPending ? "Submitting…" : editTarget ? "Update Request →" : "Submit Request →"}
           </button>
         </div>
       </SectionBox>
+      </div>
 
       <SectionBox
         title="My Leave History"
@@ -893,6 +1029,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
             {pagedHistory.map((leave, idx) => {
               const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
+              const canManageOwnLeave = leave.status === "pending_superadmin";
               return (
                 <div
                   key={leave._id || idx}
@@ -906,7 +1043,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                   }}
                 >
                   <div className="absolute top-0 left-0 bottom-0 w-[3px] rounded-l-[12px] xs:rounded-l-[14px] sm:rounded-l-[16px]" style={{ background: accent }} />
-                  <div className="flex flex-col xs:flex-row justify-between items-start gap-2 xs:gap-3 pl-2">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-2 sm:gap-3 pl-2">
                     <div className="flex-1 min-w-0 w-full">
                       <div className="flex gap-1 sm:gap-1.5 flex-wrap mb-2 sm:mb-2.5">
                         <TypeBadge type={leave.leaveType} />
@@ -928,11 +1065,34 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                       )}
                       <LeaveTimeline leave={leave} />
                     </div>
-                    {leave.createdAt && (
-                      <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-left xs:text-right leading-relaxed flex-shrink-0">
-                        Applied<br /><span className="font-semibold text-[#7B6890]">{fmt(leave.createdAt)}</span>
-                      </div>
-                    )}
+                    <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 flex-shrink-0 w-full sm:w-auto">
+                      {canManageOwnLeave && (
+                        <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
+                          <button
+                            onClick={() => openEdit(leave)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold cursor-pointer border-none"
+                            style={{ background: "#F0F9FF", color: "#0369A1" }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(leave._id)}
+                            disabled={deleteMut.isPending}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[9px] text-[12px] font-semibold cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ background: "#FFF1F2", color: "#991B1B" }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                      {leave.createdAt && (
+                        <div className="text-[9px] sm:text-[10px] text-[#9B8BAE] text-left sm:text-right leading-relaxed flex-shrink-0">
+                          Applied<br /><span className="font-semibold text-[#7B6890]">{fmt(leave.createdAt)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -974,6 +1134,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
           </div>
         )}
       </SectionBox>
+      <LeaveActionModal dialog={leaveDialog} onClose={() => setLeaveDialog(null)} onConfirm={confirmDeleteLeave} />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import {
   applyLeaveManager, getMyLeavesManager, getAllManagerLeaves, getLeaveHistory,
   acceptLeaveRequest, rejectLeaveRequest, forwardLeaveToReportingManager,
   getForwardedLeavesManager, acceptForwardedLeave, rejectForwardedLeave, forwardLeaveUpChain,
+  editLeaveManager, deleteLeaveManager,
 } from "../../../api/managerapi/leave/ma.leave.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -23,6 +24,28 @@ export const useGetMyLeavesManager = () => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useEditLeaveManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: editLeaveManager,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myLeavesManager"] });
+      queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });
+    },
+  });
+};
+
+export const useDeleteLeaveManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteLeaveManager,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myLeavesManager"] });
+      queryClient.invalidateQueries({ queryKey: ["leaveHistory"] });
+    },
   });
 };
 
