@@ -133,3 +133,42 @@ export const bulkDeletePayroll = async (ids) => {
   const res = await api.post("admin/payroll/bulk/delete", { ids });
   return res.data;
 };
+
+
+
+// --- Full & Final (FnF) settlement — one-time, for resigned/fired/terminated people ---
+
+export const listEligibleForFnF = async () => {
+  const res = await api.get("admin/payroll/fnf/eligible");
+  return res.data;
+};
+
+export const generateFnF = async (data) => {
+  const res = await api.post("admin/payroll/fnf/generate", data);
+  return res.data;
+};
+
+export const listFnF = async (params) => {
+  const res = await api.get("admin/payroll/fnf", { params });
+  return res.data;
+};
+
+export const getFnFSlip = async (id) => {
+  const res = await api.get(`admin/payroll/fnf/${id}`);
+  return res.data;
+};
+
+export const updateFnF = async (id, data) => {
+  const res = await api.patch(`admin/payroll/fnf/${id}`, data);
+  return res.data;
+};
+
+export const updateFnFStatus = async (id, status) => {
+  const res = await api.patch(`admin/payroll/fnf/${id}/status`, { status });
+  return res.data;
+};
+
+export const deleteFnF = async (id) => {
+  const res = await api.delete(`admin/payroll/fnf/${id}`);
+  return res.data;
+};
