@@ -82,6 +82,7 @@ const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const unifiedauthrouter = require('../routes/Unified.auth.route');
 const payrollrouter = require('../routes/payroll.route');
 const payrollpolicyrouter = require('../routes/payrollpolicy.route');
+const fnfrouter = require('../routes/fnf.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
 const notificationrouter = require('../routes/Notification.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
@@ -105,6 +106,7 @@ const routes = {
   unifiedauthrouter,
   payrollrouter,
   payrollpolicyrouter,
+  fnfrouter,
   reimbursementrouter,
   notificationrouter,
 };
@@ -135,6 +137,8 @@ app.use('/admin/payroll', payrollrouter);
 app.use('/admin/payroll', payrollpolicyrouter);
 app.use('/superadmin/payroll', payrollrouter);
 app.use('/superadmin/payroll', payrollpolicyrouter);
+app.use('/admin/payroll/fnf', fnfrouter);
+app.use('/superadmin/payroll/fnf', fnfrouter);
 app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
 
