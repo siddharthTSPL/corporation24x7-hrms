@@ -10,9 +10,24 @@ const ROLE_META = {
   User:    { label: "Employee", icon: <FaUser size={10} />,       color: "#0d9e6e", bg: "#e8f7f1", border: "#a7f3d0" },
 };
 
+// Kept in sync with DEPT_FULL_FORMS in the employee directory component —
+// short department codes (OPR, BPO, ENG, HR, MGMT) shown as full names here.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function deptLabel(dept) {
+  if (!dept) return "";
+  return DEPT_FULL_FORMS[dept] || dept;
 }
 
 function RoleChip({ model }) {
@@ -104,7 +119,7 @@ function EmployeeHistoryDrawer({ open, onClose, employeeSummary, historyData, is
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
                 <RoleChip model={employee.person_model || employeeSummary?.person_model} />
-                {employee.uid && <span className="text-[10px] text-[#993556] font-mono">{employee.uid}</span>}
+                {employee.empid && <span className="text-[10px] text-[#993556] font-mono">{employee.empid}</span>}
               </div>
             </div>
           </div>
@@ -183,9 +198,10 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
   const employees = search
     ? rawEmployees.filter((e) =>
         `${e.f_name || ""} ${e.l_name || ""}`.toLowerCase().includes(search.toLowerCase()) ||
-        e.uid?.toLowerCase().includes(search.toLowerCase()) ||
+        e.empid?.toLowerCase().includes(search.toLowerCase()) ||
         e.designation?.toLowerCase().includes(search.toLowerCase()) ||
-        e.department?.toLowerCase().includes(search.toLowerCase())
+        e.department?.toLowerCase().includes(search.toLowerCase()) ||
+        deptLabel(e.department).toLowerCase().includes(search.toLowerCase())
       )
     : rawEmployees;
 
@@ -213,7 +229,7 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#993556]" size={11} />
             <input
               className="w-full pl-9 pr-3 py-2.5 bg-[#fdf5f9] border border-[#e8d5e2] rounded-lg text-[13px] text-[#0d0209] outline-none transition placeholder:text-[#c499b4] min-h-[44px] focus:border-[#730042] focus:ring-2 focus:ring-[#f7ecf3]"
-              placeholder="Search by name, ID, designation, department…"
+              placeholder="Search by name, Employee ID, designation, department…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -254,14 +270,14 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
                           <Avatar f_name={e.f_name} l_name={e.l_name} />
                           <div>
                             <p className="text-[13px] font-semibold text-[#730042]">{e.f_name} {e.l_name}</p>
-                            <p className="text-[10px] text-[#993556] font-mono">{e.uid || "—"}</p>
+                            <p className="text-[10px] text-[#993556] font-mono">{e.empid || "—"}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3"><RoleChip model={e.person_model} /></td>
                       <td className="px-4 py-3">
                         <p className="text-[12px] text-[#730042] font-medium">{e.designation || "—"}</p>
-                        <p className="text-[10px] text-[#993556]">{e.department || ""}</p>
+                        <p className="text-[10px] text-[#993556]">{deptLabel(e.department)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border" style={{ color: "#730042", background: "#f7ecf3", borderColor: "#e8d5e2" }}>
@@ -294,7 +310,7 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
                       <p className="text-[13px] font-semibold text-[#730042] truncate">{e.f_name} {e.l_name}</p>
                       <RoleChip model={e.person_model} />
                     </div>
-                    <p className="text-[10px] text-[#993556] font-mono mb-1">{e.uid || "—"}</p>
+                    <p className="text-[10px] text-[#993556] font-mono mb-1">{e.empid || "—"}</p>
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border" style={{ color: "#730042", background: "#f7ecf3", borderColor: "#e8d5e2" }}>
                         {e.total_assets_assigned} unit{e.total_assets_assigned === 1 ? "" : "s"}
@@ -326,4 +342,3 @@ export default function EmployeeAssetsPanel({ useEmployees, useHistory }) {
     </div>
   );
 }
-

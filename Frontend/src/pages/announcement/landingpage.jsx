@@ -83,8 +83,6 @@ function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   }, [])
 
   const scrollToTop = () => {
-    // Jo bhi actually scroll ho raha ho — ref wala div, ya window/document —
-    // sabko try karo taaki chahe jahan bhi scrolling ho rahi ho, kaam kare.
     scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
     document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
@@ -220,7 +218,6 @@ function TalkToExpertButton({ phone = '+917017415604', className }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
-    // mobile pe default tel: link behavior chalne do
   }
 
   return (
@@ -730,7 +727,8 @@ function Pricing() {
       desc: 'Perfect for small teams getting started',
       monthlyPrice: 47,
       yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance and Live Map Tracking', 'Live Tracking of Employee Active and Idle Time','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
+      features: ['Geo Tag Attendance','Face Attendence', 'Live Map Tracking', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Performance Management','Assets Management','Team Documentation','Timesheet','Reimbursement','Grievance Management','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)','Email support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
@@ -738,7 +736,8 @@ function Pricing() {
       monthlyPrice: 119,
       yearlyPrice: Math.round(119 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)']
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
+      crossFeatures: []
     },
     {
       name: 'Enterprise',
@@ -746,13 +745,16 @@ function Pricing() {
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
-        'Multi-company support',
-        'Role-based permissions',
+        'Free Smartphone gifthamper',
+        'Face Attendence',
+        'Custom integrations',
         'SSO',
         'API access',
-        'Custom integrations',
+        'Two-factor authentication',
+        'On-premises/ Private cloud hosting',
         'Dedicated account manager',
       ],
+      crossFeatures: []
     }
   ]
 
@@ -807,15 +809,18 @@ function Pricing() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-center mb-6 pt-5">
+          {/* items-stretch (not items-center) so every card fills the row's full height —
+              combined with h-full below, this keeps Basic / Advance / Enterprise
+              all exactly the same size regardless of how many features each lists. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] transition-transform duration-300 ${
-                    p.popular ? 'lg:scale-[1.045] relative z-[5]' : 'hover:scale-[1.02]'
+                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
+                    p.popular ? 'relative z-[5]' : 'hover:scale-[1.02]'
                   }`}
                 >
                   {p.popular && (
@@ -835,10 +840,15 @@ function Pricing() {
                       <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
                     )}
                   </div>
-                  <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
+                  <ul className="list-none p-0 m-0 flex flex-col gap-2.5 flex-1">
                     {p.features.map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
-                        <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />{f}
+                        {p.crossFeatures?.includes(f) ? (
+                          <FiX className="text-[#7A004B] shrink-0 mt-0.5" />
+                        ) : (
+                          <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />
+                        )}
+                        {f}
                       </li>
                     ))}
                   </ul>
