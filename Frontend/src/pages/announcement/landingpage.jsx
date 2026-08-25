@@ -734,7 +734,7 @@ function Pricing() {
     },
     {
       name: 'Advance',
-      desc: 'For growing businesses that need more. Everything in Starter +',
+      desc: 'For growing businesses that need more. Everything in Basic +',
       monthlyPrice: 119,
       yearlyPrice: Math.round(119 * 12 * 0.83), // 17% off on annual total
       popular: true,
@@ -742,7 +742,7 @@ function Pricing() {
     },
     {
       name: 'Enterprise',
-      desc: 'Ultimate power and flexibility. Everything in Growth +',
+      desc: 'Ultimate power and flexibility. Everything in Advance +',
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
