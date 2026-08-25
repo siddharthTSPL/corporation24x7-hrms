@@ -171,13 +171,15 @@ export const adminActionOnLeave = async (data) => {
 
 
 
-export const setEmployeeWorkingStatus = async (id, working_status) => {
-  const res = await api.put(`/admin/employee/${id}/working-status`, { working_status });
+export const setEmployeeWorkingStatus = async (id, payload) => {
+  const body = typeof payload === "string" ? { working_status: payload } : payload;
+  const res = await api.put(`/admin/employee/${id}/working-status`, body);
   return res.data;
 };
 
-export const setManagerWorkingStatus = async (id, working_status) => {
-  const res = await api.put(`/admin/manager/${id}/working-status`, { working_status });
+export const setManagerWorkingStatus = async (id, payload) => {
+  const body = typeof payload === "string" ? { working_status: payload } : payload;
+  const res = await api.put(`/admin/manager/${id}/working-status`, body);
   return res.data;
 };
 
