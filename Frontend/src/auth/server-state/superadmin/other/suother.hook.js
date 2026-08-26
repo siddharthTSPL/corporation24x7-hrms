@@ -41,7 +41,9 @@ import {
   setKioskPassword,
   getLeavePolicy,
   setLeavePolicy,
-  getParticularAdmin
+  getParticularAdmin,
+  setAdminHRRole,
+  superAdminAcknowledgeReview
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -59,6 +61,26 @@ export const useGetAllReviews = (params = {}) => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useSetAdminHRRole = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setAdminHRRole,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+    },
+  });
+};
+
+export const useSuperAdminAcknowledgeReview = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: superAdminAcknowledgeReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allReviews"] });
+    },
   });
 };
 
