@@ -86,36 +86,8 @@ const payrollpolicyrouter = require('../routes/payrollpolicy.route');
 const fnfrouter = require('../routes/Fnf.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
 const notificationrouter = require('../routes/Notification.routes');
+const reviewrouter = require('../routes/review.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
-
-// DEBUG — remove after fix
-const routes = {
-  adminrouter,
-  managerrouter,
-  userrouter,
-  attendancerouter,
-  superadminrouter,
-  ticketroute,
-  recruitmentroute,
-  wfhroute,
-  permissionroute,
-  timesheetroute,
-  kioskrouter,
-  faceattendancerouter,
-  shiftrouter,
-  holidaypolicyrouter,
-  unifiedauthrouter,
-  payrollrouter,
-  payrollpolicyrouter,
-  fnfrouter,
-  reimbursementrouter,
-  notificationrouter,
-};
-Object.entries(routes).forEach(([name, r]) => {
-  if (!r) console.error(`❌ UNDEFINED: ${name}`);
-  else if (typeof r !== 'function') console.error(`❌ NOT A FUNCTION: ${name} — type: ${typeof r}, value:`, r);
-  else console.log(`✅ ${name} loaded`);
-});
 
 app.use('/auth', unifiedauthrouter);
 app.use('/admin', adminrouter);
@@ -142,6 +114,7 @@ app.use('/admin/payroll/fnf', fnfrouter);
 app.use('/superadmin/payroll/fnf', fnfrouter);
 app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
+app.use('/review', reviewrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
