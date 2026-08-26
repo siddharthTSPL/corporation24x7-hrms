@@ -54,3 +54,8 @@ export const getPersonalDocuments = async () => {
   const res = await api.get("user/getPersonalDocuments");
   return res.data;
 };
+
+export const respondToMyReviewAsEmployee = async (data) => {
+  const res = await api.post("user/review/respond", data);
+  return res.data;
+};
