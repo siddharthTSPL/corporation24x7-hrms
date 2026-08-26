@@ -626,8 +626,10 @@ useEffect(() => {
 
   const setCity = (e) => setForm(p => ({ ...p, city: e.target.value }));
 
-   const handleSave = () => {
+      const handleSave = () => {
     if (!form.personal_contact) { onError("Personal contact is required"); return; }
+    if (!PHONE_REGEX.test(form.personal_contact)) { onError("Personal contact must be exactly 10 digits"); return; }
+    if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be exactly 10 digits"); return; }
     if (form.e_contact && form.personal_contact === form.e_contact) { onError("Emergency contact must be different from personal contact"); return; }
     if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) {
       onError("Date of birth cannot be in the future");
@@ -662,11 +664,18 @@ useEffect(() => {
         onChange={e => setForm(p => ({ ...p, personal_contact: e.target.value }))}
         placeholder="Enter personal phone number"
       />
+            <InputField
+        label="Personal contact"
+        type="tel"
+        value={form.personal_contact}
+        onChange={e => setForm(p => ({ ...p, personal_contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+        placeholder="Enter personal phone number"
+      />
       <InputField
         label="Emergency contact"
         type="tel"
         value={form.e_contact}
-        onChange={e => setForm(p => ({ ...p, e_contact: e.target.value }))}
+        onChange={e => setForm(p => ({ ...p, e_contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
         placeholder="Enter emergency contact"
         hint={
           form.personal_contact && form.e_contact && form.personal_contact === form.e_contact
