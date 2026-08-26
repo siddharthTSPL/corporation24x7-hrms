@@ -2279,11 +2279,18 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
             Pending salary from any unpaid regular payroll months is added in automatically. Fill in the rest below — everything stays editable until this is approved.
           </p>
         )}
-        {mode === "generate" && person?.bankInfoMissing && (
-          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7a5710", background: C.amberBg, border: "1px solid #ecd6a8", padding: "8px 10px", borderRadius: 8 }}>
-            This person hasn't filled PAN / bank details on their profile yet. Please fill them in below before generating the settlement.
-          </p>
-        )}
+        {mode === "generate" && person?.bankInfoMissing && (() => {
+          const missing = [
+            !person.pan && "PAN",
+            !person.bankAccountNumber && "bank account number",
+            !person.bankName && "bank name",
+          ].filter(Boolean);
+          return (
+            <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7a5710", background: C.amberBg, border: "1px solid #ecd6a8", padding: "8px 10px", borderRadius: 8 }}>
+              This person hasn't filled their {missing.join(" / ")} on their profile yet. Please fill {missing.length > 1 ? "them" : "it"} in below before generating the settlement.
+            </p>
+          );
+        })()}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Last Working Day">
