@@ -13,6 +13,10 @@ import {
   getattendance,
   fetchOrgInfo,
   getOrgInfo,
+  getSubManagers,
+  reviewSubManager,
+  getMyTeamReviews,
+  respondToMyReviewAsManager,
 } from "../../../api/managerapi/other/ma.other.api";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -68,6 +72,47 @@ export const useReviewEmployee = () => {
   return useMutation({
     mutationKey: ["reviewEmployee"],
     mutationFn: reviewEmployee,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meManager"] });
+    },
+  });
+};
+
+export const useGetSubManagers = () => {
+  return useQuery({
+    queryKey: ["subManagers"],
+    queryFn: getSubManagers,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useReviewSubManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: ["reviewSubManager"],
+    mutationFn: reviewSubManager,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meManager"] });
+      queryClient.invalidateQueries({ queryKey: ["myTeamReviews"] });
+    },
+  });
+};
+
+export const useGetMyTeamReviews = (params = {}) => {
+  return useQuery({
+    queryKey: ["myTeamReviews", params],
+    queryFn: () => getMyTeamReviews(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useRespondToMyReviewAsManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: respondToMyReviewAsManager,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meManager"] });
     },
