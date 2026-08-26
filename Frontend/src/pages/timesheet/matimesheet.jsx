@@ -506,11 +506,15 @@ function WorkloadHeatmap({ weekStart, heatmap }) {
       <div className="flex flex-col gap-2.5 lg:hidden">
         {heatmap.map((row, i) => {
           const label = row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase();
+          const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
           return (
             <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
               <div className="flex items-center gap-2 mb-2 min-w-0">
                 <div className="w-7 h-7 bg-[#730042]/[0.08] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] shrink-0">{label}</div>
-                <span className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</span>
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</div>
+                  {meta && <div className="text-[10px] text-gray-400 truncate">{meta}</div>}
+                </div>
               </div>
               <div className="grid grid-cols-7 gap-1">
                 {dayKeys.map((dk, di) => {
@@ -534,14 +538,19 @@ function WorkloadHeatmap({ weekStart, heatmap }) {
 
       {/* Desktop: full-width row grid */}
       <div className="hidden lg:block min-w-0">
-        <div className="flex items-center gap-2 mb-2 pl-10">
+        <div className="flex items-center gap-2 mb-2 pl-[7.5rem]">
           {DAY_KEYS.map((d) => <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>)}
         </div>
         {heatmap.map((row, i) => {
           const label = row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase();
+          const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
           return (
             <div key={i} className="flex items-center gap-2 mb-1.5">
               <div className="w-8 h-8 bg-[#730042]/[0.08] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">{label}</div>
+              <div className="w-[7.5rem] min-w-0 shrink-0 pr-2">
+                <div className="text-[11px] font-semibold text-gray-800 truncate">{row.name || row.person}</div>
+                {meta && <div className="text-[9px] text-gray-400 truncate">{meta}</div>}
+              </div>
               {dayKeys.map((dk) => {
                 const pct = row.days[dk]?.loadPercent || 0;
                 const bg = pct === 0 ? "bg-gray-50" : pct < 60 ? "bg-emerald-100" : pct < 90 ? "bg-amber-100" : "bg-red-100";
