@@ -531,9 +531,10 @@ function ContactTab({ adminData, onSuccess, onError }) {
     ? [{ name: form.city }, ...cities]
     : cities;
 
-  const handleSave = () => {
+    const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
+    if (form.e_contact && form.personal_contact && form.e_contact === form.personal_contact) { onError("Emergency contact must be different from personal contact"); return; }
     if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) { onError("Date of birth cannot be in the future"); return; }
     mutate(
       { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining, date_of_birth: form.date_of_birth },
@@ -549,8 +550,19 @@ function ContactTab({ adminData, onSuccess, onError }) {
 
   return (
     <SectionCard title="Contact & office" subtitle="Fields you can update" accent={C.green}>
-      <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
-      <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
+            <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
+      <InputField
+        label="Emergency contact"
+        type="tel"
+        value={form.e_contact}
+        onChange={setPhone("e_contact")}
+        placeholder="Emergency contact"
+        hint={
+          form.personal_contact && form.e_contact && form.personal_contact === form.e_contact
+            ? "Emergency contact must be different from personal contact"
+            : "Reached in case of emergency"
+        }
+      />
       <Grid cols={3}>
         <SelectField
           label="Country"
