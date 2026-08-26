@@ -1,4 +1,4 @@
-import { uploadDocument, getDocuments, editDocument, deleteDocument, fetchOrgInfo, getPersonalDocuments, getExpenseDocuments } from "../../../api/employeeapi/other/em.other.api";
+import { uploadDocument, getDocuments, editDocument, deleteDocument, fetchOrgInfo, getPersonalDocuments, getExpenseDocuments, respondToMyReviewAsEmployee } from "../../../api/employeeapi/other/em.other.api";
 import { getAttendance } from "../../../api/employeeapi/leave/em.leave.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -72,3 +72,13 @@ export const useGetExpenseDocuments = () =>
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+
+export const useRespondToMyReviewAsEmployee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: respondToMyReviewAsEmployee,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meUser"] });
+    },
+  });
+};
