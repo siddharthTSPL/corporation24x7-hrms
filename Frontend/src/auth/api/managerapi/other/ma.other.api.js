@@ -37,6 +37,26 @@ export const getUsersUnderManager = async () => {
   return res.data;
 };
 
+export const getSubManagers = async () => {
+  const res = await api.get("manager/submanagers");
+  return res.data;
+};
+
+export const reviewSubManager = async (data) => {
+  const res = await api.post("manager/reviewtosubmanager", data);
+  return res.data;
+};
+
+export const getMyTeamReviews = async (params = {}) => {
+  const res = await api.get("manager/team-reviews", { params });
+  return res.data;
+};
+
+export const respondToMyReviewAsManager = async (data) => {
+  const res = await api.post("manager/review/respond", data);
+  return res.data;
+};
+
 export const editManagerProfile = async (data) => {
   const res = await api.put("manager/manager/edit-profile", data);
   return res.data;
