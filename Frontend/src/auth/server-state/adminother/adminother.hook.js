@@ -7,7 +7,8 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
-  getInactiveUsers, getActiveUserCount, getAllAdmins, getAttendanceHistory
+  getInactiveUsers, getActiveUserCount, getAllAdmins, getAttendanceHistory,
+  respondToMyReviewAsAdmin, hrAcknowledgeReview
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -189,6 +190,26 @@ export const useGetAllReviews = (params = {}) => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useRespondToMyReviewAsAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: respondToMyReviewAsAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useHrAcknowledgeReview = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: hrAcknowledgeReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allReviews"] });
+    },
   });
 };
 
