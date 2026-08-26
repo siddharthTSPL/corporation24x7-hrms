@@ -661,13 +661,6 @@ useEffect(() => {
         label="Personal contact"
         type="tel"
         value={form.personal_contact}
-        onChange={e => setForm(p => ({ ...p, personal_contact: e.target.value }))}
-        placeholder="Enter personal phone number"
-      />
-            <InputField
-        label="Personal contact"
-        type="tel"
-        value={form.personal_contact}
         onChange={e => setForm(p => ({ ...p, personal_contact: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
         placeholder="Enter personal phone number"
       />
