@@ -30,7 +30,7 @@ const { startOfDay } = require("../automatic/weekoffcalendar");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
-const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/Licensecheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
 const AssetModel = require("../Models/asset.model");
 const { notifyLeaveDecision, notifyAssetAssigned, notifyLeaveApplied } = require("../utils/notify.utils");
 const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils");
@@ -2395,70 +2395,6 @@ const applyleave = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
-const editleaveadmin = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.admin.organisation_id;
-
-  const leave = await AdminLeave.findOne({
-    _id: req.params.id,
-    organisation_id,
-    admin: req.admin._id,
-  });
-  if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status !== "pending_superadmin")
-    return next(
-      Object.assign(
-        new Error("Cannot edit leave that is already processed or forwarded"),
-        { statusCode: 400 },
-      ),
-    );
-
-  const { leaveType, startDate, endDate, reason } = req.body;
-  if (startDate && endDate) {
-    const start = parseISTDateOnly(startDate);
-    const end = parseISTDateOnly(endDate);
-    if (end < start)
-      return next(
-        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
-      );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-  }
-  if (leaveType) leave.leaveType = leaveType;
-  if (reason) leave.reason = reason;
-  await leave.save();
-  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
-};
-
-const deleteleaveadmin = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.admin.organisation_id;
-
-  const leave = await AdminLeave.findOne({
-    _id: req.params.id,
-    organisation_id,
-    admin: req.admin._id,
-  });
-  if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (leave.status !== "pending_superadmin")
-    return next(
-      Object.assign(
-        new Error("Cannot delete leave that is already processed or forwarded"),
-        { statusCode: 400 },
-      ),
-    );
-
-  await AdminLeave.findByIdAndDelete(req.params.id);
-  res.status(200).json({ success: true, message: "Leave deleted successfully" });
-};
-
 const getmyleavehistory = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -2864,6 +2800,10 @@ const getme = async (req, res, next) => {
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      // Reviewee here is always this admin, but ReviewCard still reads
+      // review.reviewee.f_name for the card title — without this the
+      // frontend showed "Unknown" on every card in "My Review".
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
       .lean(),
   ]);
 
@@ -4255,8 +4195,6 @@ module.exports = {
   acceptLeave,
   rejectLeave,
   applyleave,
-  editleaveadmin,
-  deleteleaveadmin,
   getmyleavehistory,
   noofemployee,
   createannouncement,

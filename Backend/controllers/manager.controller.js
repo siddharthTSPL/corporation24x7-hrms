@@ -1286,6 +1286,10 @@ const getme = async (req, res, next) => {
     LeaveBalance.find({ employee: manager._id, organisation_id }).lean(),
     Review.find({ reviewee: manager._id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      // Reviewee here is always this manager, but ReviewCard still reads
+      // review.reviewee.f_name for the card title — without this the
+      // frontend showed "Unknown" on every card in "My Review".
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
       .lean(),
   ]);
 
