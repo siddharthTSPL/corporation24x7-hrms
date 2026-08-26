@@ -2301,7 +2301,7 @@ export default function EmployeeTable(){
 
   const handleEditChange=(e)=>setEditForm({...editForm,[e.target.name]:e.target.value});
 
-  const validateEdit=()=>{
+   const validateEdit=()=>{
     const err={};
     if(!editForm.f_name?.trim())err.f_name="Required";
     if(!editForm.l_name?.trim())err.l_name="Required";
@@ -2311,6 +2311,9 @@ export default function EmployeeTable(){
     if(!editForm.department)err.department="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+    else if(editForm.personal_contact && editForm.e_contact && editForm.e_contact===editForm.personal_contact){
+      err.e_contact="Emergency contact must be different from personal contact";
+    }
     setEditErrors(err);
     return Object.keys(err).length===0;
   };
@@ -2880,9 +2883,17 @@ return(
               <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
-          <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          
+                    <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field
+            label="Emergency Contact"
+            error={
+              editForm.e_contact && editForm.personal_contact && editForm.e_contact===editForm.personal_contact
+                ? "Emergency contact must be different from personal contact"
+                : editErrors.e_contact
+            }
+          >
+            <input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/>
+          </Field>
         </Modal>
       )}
 
