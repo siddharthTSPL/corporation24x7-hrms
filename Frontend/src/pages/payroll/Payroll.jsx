@@ -2530,7 +2530,7 @@ function FnFTab({ notify }) {
                     </td>
                     <td style={{ padding: "8px 10px" }}>
                       <PrimaryButton onClick={() => setFormModal({ mode: "generate", person: p })} style={{ padding: "7px 14px", minHeight: 32, fontSize: 12.5 }}>
-                        Generate FnF
+                        Generate F&F
                       </PrimaryButton>
                     </td>
                   </tr>
