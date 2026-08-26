@@ -2230,6 +2230,15 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
         bankName: record.employeeSnapshot?.bankName || "",
         remarks: record.remarks || "",
       });
+    } else if (mode === "generate" && person) {
+      setForm({
+        lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+        otherEarnings: 0, deductions: 0, otherDeductions: 0,
+        pan: person.pan || "",
+        bankAccountNumber: person.bankAccountNumber || "",
+        bankName: person.bankName || "",
+        remarks: "",
+      });
     } else {
       setForm({
         lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
@@ -2237,11 +2246,19 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
         pan: "", bankAccountNumber: "", bankName: "", remarks: "",
       });
     }
-  }, [mode, record, open]);
+  }, [mode, record, person, open]);
 
   if (!open) return null;
 
   const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  // Generate mode gets this straight from the eligible-list flag the backend
+  // already computes. Edit mode (record already exists) derives the same
+  // thing from the saved snapshot, since bankInfoMissing isn't part of the record.
+  const bankInfoMissing =
+    mode === "generate"
+      ? Boolean(person?.bankInfoMissing)
+      : !(record?.employeeSnapshot?.pan && record?.employeeSnapshot?.bankAccountNumber && record?.employeeSnapshot?.bankName);
 
   const submit = () => {
     if (mode === "generate") {
@@ -2302,15 +2319,37 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
           <Field label="Other Deductions (₹)">
             <TextInput type="number" value={form.otherDeductions} onChange={set("otherDeductions")} />
           </Field>
-          <Field label="PAN">
-            <TextInput type="text" value={form.pan} onChange={set("pan")} />
-          </Field>
-          <Field label="Bank Account Number">
-            <TextInput type="text" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} />
-          </Field>
-          <Field label="Bank Name">
-            <TextInput type="text" value={form.bankName} onChange={set("bankName")} />
-          </Field>
+          {bankInfoMissing ? (
+            <>
+              <Field label="PAN">
+                <TextInput type="text" value={form.pan} onChange={set("pan")} />
+              </Field>
+              <Field label="Bank Account Number">
+                <TextInput type="text" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} />
+              </Field>
+              <Field label="Bank Name">
+                <TextInput type="text" value={form.bankName} onChange={set("bankName")} />
+              </Field>
+            </>
+          ) : (
+            <div
+              className="sm:col-span-2"
+              style={{
+                fontSize: 12.5,
+                color: C.text,
+                background: C.brandLight,
+                padding: "10px 12px",
+                borderRadius: 8,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px 20px",
+              }}
+            >
+              <span><strong>Bank Name:</strong> {form.bankName}</span>
+              <span><strong>A/C No:</strong> {form.bankAccountNumber}</span>
+              <span style={{ color: C.muted, fontStyle: "italic" }}>Auto-filled from employee profile</span>
+            </div>
+          )}
         </div>
         <div style={{ marginTop: 12 }}>
           <Field label="Remarks">
