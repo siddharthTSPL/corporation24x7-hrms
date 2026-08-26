@@ -136,6 +136,10 @@ const managerSchema = new mongoose.Schema(
     isFirstLogin: { type: Boolean, default: true },
     date_of_joining: { type: Date, default: null },
     date_of_birth: { type: Date, default: null },
+    // Calendar year the "Happy Birthday" popup was last shown/dismissed for
+    // this person, so it appears once on their birthday (first login of that
+    // day) and then stays quiet for the rest of the year.
+    lastBirthdayWishYear: { type: Number, default: null },
   },
   { timestamps: true }
 );
