@@ -2234,10 +2234,10 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
       setForm({
         lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
         otherEarnings: 0, deductions: 0, otherDeductions: 0,
-        pan: "", bankAccountNumber: "", bankName: "", remarks: "",
+        pan: person?.pan || "", bankAccountNumber: person?.bankAccountNumber || "", bankName: person?.bankName || "", remarks: "",
       });
     }
-  }, [mode, record, open]);
+  }, [mode, record, person, open]);
 
   if (!open) return null;
 
@@ -2277,6 +2277,11 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
         {mode === "generate" && (
           <p style={{ margin: "0 0 14px", fontSize: 12, color: C.muted, background: C.brandLight, padding: "8px 10px", borderRadius: 8 }}>
             Pending salary from any unpaid regular payroll months is added in automatically. Fill in the rest below — everything stays editable until this is approved.
+          </p>
+        )}
+        {mode === "generate" && person?.bankInfoMissing && (
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: "#7a5710", background: C.amberBg, border: "1px solid #ecd6a8", padding: "8px 10px", borderRadius: 8 }}>
+            This person hasn't filled PAN / bank details on their profile yet. Please fill them in below before generating the settlement.
           </p>
         )}
 
@@ -2517,6 +2522,7 @@ function FnFTab({ notify }) {
                   <th style={{ padding: "6px 10px" }}>Name</th>
                   <th style={{ padding: "6px 10px" }}>Type</th>
                   <th style={{ padding: "6px 10px" }}>Exit Reason</th>
+                  <th style={{ padding: "6px 10px" }}>Bank Info</th>
                   <th style={{ padding: "6px 10px" }}></th>
                 </tr>
               </thead>
@@ -2527,6 +2533,13 @@ function FnFTab({ notify }) {
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[p.employeeModel] || p.employeeModel}</td>
                     <td style={{ padding: "8px 10px" }}>
                       <Badge color={C.red} bg={C.redBg}>{EXIT_TYPE_LABEL[p.workingStatus] || p.workingStatus}</Badge>
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      {p.bankInfoMissing ? (
+                        <Badge color={C.amber} bg={C.amberBg}>Fill required</Badge>
+                      ) : (
+                        <Badge color={C.green} bg={C.greenBg}>On file</Badge>
+                      )}
                     </td>
                     <td style={{ padding: "8px 10px" }}>
                       <PrimaryButton onClick={() => setFormModal({ mode: "generate", person: p })} style={{ padding: "7px 14px", minHeight: 32, fontSize: 12.5 }}>
