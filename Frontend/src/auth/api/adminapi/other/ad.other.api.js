@@ -106,6 +106,16 @@ export const getAllReviews = async (params = {}) => {
   return res.data;
 };
 
+export const respondToMyReviewAsAdmin = async (data) => {
+  const res = await api.post("/admin/review/respond", data);
+  return res.data;
+};
+
+export const hrAcknowledgeReview = async (data) => {
+  const res = await api.post("/admin/review/hr-acknowledge", data);
+  return res.data;
+};
+
 export const getparticularEmployeeStats = async (id) => {
   const res = await api.get(`/admin/getperticularemployee/${id}`);
   return res.data;
