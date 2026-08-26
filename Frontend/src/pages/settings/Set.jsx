@@ -509,7 +509,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     });
   }, [adminData]);
 
-  const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+    const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value.replace(/\D/g, "").slice(0, 10) }));
 
   const setCountry = (e) => {
     const countryIso = e.target.value;
