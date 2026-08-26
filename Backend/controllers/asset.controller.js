@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const AssetModel = require("../Models/Asset.model");
+const AssetModel = require("../Models/asset.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
