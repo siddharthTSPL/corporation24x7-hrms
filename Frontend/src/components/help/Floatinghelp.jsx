@@ -5,7 +5,7 @@ import { FaQuestion, FaTimes, FaMapSigns, FaHeadset, FaBook } from "react-icons/
 const SIZE = 56;
 const MARGIN = 20;
 const DRAG_THRESHOLD = 6; // px of movement before a press counts as a drag, not a click
-const STORAGE_KEY = "floatingHelpPos";
+const STORAGE_KEY = "floatingHelpPos_v2"; // bumped: invalidates any stale/overlapping saved positions from before the clamp fix
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
@@ -23,11 +23,21 @@ function loadSavedPos() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
-    if (typeof p?.x !== "number" || typeof p?.y !== "number") return null;
+    if (!Number.isFinite(p?.x) || !Number.isFinite(p?.y)) return null;
     return p;
   } catch {
     return null;
   }
+}
+
+function safePos(candidate) {
+  const base = candidate && Number.isFinite(candidate.x) && Number.isFinite(candidate.y)
+    ? candidate
+    : defaultPos();
+  return {
+    x: clamp(base.x, MARGIN, Math.max(MARGIN, window.innerWidth - SIZE - MARGIN)),
+    y: clamp(base.y, MARGIN, Math.max(MARGIN, window.innerHeight - SIZE - MARGIN)),
+  };
 }
 
 /**
@@ -44,25 +54,21 @@ function loadSavedPos() {
  */
 export default function FloatingHelp({ onTakeTour, onTechnicalSupport, onDocumentation }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(() => {
-    const saved = loadSavedPos() || defaultPos();
-    return {
-      x: clamp(saved.x, MARGIN, window.innerWidth - SIZE - MARGIN),
-      y: clamp(saved.y, MARGIN, window.innerHeight - SIZE - MARGIN),
-    };
-  });
+  const [pos, setPos] = useState(() => safePos(loadSavedPos()));
   const [dragging, setDragging] = useState(false);
   const rootRef = useRef(null);
   const dragState = useRef(null); // { startX, startY, originX, originY, moved }
 
+  // Re-validate once more right after mount, in case innerWidth/innerHeight
+  // at the moment of the very first render (before scrollbars, browser
+  // chrome, or a not-yet-settled layout) differed from the real viewport.
+  useEffect(() => {
+    setPos((p) => safePos(p));
+  }, []);
+
   // Keep the button on-screen if the window gets resized/rotated.
   useEffect(() => {
-    const onResize = () => {
-      setPos((p) => ({
-        x: clamp(p.x, MARGIN, window.innerWidth - SIZE - MARGIN),
-        y: clamp(p.y, MARGIN, window.innerHeight - SIZE - MARGIN),
-      }));
-    };
+    const onResize = () => setPos((p) => safePos(p));
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
