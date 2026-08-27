@@ -234,8 +234,6 @@ function App() {
             <Route path="/manager-timesheet"        element={<Managertimesheet />} />
             <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
             <Route path="/admin-asset-management"   element={<Adminasset />} />
-            <Route path="/help-center"               element={<HelpCenter />} />
-            <Route path="/notifications"             element={<NotificationsPage />} />
 
             <Route
               path="/reimbursement-admin"
@@ -438,8 +436,25 @@ function App() {
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
-            <Route path="/help-center"                     element={<HelpCenter />} />
-            <Route path="/notifications"                   element={<NotificationsPage />} />
+          </Route>
+
+          {/* Shared across every logged-in role. These previously lived duplicated
+              inside both the admin/manager/employee block and the superadmin block;
+              since react-router resolves ties between equal-specificity routes by
+              declaration order, the first (admin/manager/employee-only) block always
+              won the match — so a super admin hitting /notifications or /help-center
+              was matched against an allowedRoles list that didn't include "superadmin"
+              and got bounced to Access Restricted. Single shared block, single
+              source of truth, fixes that for every role at once. */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["admin", "manager", "employee", "superadmin"]}>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/help-center"    element={<HelpCenter />} />
+            <Route path="/notifications"  element={<NotificationsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />
