@@ -44,7 +44,13 @@ function loadSavedPos() {
  */
 export default function FloatingHelp({ onTakeTour, onTechnicalSupport, onDocumentation }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState(() => loadSavedPos() || defaultPos());
+  const [pos, setPos] = useState(() => {
+    const saved = loadSavedPos() || defaultPos();
+    return {
+      x: clamp(saved.x, MARGIN, window.innerWidth - SIZE - MARGIN),
+      y: clamp(saved.y, MARGIN, window.innerHeight - SIZE - MARGIN),
+    };
+  });
   const [dragging, setDragging] = useState(false);
   const rootRef = useRef(null);
   const dragState = useRef(null); // { startX, startY, originX, originY, moved }
