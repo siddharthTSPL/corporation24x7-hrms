@@ -27,6 +27,7 @@ import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useRev
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -40,6 +41,23 @@ export const DEPT_FULL_FORMS = {
 
 export const getDepartmentName = (dept) =>
   DEPT_FULL_FORMS[dept] || dept || "—";
+
+// Departments are now custom/dynamic per organisation (added from TorchX
+// Management -> Departments). This pulls the live list for the Add/Edit
+// Admin form, falling back to the legacy OPR/BPO/ENG/HR/MGMT list while it
+// loads or if no custom departments have been added yet.
+function useDepartmentOptions() {
+  const { data, isLoading } = useGetAllDepartmentsSuperAdmin();
+  const departments = data?.departments;
+
+  const options =
+    departments && departments.length
+      ? departments.map((d) => ({ value: d.code || d.name, label: d.name }))
+      : DEPT_OPTIONS.map((code) => ({ value: code, label: DEPT_FULL_FORMS[code] }));
+
+  return { options, loading: isLoading };
+}
+
 const ROLE_LABEL = {
   admin: "Admin",
   senior_admin: "Senior Admin",
@@ -755,6 +773,7 @@ function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
 }
 
 function AdminModal({ open, onClose, initial, onSave, loading }) {
+  const { options: deptOptions } = useDepartmentOptions();
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -1135,8 +1154,8 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             <FLabel required>Department</FLabel>
             <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
   <option value="">Select department</option>
-  {DEPT_OPTIONS.map((d) => (
-    <option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>
+  {deptOptions.map((d) => (
+    <option key={d.value} value={d.value}>{d.label}</option>
   ))}
 </FSel>
             <FieldErr msg={showErr("department")} />
