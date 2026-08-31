@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { downloadCsv } from "../dashboard/Exportcsv";
+import { DEPT_FULL_FORMS } from "../employee/EmployeeTable";
 
 // ---------------------------------------------------------------------------
 // Shared design tokens — mirrors pages/payroll/Payroll.jsx so this module
@@ -123,7 +124,7 @@ function buildClaimCsvRows(claims) {
     employeeName: claim.employeeName || "",
     empid: claim.empid || "",
     submitterModel: claim.submitterModel || "",
-    department: claim.department || "",
+    department: DEPT_FULL_FORMS[claim.department] || claim.department || "",
     designation: claim.designation || "",
     reimbursementType: claim.reimbursementType || "",
     expenseDate: fmtDate(claim.expenseDate),
@@ -665,7 +666,7 @@ function ClaimDetail({ claim }) {
       {row("Claim Number", claim.claimNumber)}
       {row("Employee", claim.employeeName)}
       {row("Employee ID", claim.empid)}
-      {row("Department", claim.department)}
+      {row("Department", DEPT_FULL_FORMS[claim.department] || claim.department)}
       {row("Designation", claim.designation)}
       {row("Email", claim.email)}
       {row("Reporting Manager", claim.reportingManager ? `${claim.reportingManager.f_name} ${claim.reportingManager.l_name}` : null)}
@@ -832,7 +833,7 @@ function FilterBar({ claims, filters, onChange }) {
         <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.department} onChange={set("department")}>
           <option value="">All Departments</option>
           {departments.map((d) => (
-            <option key={d} value={d}>{d}</option>
+            <option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>
           ))}
         </select>
         <select style={{ ...selectStyle, flex: "1 1 150px", minWidth: 140 }} value={filters.designation} onChange={set("designation")}>
