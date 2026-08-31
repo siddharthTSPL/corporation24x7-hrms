@@ -8,7 +8,7 @@ import {
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
   FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
-  FaCrown, FaMagic,
+  FaCrown, FaMagic, FaHome,
 } from "react-icons/fa";
 
 import { Country, State, City } from "country-state-city";
@@ -28,6 +28,7 @@ import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -1717,6 +1718,7 @@ function SuperAdminDashboard() {
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
   const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("overview"); // "overview" | "analytics"
 
   useEffect(() => {
     const REFRESH_FLAG_KEY = "dashboardAutoRefreshed";
@@ -1896,6 +1898,49 @@ function SuperAdminDashboard() {
     return "bg-[#f7ecf3] text-[#730042] border border-[#e8d5e2]";
   };
 
+  // Top-right pill switch shown in both views so the super admin can hop
+  // between the day-to-day overview and the data-heavy analytics dashboard
+  // without leaving the page.
+  const ViewToggle = () => (
+    <div className="flex gap-1 bg-white border border-[#ede5e0] rounded-full p-1 shadow-sm">
+      <button
+        onClick={() => setViewMode("overview")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "overview" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaHome size={10} /> Overview
+      </button>
+      <button
+        onClick={() => setViewMode("analytics")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "analytics" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaChartBar size={10} /> Analytics
+      </button>
+    </div>
+  );
+
+  if (viewMode === "analytics") {
+    return (
+      <div className="min-h-screen bg-[#fdf5f9] p-3 sm:p-5 lg:p-7 font-[system-ui,sans-serif] text-[#0d0209]">
+        <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold m-0 tracking-tight" style={{ fontFamily: "'Lora',serif" }}>
+              Analytics
+            </h1>
+            <p className="text-[12px] text-[#8a6f68] mt-0.5">
+              Organisation-wide insights across attendance, leave, payroll & more
+            </p>
+          </div>
+          <ViewToggle />
+        </div>
+        <AnalyticsDashboard role="superadmin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fdf5f9] p-3 sm:p-5 lg:p-7 font-[system-ui,sans-serif] text-[#0d0209]">
       <style>{`
@@ -1923,6 +1968,7 @@ function SuperAdminDashboard() {
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
+              <ViewToggle />
               <div className="bg-white rounded-full shadow-md">
                 <NotificationBell />
               </div>
@@ -1945,6 +1991,9 @@ function SuperAdminDashboard() {
           </div>
 
           <div className="flex sm:hidden gap-2 mt-3 items-center">
+            <div className="flex-shrink-0">
+              <ViewToggle />
+            </div>
             <div className="bg-white rounded-full shadow-md flex-shrink-0">
               <NotificationBell />
             </div>
