@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { downloadCsv } from "../dashboard/Exportcsv";
+import { exportReviewsCsv } from "./reviewCsv";
+import { useReviewCriteria } from "./useReviewCriteria";
+import PointsBreakdown from "./PointsBreakdown";
 
 const BRAND = {
   pink: "#8B1A4A",
@@ -27,6 +29,22 @@ function ratingColor(rating) {
   return "#B0233A";
 }
 
+const STATUS_LABEL = {
+  submitted: "Awaiting response",
+  reviewee_accepted: "Accepted",
+  reviewee_disputed: "Disputed",
+  hr_approved: "HR Approved",
+  hr_rejected: "HR Rejected",
+};
+
+const STATUS_COLOR = {
+  submitted: "#B8860B",
+  reviewee_accepted: "#1E7A3D",
+  reviewee_disputed: "#B0233A",
+  hr_approved: "#1E7A3D",
+  hr_rejected: "#B0233A",
+};
+
 function formatDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", {
@@ -36,44 +54,6 @@ function formatDate(d) {
   });
 }
 
-function buildCsvRows(reviews) {
-  return reviews.map((r) => ({
-    revieweeName: getFullName(r.reviewee),
-    revieweeEmail: getEmail(r.reviewee),
-    revieweeRole: r.revieweeRole ?? "",
-    monthYear: r.monthYear ?? "",
-    taskPercentage: r.taskSubmission?.percentage ?? "",
-    taskRating: r.taskSubmission?.rating ?? "",
-    behaviourScore: r.behaviourEthics?.score ?? "",
-    behaviourRating: r.behaviourEthics?.rating ?? "",
-    attendancePercentage: r.attendance?.percentage ?? "",
-    attendanceRating: r.attendance?.rating ?? "",
-    overallScore: r.overallScore ?? "",
-    overallRating: r.overallRating ?? "",
-    comment: r.comment ?? "",
-    reviewedBy: getFullName(r.reviewer),
-    reviewedOn: formatDate(r.createdAt),
-  }));
-}
-
-const CSV_COLUMNS = [
-  { key: "revieweeName", label: "Reviewee" },
-  { key: "revieweeEmail", label: "Email" },
-  { key: "revieweeRole", label: "Role" },
-  { key: "monthYear", label: "Month" },
-  { key: "taskPercentage", label: "Task %" },
-  { key: "taskRating", label: "Task Rating" },
-  { key: "behaviourScore", label: "Behaviour Score" },
-  { key: "behaviourRating", label: "Behaviour Rating" },
-  { key: "attendancePercentage", label: "Attendance %" },
-  { key: "attendanceRating", label: "Attendance Rating" },
-  { key: "overallScore", label: "Overall Score" },
-  { key: "overallRating", label: "Overall Rating" },
-  { key: "comment", label: "Comment" },
-  { key: "reviewedBy", label: "Reviewed By" },
-  { key: "reviewedOn", label: "Reviewed On" },
-];
-
 export default function ReviewHistoryPanel({
   useGetAllReviews,
   revieweeRoleModel,
@@ -82,6 +62,11 @@ export default function ReviewHistoryPanel({
 }) {
   const [monthYear, setMonthYear] = useState("");
   const [search, setSearch] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+
+  const { data: criteriaData, isLoading: criteriaLoading } = useReviewCriteria();
+  const plusCriteria = criteriaData?.plusPoints ?? [];
+  const minusCriteria = criteriaData?.minusPoints ?? [];
 
   const params = useMemo(() => {
     const p = {};
@@ -108,7 +93,9 @@ export default function ReviewHistoryPanel({
     const filename = `${csvFilePrefix}-${monthYear || "all"}-${new Date()
       .toISOString()
       .slice(0, 10)}.csv`;
-    downloadCsv(filename, CSV_COLUMNS, buildCsvRows(filtered));
+    // Includes the full 28-point breakdown (14 Plus + 14 Minus), not just
+    // the overall /5 score.
+    exportReviewsCsv({ reviews: filtered, plusCriteria, minusCriteria, filename });
   };
 
   return (
@@ -152,36 +139,21 @@ export default function ReviewHistoryPanel({
           <button
             type="button"
             onClick={handleExport}
-            disabled={filtered.length === 0}
+            disabled={filtered.length === 0 || criteriaLoading}
             className="flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-lg text-[13px] font-medium text-white cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
             style={{
               background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
               boxShadow: "0 3px 12px rgba(139,26,74,0.3)",
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path
-                d="M6.5 1v8M3.5 6l3 3 3-3M2 11.5h9"
-                stroke="#fff"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Export CSV
+            Export CSV (all 28 points)
           </button>
         </div>
       </div>
 
       <div className="p-3 sm:p-4">
         {isLoading && (
-          <div className="text-[#9B7A8A] text-sm py-6 px-2 flex items-center gap-2 justify-center">
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke={BRAND.mutedText} strokeWidth="2" opacity="0.3" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke={BRAND.mutedText} strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            Loading reviews…
-          </div>
+          <div className="text-[#9B7A8A] text-sm py-6 px-2 text-center">Loading reviews…</div>
         )}
 
         {isError && (
@@ -207,7 +179,7 @@ export default function ReviewHistoryPanel({
 
         {!isLoading && !isError && filtered.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[13px] min-w-[860px]">
+            <table className="w-full border-collapse text-[13px] min-w-[820px]">
               <thead>
                 <tr style={{ background: BRAND.accentLight }}>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
@@ -217,16 +189,13 @@ export default function ReviewHistoryPanel({
                     Month
                   </th>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Task
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Behaviour
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
-                    Attendance
-                  </th>
-                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
                     Overall
+                  </th>
+                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
+                    Status
+                  </th>
+                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
+                    Recommendation
                   </th>
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
                     Reviewed By
@@ -234,50 +203,71 @@ export default function ReviewHistoryPanel({
                   <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
                     Date
                   </th>
+                  <th className="text-left py-2.5 px-3 font-medium text-[11px] tracking-[0.05em] uppercase" style={{ color: BRAND.mutedText }}>
+                    28 Points
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
-                  <tr key={r._id} className="border-b" style={{ borderColor: BRAND.cardBorder }}>
-                    <td className="py-2.5 px-3">
-                      <p className="m-0 font-medium truncate max-w-[160px]" style={{ color: BRAND.textPrimary }}>
-                        {getFullName(r.reviewee)}
-                      </p>
-                      <p className="m-0 text-[11px] truncate max-w-[160px]" style={{ color: BRAND.mutedText }}>
-                        {getEmail(r.reviewee)}
-                      </p>
-                    </td>
-                    <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
-                      {r.monthYear}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.taskSubmission?.rating) }}>
-                        {r.taskSubmission?.percentage}% · {r.taskSubmission?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.behaviourEthics?.rating) }}>
-                        {r.behaviourEthics?.score}/10 · {r.behaviourEthics?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span style={{ color: ratingColor(r.attendance?.rating) }}>
-                        {r.attendance?.percentage}% · {r.attendance?.rating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <span className="font-semibold" style={{ color: ratingColor(r.overallRating) }}>
-                        {r.overallScore}/10 · {r.overallRating}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
-                      {getFullName(r.reviewer)}
-                    </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap" style={{ color: BRAND.mutedText }}>
-                      {formatDate(r.createdAt)}
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((r) => {
+                  const isExpanded = expandedId === r._id;
+                  return (
+                    <React.Fragment key={r._id}>
+                      <tr className="border-b" style={{ borderColor: BRAND.cardBorder }}>
+                        <td className="py-2.5 px-3">
+                          <p className="m-0 font-medium truncate max-w-[160px]" style={{ color: BRAND.textPrimary }}>
+                            {getFullName(r.reviewee)}
+                          </p>
+                          <p className="m-0 text-[11px] truncate max-w-[160px]" style={{ color: BRAND.mutedText }}>
+                            {getEmail(r.reviewee)}
+                          </p>
+                        </td>
+                        <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
+                          {r.monthYear}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-semibold" style={{ color: ratingColor(r.overallRating) }}>
+                            {r.overallScore}/5 · {r.overallRating}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className="text-[11px] font-medium py-0.5 px-2 rounded-full whitespace-nowrap"
+                            style={{ background: `${STATUS_COLOR[r.status] ?? BRAND.mutedText}18`, color: STATUS_COLOR[r.status] ?? BRAND.mutedText }}
+                          >
+                            {STATUS_LABEL[r.status] ?? r.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
+                          {r.recommendation ?? "—"}
+                        </td>
+                        <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
+                          {getFullName(r.reviewer)}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap" style={{ color: BRAND.mutedText }}>
+                          {formatDate(r.createdAt)}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isExpanded ? null : r._id)}
+                            className="text-[11px] font-medium cursor-pointer"
+                            style={{ color: BRAND.pink }}
+                          >
+                            {isExpanded ? "Hide ▲" : "View ▼"}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="border-b" style={{ borderColor: BRAND.cardBorder }}>
+                          <td colSpan={8} className="py-3 px-3" style={{ background: BRAND.accentLight }}>
+                            <PointsBreakdown review={r} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

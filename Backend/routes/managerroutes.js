@@ -35,6 +35,7 @@ managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroll
 managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontroller.getattendance));
 
 managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
+managerrouter.get("/submanagers", managermiddleware, asyncHandler(managercontroller.getSubManagers));
 
 managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
 managerrouter.put("/editleavem/:id", managermiddleware, asyncHandler(managercontroller.editleavem));
@@ -50,6 +51,10 @@ managerrouter.post("/rejectforwardedleave", managermiddleware, asyncHandler(mana
 managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, asyncHandler(managercontroller.forwardLeaveUpChain));
 
 managerrouter.post("/reviewtoemployee", managermiddleware, asyncHandler(managercontroller.reviewtoemployee));
+managerrouter.post("/reviewtosubmanager", managermiddleware, asyncHandler(managercontroller.reviewtosubmanager));
+managerrouter.get("/team-reviews", managermiddleware, asyncHandler(managercontroller.getMyTeamReviews));
+// Step 2: Manager (as reviewee, reviewed by Admin/senior manager) accepts/disputes.
+managerrouter.post("/review/respond", managermiddleware, asyncHandler(managercontroller.respondToMyReview));
 
 managerrouter.get("/showannouncements", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.showannouncements));
 managerrouter.get("/showannouncement/:id", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.particularannouncement));

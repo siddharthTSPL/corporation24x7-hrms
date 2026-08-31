@@ -165,8 +165,8 @@ const validateForm = (form, isEdit) => {
   if (!form.f_name.trim()) e.f_name = "First name is required";
   else if (!NAME_REGEX_NONEMPTY.test(form.f_name.trim())) e.f_name = "Only letters and spaces are allowed";
 
-  if (!form.l_name.trim()) e.l_name = "Last name is required";
-  else if (!NAME_REGEX_NONEMPTY.test(form.l_name.trim())) e.l_name = "Only letters and spaces are allowed";
+   
+  if (form.l_name.trim() && !NAME_REGEX_NONEMPTY.test(form.l_name.trim())) e.l_name = "Only letters and spaces are allowed";
 
   if (!form.work_email.trim()) e.work_email = "Work email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.work_email)) e.work_email = "Enter a valid email address";
@@ -183,8 +183,9 @@ const validateForm = (form, isEdit) => {
   if (!form.personal_contact.trim()) e.personal_contact = "Personal contact is required";
   else if (!/^[6-9]\d{9}$/.test(form.personal_contact)) e.personal_contact = "Enter a valid 10-digit mobile number";
 
-  if (!form.e_contact.trim()) e.e_contact = "Emergency contact is required";
+   if (!form.e_contact.trim()) e.e_contact = "Emergency contact is required";
   else if (!/^[6-9]\d{9}$/.test(form.e_contact)) e.e_contact = "Enter a valid 10-digit mobile number";
+  else if (form.personal_contact && form.e_contact === form.personal_contact) e.e_contact = "Emergency contact must be different from personal contact";
 
   if (!form.designation.trim()) e.designation = "Designation is required";
   if (!form.department) e.department = "Department is required";
@@ -1032,7 +1033,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               <FieldErr msg={showErr("f_name")} />
             </div>
             <div>
-              <FLabel required>Last Name</FLabel>
+              <FLabel>Last Name</FLabel>
               <FInput placeholder="e.g. Sharma" value={form.l_name} onChange={setFiltered("l_name", NAME_REGEX)} onBlur={blur("l_name")} err={showErr("l_name")} />
               <FieldErr msg={showErr("l_name")} />
             </div>

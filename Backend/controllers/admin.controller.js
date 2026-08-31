@@ -15,7 +15,7 @@ const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
-const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
+const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee, hrAcknowledgeReview } = require("../utils/reviewWorkflow.utils");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
@@ -2604,71 +2604,93 @@ const reviewtomanager = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { managerid, assignedDays, actualDays, behaviourScore, comment } = req.body;
-  if (!managerid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
-    return next(Object.assign(new Error("managerid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
+  const { managerid } = req.body;
+  if (!managerid)
+    return next(Object.assign(new Error("managerid is required"), { statusCode: 400 }));
 
   const organisation_id = req.admin.organisation_id;
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
-  const [manager, existingreview] = await Promise.all([
-    Managermodel.findOne({ _id: managerid, organisation_id }).select("role").lean(),
-    Review.findOne({ reviewer: req.admin._id, reviewee: managerid, monthYear, organisation_id })
-      .select("_id")
-      .lean(),
-  ]);
-
+  const manager = await Managermodel.findOne({ _id: managerid, organisation_id })
+    .select("role designation department")
+    .lean();
   if (!manager)
     return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-  if (existingreview)
-    return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
 
   try {
-    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
-    const behaviourEthics = computeBehaviour(behaviourScore);
+    const fields = buildReviewFields(req.body);
 
-    const summary = await AttendanceSummary.findOne({
-      employee: managerid,
-      role: "manager",
-      month,
-      year,
-    }).lean();
-    const attendance = computeAttendance({
-      presentDays: summary?.presentDays ?? 0,
-      halfDays: summary?.halfDays ?? 0,
-      absentDays: summary?.absentDays ?? 0,
-    });
-
-    const overall = computeOverall({
-      taskScore: taskSubmission.score,
-      behaviourScore: behaviourEthics.score,
-      attendanceScore: attendance.score,
-    });
-
-    const review = await Review.create({
-      organisation_id,
-      reviewerRole: "admin",
-      reviewer: req.admin._id,
-      reviewerRoleModel: "Admin",
-      revieweeRole: manager.role,
-      reviewee: managerid,
-      revieweeRoleModel: "Manager",
-      taskSubmission,
-      behaviourEthics,
-      attendance,
-      overallScore: overall.score,
-      overallRating: overall.rating,
-      comment: comment || "",
-      monthYear,
-    });
+    const review = await createReviewOrThrow(
+      Review,
+      {
+        organisation_id,
+        reviewerRole: "admin",
+        reviewer: req.admin._id,
+        reviewerRoleModel: "Admin",
+        revieweeRole: manager.role,
+        reviewee: managerid,
+        revieweeRoleModel: "Manager",
+        revieweeDepartment: fields.revieweeDepartment || manager.department || "",
+        revieweeDesignation: fields.revieweeDesignation || manager.designation || "",
+        ...fields,
+      },
+      "You have already reviewed this manager this month."
+    );
 
     res.status(201).json({ message: "Review submitted successfully", review });
   } catch (err) {
-    if (err.code === 11000)
-      return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
+    next(err);
+  }
+};
+
+// Step 2 — an Admin, when they are the *reviewee* (reviewed by SuperAdmin),
+// accepts or disputes that review.
+const respondToMyReview = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { reviewId, status, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await respondToReviewAsReviewee(Review, {
+      reviewId,
+      revieweeId: req.admin._id,
+      revieweeRoleModel: "Admin",
+      organisation_id: req.admin.organisation_id,
+      status,
+      comment,
+    });
+    res.status(200).json({ success: true, message: "Response recorded", review });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Step 3 — FINAL approval. Only an Admin with isHR === true can call this,
+// and it applies to any review in the organisation (Admin visibility is
+// org-wide), regardless of who the reviewer/reviewee were.
+const hrAcknowledgeReviewHandler = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  if (!req.admin.isHR)
+    return next(Object.assign(new Error("Only an Admin designated as HR can give the final acknowledgement"), { statusCode: 403 }));
+
+  const { reviewId, decision, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await hrAcknowledgeReview(Review, {
+      reviewId,
+      hrAdminId: req.admin._id,
+      organisation_id: req.admin.organisation_id,
+      decision,
+      comment,
+    });
+    res.status(200).json({ success: true, message: `Review ${decision}`, review });
+  } catch (err) {
     next(err);
   }
 };
@@ -2843,6 +2865,10 @@ const getme = async (req, res, next) => {
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      // Reviewee here is always this admin, but ReviewCard still reads
+      // review.reviewee.f_name for the card title — without this the
+      // frontend showed "Unknown" on every card in "My Review".
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
       .lean(),
   ]);
 
@@ -4244,6 +4270,8 @@ module.exports = {
   deleteAnnouncement,
   reviewtomanager,
   getAllReviewsForAdmin,
+  respondToMyReview,
+  hrAcknowledgeReviewHandler,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,

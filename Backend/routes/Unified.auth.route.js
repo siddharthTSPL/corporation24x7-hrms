@@ -8,6 +8,7 @@ const {
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
   dismissWelcomeMessage,
+  dismissBirthdayWish,
   generateCompanionLink,
   redeemCompanionLink,
 } = require("../controllers/Unified.auth.controller");
@@ -26,6 +27,9 @@ router.post("/forgot-password/reset-password", asyncHandler(unifiedResetPassword
 
 // POST /auth/dismiss-welcome — marks the first-login welcome popup as seen
 router.post("/dismiss-welcome", anyRoleAuth, asyncHandler(dismissWelcomeMessage));
+
+// POST /auth/dismiss-birthday — marks this year's "Happy Birthday" popup as seen
+router.post("/dismiss-birthday", anyRoleAuth, asyncHandler(dismissBirthdayWish));
 
 // GET /auth/companion-link — from an already logged-in browser (any role),
 // mints a short-lived link that can be opened in a different browser to

@@ -351,6 +351,28 @@ const dismissWelcomeMessage = async (req, res, next) => {
   });
 };
 
+// Marks this year's "Happy Birthday" popup as seen — one popup per person per
+// calendar year, regardless of how many times they log in that day.
+const dismissBirthdayWish = async (req, res, next) => {
+  if (!req.user || !req.actor) {
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  }
+
+  const currentYear = new Date().getFullYear();
+
+  if ("lastBirthdayWishYear" in req.user && req.user.lastBirthdayWishYear !== currentYear) {
+    req.user.lastBirthdayWishYear = currentYear;
+    await req.user.save({ validateBeforeSave: false });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Birthday wish dismissed",
+    role: req.actor.role,
+    lastBirthdayWishYear: currentYear,
+  });
+};
+
 // --- Forgot password: send OTP (role auto-detected from email) ---
 const { buildForgotPasswordOtpEmail } = require("../utils/helpers/emailtemp");
 
@@ -597,6 +619,7 @@ module.exports = {
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
   dismissWelcomeMessage,
+  dismissBirthdayWish,
   generateCompanionLink,
   redeemCompanionLink,
 };

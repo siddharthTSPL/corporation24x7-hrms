@@ -1,7 +1,46 @@
 const TimeLog = require("../Models/Timelog.model");
 const TSJob = require("../Models/Tsjob.model");
+const User = require("../Models/user.model");
+const Manager = require("../Models/manager.model");
+const Admin = require("../Models/Admin.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
+
+// getDirectReportIds only returns { id, model, name, email, role } — no
+// empid/department/designation. Reports can be spread across the User,
+// Manager, and Admin collections, so fetch each collection once (in
+// parallel) and build an id -> profile lookup map.
+const buildProfileMap = async (reportIds, organisation_id) => {
+  const idsByModel = { User: [], Manager: [], Admin: [] };
+  for (const r of reportIds) {
+    if (idsByModel[r.model]) idsByModel[r.model].push(r.id);
+  }
+
+  const MODEL_MAP = { User, Manager, Admin };
+  const profileMap = new Map();
+
+  await Promise.all(
+    Object.entries(idsByModel)
+      .filter(([, ids]) => ids.length)
+      .map(async ([modelName, ids]) => {
+        const docs = await MODEL_MAP[modelName]
+          .find({ _id: { $in: ids }, organisation_id })
+          .select("empid f_name l_name department designation")
+          .lean();
+
+        for (const doc of docs) {
+          profileMap.set(doc._id.toString(), {
+            name: `${doc.f_name} ${doc.l_name}`,
+            empid: doc.empid,
+            department: doc.department,
+            designation: doc.designation,
+          });
+        }
+      })
+  );
+
+  return profileMap;
+};
 
 const DAILY_CAPACITY_MINUTES = 480;
 
@@ -46,9 +85,21 @@ const getTeamWorkloadHeatmap = async (req, res, next) => {
     },
   ]);
 
+  const profileMap = await buildProfileMap(reportIds, organisation_id);
+
   const heatmapMap = new Map();
   for (const report of reportIds) {
-    heatmapMap.set(report.id.toString(), { person: report.id, model: report.model, days: {} });
+    const key = report.id.toString();
+    const profile = profileMap.get(key) || {};
+    heatmapMap.set(key, {
+      person: report.id,
+      model: report.model,
+      name: profile.name || report.name,
+      empid: profile.empid || null,
+      department: profile.department || null,
+      designation: profile.designation || null,
+      days: {},
+    });
   }
 
   for (const entry of logs) {

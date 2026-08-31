@@ -109,6 +109,14 @@ const adminSchema = new mongoose.Schema(
       default: "admin",
     },
 
+    // Set only by SuperAdmin. When true, this Admin can give the final
+    // "HR Acknowledgement" approval on any performance review in the
+    // organisation. Multiple admins can hold this flag at once.
+    isHR: {
+      type: Boolean,
+      default: false,
+    },
+
     designation: {
       type: String,
       required: true,
@@ -245,6 +253,14 @@ const adminSchema = new mongoose.Schema(
 
     date_of_birth: {
       type: Date,
+      default: null,
+    },
+
+    // Calendar year the "Happy Birthday" popup was last shown/dismissed for
+    // this person, so it appears once on their birthday (first login of that
+    // day) and then stays quiet for the rest of the year.
+    lastBirthdayWishYear: {
+      type: Number,
       default: null,
     },
   },

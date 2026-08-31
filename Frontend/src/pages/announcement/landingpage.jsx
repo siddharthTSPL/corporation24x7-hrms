@@ -725,14 +725,16 @@ function Pricing() {
     {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
+      inherits: null, // Basic ke neeche kuch nahi dikhana
       monthlyPrice: 47,
       yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Live Map Tracking', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Performance Management','Assets Management','Team Documentation','Timesheet','Reimbursement','Grievance Management','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)','Email support (24/7)'],
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
       crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
-      desc: 'For growing businesses that need more. Everything in Basic +',
+      desc: 'For growing businesses that need more',
+      inherits: 'Everything in Basic +', // <- price ke neeche dark/bold highlighted dikhega
       monthlyPrice: 119,
       yearlyPrice: Math.round(119 * 12 * 0.83), // 17% off on annual total
       popular: true,
@@ -741,16 +743,16 @@ function Pricing() {
     },
     {
       name: 'Enterprise',
-      desc: 'Ultimate power and flexibility. Everything in Advance +',
+      desc: 'Ultimate power and flexibility',
+      inherits: 'Everything in Advance +', // <- price ke neeche dark/bold highlighted dikhega
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
         'Free Smartphone gifthamper',
         'Face Attendence',
-        'Custom integrations',
-        'SSO',
+        'Custom Integrations',
+        'Single Sign-On',
         'API access',
-        'Two-factor authentication',
         'On-premises/ Private cloud hosting',
         'Dedicated account manager',
       ],
@@ -839,6 +841,11 @@ function Pricing() {
                     {price !== null && (
                       <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
                     )}
+                    {p.inherits && (
+                      <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">
+                        {p.inherits}
+                      </div>
+                    )}
                   </div>
                   <ul className="list-none p-0 m-0 flex flex-col gap-2.5 flex-1">
                     {p.features.map(f => (
@@ -915,7 +922,7 @@ function Pricing() {
       </Wrap>
     </section>
   )
-}
+} 
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
