@@ -10,9 +10,24 @@ import {
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee,
 } from "../../auth/server-state/adminother/adminother.hook";
+import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
 import EmployeeDetailModal from "./EmployeeDetailModal";
 
 const DEPARTMENTS = ["OPR", "BPO", "ENG", "MGMT", "HR"];
+
+// Departments are now custom/dynamic per organisation (added from TorchX
+// Management -> Departments). Falls back to the legacy list while loading
+// or if the org hasn't added any departments yet.
+function useDepartmentOptions() {
+  const { data, isLoading } = useGetAllDepartments();
+  const departments = data?.departments;
+  const options =
+    departments && departments.length
+      ? departments.map((d) => d.code || d.name)
+      : DEPARTMENTS;
+  return { options, loading: isLoading };
+}
+
 const LOCATIONS   = ["Noida", "Bareilly", "Delhi", "Mumbai"];
 const INDIAN_STATES = [
   "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
@@ -342,6 +357,7 @@ function DeleteConfirm({ user, onConfirm, onCancel }) {
 }
 
 function EmpStepFields({ step, form, onChange, errors, managers }) {
+  const { options: deptOptions } = useDepartmentOptions();
   if (step === 0) return (
     <>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls} /></Field>
@@ -373,7 +389,7 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Software Engineer" value={form.designation} onChange={onChange} className={inputCls} /></Field>
@@ -461,6 +477,7 @@ function EmpStepFields({ step, form, onChange, errors, managers }) {
 }
 
 function MgrStepFields({ step, form, onChange, errors, managers }) {
+  const { options: deptOptions } = useDepartmentOptions();
 const [showPassword, setShowPassword] = useState(false);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 const newErrors = {};
@@ -580,7 +597,7 @@ const passwordRegex =
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </Field>
       <Field label="Designation" required error={errors.designation}><input name="designation" placeholder="e.g. Head of Engineering" value={form.designation} onChange={onChange} className={inputCls} /></Field>
@@ -669,6 +686,7 @@ const passwordRegex =
 }
 
 export default function EmployeeTable() {
+  const { options: deptOptions } = useDepartmentOptions();
   const [open,        setOpen]        = useState(false);
   const [openManager, setOpenManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -927,7 +945,7 @@ export default function EmployeeTable() {
               <div className="hidden sm:flex gap-2">
                 <select className={`${inputCls} flex-1`} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                   <option value="">All Departments</option>
-                  {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <select className={`${inputCls} flex-1`} value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
                   <option value="">All Roles</option>
@@ -944,7 +962,7 @@ export default function EmployeeTable() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <select className={inputCls} value={filters.department} onChange={(e) => setFilters({ ...filters, department: e.target.value })}>
                     <option value="">All Depts</option>
-                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                   <select className={inputCls} value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
                     <option value="">All Roles</option>
@@ -1115,7 +1133,7 @@ export default function EmployeeTable() {
           <Field label="Work Email" required error={editErrors.work_email}><input name="work_email" type="email" value={editForm.work_email} onChange={handleEditChange} className={inputCls} /></Field>
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
-              <option value="">Select Department</option>{DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              <option value="">Select Department</option>{deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </Field>
           <Field label="Designation" required error={editErrors.designation}><input name="designation" value={editForm.designation} onChange={handleEditChange} className={inputCls} /></Field>
