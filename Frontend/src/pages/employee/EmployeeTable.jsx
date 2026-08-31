@@ -25,6 +25,7 @@ import {
   useAdminInactiveUsers, useGetActiveUserCount,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
 import axios from "axios";
 
 import * as XLSX from "xlsx";
@@ -52,6 +53,22 @@ export const DEPT_FULL_FORMS = {
   HR: "Human Resources",
   MGMT: "Management",
 };
+
+// Departments are now custom/dynamic per organisation (added from TorchX
+// Management -> Departments). This pulls the live list for onboarding/edit
+// dropdowns, falling back to the legacy OPR/BPO/ENG/HR/MGMT list while it
+// loads or if the org hasn't got any departments back yet.
+export function useDepartmentOptions() {
+  const { data, isLoading } = useGetAllDepartments();
+  const departments = data?.departments;
+
+  const options =
+    departments && departments.length
+      ? departments.map((d) => ({ value: d.code || d.name, label: d.name }))
+      : DEPT_OPTIONS.map((code) => ({ value: code, label: DEPT_FULL_FORMS[code] }));
+
+  return { options, loading: isLoading };
+}
 
 const LOCATIONS = [
   "Noida", "Bareilly", "Delhi", "Mumbai",
@@ -1845,6 +1862,7 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
   );
 }
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
+  const { options: deptOptions } = useDepartmentOptions();
   if(step===0)return(
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. EMP-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
@@ -1898,9 +1916,9 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
           className={inputCls}
         >
           <option value="">Select Department</option>
-          {DEPT_OPTIONS.map((dept) => (
-            <option key={dept} value={dept}>
-              {DEPT_FULL_FORMS[dept]}
+          {deptOptions.map((dept) => (
+            <option key={dept.value} value={dept.value}>
+              {dept.label}
             </option>
           ))}
         </select>
@@ -1968,6 +1986,7 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
 }
 
 function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin,perms,onPermChange}){
+  const { options: deptOptions } = useDepartmentOptions();
   if(step===0)return(
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. MGR-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
@@ -2016,9 +2035,9 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPT_OPTIONS.map((dept) => (
-            <option key={dept} value={dept}>
-              {DEPT_FULL_FORMS[dept]}
+          {deptOptions.map((dept) => (
+            <option key={dept.value} value={dept.value}>
+              {dept.label}
             </option>
           ))}
         </select>
@@ -2208,6 +2227,7 @@ function getErrorSummary(err){
 }
 
 export default function EmployeeTable(){
+  const { options: deptOptions } = useDepartmentOptions();
   const [open,setOpen]=useState(false);
   const [openManager,setOpenManager]=useState(false);
   const [showFilters,setShowFilters]=useState(false);
@@ -2677,9 +2697,9 @@ return(
   </select>
   <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
     <option value="">All Departments</option>
-    {DEPT_OPTIONS.map((dept)=>(
-      <option key={dept} value={dept}>
-        {DEPT_FULL_FORMS[dept]}
+    {deptOptions.map((dept)=>(
+      <option key={dept.value} value={dept.value}>
+        {dept.label}
       </option>
     ))}
   </select>
@@ -2858,8 +2878,8 @@ return(
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
               <option value="">Select Department</option>
-              {DEPT_OPTIONS.map((dept)=>(
-                <option key={dept} value={dept}>{DEPT_FULL_FORMS[dept]}</option>
+              {deptOptions.map((dept)=>(
+                <option key={dept.value} value={dept.value}>{dept.label}</option>
               ))}
             </select>
           </Field>
