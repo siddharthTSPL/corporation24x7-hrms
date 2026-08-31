@@ -1128,7 +1128,7 @@ const updateAdmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
-  ["f_name", "l_name", "phone", "gender", "designation", "profile_image"].forEach(
+  ["f_name", "l_name", "phone", "gender", "designation", "profile_image", "department", "office_location"].forEach(
     (field) => {
       if (req.body[field] !== undefined) admin[field] = req.body[field];
     },
@@ -1145,6 +1145,8 @@ const updateAdmin = async (req, res, next) => {
       phone: admin.phone,
       gender: admin.gender,
       designation: admin.designation,
+      department: admin.department,
+      office_location: admin.office_location,
       status: admin.status,
     },
   });
