@@ -70,7 +70,9 @@ const {
   setManagerWorkingStatus,
   getInactiveUsers,
   getActiveUserCount,
-  getAllAdminsForOrg
+  getAllAdminsForOrg,
+  respondToMyReview,
+  hrAcknowledgeReviewHandler
 
 } = require("../controllers/admin.controller");
 
@@ -276,6 +278,23 @@ adminrouter.get(
   "/allreviews",
   adminauthmiddleware,
   asyncHandler(getAllReviewsForAdmin),
+);
+
+// Step 2 — this Admin, as the *reviewee* of a review a SuperAdmin gave them,
+// accepts or disputes it.
+adminrouter.post(
+  "/review/respond",
+  adminauthmiddleware,
+  asyncHandler(respondToMyReview),
+);
+
+// Step 3 — FINAL approval. Only reachable by an Admin flagged isHR === true
+// (enforced inside the handler); applies org-wide regardless of who the
+// reviewer/reviewee were.
+adminrouter.post(
+  "/review/hr-acknowledge",
+  adminauthmiddleware,
+  asyncHandler(hrAcknowledgeReviewHandler),
 );
 
 adminrouter.get(

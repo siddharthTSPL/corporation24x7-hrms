@@ -16,6 +16,16 @@ export const getAllReviews = async (params = {}) => {
   return res.data;
 };
 
+export const setAdminHRRole = async (data) => {
+  const res = await api.post("superadmin/set-hr-role", data);
+  return res.data;
+};
+
+export const superAdminAcknowledgeReview = async (data) => {
+  const res = await api.post("superadmin/review/acknowledge", data);
+  return res.data;
+};
+
 export const getTodayCheckins = async () => {
   const res = await api.get("superadmin/getTodayCheckins");
   return res.data;

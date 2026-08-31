@@ -37,3 +37,8 @@ export const dismissWelcomeMessage = async () => {
   const res = await api.post('auth/dismiss-welcome');
   return res.data;
 };
+
+export const dismissBirthdayWish = async () => {
+  const res = await api.post('auth/dismiss-birthday');
+  return res.data;
+};

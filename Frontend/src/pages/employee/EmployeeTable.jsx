@@ -1844,13 +1844,12 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
     </div>
   );
 }
-
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
   if(step===0)return(
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. EMP-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Last Name" error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
       <PasswordField
         label="Password"
@@ -1876,7 +1875,17 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
         </select>
       </Field>
       <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field
+        label="Emergency Contact"
+        required
+        error={
+          form.e_contact && form.personal_contact && form.e_contact===form.personal_contact
+            ? "Emergency contact must be different from personal contact"
+            : errors.e_contact
+        }
+      >
+        <input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/>
+      </Field>
     </>
   );
   if(step===1)return(
@@ -1963,7 +1972,7 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. MGR-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Last Name" error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
       <PasswordField
         label="Password"
@@ -1989,7 +1998,17 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
         </select>
       </Field>
       <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field
+        label="Emergency Contact"
+        required
+        error={
+          form.e_contact && form.personal_contact && form.e_contact===form.personal_contact
+            ? "Emergency contact must be different from personal contact"
+            : errors.e_contact
+        }
+      >
+        <input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/>
+      </Field>
     </>
   );
   if(step===1)return(
@@ -2078,8 +2097,10 @@ function validateContactInfo(form){
   if(!form.empid?.trim())err.empid="Required";
   if(!form.f_name)err.f_name="Required";
   else if(!NAME_REGEX.test(form.f_name))err.f_name="Enter a valid name";
-  if(!form.l_name)err.l_name="Required";
-  else if(!NAME_REGEX.test(form.l_name))err.l_name="Enter a valid name";
+
+  // last name ab required nahi — sirf format check hoga agar user kuch bhare
+  if(form.l_name && !NAME_REGEX.test(form.l_name))err.l_name="Enter a valid name";
+
   if(!form.work_email)err.work_email="Required";
   else if(!EMAIL_REGEX.test(form.work_email))err.work_email="Invalid email address";
   if(!form.password)err.password="Required";
@@ -2091,6 +2112,12 @@ function validateContactInfo(form){
   else if(!PHONE_REGEX.test(form.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
   if(!form.e_contact)err.e_contact="Required";
   else if(!PHONE_REGEX.test(form.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+
+  // personal aur emergency contact same nahi hone chahiye
+  else if(form.personal_contact && form.e_contact===form.personal_contact){
+    err.e_contact="Emergency contact must be different from personal contact";
+  }
+
   return err;
 }
 
@@ -2274,7 +2301,7 @@ export default function EmployeeTable(){
 
   const handleEditChange=(e)=>setEditForm({...editForm,[e.target.name]:e.target.value});
 
-  const validateEdit=()=>{
+   const validateEdit=()=>{
     const err={};
     if(!editForm.f_name?.trim())err.f_name="Required";
     if(!editForm.l_name?.trim())err.l_name="Required";
@@ -2284,6 +2311,9 @@ export default function EmployeeTable(){
     if(!editForm.department)err.department="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+    else if(editForm.personal_contact && editForm.e_contact && editForm.e_contact===editForm.personal_contact){
+      err.e_contact="Emergency contact must be different from personal contact";
+    }
     setEditErrors(err);
     return Object.keys(err).length===0;
   };
@@ -2853,9 +2883,17 @@ return(
               <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
-          <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          
+                    <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field
+            label="Emergency Contact"
+            error={
+              editForm.e_contact && editForm.personal_contact && editForm.e_contact===editForm.personal_contact
+                ? "Emergency contact must be different from personal contact"
+                : editErrors.e_contact
+            }
+          >
+            <input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/>
+          </Field>
         </Modal>
       )}
 

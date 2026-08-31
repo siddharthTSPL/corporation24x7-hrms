@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const AssetModel = require("../Models/Asset.model");
+const AssetModel = require("../Models/asset.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
@@ -7,7 +7,7 @@ const { notifyAssetAssigned } = require("../utils/notify.utils");
 
 const PERSON_MODEL_MAP = { Admin: AdminModel, Manager: Managermodel, User: Usermodel };
 const PERSON_SELECT =
-  "_id f_name l_name uid work_email designation department working_status profile_image";
+  "_id f_name l_name empid uid work_email designation department working_status profile_image";
 
 const generateAssetId = () => {
   const ts = Date.now().toString(36).toUpperCase();
@@ -820,6 +820,7 @@ const getEmployeesWithAssets = async (req, res, next) => {
           person_model: g._id.assigned_to_model,
           f_name: person.f_name,
           l_name: person.l_name,
+          empid: person.empid,
           uid: person.uid,
           work_email: person.work_email,
           designation: person.designation,

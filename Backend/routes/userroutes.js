@@ -36,7 +36,8 @@ const {
   showPasswordPage,
   sendPasswordSetupLink,
   getExpenseDocuments,
-  getPersonalDocuments
+  getPersonalDocuments,
+  respondToMyReview,
 } = require("../controllers/user.controller");
 
 const { getMyAssets } = require("../controllers/asset.controller");
@@ -58,6 +59,8 @@ userrouter.post("/firstloginpasswordchange", asyncHandler(firstLoginPasswordChan
 
 userrouter.post("/logout", employeemiddleware, asyncHandler(userlogout));
 userrouter.get("/getme", employeemiddleware, asyncHandler(getme));
+// Step 2: Employee accepts/disputes the review their manager gave them.
+userrouter.post("/review/respond", employeemiddleware, asyncHandler(respondToMyReview));
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));
 userrouter.put("/changepassword", employeemiddleware, asyncHandler(changepassword));
 userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));

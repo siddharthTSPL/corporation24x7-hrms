@@ -5,15 +5,27 @@ import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import { Outlet } from "react-router-dom";
 import { useAuth, usePermissionsSync } from "../auth/store/getmeauth/getmeauth";
-import { useDismissWelcomeMessage } from "../auth/store/unifiedauth/Unifiedauth.hook";
+import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/unifiedauth/Unifiedauth.hook";
 import WelcomeModal from "../components/WelcomeModal";
+import BirthdayModal from "../components/BirthdayModal";
+
+// True when `dob` (any year) falls on today's month/day.
+function isBirthdayToday(dob) {
+  if (!dob) return false;
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  return d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+}
 
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showBirthday, setShowBirthday] = useState(false);
   const { data: auth } = useAuth();
   const queryClient = useQueryClient();
   const { mutate: dismissWelcome, isPending: isDismissingWelcome } = useDismissWelcomeMessage();
+  const { mutate: dismissBirthday, isPending: isDismissingBirthday } = useDismissBirthdayWish();
 
   usePermissionsSync();
 
@@ -43,9 +55,19 @@ export default function MainLayout() {
         "there";
   const professionLabel = account?.designation || roleLabels[auth?.role] || "";
 
+  const currentYear = new Date().getFullYear();
+  const shouldShowBirthday =
+    !shouldShowWelcome &&
+    isBirthdayToday(account?.date_of_birth) &&
+    account?.lastBirthdayWishYear !== currentYear;
+
   useEffect(() => {
     setShowWelcome(shouldShowWelcome);
   }, [shouldShowWelcome]);
+
+  useEffect(() => {
+    setShowBirthday(shouldShowBirthday);
+  }, [shouldShowBirthday]);
 
   const markWelcomeAsSeenInCache = () => {
     queryClient.setQueryData(["auth"], (current) => {
@@ -119,6 +141,45 @@ export default function MainLayout() {
     });
   };
 
+  const markBirthdayAsSeenInCache = () => {
+    queryClient.setQueryData(["auth"], (current) => {
+      if (!current?.data) return current;
+      const year = new Date().getFullYear();
+
+      const roleKey =
+        current.role === "superadmin" ? "superAdmin"
+        : current.role === "admin" ? "user"
+        : current.role === "manager" ? "manager"
+        : current.role === "employee" ? "employee"
+        : null;
+
+      if (!roleKey || !current.data[roleKey]) return current;
+
+      return {
+        ...current,
+        data: {
+          ...current.data,
+          [roleKey]: {
+            ...current.data[roleKey],
+            lastBirthdayWishYear: year,
+          },
+        },
+      };
+    });
+  };
+
+  const handleCloseBirthday = () => {
+    dismissBirthday(undefined, {
+      onSuccess: () => {
+        markBirthdayAsSeenInCache();
+        setShowBirthday(false);
+      },
+      onError: (error) => {
+        toast.error(error?.message || "Couldn't save birthday status. Please try again.");
+      },
+    });
+  };
+
   return (
     <div className="flex h-screen bg-(--background)">
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -137,6 +198,14 @@ export default function MainLayout() {
           roleLabel={roleLabels[auth?.role] || ""}
           onClose={handleCloseWelcome}
           isClosing={isDismissingWelcome}
+        />
+      )}
+
+      {!showWelcome && showBirthday && (
+        <BirthdayModal
+          displayName={displayName}
+          onClose={handleCloseBirthday}
+          isClosing={isDismissingBirthday}
         />
       )}
     </div>

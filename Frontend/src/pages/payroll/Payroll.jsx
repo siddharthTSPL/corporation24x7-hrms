@@ -2209,29 +2209,56 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
 
   const [form, setForm] = useState({
     lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
-    otherEarnings: 0, deductions: 0, otherDeductions: 0, remarks: "",
+    otherEarnings: 0, deductions: 0, otherDeductions: 0,
+    pan: "", bankAccountNumber: "", bankName: "", remarks: "",
   });
 
   useEffect(() => {
     if (mode === "edit" && record) {
+      const namedAmount = (particular) =>
+        (record.otherIncome?.items || []).find((i) => i.particular === particular)?.amount || 0;
       setForm({
-        lastWorkingDay: record.lastWorkingDay ? record.lastWorkingDay.slice(0, 10) : "",
-        leaveEncashment: record.settlement?.leaveEncashment || 0,
-        gratuity: record.settlement?.gratuity || 0,
-        bonus: record.settlement?.bonus || 0,
-        otherEarnings: record.settlement?.otherEarnings || 0,
-        deductions: record.settlement?.deductions || 0,
-        otherDeductions: record.settlement?.otherDeductions || 0,
+        lastWorkingDay: record.dateOfLeaving ? record.dateOfLeaving.slice(0, 10) : "",
+        leaveEncashment: namedAmount("Leave Encashment"),
+        gratuity: namedAmount("Gratuity"),
+        bonus: namedAmount("Bonus"),
+        otherEarnings: namedAmount("Other Earnings"),
+        deductions: record.deductions?.recoveries || 0,
+        otherDeductions: record.deductions?.other || 0,
+        pan: record.employeeSnapshot?.pan || "",
+        bankAccountNumber: record.employeeSnapshot?.bankAccountNumber || "",
+        bankName: record.employeeSnapshot?.bankName || "",
         remarks: record.remarks || "",
       });
+    } else if (mode === "generate" && person) {
+      setForm({
+        lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+        otherEarnings: 0, deductions: 0, otherDeductions: 0,
+        pan: person.pan || "",
+        bankAccountNumber: person.bankAccountNumber || "",
+        bankName: person.bankName || "",
+        remarks: "",
+      });
     } else {
-      setForm({ lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0, otherEarnings: 0, deductions: 0, otherDeductions: 0, remarks: "" });
+      setForm({
+        lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+        otherEarnings: 0, deductions: 0, otherDeductions: 0,
+        pan: "", bankAccountNumber: "", bankName: "", remarks: "",
+      });
     }
-  }, [mode, record, open]);
+  }, [mode, record, person, open]);
 
   if (!open) return null;
 
   const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  // Generate mode gets this straight from the eligible-list flag the backend
+  // already computes. Edit mode (record already exists) derives the same
+  // thing from the saved snapshot, since bankInfoMissing isn't part of the record.
+  const bankInfoMissing =
+    mode === "generate"
+      ? Boolean(person?.bankInfoMissing)
+      : !(record?.employeeSnapshot?.pan && record?.employeeSnapshot?.bankAccountNumber && record?.employeeSnapshot?.bankName);
 
   const submit = () => {
     if (mode === "generate") {
@@ -2292,6 +2319,37 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
           <Field label="Other Deductions (₹)">
             <TextInput type="number" value={form.otherDeductions} onChange={set("otherDeductions")} />
           </Field>
+          {bankInfoMissing ? (
+            <>
+              <Field label="PAN">
+                <TextInput type="text" value={form.pan} onChange={set("pan")} />
+              </Field>
+              <Field label="Bank Account Number">
+                <TextInput type="text" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} />
+              </Field>
+              <Field label="Bank Name">
+                <TextInput type="text" value={form.bankName} onChange={set("bankName")} />
+              </Field>
+            </>
+          ) : (
+            <div
+              className="sm:col-span-2"
+              style={{
+                fontSize: 12.5,
+                color: C.text,
+                background: C.brandLight,
+                padding: "10px 12px",
+                borderRadius: 8,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px 20px",
+              }}
+            >
+              <span><strong>Bank Name:</strong> {form.bankName}</span>
+              <span><strong>A/C No:</strong> {form.bankAccountNumber}</span>
+              <span style={{ color: C.muted, fontStyle: "italic" }}>Auto-filled from employee profile</span>
+            </div>
+          )}
         </div>
         <div style={{ marginTop: 12 }}>
           <Field label="Remarks">
@@ -2318,39 +2376,252 @@ function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) 
   );
 }
 
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB");
+}
+
+function FnFSlipSection({ title, rows, total, totalLabel = "Total" }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.brandDark, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>{title}</div>
+      <table className="w-full" style={{ borderCollapse: "collapse", fontSize: 13 }}>
+        <tbody>
+          {rows.map(([label, amt], i) => (
+            <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+              <td style={{ padding: "5px 4px", color: C.text }}>{label}</td>
+              <td style={{ padding: "5px 4px", textAlign: "right", color: C.text, whiteSpace: "nowrap" }}>{fmtINR(amt)}</td>
+            </tr>
+          ))}
+          <tr style={{ borderTop: `1px solid ${C.border}` }}>
+            <td style={{ padding: "5px 4px", fontWeight: 800, color: C.text }}>{totalLabel}</td>
+            <td style={{ padding: "5px 4px", textAlign: "right", fontWeight: 800, color: C.text, whiteSpace: "nowrap" }}>{fmtINR(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function downloadFnFSlip(fnf) {
+  const income = fnf.income || { basic: 0, hra: 0, allowances: [], total: 0 };
+  const otherIncome = fnf.otherIncome || { items: [], total: 0 };
+  const holding = fnf.holding || { salaryOnHold: 0, reimbursementOnHold: 0, assetRecovery: 0, total: 0 };
+  const deductions = fnf.deductions || { pf: 0, professionalTax: 0, tds: 0, recoveries: 0, other: 0, total: 0 };
+
+  const incomeRows = [
+    ["Basic Salary", income.basic],
+    ["House Rent Allowance", income.hra],
+    ...(income.allowances || []).map((a) => [a.name, a.amount]),
+  ];
+  const otherIncomeRows = (otherIncome.items || []).map((i) => [i.particular, i.amount]);
+  const holdingRows = [
+    ["Salary payable on hold", holding.salaryOnHold],
+    ["Reimbursement payable on hold", holding.reimbursementOnHold],
+    ["Asset Recovery", holding.assetRecovery],
+  ];
+  const deductionRows = [
+    ["Provident Fund", deductions.pf],
+    ["Professional Tax", deductions.professionalTax],
+    ["TDS", deductions.tds],
+    ["Deductions / Recoveries", deductions.recoveries || 0],
+    ["Other Deductions", deductions.other],
+  ];
+
+  const rowsHtml = (rows) => rows.map(([label, amt]) => `<tr><td>${label}</td><td class="amt">${fmtINR(amt)}</td></tr>`).join("");
+  const sectionHtml = (title, rows, total, totalLabel = "Total") => `
+  <table>
+    <thead><tr><th>${title}</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      ${rowsHtml(rows)}
+      <tr class="total-row"><td>${totalLabel}</td><td class="amt">${fmtINR(total)}</td></tr>
+    </tbody>
+  </table>`;
+
+  const orgName = fnf.organisationSnapshot?.name || "";
+  const name = fnf.employeeSnapshot?.name || "";
+  const monthLabel = fnf.settlementMonth ? `${MONTH_NAMES[fnf.settlementMonth - 1]}, ${String(fnf.settlementYear).slice(-2)}` : "—";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${orgName ? orgName + " - " : ""}Full & Final Settlement - ${name}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
+  .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
+  td { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f3ede9; }
+  td.amt, th.amt { text-align: right; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 20px; font-size: 13px; }
+  .grid .lbl { color: #8a7a74; }
+  .total-row td { font-weight: 700; border-top: 2px solid #2a1a16; border-bottom: none; }
+  .net { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 2px solid #2a1a16; border-bottom: 2px solid #2a1a16; margin: 18px 0; }
+  .net .lbl { font-size: 14px; font-weight: 700; }
+  .net .val { font-size: 18px; font-weight: 800; }
+  .remarks { font-size: 12.5px; color: #8a7a74; margin-top: 10px; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  ${orgName ? `<p class="org">${orgName}</p>` : ""}
+  <h1>Full & Final Settlement Statement</h1>
+
+  <div class="grid">
+    <div><span class="lbl">Employee Name: </span>${name}</div>
+    <div><span class="lbl">Employee ID: </span>${fnf.employeeSnapshot?.employeeId || "—"}</div>
+    <div><span class="lbl">Designation: </span>${fnf.employeeSnapshot?.designation || "—"}</div>
+    <div><span class="lbl">Department: </span>${departmentLabel(fnf.employeeSnapshot?.department)}</div>
+    <div><span class="lbl">PAN: </span>${fnf.employeeSnapshot?.pan || "—"}</div>
+    <div><span class="lbl">Date of Joining: </span>${fmtDate(fnf.dateOfJoining)}</div>
+    <div><span class="lbl">Date of Resignation: </span>${fmtDate(fnf.dateOfResignation)}</div>
+    <div><span class="lbl">Date of Leaving: </span>${fmtDate(fnf.dateOfLeaving)}</div>
+    <div><span class="lbl">Total Days in ${monthLabel}: </span>${fnf.totalDaysInMonth ?? "—"}</div>
+    <div><span class="lbl">Payable Days in ${monthLabel}: </span>${fnf.payableDaysInMonth ?? "—"}</div>
+    <div><span class="lbl">Bank Account Number: </span>${fnf.employeeSnapshot?.bankAccountNumber || "—"}</div>
+    <div><span class="lbl">Bank Name: </span>${fnf.employeeSnapshot?.bankName || "—"}</div>
+  </div>
+
+  ${sectionHtml("Income", incomeRows, income.total)}
+  ${sectionHtml("Other Income", otherIncomeRows, otherIncome.total)}
+  ${sectionHtml("Holding", holdingRows, holding.total)}
+  ${sectionHtml("Deductions", deductionRows, deductions.total)}
+
+  <div class="net">
+    <span class="lbl">NET AMOUNT PAYABLE</span>
+    <span class="val">${fmtINR(fnf.netPayable)}</span>
+  </div>
+
+  ${fnf.remarks ? `<p class="remarks">${fnf.remarks}</p>` : ""}
+
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+
+  if (!win) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FnF Statement - ${name}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function FnFSlipModal({ fnf, onClose }) {
   if (!fnf) return null;
-  const s = fnf.settlement || {};
-  const rows = [
-    ["Pending Salary", s.pendingSalary],
-    ["Leave Encashment", s.leaveEncashment],
-    ["Gratuity", s.gratuity],
-    ["Bonus", s.bonus],
-    ["Other Earnings", s.otherEarnings],
-    ["Deductions / Recoveries", -1 * (s.deductions || 0)],
-    ["Other Deductions", -1 * (s.otherDeductions || 0)],
+  const canDownload = fnf.status === "approved" || fnf.status === "paid";
+
+  const income = fnf.income || { basic: 0, hra: 0, allowances: [], total: 0 };
+  const otherIncome = fnf.otherIncome || { items: [], total: 0 };
+  const holding = fnf.holding || { salaryOnHold: 0, reimbursementOnHold: 0, assetRecovery: 0, total: 0 };
+  const deductions = fnf.deductions || { pf: 0, professionalTax: 0, tds: 0, recoveries: 0, other: 0, total: 0 };
+
+  const incomeRows = [
+    ["Basic Salary", income.basic],
+    ["House Rent Allowance", income.hra],
+    ...(income.allowances || []).map((a) => [a.name, a.amount]),
   ];
+
+  const otherIncomeRows = (otherIncome.items || []).map((i) => [i.particular, i.amount]);
+
+  const holdingRows = [
+    ["Salary payable on hold", holding.salaryOnHold],
+    ["Reimbursement payable on hold", holding.reimbursementOnHold],
+    ["Asset Recovery", holding.assetRecovery],
+  ];
+
+  const deductionRows = [
+    ["Provident Fund", deductions.pf],
+    ["Professional Tax", deductions.professionalTax],
+    ["TDS", deductions.tds],
+    ["Deductions / Recoveries", deductions.recoveries || 0],
+    ["Other Deductions", deductions.other],
+  ];
+
+  const monthLabel = fnf.settlementMonth ? `${MONTH_NAMES[fnf.settlementMonth - 1]}, ${String(fnf.settlementYear).slice(-2)}` : "—";
+
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 460, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
-        <h3 style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 800, color: C.text }}>Full & Final Settlement</h3>
-        <p style={{ margin: "0 0 2px", fontSize: 13, color: C.text, fontWeight: 600 }}>{fnf.employeeSnapshot?.name} ({fnf.employeeSnapshot?.employeeId})</p>
-        <p style={{ margin: "0 0 16px", fontSize: 12, color: C.muted }}>
-          {EXIT_TYPE_LABEL[fnf.exitType] || fnf.exitType}{fnf.lastWorkingDay ? ` · Last working day ${new Date(fnf.lastWorkingDay).toLocaleDateString()}` : ""}
-        </p>
-        <div style={{ borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: "10px 0" }}>
-          {rows.map(([label, amt]) => (
-            <div key={label} className="flex justify-between" style={{ fontSize: 13, padding: "4px 0", color: C.text }}>
-              <span>{label}</span>
-              <span style={{ fontWeight: 600, color: amt < 0 ? C.red : C.text }}>{fmtINR(amt)}</span>
-            </div>
-          ))}
+      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div>
+            {fnf.organisationSnapshot?.name && <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.brand }}>{fnf.organisationSnapshot.name}</p>}
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.brandDark }}>Full & Final Settlement Statement</h3>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {canDownload && (
+              <GhostButton onClick={() => downloadFnFSlip(fnf)}>Download</GhostButton>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          </div>
         </div>
-        <div className="flex justify-between" style={{ padding: "12px 0 4px", fontSize: 15, fontWeight: 800 }}>
-          <span>Net Payable</span>
+
+        <table className="w-full" style={{ borderCollapse: "collapse", fontSize: 12.5, color: C.text }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Employee Name</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.name}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Joining</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfJoining)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Employee ID</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.employeeId}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Resignation</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfResignation)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Designation</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.designation}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Leaving</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfLeaving)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Department</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{departmentLabel(fnf.employeeSnapshot?.department)}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Total Days in {monthLabel}</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.totalDaysInMonth}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>PAN</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.pan || "—"}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Payable Days in {monthLabel}</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.payableDaysInMonth}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Bank Account Number</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.bankAccountNumber || "—"}</td>
+              <td></td><td></td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Bank Name</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.bankName || "—"}</td>
+              <td></td><td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <FnFSlipSection title="Income" rows={incomeRows} total={income.total} />
+        <FnFSlipSection title="Other Income" rows={otherIncomeRows} total={otherIncome.total} />
+        <FnFSlipSection title="Holding" rows={holdingRows} total={holding.total} />
+        <FnFSlipSection title="Deductions" rows={deductionRows} total={deductions.total} />
+
+        <div className="flex justify-between" style={{ padding: "14px 4px 4px", fontSize: 16, fontWeight: 800, borderTop: `2px solid ${C.text}`, marginTop: 14 }}>
+          <span>Net Amount Payable</span>
           <span style={{ color: C.brandDark }}>{fmtINR(fnf.netPayable)}</span>
         </div>
-        <div style={{ marginTop: 10 }}>{statusBadge(fnf.status)}</div>
+
+        <div style={{ marginTop: 12 }}>{statusBadge(fnf.status)}</div>
         {fnf.remarks && <p style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{fnf.remarks}</p>}
       </div>
     </div>
@@ -2423,7 +2694,7 @@ function FnFTab({ notify }) {
                     </td>
                     <td style={{ padding: "8px 10px" }}>
                       <PrimaryButton onClick={() => setFormModal({ mode: "generate", person: p })} style={{ padding: "7px 14px", minHeight: 32, fontSize: 12.5 }}>
-                        Generate FnF
+                        Generate F&F
                       </PrimaryButton>
                     </td>
                   </tr>

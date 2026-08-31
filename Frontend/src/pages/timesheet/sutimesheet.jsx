@@ -857,9 +857,11 @@ export default function SuperAdminTimesheet() {
                         return row.days?.[d.toISOString().slice(0, 10)];
                       });
                       const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                      const memberMeta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                       return (
                         <div key={i} className="min-w-0">
-                          <div className="text-[12px] font-semibold text-gray-700 truncate mb-1.5">{memberName}</div>
+                          <div className="text-[12px] font-semibold text-gray-700 truncate">{memberName}</div>
+                          {memberMeta && <div className="text-[10px] text-gray-400 truncate mb-1.5">{memberMeta}</div>}
                           <div className="grid grid-cols-7 gap-1">
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
@@ -884,7 +886,7 @@ export default function SuperAdminTimesheet() {
                     <table className="w-full border-collapse text-[12px] table-fixed">
                       <thead>
                         <tr>
-                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[18%]">Member</th>
+                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[24%]">Member</th>
                           {DAY_NAMES.map(d => (
                             <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
                           ))}
@@ -898,9 +900,13 @@ export default function SuperAdminTimesheet() {
                             return row.days?.[d.toISOString().slice(0, 10)];
                           });
                           const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                          const memberMeta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                           return (
                             <tr key={i} className="border-t border-[#E4E6EF]">
-                              <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate">{memberName}</td>
+                              <td className="py-2.5 pr-4 pl-1 text-gray-700 min-w-0">
+                                <div className="font-medium truncate">{memberName}</div>
+                                {memberMeta && <div className="text-[10px] text-gray-400 truncate">{memberMeta}</div>}
+                              </td>
                               {days.map((day, j) => {
                                 const pct = day?.loadPercent ?? 0;
                                 const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";

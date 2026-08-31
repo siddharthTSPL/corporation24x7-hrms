@@ -5,6 +5,7 @@ import {
   unifiedVerifyForgotPasswordOtp,
   unifiedResetPassword,
   dismissWelcomeMessage,
+  dismissBirthdayWish,
 } from "../../api/unifiedauth/unifiedauth.api";
 
 export const useUnifiedLogin = () =>
@@ -35,4 +36,10 @@ export const useDismissWelcomeMessage = () =>
   useMutation({
     mutationKey: ["dismiss-welcome-message"],
     mutationFn: dismissWelcomeMessage,
+  });
+
+export const useDismissBirthdayWish = () =>
+  useMutation({
+    mutationKey: ["dismiss-birthday-wish"],
+    mutationFn: dismissBirthdayWish,
   });

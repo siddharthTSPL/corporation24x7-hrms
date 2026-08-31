@@ -1111,13 +1111,17 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
+                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
                             <div className="flex items-center gap-2 mb-2 min-w-0">
                               <div className="w-7 h-7 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] shrink-0">
                                 {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
                               </div>
-                              <span className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</span>
+                              <div className="min-w-0">
+                                <div className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</div>
+                                {meta && <div className="text-[10px] text-gray-400 truncate">{meta}</div>}
+                              </div>
                             </div>
                             <div className="grid grid-cols-7 gap-1">
                               {dayKeys.map((dk, di) => {
@@ -1140,7 +1144,7 @@ export default function AdminTimesheet() {
                     </div>
 
                     <div className="hidden lg:block min-w-0">
-                      <div className="flex items-center gap-2.5 mb-2.5 pl-11">
+                      <div className="flex items-center gap-2.5 mb-2.5 pl-[7.5rem]">
                         {DAY_NAMES.map((d) => (
                           <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>
                         ))}
@@ -1151,10 +1155,15 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
+                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="flex items-center gap-2.5 mb-2">
                             <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">
                               {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
+                            </div>
+                            <div className="w-[7.5rem] min-w-0 shrink-0 pr-2">
+                              <div className="text-[11px] font-semibold text-gray-800 truncate">{row.name || row.person}</div>
+                              {meta && <div className="text-[9px] text-gray-400 truncate">{meta}</div>}
                             </div>
                             {dayKeys.map((dk) => {
                               const pct = row.days[dk]?.loadPercent || 0;

@@ -39,6 +39,9 @@ const {
   deleteAnnouncement,
   reviewtoadmin,
   getAllReviewsForSuperAdmin,
+  setAdminHRRole,
+  getHRAdmins,
+  superAdminAcknowledgeReview,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
@@ -210,6 +213,26 @@ superAdminRouter.get(
   superAdminAuth,
   asyncHandler(getAllReviewsForSuperAdmin),
 );
+
+// SuperAdmin grants/revokes HR approval rights on an Admin.
+superAdminRouter.post(
+  "/set-hr-role",
+  superAdminAuth,
+  asyncHandler(setAdminHRRole),
+);
+superAdminRouter.get(
+  "/hr-admins",
+  superAdminAuth,
+  asyncHandler(getHRAdmins),
+);
+
+// SuperAdmin can also give/override the final review acknowledgement directly.
+superAdminRouter.post(
+  "/review/acknowledge",
+  superAdminAuth,
+  asyncHandler(superAdminAcknowledgeReview),
+);
+
 superAdminRouter.get(
   "/gettodaycheckins",
   superAdminAuth,
