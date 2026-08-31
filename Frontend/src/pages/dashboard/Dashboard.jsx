@@ -16,6 +16,8 @@ import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftE
 import NotificationBell from "../../components/notifications/NotificationBell";
 import MyAssetsWidget from "../asset/MyAssetsWidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
+import AnalyticsDashboard from "./AnalyticsDashboard";
+import { FaChartBar, FaHome } from "react-icons/fa";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["S","M","T","W","T","F","S"];
@@ -795,6 +797,7 @@ export default function Dashboard() {
   const [empExpand, setEmpExpand]=useState(false);
   const [showAttendanceModal, setShowAttendanceModal]=useState(false);
   const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("overview"); // "overview" | "analytics"
 
    useEffect(() => {
     const refreshKey = "dashboard_auto_refreshed";
@@ -934,6 +937,52 @@ export default function Dashboard() {
   const liveCheckinCount = useMemo(()=>checkins.filter(c=>c.source!=="face").length,[checkins]);
   const faceCheckinCount = useMemo(()=>checkins.filter(c=>c.source==="face").length,[checkins]);
 
+  // Top-right pill switch shown in both views so the admin can hop between
+  // the day-to-day overview and the data-heavy analytics dashboard without
+  // leaving the page. Kept as an early return (instead of wrapping the huge
+  // existing JSX tree below) so the two views stay independent and simple.
+  const ViewToggle = () => (
+    <div className="flex gap-1 bg-white border border-[#ede5e0] rounded-full p-1 shadow-sm">
+      <button
+        onClick={() => setViewMode("overview")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "overview" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaHome size={10} /> Overview
+      </button>
+      <button
+        onClick={() => setViewMode("analytics")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "analytics" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaChartBar size={10} /> Analytics
+      </button>
+    </div>
+  );
+
+  if (viewMode === "analytics") {
+    return (
+      <div className="bg-[#f9f8f2] min-h-screen text-[#2a1a16]" style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+          <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold m-0 tracking-tight" style={{ fontFamily: "'Lora',serif" }}>
+                Analytics
+              </h1>
+              <p className="text-[12px] text-[#b0948a] mt-0.5 font-sans">
+                Organisation-wide insights across attendance, leave, payroll & more
+              </p>
+            </div>
+            <ViewToggle />
+          </div>
+          <AnalyticsDashboard role="admin" />
+        </div>
+      </div>
+    );
+  }
+
   if (meError) return (
     <div className="font-sans bg-[#f9f8f2] min-h-screen flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl border border-[#ede5e0] p-8 text-center max-w-xs">
@@ -970,6 +1019,7 @@ export default function Dashboard() {
 </p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <ViewToggle />
             {employee?.office_location && (
               <div className="hidden sm:block text-[11px] text-[#b0948a] bg-white border border-[#ede5e0] rounded-full px-3 py-1 font-sans">
                 📍 {employee.office_location}
