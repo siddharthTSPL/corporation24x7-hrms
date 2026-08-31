@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ratingColor } from "./ReviewGradingForm";
+import PointsBreakdown from "./PointsBreakdown";
 
 const BRAND = {
   pink: "#8B1A4A",
@@ -102,6 +103,7 @@ export default function ReviewCard({
 
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-3 border-t pt-3" style={{ borderColor: BRAND.cardBorder }}>
+          <PointsBreakdown review={review} />
           {review.reviewerComments && (
             <div>
               <p className="m-0 text-[10.5px] uppercase tracking-[0.08em]" style={{ color: BRAND.mutedText }}>Reviewer Comments</p>
