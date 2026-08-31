@@ -24,9 +24,13 @@ const userSchema = new mongoose.Schema(
     },
 
     department: {
+      // Free-text department name/code. Used to be a fixed enum
+      // (OPR/BPO/ENG/HR/MGMT) - now each organisation manages its own list
+      // of departments (see Models/department.model.js) via TorchX Management,
+      // so this just stores whatever department name was picked.
       type: String,
-      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: [true, "Department is required"],
+      trim: true,
     },
 
     Under_manager: {

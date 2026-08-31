@@ -24,9 +24,11 @@ const adminSchema = new mongoose.Schema(
     },
 
     department: {
+      // Free-text department name/code - see Models/department.model.js;
+      // organisations manage their own custom department list now.
       type: String,
-      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: true,
+      trim: true,
     },
 
     f_name: {
