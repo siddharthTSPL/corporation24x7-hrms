@@ -10,7 +10,7 @@ import {
 } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import ReviewGradingForm from "./ReviewGradingForm";
 import MyReviewsList from "./MyReviewsList";
-import { ratingColor } from "./ReviewGradingForm";
+import ReviewHistoryPanel from "./Reviewhistorypanel";
 
 const BRAND = {
   pink: "#8B1A4A",
@@ -146,9 +146,6 @@ export default function ReviewEmployee() {
   const { mutate: submitEmployeeReview, isPending: empPending, error: empError } = useReviewEmployee();
   const { mutate: submitSubManagerReview, isPending: subPending, error: subError } = useReviewSubManager();
 
-  const teamReviews = useGetMyTeamReviews();
-  const reviews = teamReviews.data?.reviews ?? [];
-
   const { data: meData } = useGetMeManager();
   const myReviews = meData?.reviews ?? [];
   const { mutate: respond, isPending: respondPending } = useRespondToMyReviewAsManager();
@@ -280,50 +277,21 @@ export default function ReviewEmployee() {
         )}
 
         {tab === "team" && (
-          <div className="bg-white rounded-2xl border-2 shadow-md overflow-hidden" style={{ borderColor: BRAND.maroon }}>
-            <div className="p-4 sm:p-5 border-b" style={{ borderColor: BRAND.cardBorder }}>
-              <p className="m-0 text-[11px] tracking-[0.1em] uppercase font-medium" style={{ color: BRAND.mutedText }}>
-                Reviews For Your Team
-              </p>
-            </div>
-            <div className="p-3 sm:p-4">
-              {teamReviews.isLoading && <div className="text-center py-8 text-sm" style={{ color: BRAND.mutedText }}>Loading…</div>}
-              {!teamReviews.isLoading && reviews.length === 0 && (
-                <div className="text-center py-10 text-sm" style={{ color: BRAND.mutedText }}>No reviews yet.</div>
-              )}
-              {!teamReviews.isLoading && reviews.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-[13px] min-w-[640px]">
-                    <thead>
-                      <tr style={{ background: BRAND.accentLight }}>
-                        <th className="text-left py-2.5 px-3 text-[11px] uppercase" style={{ color: BRAND.mutedText }}>Reviewee</th>
-                        <th className="text-left py-2.5 px-3 text-[11px] uppercase" style={{ color: BRAND.mutedText }}>Month</th>
-                        <th className="text-left py-2.5 px-3 text-[11px] uppercase" style={{ color: BRAND.mutedText }}>Overall</th>
-                        <th className="text-left py-2.5 px-3 text-[11px] uppercase" style={{ color: BRAND.mutedText }}>Status</th>
-                        <th className="text-left py-2.5 px-3 text-[11px] uppercase" style={{ color: BRAND.mutedText }}>Reviewed By</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reviews.map((r) => (
-                        <tr key={r._id} className="border-b" style={{ borderColor: BRAND.cardBorder }}>
-                          <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>{getFullName(r.reviewee)}</td>
-                          <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>{r.monthYear}</td>
-                          <td className="py-2.5 px-3 font-semibold" style={{ color: ratingColor(r.overallRating) }}>
-                            {r.overallScore}/5 · {r.overallRating}
-                          </td>
-                          <td className="py-2.5 px-3" style={{ color: BRAND.mutedText }}>{r.status}</td>
-                          <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>{getFullName(r.reviewer)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
+          <ReviewHistoryPanel
+            useGetAllReviews={useGetMyTeamReviews}
+            revieweeLabel="Team Member"
+            csvFilePrefix="team-reviews"
+          />
         )}
 
-        {tab === "mine" && <MyReviewsList reviews={myReviews} onRespond={respond} respondPending={respondPending} />}
+        {tab === "mine" && (
+          <MyReviewsList
+            reviews={myReviews}
+            onRespond={respond}
+            respondPending={respondPending}
+            csvFilePrefix="manager-my-reviews"
+          />
+        )}
       </div>
     </div>
   );

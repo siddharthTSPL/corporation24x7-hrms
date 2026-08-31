@@ -168,7 +168,14 @@ export default function ReviewManager() {
           <ReviewHistoryPanel useGetAllReviews={useGetAllReviews} revieweeRoleModel="Manager" revieweeLabel="Manager" csvFilePrefix="manager-reviews" />
         )}
 
-        {tab === "mine" && <MyReviewsList reviews={myReviews} onRespond={respond} respondPending={respondPending} />}
+        {tab === "mine" && (
+          <MyReviewsList
+            reviews={myReviews}
+            onRespond={respond}
+            respondPending={respondPending}
+            csvFilePrefix="admin-my-reviews"
+          />
+        )}
 
         {tab === "hr" && isHR && <HrApprovalsPanel useGetAllReviews={useGetAllReviews} onHrDecision={hrDecide} isPending={hrPending} />}
 
