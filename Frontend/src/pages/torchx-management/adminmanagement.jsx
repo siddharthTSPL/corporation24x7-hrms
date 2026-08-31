@@ -15,6 +15,7 @@ import {
   UserPlus,
   ShieldCheck,
   History,
+  Building2,
 } from 'lucide-react';
 
 import {
@@ -48,6 +49,13 @@ import {
 } from '../../auth/server-state/holidaypolicy/holidaypolicy.hook';
 
 import { useGetAllEmployee } from '../../auth/server-state/adminother/adminother.hook';
+
+import {
+  useGetAllDepartments,
+  useCreateDepartment,
+  useUpdateDepartment,
+  useDeleteDepartment,
+} from '../../auth/server-state/department/department.hook';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABEL = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -1420,10 +1428,173 @@ function WeekOffPanel({ notify }) {
   );
 }
 
+function DepartmentsPanel({ notify }) {
+  const { data: deptData, isLoading: loading } = useGetAllDepartments();
+  const departments = deptData?.departments || [];
+
+  const createMutation = useCreateDepartment();
+  const updateMutation = useUpdateDepartment();
+  const deleteMutation = useDeleteDepartment();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', code: '' });
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const saving = createMutation.isPending || updateMutation.isPending;
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ name: '', code: '' });
+    setModalOpen(true);
+  };
+
+  const openEdit = (dept) => {
+    setEditing(dept);
+    setForm({ name: dept.name, code: dept.code || '' });
+    setModalOpen(true);
+  };
+
+  const submitDepartment = () => {
+    if (!form.name.trim()) {
+      notify('error', 'Department name is required');
+      return;
+    }
+
+    const onError = (e) => notify('error', errMsg(e, 'Could not save department'));
+
+    if (editing) {
+      updateMutation.mutate(
+        { id: editing._id, data: form },
+        {
+          onSuccess: () => {
+            notify('success', 'Department updated');
+            setModalOpen(false);
+          },
+          onError,
+        }
+      );
+    } else {
+      createMutation.mutate(form, {
+        onSuccess: () => {
+          notify('success', 'Department added');
+          setModalOpen(false);
+        },
+        onError,
+      });
+    }
+  };
+
+  const removeDepartment = (dept) => {
+    deleteMutation.mutate(dept._id, {
+      onSuccess: () => {
+        notify('success', 'Department removed');
+        setConfirmDelete(null);
+      },
+      onError: (e) => notify('error', errMsg(e, 'Could not remove department')),
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+      <SectionCard
+        icon={Building2}
+        title="Departments"
+        subtitle="Add your own departments — they show up instantly in onboarding and edit-department dropdowns"
+        action={
+          <Button onClick={openCreate} className="w-full sm:w-auto">
+            <Plus className="w-4 h-4" /> New department
+          </Button>
+        }
+      >
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        ) : departments.length === 0 ? (
+          <EmptyRow text="No departments yet. Add your first one." />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {departments.map((dept) => (
+              <div
+                key={dept._id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3.5 sm:px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 truncate">{dept.name}</p>
+                  {dept.code && <p className="text-xs text-slate-400 mt-0.5">{dept.code}</p>}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => openEdit(dept)}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#730042] transition-colors"
+                    title="Edit"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(dept)}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                    title="Remove"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit department' : 'New department'}>
+        <div className="p-4 sm:p-5 md:p-6 flex flex-col gap-4">
+          <Field label="Name">
+            <input
+              className={inputCls}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Engineering"
+            />
+          </Field>
+          <Field label="Short code (optional)">
+            <input
+              className={inputCls}
+              value={form.code}
+              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+              placeholder="e.g. ENG"
+            />
+          </Field>
+          <Button onClick={submitDepartment} disabled={saving} className="w-full">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : editing ? 'Save changes' : 'Add department'}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Remove department">
+        <div className="p-4 sm:p-5 md:p-6 flex flex-col gap-4">
+          <p className="text-sm text-slate-600">
+            Remove <span className="font-medium text-slate-800">{confirmDelete?.name}</span>? It will no longer appear in onboarding or
+            edit-department dropdowns, but employees already assigned to it are unaffected.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setConfirmDelete(null)} className="flex-1">
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={() => removeDepartment(confirmDelete)} disabled={deleteMutation.isPending} className="flex-1">
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Remove'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 const TABS = [
   { key: 'shifts', label: 'Shifts', icon: Clock },
   { key: 'holidays', label: 'Holidays', icon: CalendarDays },
   { key: 'weekoff', label: 'Week-off policy', icon: Settings2 },
+  { key: 'departments', label: 'Departments', icon: Building2 },
 ];
 
 export default function AdminManagement() {
@@ -1464,6 +1635,7 @@ export default function AdminManagement() {
         {tab === 'shifts' && <ShiftsPanel notify={notify} />}
         {tab === 'holidays' && <HolidaysPanel notify={notify} />}
         {tab === 'weekoff' && <WeekOffPanel notify={notify} />}
+        {tab === 'departments' && <DepartmentsPanel notify={notify} />}
       </div>
     </div>
   );
