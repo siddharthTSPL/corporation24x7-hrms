@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -35,12 +36,16 @@ import {
   useTimesheetDetailedReport,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -509,7 +514,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISTKey();
 
   return (
     <Card className="overflow-hidden">
@@ -604,7 +609,7 @@ export default function AdminTimesheet() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
   const [editJobModal, setEditJobModal] = useState(false);
   const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
@@ -671,7 +676,19 @@ export default function AdminTimesheet() {
     ...(reportBillable ? { billable: reportBillable } : {}),
   };
   const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
-  const reportRows = reportData?.rows ?? [];
+  const allReportRows = reportData?.rows ?? [];
+  const [reportView, setReportView] = useState("detailed");
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const exportReportCSV = () => {
+    const isWeekend = reportView === "weekend";
+    downloadReportCSV(
+      reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${isWeekend ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
 
   const { data: reportProjectsData } = useMyProjects();
   const reportProjectOptions = reportProjectsData?.projects ?? [];
@@ -725,7 +742,7 @@ export default function AdminTimesheet() {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
       onSuccess: (res) => {
         setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+        setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
         refetchWeek();
         if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       },
@@ -1478,13 +1495,29 @@ export default function AdminTimesheet() {
           <div className="min-w-0">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">Time Sheet Report</h1>
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">
                   {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
                   {reportLoading && " · refreshing…"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Weekend
+                  </button>
+                </div>
                 <span className="text-xs text-gray-400 shrink-0">Week of</span>
                 <input
                   type="date"
@@ -1492,6 +1525,9 @@ export default function AdminTimesheet() {
                   onChange={(e) => setReportWeek(e.target.value)}
                   className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
                 />
+                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">
+                  Export CSV
+                </Btn>
               </div>
             </div>
 
