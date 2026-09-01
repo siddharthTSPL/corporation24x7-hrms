@@ -387,6 +387,7 @@ const getAllTimesheets = async (req, res, next) => {
 //   from, to            — "YYYY-MM-DD" date range (inclusive)
 //   week_start          — "YYYY-MM-DD" alternative to from/to, picks that IST week
 //   employee_id         — a specific User/Manager/Admin _id
+//   employee_name       — partial employee name (case-insensitive)
 //   employee_model      — "User" | "Manager" | "Admin"
 //   department          — free-text department name (case-insensitive)
 //   designation          — free-text designation (case-insensitive)
@@ -429,6 +430,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
     to,
     week_start,
     employee_id,
+    employee_name,
     employee_model,
     department,
     designation,
@@ -486,6 +488,15 @@ const getTimesheetDetailedReport = async (req, res, next) => {
     .populate({ path: "timesheet", select: "status approved_by rejected_by remarks week_start week_end" })
     .sort({ log_date: 1 })
     .lean();
+
+  // Employee metadata lives on the polymorphic logged_by doc, so filter it
+  // after population rather than duplicating it on every time log.
+  if (employee_name) {
+    const nameSearch = employee_name.trim().toLowerCase();
+    logs = logs.filter((l) =>
+      `${l.logged_by?.f_name || ""} ${l.logged_by?.l_name || ""}`.trim().toLowerCase().includes(nameSearch)
+    );
+  }
 
   // department/designation/status live on the polymorphic logged_by doc or
   // the linked timesheet, not on TimeLog itself — filter post-populate.

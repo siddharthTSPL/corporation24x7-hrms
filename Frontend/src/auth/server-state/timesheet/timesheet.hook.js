@@ -467,7 +467,7 @@ export const useJobTimeline = (id) =>
 
 // Detailed, filterable Time Sheet Report (Admin/SuperAdmin) — one row per
 // time-log entry (+ "Off" placeholder rows for un-logged week-off days).
-// params: { from?, to?, week_start?, employee_id?, employee_model?,
+// params: { from?, to?, week_start?, employee_id?, employee_name?, employee_model?,
 //           department?, designation?, project_id?, job_id?, status?, billable? }
 export const useTimesheetDetailedReport = (params = {}) =>
   useQuery({
