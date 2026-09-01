@@ -197,7 +197,33 @@ const listSalaryStructures = async (req, res) => {
   if (employeeModel) filter.employeeModel = employeeModel;
 
   const structures = await SalaryStructure.find(filter).lean();
-  res.status(200).json({ success: true, count: structures.length, structures });
+
+  // Payroll-readiness warnings — missing these doesn't block generating
+  // payroll, but the admin should see it: no bank account means this
+  // person can't actually be paid out, and no date of joining means
+  // gratuity eligibility (5-year continuous service) can't be computed.
+  const idsByModel = {};
+  for (const s of structures) {
+    (idsByModel[s.employeeModel] ||= []).push(s.employee);
+  }
+  const detailsByEmployee = new Map();
+  for (const [model, ids] of Object.entries(idsByModel)) {
+    const Model = EMPLOYEE_MODEL_MAP[model];
+    if (!Model) continue;
+    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining").lean();
+    for (const d of docs) detailsByEmployee.set(String(d._id), d);
+  }
+
+  const withWarnings = structures.map((s) => {
+    const details = detailsByEmployee.get(String(s.employee));
+    return {
+      ...s,
+      missingBankAccount: !details?.account_number,
+      missingDateOfJoining: !details?.date_of_joining,
+    };
+  });
+
+  res.status(200).json({ success: true, count: withWarnings.length, structures: withWarnings });
 };
 
 
