@@ -43,6 +43,15 @@ const nonNegative = (v) => {
   return n < 0 ? "0" : v;
 };
 
+const clampMaxHoursPerDay = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  if (n < 0) return "0";
+  if (n > 24) return "24";
+  return v;
+};
+
 const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
@@ -1426,7 +1435,7 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+          <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
@@ -1465,7 +1474,7 @@ export default function SuperAdminTimesheet() {
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={e => setEditJobForm(p => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
