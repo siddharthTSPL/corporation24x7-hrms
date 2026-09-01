@@ -10,6 +10,7 @@ import {
   approveTimesheet, rejectTimesheet, forwardTimesheet,
   getTeamWorkloadHeatmap, getOverrunRiskJobs, getIdleJobs, getMyProductivitySummary,
   getOrgAllTimeLogs, getOrgAllTimesheets, getOrgAllJobs, getJobTimeline,
+  getTimesheetDetailedReport,
 } from "../../api/timesheet/timesheet.api";
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -462,4 +463,17 @@ export const useJobTimeline = (id) =>
     enabled: !!id,
     staleTime: 0,
     refetchOnMount: true,
+  });
+
+// Detailed, filterable Time Sheet Report (Admin/SuperAdmin) — one row per
+// time-log entry (+ "Off" placeholder rows for un-logged week-off days).
+// params: { from?, to?, week_start?, employee_id?, employee_model?,
+//           department?, designation?, project_id?, job_id?, status?, billable? }
+export const useTimesheetDetailedReport = (params = {}) =>
+  useQuery({
+    queryKey: ["tsTimesheetDetailedReport", params],
+    queryFn: () => getTimesheetDetailedReport(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
