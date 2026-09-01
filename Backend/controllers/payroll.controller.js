@@ -271,6 +271,9 @@ const generatePayroll = async (req, res) => {
     ? null
     : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
+  const employeeDoc = await EMPLOYEE_MODEL_MAP[employeeModel]?.findById(employee).select("date_of_joining").lean();
+  const dateOfJoining = employeeDoc?.date_of_joining || null;
+
   const result = calculatePayrollForMonth({
     structure,
     policy,
@@ -279,6 +282,7 @@ const generatePayroll = async (req, res) => {
     year: Number(year),
     extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
     manualAttendance,
+    dateOfJoining,
   });
 
   const employeeSnapshot = await getEmployeeSnapshot(employeeModel, employee);
@@ -370,6 +374,12 @@ const bulkGeneratePayroll = async (req, res) => {
     .lean();
   const existingStatusByEmployee = new Map(existingPayrolls.map((p) => [String(p.employee), p.status]));
 
+  const employeeDocs = await EMPLOYEE_MODEL_MAP[model]
+    .find({ _id: { $in: employeeIds } })
+    .select("date_of_joining")
+    .lean();
+  const dojByEmployee = new Map(employeeDocs.map((d) => [String(d._id), d.date_of_joining || null]));
+
   const ops = [];
   const skipped = [];
 
@@ -398,6 +408,7 @@ const bulkGeneratePayroll = async (req, res) => {
       month: Number(month),
       year: Number(year),
       extras: {},
+      dateOfJoining: dojByEmployee.get(String(structure.employee)) || null,
     });
 
     const employeeSnapshot = await getEmployeeSnapshot(model, structure.employee);
