@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
-  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
+  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
   useOrgAllTimeLogs, useOrgAllTimesheets,
@@ -574,7 +574,6 @@ export default function SuperAdminTimesheet() {
   const updateJob       = useUpdateJob();
   const approveTS       = useApproveTimesheet();
   const rejectTS        = useRejectTimesheet();
-  const archiveJob      = useArchiveJob();
   const updateJobStatus = useUpdateJobStatus();
   const logTime         = useLogTime();
   const submitTS        = useSubmitTimesheet();
@@ -1002,16 +1001,15 @@ export default function SuperAdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
-                        <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
-                        <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
-                          className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
-                          {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
-                            <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
-                          ))}
-                        </select>
-                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id, { onSuccess: refetchJobs })} className="text-[12px] px-3 min-h-[36px]">Archive</Btn>
-                      </div>
+  <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
+  <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
+  <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
+    className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
+    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
+      <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
+    ))}
+  </select>
+</div>
                     </div>
                     {job.estimated_hours > 0 && (
                       <div className="h-0.5 bg-[#E4E6EF] rounded-full mt-3 overflow-hidden">
