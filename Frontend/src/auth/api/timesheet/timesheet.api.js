@@ -267,3 +267,12 @@ export const getJobTimeline = async (id) => {
   const res = await api.get(`timesheet/admin/jobs/${id}/timeline`);
   return res.data;
 };
+
+// Detailed, filterable Time Sheet Report — Name, Designation, Department,
+// Project, Job, Date, Required/Serving/Overtime hours, Approved/Rejected by.
+// params: { from?, to?, week_start?, employee_id?, employee_model?,
+//           department?, designation?, project_id?, job_id?, status?, billable? }
+export const getTimesheetDetailedReport = async (params) => {
+  const res = await api.get("timesheet/admin/timesheet-report", { params });
+  return res.data;
+};

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
-  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
+  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
   useOrgAllTimeLogs, useOrgAllTimesheets,
@@ -9,15 +9,20 @@ import {
   useResumeTimer, useStopTimer, useDiscardTimer, useHeartbeatTimer,
   useMyWeekLog, useLogTime, useSubmitTimesheet, useMyTimesheets,
   useRecallTimesheet, useMyProductivitySummary, useJobById,
-  useForwardTimesheet,
+  useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -41,6 +46,15 @@ const nonNegative = (v) => {
   const n = Number(v);
   if (Number.isNaN(n)) return v;
   return n < 0 ? "0" : v;
+};
+
+const clampMaxHoursPerDay = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  if (n < 0) return "0";
+  if (n > 24) return "24";
+  return v;
 };
 
 const STATUS_STYLE = {
@@ -79,6 +93,7 @@ const NAV_TABS = [
   { id: "org-logs",   label: "All Logs"       },
   { id: "org-sheets", label: "All Timesheets" },
   { id: "analytics",  label: "Analytics"      },
+  { id: "report",     label: "Time Sheet Report" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -426,7 +441,7 @@ function TimerWidget({ assignedJobs }) {
 
 function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayISTKey();
   return (
     <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden shadow-sm min-w-0">
       {/* Mobile: stacked day-by-day list — no horizontal scroll needed */}
@@ -518,7 +533,7 @@ export default function SuperAdminTimesheet() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [logModal, setLogModal] = useState(false);
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
   const [editJobOpen, setEditJobOpen] = useState(false);
   const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: true, hourly_rate: "", currency: "INR", due_date: "" });
 
@@ -558,6 +573,43 @@ export default function SuperAdminTimesheet() {
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
+  // ─── Time Sheet Report (detailed + weekend, filterable, org-wide) ────────
+  const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportView, setReportView] = useState("detailed");
+  const [reportEmployeeModel, setReportEmployeeModel] = useState("");
+  const [reportDepartment, setReportDepartment] = useState("");
+  const [reportDesignation, setReportDesignation] = useState("");
+  const [reportProject, setReportProject] = useState("");
+  const [reportJob, setReportJob] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportBillable, setReportBillable] = useState("");
+
+  const reportParams = {
+    week_start: reportWeek,
+    ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
+    ...(reportDepartment ? { department: reportDepartment } : {}),
+    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(reportProject ? { project_id: reportProject } : {}),
+    ...(reportJob ? { job_id: reportJob } : {}),
+    ...(reportStatus ? { status: reportStatus } : {}),
+    ...(reportBillable ? { billable: reportBillable } : {}),
+  };
+  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const allReportRows = reportData?.rows ?? [];
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
+  const reportJobOptions = reportJobsData?.jobs ?? [];
+
+  const exportReportCSV = () => {
+    downloadReportCSV(
+      reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${reportView === "weekend" ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
+
   const createProject   = useCreateProject();
   const addProjectMembers = useAddProjectMembers();
   const removeProjectMember = useRemoveProjectMember();
@@ -565,7 +617,6 @@ export default function SuperAdminTimesheet() {
   const updateJob       = useUpdateJob();
   const approveTS       = useApproveTimesheet();
   const rejectTS        = useRejectTimesheet();
-  const archiveJob      = useArchiveJob();
   const updateJobStatus = useUpdateJobStatus();
   const logTime         = useLogTime();
   const submitTS        = useSubmitTimesheet();
@@ -696,7 +747,7 @@ export default function SuperAdminTimesheet() {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
       onSuccess: () => {
         setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+        setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
         refetchWeek();
       }
     });
@@ -993,16 +1044,15 @@ export default function SuperAdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
-                        <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
-                        <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
-                          className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
-                          {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
-                            <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
-                          ))}
-                        </select>
-                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id, { onSuccess: refetchJobs })} className="text-[12px] px-3 min-h-[36px]">Archive</Btn>
-                      </div>
+  <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
+  <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
+  <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
+    className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
+    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
+      <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
+    ))}
+  </select>
+</div>
                     </div>
                     {job.estimated_hours > 0 && (
                       <div className="h-0.5 bg-[#E4E6EF] rounded-full mt-3 overflow-hidden">
@@ -1269,6 +1319,129 @@ export default function SuperAdminTimesheet() {
             </Card>
           </div>
         )}
+
+        {tab === "report" && (
+          <div className="min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </h1>
+                <p className="text-xs text-gray-400 mt-1 mb-0">
+                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportLoading && " · refreshing…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Weekend
+                  </button>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                <input
+                  type="date"
+                  value={reportWeek}
+                  onChange={(e) => setReportWeek(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                />
+                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">Export CSV</Btn>
+              </div>
+            </div>
+
+            <Card className="px-4 sm:px-5 py-4 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+                <Select label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
+                  <option value="">All Roles</option>
+                  <option value="User">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </Select>
+                <Input label="Department" placeholder="e.g. Engineering" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)} />
+                <Input label="Designation" placeholder="e.g. Software Engineer" value={reportDesignation} onChange={(e) => setReportDesignation(e.target.value)} />
+                <Select label="Project" value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
+                  <option value="">All Projects</option>
+                  {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </Select>
+                <Select label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                  <option value="">All Jobs</option>
+                  {reportJobOptions.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
+                </Select>
+                <Select label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </Select>
+                <Select label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                  <option value="">All</option>
+                  <option value="true">Billable only</option>
+                  <option value="false">Non-billable only</option>
+                </Select>
+              </div>
+              {(reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+                <button
+                  onClick={() => {
+                    setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+                    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
+                  }}
+                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </Card>
+
+            {reportRows.length === 0 ? (
+              <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
+                <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
+                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {reportRows.map((r, i) => (
+                  <Card
+                    key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
+                    className={cn("px-3.5 py-3", (r.day_type === "week_off" || r.day_type === "holiday") && "bg-gray-50/70")}
+                  >
+                    <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
+                      <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
+                      {r.day_type === "week_off" || r.day_type === "holiday" ? (
+                        <Badge>{r.day_label}</Badge>
+                      ) : (
+                        <Badge tw={(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).tw}>
+                          {(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).label}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                    {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                    <div className="flex items-center justify-between flex-wrap gap-1.5">
+                      <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
+                      <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
+                        <span className="text-gray-400">Req {r.required_hours}h</span>
+                        <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">OT {r.overtime_hours}h</span>}
+                      </div>
+                    </div>
+                    {(r.approved_by || r.rejected_by) && (
+                      <div className="text-[11px] text-gray-400 mt-1.5">
+                        {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <Modal open={!!approveModal} onClose={() => setApproveModal(null)} title="Approve Timesheet">
@@ -1426,7 +1599,7 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+          <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
@@ -1465,7 +1638,7 @@ export default function SuperAdminTimesheet() {
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={e => setEditJobForm(p => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
