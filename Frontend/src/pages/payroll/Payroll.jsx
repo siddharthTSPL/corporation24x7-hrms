@@ -1784,13 +1784,13 @@ function isBulkSelectable(status) {
   return Boolean(BULK_ACTIONS[status]);
 }
 
-// FIX: "approved" now also allows the "hold" bulk action, so selecting
-// approved rows shows "Hold All" — putting them into on_hold, from where
-// "Resume All" (approve) already worked correctly.
+// Keep bulk actions narrow and predictable:
+// - only generated rows can be bulk-deleted
+// - only approved rows can be bulk-paid
+// - on-hold and paid rows stay out of bulk selection entirely
 const BULK_ACTIONS = {
   generated: ["approve", "hold", "delete"],
-  on_hold: ["approve", "delete"],
-  approved: ["hold", "delete"],
+  approved: ["paid", "hold"],
 };
 
 function buildPayrollExportRows(payrolls, directory) {
@@ -2077,6 +2077,11 @@ function RecordsTab({ notify, directory }) {
                 Hold All
               </GhostButton>
             )}
+            {selectedActions.includes("paid") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("paid")}>
+                Mark Paid All
+              </GhostButton>
+            )}
             {selectedActions.includes("delete") && (
               <GhostButton
                 disabled={bulkDeletePending}
@@ -2129,7 +2134,7 @@ function RecordsTab({ notify, directory }) {
                       type="checkbox"
                       checked={selectedIds.has(p._id)}
                       disabled={!isBulkSelectable(p.status)}
-                      title={!isBulkSelectable(p.status) ? "Paid records can't be bulk-selected" : ""}
+                      title={!isBulkSelectable(p.status) ? "Only generated and approved payrolls can be bulk-selected" : ""}
                       onChange={() => toggleSelectOne(p._id, p.status)}
                     />
                   </td>
