@@ -2,7 +2,14 @@ const ActiveTimer = require("../Models/Activetimer.model");
 const TSJob = require("../Models/Tsjob.model");
 const TimeLog = require("../Models/Timelog.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
-const { recomputeJobHours } = require("./timelog.controller");
+const { endOfISTDay, startOfISTDay } = require("../utils/Istdate.utils");
+const {
+  recomputeJobHours,
+  resolveDailyLimitMinutes,
+  resolveDayType,
+  splitRegularOvertime,
+  getExistingDayMinutes,
+} = require("./timelog.controller");
 
 // Heartbeat must arrive every 60 s from the frontend.
 // Backend caps each heartbeat contribution at 60 s to prevent drift or cheating.
@@ -195,17 +202,43 @@ const stopTimer = async (req, res, next) => {
   // Minimum 1 minute — don't create 0-minute logs
   const durationMinutes = Math.max(1, Math.round(finalSeconds / 60));
 
+  // Same regular/overtime split + weekend/holiday policy used for manual
+  // entries (logTime), so timer-logged time counts correctly toward the
+  // day's cap and the weekly billable/overtime totals in reports.
+  const logDate = startOfISTDay(timer.started_at);
+  const dayStart = logDate;
+  const dayEnd = endOfISTDay(dayStart);
+  const dayType = await resolveDayType(logDate, organisation_id, actor);
+  const dailyLimitMinutes = resolveDailyLimitMinutes(jobDoc);
+  const existingMinutes = await getExistingDayMinutes({
+    organisation_id,
+    actor,
+    dayStart,
+    dayEnd,
+  });
+  const { regular, overtime } = splitRegularOvertime(
+    existingMinutes,
+    durationMinutes,
+    dailyLimitMinutes,
+    dayType
+  );
+
   const timeLog = await TimeLog.create({
     organisation_id,
     job: timer.job,
     project: jobDoc.project,
     logged_by: actor.id,
     logged_by_model: actor.model,
-    log_date: timer.started_at,
+    log_date: logDate,
     entry_mode: "timer",
     start_time: timer.started_at,
     end_time: new Date(),
     duration_minutes: durationMinutes,
+    regular_minutes: regular,
+    overtime_minutes: overtime,
+    is_overtime: overtime > 0,
+    daily_limit_minutes_at_log: dailyLimitMinutes,
+    day_type: dayType,
     note: note || timer.note || "",
     billable: jobDoc.billable,
     hourly_rate: jobDoc.hourly_rate,
