@@ -62,7 +62,7 @@ const timeLogSchema = new mongoose.Schema(
     duration_minutes: { type: Number, required: true, min: 0 },
 
     // Split of duration_minutes against that day's working-hour cap
-    // (job.max_hours_per_day, falling back to the assignee's shift length).
+    // (job.max_hours_per_day, falling back to a default of 9h/day).
     // regular_minutes + overtime_minutes always equals duration_minutes.
     regular_minutes: { type: Number, default: 0, min: 0 },
     overtime_minutes: { type: Number, default: 0, min: 0 },
@@ -70,6 +70,18 @@ const timeLogSchema = new mongoose.Schema(
     // Snapshot of the per-day cap (minutes) that was in effect when this
     // entry was logged/last recalculated, kept for audit/report clarity.
     daily_limit_minutes_at_log: { type: Number, default: null },
+
+    // Weekend/holiday policy: what kind of calendar day (for this employee,
+    // per their weekly-off policy + org holiday calendar) log_date fell on
+    // at the time this entry was logged/last recalculated. A log on a
+    // "week_off" or "holiday" day is never counted as regular working time
+    // - it is entirely overtime, regardless of the daily cap (see
+    // resolveDailyLimitMinutes/splitRegularOvertime in timelog.controller.js).
+    day_type: {
+      type: String,
+      enum: ["working", "week_off", "holiday", "unconfigured"],
+      default: "working",
+    },
 
     note: { type: String, trim: true, maxlength: 500, default: "" },
 
