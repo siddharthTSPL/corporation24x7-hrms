@@ -3,7 +3,7 @@ const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
-const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
+const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 
@@ -422,6 +422,7 @@ const resolveActorName = async (id, cache) => {
 };
 
 const getTimesheetDetailedReport = async (req, res, next) => {
+  const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
   const {
     from,
@@ -437,6 +438,21 @@ const getTimesheetDetailedReport = async (req, res, next) => {
     billable,
   } = req.query;
 
+  // Manager only sees their own team (direct + indirect reports), never the
+  // whole org - Admin/SuperAdmin stay org-wide as before.
+  let teamIds = null;
+  if (actor.model === "Manager") {
+    const reports = await getDirectReportIds({
+      actorId: actor.id,
+      actorModel: "Manager",
+      organisationId: organisation_id,
+    });
+    teamIds = reports.map((r) => r.id.toString());
+    if (!teamIds.length) {
+      return res.status(200).json({ success: true, range: { start: null, end: null }, count: 0, rows: [] });
+    }
+  }
+
   // ─ resolve the date range ─
   let start, end;
   if (week_start) {
@@ -451,7 +467,13 @@ const getTimesheetDetailedReport = async (req, res, next) => {
   }
 
   const logFilter = { organisation_id, log_date: { $gte: start, $lt: end } };
-  if (employee_id) logFilter.logged_by = employee_id;
+  if (teamIds) logFilter.logged_by = { $in: teamIds };
+  if (employee_id) {
+    if (teamIds && !teamIds.includes(employee_id.toString())) {
+      return next(httpError("You can only view timesheet reports for your own team", 403));
+    }
+    logFilter.logged_by = employee_id;
+  }
   if (employee_model) logFilter.logged_by_model = employee_model;
   if (job_id) logFilter.job = job_id;
   if (project_id) logFilter.project = project_id;
