@@ -524,6 +524,7 @@ const updatePayrollStatus = async (req, res) => {
   if (!["approved", "paid", "on_hold"].includes(status))
     return res.status(400).json({ success: false, message: "status must be approved, paid or on_hold" });
 
+  const allowedSourceStatuses = BULK_STATUS_SOURCE_MAP[status] || [];
   const setFields = { status };
   if (status === "approved") {
     setFields.approvedBy = req.admin._id;
@@ -531,8 +532,19 @@ const updatePayrollStatus = async (req, res) => {
   }
   if (status === "paid") setFields.paidOn = new Date();
 
-  const payroll = await Payroll.findOneAndUpdate({ _id: id, organisation_id }, { $set: setFields }, { new: true });
-  if (!payroll) return res.status(404).json({ success: false, message: "Payroll not found" });
+  const payroll = await Payroll.findOneAndUpdate(
+    { _id: id, organisation_id, status: { $in: allowedSourceStatuses } },
+    { $set: setFields },
+    { new: true }
+  );
+  if (!payroll) {
+    const existing = await Payroll.findOne({ _id: id, organisation_id }, { status: 1 }).lean();
+    if (!existing) return res.status(404).json({ success: false, message: "Payroll not found" });
+    return res.status(400).json({
+      success: false,
+      message: `Cannot mark ${existing.status} payroll as ${status.replace("_", " ")}`,
+    });
+  }
 
   res.status(200).json({ success: true, payroll });
 };
@@ -555,6 +567,11 @@ const deletePayroll = async (req, res) => {
   res.status(200).json({ success: true, message: "Payroll record deleted" });
 };
 
+const BULK_STATUS_SOURCE_MAP = {
+  approved: ["generated", "on_hold"],
+  on_hold: ["generated", "approved"],
+  paid: ["approved"],
+};
 
 const bulkUpdatePayrollStatus = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
@@ -566,6 +583,7 @@ const bulkUpdatePayrollStatus = async (req, res) => {
   if (!["approved", "paid", "on_hold"].includes(status))
     return res.status(400).json({ success: false, message: "status must be approved, paid or on_hold" });
 
+  const allowedSourceStatuses = BULK_STATUS_SOURCE_MAP[status] || [];
   const setFields = { status };
   if (status === "approved") {
     setFields.approvedBy = req.admin._id;
@@ -573,8 +591,14 @@ const bulkUpdatePayrollStatus = async (req, res) => {
   }
   if (status === "paid") setFields.paidOn = new Date();
 
+  const eligible = await Payroll.find(
+    { _id: { $in: ids }, organisation_id, status: { $in: allowedSourceStatuses } },
+    { _id: 1 }
+  ).lean();
+  const eligibleIds = eligible.map((row) => row._id);
+
   const result = await Payroll.updateMany(
-    { _id: { $in: ids }, organisation_id },
+    { _id: { $in: eligibleIds }, organisation_id },
     { $set: setFields }
   );
 
@@ -582,6 +606,7 @@ const bulkUpdatePayrollStatus = async (req, res) => {
     success: true,
     matched: result.matchedCount,
     modified: result.modifiedCount,
+    skippedCount: ids.length - eligibleIds.length,
   });
 };
 
