@@ -8,6 +8,29 @@
 const daysInMonth = (month, year) => new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 /**
+ * Completed years of continuous service as of `asOfDate`, per the Payment
+ * of Gratuity Act's own rounding rule (Sec. 4(2)): a "year" in which the
+ * employee has rendered service for more than 6 months counts as one full
+ * year. Returns 0 if dateOfJoining is missing/invalid.
+ */
+function computeYearsOfService(dateOfJoining, asOfDate) {
+  if (!dateOfJoining) return 0;
+  const doj = new Date(dateOfJoining);
+  const asOf = asOfDate instanceof Date ? asOfDate : new Date(asOfDate);
+  if (Number.isNaN(doj.getTime()) || Number.isNaN(asOf.getTime()) || doj > asOf) return 0;
+
+  let years = asOf.getUTCFullYear() - doj.getUTCFullYear();
+  let months = asOf.getUTCMonth() - doj.getUTCMonth();
+  if (asOf.getUTCDate() < doj.getUTCDate()) months -= 1;
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  if (months >= 6) years += 1;
+  return Math.max(0, years);
+}
+
+/**
  * Safely evaluates a custom Salary Component formula like "basic*0.1 + 500"
  * or "gross - hra". Only these variable names are allowed: basic, gross,
  * ctc, hra. Every identifier in the formula is substituted with a plain
@@ -172,7 +195,7 @@ function calculateSalaryBreakup(ctc, policy) {
  *   entirely — the admin is telling the system exactly how many days this
  *   person is being paid for.
  */
-function calculatePayrollForMonth({ structure, policy, attendanceSummary, month, year, extras = {}, manualAttendance = null }) {
+function calculatePayrollForMonth({ structure, policy, attendanceSummary, month, year, extras = {}, manualAttendance = null, dateOfJoining = null }) {
   const { monthlyGross, basic, hra, allowances, deductionComponents = [], benefitComponents = [], reimbursementComponents = [] } = structure.breakup;
 
   const calendarDaysInMonth = daysInMonth(month, year);
@@ -271,10 +294,21 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
   );
   const netSalary = round2(totalEarnings - totalDeductions);
 
-  // Standard gratuity estimate (informational, employer cost only — not
-  // deducted from the employee): 15 days' basic per year of service,
-  // approximated monthly as 4.81% of Basic.
-  const gratuity = round2(earnedBasic * 0.0481);
+  // Gratuity (informational, employer cost only — not deducted from the
+  // employee). Payment of Gratuity Act formula:
+  //   Gratuity = (15 × Last Drawn Salary × Years of Service) / 26
+  // "Last drawn salary" = this month's earned Basic (app has no separate DA
+  // component). Only kicks in once continuous service reaches 5 years —
+  // before that, shown as 0 rather than an estimate the employee isn't
+  // actually entitled to yet. What's shown here is 1/12th of that
+  // entitlement (this month's accrual) — the lump-sum itself is settled via
+  // Full & Final at exit, not paid out monthly.
+  const payPeriodEnd = new Date(Date.UTC(year, month, 0));
+  const yearsOfService = computeYearsOfService(dateOfJoining, payPeriodEnd);
+  const gratuityEligible = yearsOfService >= 5;
+  const gratuity = gratuityEligible
+    ? round2((15 * earnedBasic * yearsOfService) / 26 / 12)
+    : 0;
 
   return {
     breakup: {
@@ -330,4 +364,4 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
-module.exports = { calculateSalaryBreakup, calculatePayrollForMonth, daysInMonth, round2, evaluateFormula, computeComponentAmount };
+module.exports = { calculateSalaryBreakup, calculatePayrollForMonth, daysInMonth, round2, evaluateFormula, computeComponentAmount, computeYearsOfService };
