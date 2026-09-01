@@ -1217,7 +1217,19 @@ function StructuresTab({ notify, directory }) {
               <tbody>
                 {structures.map((s) => (
                   <tr key={s._id} style={{ borderTop: `1px solid ${C.border}` }}>
-                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, s.employee, s.employeeModel)}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {resolveName(directory, s.employee, s.employeeModel)}
+                      {(s.missingBankAccount || s.missingDateOfJoining) && (
+                        <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+                          {s.missingBankAccount && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Bank account not mentioned</span>
+                          )}
+                          {s.missingDateOfJoining && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Date of joining not added</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[s.employeeModel] || s.employeeModel}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.ctc)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.monthlyGross)}</td>
