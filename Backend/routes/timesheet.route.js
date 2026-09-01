@@ -128,6 +128,7 @@ const {
   forwardTimesheet,
   recallTimesheet,
   getAllTimesheets,
+  getTimesheetDetailedReport,
 } = require("../controllers/timesheet.controller");
 
 const {
@@ -278,6 +279,14 @@ timesheetRouter.get(
   "/admin/timesheets",
   saOrAdmin,
   asyncHandler(getAllTimesheets),
+);
+// Detailed, filterable Time Sheet Report — see controller doc-comment for
+// the full filter list (date range/week, employee, department, designation,
+// project, job, status, billable).
+timesheetRouter.get(
+  "/admin/timesheet-report",
+  saOrAdmin,
+  asyncHandler(getTimesheetDetailedReport),
 );
 
 module.exports = timesheetRouter;
