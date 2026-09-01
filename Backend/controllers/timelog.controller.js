@@ -4,30 +4,51 @@ const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 const { parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 const { resolveEmployeeShift, getShiftDurationMinutes } = require("../utils/shift.utils");
+const { classifyNonWorkingDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 
 // ─── overtime helpers ────────────────────────────────────────────────────────
 // A job can set its own per-day working-hour cap (max_hours_per_day). If it
-// doesn't, we fall back to the assignee's shift length (end - start) as the
-// day's regular-working-hour baseline. Anything logged past that cap on a
-// given IST day is overtime instead of regular working time.
+// doesn't, the day's regular-working-hour baseline defaults to 9h/day
+// (DEFAULT_DAILY_LIMIT_MINUTES). Anything logged past that cap on a given
+// IST WORKING day is overtime instead of regular working time.
+//
+// On a week-off day (per the employee's weekly-off policy - e.g. Saturday
+// & Sunday when the org/employee is on a sat_sun policy) or an org holiday,
+// there is no "regular" allowance at all: the entire entry logged that day
+// is overtime. This is what keeps the weekly billable total pinned at
+// dailyCap x (working days in the week) - e.g. 8h/day x 5 working days =
+// 40h billable, with anything on top (including all of Sat/Sun) overtime.
+const DEFAULT_DAILY_LIMIT_MINUTES = 9 * 60; // 9h/day default when a job has no max_hours_per_day set
 
 const getActorDoc = (req) => req.employee || req.manager || req.admin || null;
 
-const resolveDailyLimitMinutes = async (jobDoc, req, organisation_id) => {
+const resolveDailyLimitMinutes = (jobDoc) => {
   if (jobDoc.max_hours_per_day) {
     return Math.round(jobDoc.max_hours_per_day * 60);
   }
-  const actorDoc = getActorDoc(req);
-  if (!actorDoc) return null;
-  const shift = await resolveEmployeeShift(actorDoc, organisation_id);
-  if (!shift) return null;
-  return getShiftDurationMinutes(shift);
+  return DEFAULT_DAILY_LIMIT_MINUTES;
+};
+
+// Classifies log_date for this actor as "working" | "week_off" | "holiday" |
+// "unconfigured" (rotational week-off policy with no schedule set for that
+// week yet - treated like a working day so nothing is silently miscounted).
+const resolveDayType = async (logDate, organisation_id, actor) => {
+  const result = await classifyNonWorkingDay(logDate, organisation_id, actor.id, actor.model);
+  if (result.type === "holiday") return "holiday";
+  if (result.type === "week_off") return "week_off";
+  if (result.type === "unconfigured") return "unconfigured";
+  return "working";
 };
 
 // Given minutes already logged today (existingMinutes) and a new/updated
 // entry of entryMinutes, splits the entry itself across the regular/overtime
-// boundary defined by limitMinutes.
-const splitRegularOvertime = (existingMinutes, entryMinutes, limitMinutes) => {
+// boundary defined by limitMinutes. On a week-off/holiday day (dayType
+// !== "working"/"unconfigured") there is no regular allowance at all - the
+// whole entry is overtime, regardless of the cap.
+const splitRegularOvertime = (existingMinutes, entryMinutes, limitMinutes, dayType = "working") => {
+  if (dayType === "week_off" || dayType === "holiday") {
+    return { regular: 0, overtime: entryMinutes };
+  }
   if (!limitMinutes || limitMinutes <= 0) {
     return { regular: entryMinutes, overtime: 0 };
   }
@@ -58,11 +79,19 @@ const getExistingDayMinutes = async ({ organisation_id, actor, dayStart, dayEnd,
   return agg[0]?.total || 0;
 };
 
-const buildOvertimeWarning = ({ overtime, entryMinutes, dailyLimitMinutes, usedJobCap }) => {
+const buildOvertimeWarning = ({ overtime, entryMinutes, dailyLimitMinutes, usedJobCap, dayType }) => {
   if (overtime <= 0) return null;
-  const limitHoursLabel = dailyLimitMinutes ? (dailyLimitMinutes / 60).toFixed(1) : "?";
-  const source = usedJobCap ? "for this job" : "based on your shift timing";
   const scope = overtime === entryMinutes ? "This entire entry is" : `${overtime} minute(s) of this entry are`;
+
+  if (dayType === "week_off") {
+    return `This is a week-off day (weekend), so no regular working hours apply here. ${scope} recorded as overtime. Whether overtime is paid out is at the company's discretion.`;
+  }
+  if (dayType === "holiday") {
+    return `This date is marked as a company holiday, so no regular working hours apply here. ${scope} recorded as overtime. Whether overtime is paid out is at the company's discretion.`;
+  }
+
+  const limitHoursLabel = dailyLimitMinutes ? (dailyLimitMinutes / 60).toFixed(1) : "?";
+  const source = usedJobCap ? "for this job" : "(default 9h/day)";
   return `Today's logged time has crossed the ${limitHoursLabel}h working-hour limit ${source}. ${scope} recorded as overtime. Whether overtime is paid out is at the company's discretion.`;
 };
 
@@ -155,9 +184,13 @@ const logTime = async (req, res, next) => {
   const resolvedLogDate = parseISTDateOnly(log_date);
 
   // Regular vs overtime split, against everything else already logged today.
+  // Weekend/holiday policy: a week-off day (e.g. Saturday/Sunday under a
+  // sat_sun policy) or a company holiday has no regular allowance at all -
+  // everything logged on it is overtime, independent of the daily cap.
   const dayStart = resolvedLogDate;
   const dayEnd = endOfISTDay(dayStart);
-  const dailyLimitMinutes = await resolveDailyLimitMinutes(jobDoc, req, organisation_id);
+  const dayType = await resolveDayType(resolvedLogDate, organisation_id, actor);
+  const dailyLimitMinutes = resolveDailyLimitMinutes(jobDoc);
   const existingMinutes = await getExistingDayMinutes({
     organisation_id,
     actor,
@@ -167,7 +200,8 @@ const logTime = async (req, res, next) => {
   const { regular, overtime } = splitRegularOvertime(
     existingMinutes,
     duration_minutes,
-    dailyLimitMinutes
+    dailyLimitMinutes,
+    dayType
   );
 
   const timeLog = await TimeLog.create({
@@ -183,6 +217,7 @@ const logTime = async (req, res, next) => {
     overtime_minutes: overtime,
     is_overtime: overtime > 0,
     daily_limit_minutes_at_log: dailyLimitMinutes,
+    day_type: dayType,
     note: note || "",
     billable: isBillable,
     hourly_rate: jobDoc.hourly_rate,
@@ -196,9 +231,10 @@ const logTime = async (req, res, next) => {
     entryMinutes: duration_minutes,
     dailyLimitMinutes,
     usedJobCap: !!jobDoc.max_hours_per_day,
+    dayType,
   });
 
-  res.status(201).json({ success: true, message: "Time logged", timeLog, warning });
+  res.status(201).json({ success: true, message: "Time logged", timeLog, warning, dayType });
 };
 
 const getMyDayLog = async (req, res, next) => {
@@ -276,9 +312,30 @@ const getMyWeekLog = async (req, res, next) => {
     dayBuckets[bucket.key].logs.push(log);
   }
 
+  // Weekend/holiday policy: attach day_type ("working"/"week_off"/"holiday"/
+  // "unconfigured") to every day of the week so the UI can grey out /
+  // label Saturday & Sunday (or whatever the employee's off-days are) as
+  // "Off" instead of an empty loggable cell, and know only the working
+  // days count toward the weekly regular-hours allowance.
+  const weekEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  const dayTypeMap = await getWeekOffMapForRange(start, weekEnd, organisation_id, actor.id, actor.model);
+  let workingDaysCount = 0;
+  dayKeys.forEach(({ key }) => {
+    const info = dayTypeMap.get(key);
+    const dayType = info?.unconfigured ? "unconfigured" : info?.isOff ? "week_off" : "working";
+    dayBuckets[key].dayType = dayType;
+    dayBuckets[key].isOff = dayType === "week_off";
+    if (dayType === "working" || dayType === "unconfigured") workingDaysCount += 1;
+  });
+
   const totalMinutes = logs.reduce((sum, l) => sum + l.duration_minutes, 0);
   const totalWorkingMinutes = logs.reduce((sum, l) => sum + (l.regular_minutes ?? l.duration_minutes), 0);
   const totalOvertimeMinutes = logs.reduce((sum, l) => sum + (l.overtime_minutes || 0), 0);
+  // Reference weekly billable cap using the 9h/day default x working days
+  // in this week (e.g. 9h x 5 working days = 45h). Jobs with their own
+  // max_hours_per_day still apply their own cap per entry - this total is
+  // a default-based reference figure for the week's summary.
+  const weeklyBillableCapMinutes = workingDaysCount * DEFAULT_DAILY_LIMIT_MINUTES;
 
   res.status(200).json({
     success: true,
@@ -286,6 +343,8 @@ const getMyWeekLog = async (req, res, next) => {
     totalMinutes,
     totalWorkingMinutes,
     totalOvertimeMinutes,
+    workingDaysCount,
+    weeklyBillableCapMinutes,
     days: dayBuckets,
   });
 };
@@ -345,12 +404,13 @@ const updateTimeLog = async (req, res, next) => {
     timeLog.duration_minutes = duration_minutes;
 
     // Recompute the regular/overtime split for this entry against the rest
-    // of that same IST day (excluding itself).
+    // of that same IST day (excluding itself), respecting weekend/holiday policy.
     const jobDoc = await TSJob.findById(timeLog.job);
     const dayStart = timeLog.log_date;
     const dayEnd = endOfISTDay(dayStart);
+    const dayType = await resolveDayType(dayStart, organisation_id, actor);
     const dailyLimitMinutes = jobDoc
-      ? await resolveDailyLimitMinutes(jobDoc, req, organisation_id)
+      ? resolveDailyLimitMinutes(jobDoc)
       : timeLog.daily_limit_minutes_at_log;
     const existingMinutes = await getExistingDayMinutes({
       organisation_id,
@@ -362,19 +422,22 @@ const updateTimeLog = async (req, res, next) => {
     const { regular, overtime } = splitRegularOvertime(
       existingMinutes,
       duration_minutes,
-      dailyLimitMinutes
+      dailyLimitMinutes,
+      dayType
     );
 
     timeLog.regular_minutes = regular;
     timeLog.overtime_minutes = overtime;
     timeLog.is_overtime = overtime > 0;
     timeLog.daily_limit_minutes_at_log = dailyLimitMinutes;
+    timeLog.day_type = dayType;
 
     warning = buildOvertimeWarning({
       overtime,
       entryMinutes: duration_minutes,
       dailyLimitMinutes,
       usedJobCap: !!jobDoc?.max_hours_per_day,
+      dayType,
     });
   }
 
@@ -468,4 +531,12 @@ module.exports = {
   getJobTimeLogs,
   getAllTimeLogs,
   recomputeJobHours,
+  // shared overtime/weekend-policy helpers, reused by activetimmer.controller.js
+  // (stopTimer) so timer-logged entries get the same regular/overtime split
+  // and day_type classification as manually-logged entries.
+  resolveDailyLimitMinutes,
+  resolveDayType,
+  splitRegularOvertime,
+  getExistingDayMinutes,
+  DEFAULT_DAILY_LIMIT_MINUTES,
 };
