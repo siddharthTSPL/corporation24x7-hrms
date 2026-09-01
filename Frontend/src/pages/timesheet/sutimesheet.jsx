@@ -12,6 +12,7 @@ import {
   useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
+import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
@@ -576,6 +577,7 @@ export default function SuperAdminTimesheet() {
   // ─── Time Sheet Report (detailed + weekend, filterable, org-wide) ────────
   const [reportWeek, setReportWeek] = useState(weekStart);
   const [reportView, setReportView] = useState("detailed");
+  const [reportEmployeeName, setReportEmployeeName] = useState("");
   const [reportEmployeeModel, setReportEmployeeModel] = useState("");
   const [reportDepartment, setReportDepartment] = useState("");
   const [reportDesignation, setReportDesignation] = useState("");
@@ -586,6 +588,7 @@ export default function SuperAdminTimesheet() {
 
   const reportParams = {
     week_start: reportWeek,
+    ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
     ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
     ...(reportDepartment ? { department: reportDepartment } : {}),
     ...(reportDesignation ? { designation: reportDesignation } : {}),
@@ -595,6 +598,8 @@ export default function SuperAdminTimesheet() {
     ...(reportBillable ? { billable: reportBillable } : {}),
   };
   const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const { data: departmentsData } = useGetAllDepartmentsSuperAdmin();
+  const reportDepartments = departmentsData?.departments ?? [];
   const allReportRows = reportData?.rows ?? [];
   const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
   const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
@@ -1359,14 +1364,20 @@ export default function SuperAdminTimesheet() {
             </div>
 
             <Card className="px-4 sm:px-5 py-4 mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2.5">
+                <Input label="Employee Name" placeholder="Search employee" value={reportEmployeeName} onChange={(e) => setReportEmployeeName(e.target.value)} />
                 <Select label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
                   <option value="">All Roles</option>
                   <option value="User">Employee</option>
                   <option value="Manager">Manager</option>
                   <option value="Admin">Admin</option>
                 </Select>
-                <Input label="Department" placeholder="e.g. Engineering" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)} />
+                <Select label="Department" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {reportDepartments.map((department) => (
+                    <option key={department._id} value={department.code || department.name}>{department.name}</option>
+                  ))}
+                </Select>
                 <Input label="Designation" placeholder="e.g. Software Engineer" value={reportDesignation} onChange={(e) => setReportDesignation(e.target.value)} />
                 <Select label="Project" value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
                   <option value="">All Projects</option>
@@ -1386,10 +1397,10 @@ export default function SuperAdminTimesheet() {
                   <option value="false">Non-billable only</option>
                 </Select>
               </div>
-              {(reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+              {(reportEmployeeName || reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
                 <button
                   onClick={() => {
-                    setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+                    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
                     setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
                   }}
                   className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
@@ -1428,7 +1439,7 @@ export default function SuperAdminTimesheet() {
                       <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
                         <span className="text-gray-400">Req {r.required_hours}h</span>
                         <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
-                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">OT {r.overtime_hours}h</span>}
+                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
                       </div>
                     </div>
                     {(r.approved_by || r.rejected_by) && (
