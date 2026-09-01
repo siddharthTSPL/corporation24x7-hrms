@@ -3,8 +3,9 @@ const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
-const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
-const { getISTDateParts, istDateFromYMD, parseISTDateOnly } = require("../utils/Istdate.utils");
+const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
+const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
+const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -377,6 +378,229 @@ const getAllTimesheets = async (req, res, next) => {
   res.status(200).json({ success: true, count: timesheets.length, timesheets });
 };
 
+// ─── getTimesheetDetailedReport ───────────────────────────────────────────────
+// Detailed, filterable Time Sheet Report for Admin/SuperAdmin:
+// Name, Designation, Department, Project, Job, Date, Required hours,
+// Serving hours, Overtime, and who Approved/Rejected the covering timesheet.
+//
+// Filters (all optional, via query params):
+//   from, to            — "YYYY-MM-DD" date range (inclusive)
+//   week_start          — "YYYY-MM-DD" alternative to from/to, picks that IST week
+//   employee_id         — a specific User/Manager/Admin _id
+//   employee_model      — "User" | "Manager" | "Admin"
+//   department          — free-text department name (case-insensitive)
+//   designation          — free-text designation (case-insensitive)
+//   project_id           — TSProject _id
+//   job_id                — TSJob _id
+//   status                — timesheet status ("draft"|"pending_manager"|...|"approved"|"rejected")
+//   billable              — "true" | "false"
+//
+// Also injects "Off" placeholder rows for week-off days (Saturday/Sunday,
+// or whatever the employee's weekly-off policy resolves to) that have no
+// logged entry, so the weekend always shows as Off in the report instead
+// of silently disappearing. Placeholder rows are skipped when a status or
+// billable filter is active, since they don't carry a real approval status.
+const EMPLOYEE_MODELS = { User, Manager, Admin };
+
+// Timesheet.approved_by / rejected_by don't record which collection they
+// belong to, so resolving a display name means a best-effort lookup across
+// all three actor collections (cached per report run to avoid repeat queries).
+const resolveActorName = async (id, cache) => {
+  if (!id) return null;
+  const key = id.toString();
+  if (cache.has(key)) return cache.get(key);
+  for (const Model of Object.values(EMPLOYEE_MODELS)) {
+    const doc = await Model.findById(id).select("f_name l_name").lean();
+    if (doc) {
+      const name = `${doc.f_name || ""} ${doc.l_name || ""}`.trim() || null;
+      cache.set(key, name);
+      return name;
+    }
+  }
+  cache.set(key, null);
+  return null;
+};
+
+const getTimesheetDetailedReport = async (req, res, next) => {
+  const actor = resolveActor(req);
+  const organisation_id = resolveOrgId(req);
+  const {
+    from,
+    to,
+    week_start,
+    employee_id,
+    employee_model,
+    department,
+    designation,
+    project_id,
+    job_id,
+    status,
+    billable,
+  } = req.query;
+
+  // Manager only sees their own team (direct + indirect reports), never the
+  // whole org - Admin/SuperAdmin stay org-wide as before.
+  let teamIds = null;
+  if (actor.model === "Manager") {
+    const reports = await getDirectReportIds({
+      actorId: actor.id,
+      actorModel: "Manager",
+      organisationId: organisation_id,
+    });
+    teamIds = reports.map((r) => r.id.toString());
+    if (!teamIds.length) {
+      return res.status(200).json({ success: true, range: { start: null, end: null }, count: 0, rows: [] });
+    }
+  }
+
+  // ─ resolve the date range ─
+  let start, end;
+  if (week_start) {
+    ({ start, end } = getWeekBounds(week_start));
+  } else if (from || to) {
+    start = parseISTDateOnly(from || to);
+    end = to
+      ? new Date(endOfISTDay(parseISTDateOnly(to)).getTime() + 1)
+      : new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  } else {
+    ({ start, end } = getWeekBounds(new Date()));
+  }
+
+  const logFilter = { organisation_id, log_date: { $gte: start, $lt: end } };
+  if (teamIds) logFilter.logged_by = { $in: teamIds };
+  if (employee_id) {
+    if (teamIds && !teamIds.includes(employee_id.toString())) {
+      return next(httpError("You can only view timesheet reports for your own team", 403));
+    }
+    logFilter.logged_by = employee_id;
+  }
+  if (employee_model) logFilter.logged_by_model = employee_model;
+  if (job_id) logFilter.job = job_id;
+  if (project_id) logFilter.project = project_id;
+  if (billable !== undefined) logFilter.billable = billable === "true";
+
+  let logs = await TimeLog.find(logFilter)
+    .populate({ path: "logged_by", select: "f_name l_name work_email designation department" })
+    .populate({ path: "job", select: "title project max_hours_per_day" })
+    .populate({ path: "project", select: "name code" })
+    .populate({ path: "timesheet", select: "status approved_by rejected_by remarks week_start week_end" })
+    .sort({ log_date: 1 })
+    .lean();
+
+  // department/designation/status live on the polymorphic logged_by doc or
+  // the linked timesheet, not on TimeLog itself — filter post-populate.
+  if (department) {
+    logs = logs.filter(
+      (l) => (l.logged_by?.department || "").toLowerCase() === department.toLowerCase()
+    );
+  }
+  if (designation) {
+    logs = logs.filter(
+      (l) => (l.logged_by?.designation || "").toLowerCase() === designation.toLowerCase()
+    );
+  }
+  if (status) {
+    logs = logs.filter((l) => (l.timesheet?.status || "draft") === status);
+  }
+
+  const nameCache = new Map();
+  const rows = [];
+  for (const log of logs) {
+    const ts = log.timesheet;
+    let approvedByName = null;
+    let rejectedByName = null;
+    if (ts?.status === "approved" && ts.approved_by) {
+      approvedByName = await resolveActorName(ts.approved_by, nameCache);
+    }
+    if (ts?.status === "rejected" && ts.rejected_by) {
+      rejectedByName = await resolveActorName(ts.rejected_by, nameCache);
+    }
+
+    const isOffDay = log.day_type === "week_off" || log.day_type === "holiday";
+
+    rows.push({
+      time_log_id: log._id,
+      employee_id: log.logged_by?._id || null,
+      employee_model: log.logged_by_model,
+      name: log.logged_by ? `${log.logged_by.f_name || ""} ${log.logged_by.l_name || ""}`.trim() : "—",
+      work_email: log.logged_by?.work_email || null,
+      designation: log.logged_by?.designation || "—",
+      department: log.logged_by?.department || "—",
+      project: log.project ? { id: log.project._id, name: log.project.name, code: log.project.code } : null,
+      job: log.job ? { id: log.job._id, title: log.job.title } : null,
+      date: toISTKey(log.log_date),
+      day_type: log.day_type || "working",
+      day_label: log.day_type === "week_off" ? "Weekend / Off" : log.day_type === "holiday" ? "Holiday" : "Working Day",
+      required_hours: isOffDay ? 0 : Math.round(((log.daily_limit_minutes_at_log ?? 540) / 60) * 100) / 100,
+      serving_hours: Math.round(((log.regular_minutes ?? 0) / 60) * 100) / 100,
+      overtime_hours: Math.round(((log.overtime_minutes ?? 0) / 60) * 100) / 100,
+      billable: !!log.billable,
+      entry_status: log.status,
+      timesheet_status: ts?.status || "draft",
+      approved_by: approvedByName,
+      rejected_by: rejectedByName,
+      remarks: ts?.remarks || "",
+    });
+  }
+
+  // ─ "Off" placeholder rows for week-off days with no entry ─
+  if (!status && billable === undefined) {
+    const employeesSeen = new Map();
+    rows.forEach((r) => {
+      if (!r.employee_id) return;
+      const key = `${r.employee_model}:${r.employee_id}`;
+      if (!employeesSeen.has(key)) {
+        employeesSeen.set(key, {
+          id: r.employee_id,
+          model: r.employee_model,
+          name: r.name,
+          designation: r.designation,
+          department: r.department,
+        });
+      }
+    });
+
+    const loggedDates = new Set(rows.map((r) => `${r.employee_model}:${r.employee_id}:${r.date}`));
+    const rangeEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+
+    for (const emp of employeesSeen.values()) {
+      const dayTypeMap = await getWeekOffMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
+      for (const [dateKey, info] of dayTypeMap.entries()) {
+        if (!info.isOff) continue;
+        const seenKey = `${emp.model}:${emp.id}:${dateKey}`;
+        if (loggedDates.has(seenKey)) continue;
+        rows.push({
+          time_log_id: null,
+          employee_id: emp.id,
+          employee_model: emp.model,
+          name: emp.name,
+          work_email: null,
+          designation: emp.designation,
+          department: emp.department,
+          project: null,
+          job: null,
+          date: dateKey,
+          day_type: "week_off",
+          day_label: "Weekend / Off",
+          required_hours: 0,
+          serving_hours: 0,
+          overtime_hours: 0,
+          billable: false,
+          entry_status: "off",
+          timesheet_status: "off",
+          approved_by: null,
+          rejected_by: null,
+          remarks: "",
+        });
+      }
+    }
+  }
+
+  rows.sort((a, b) => (a.date === b.date ? a.name.localeCompare(b.name) : a.date.localeCompare(b.date)));
+
+  res.status(200).json({ success: true, range: { start, end }, count: rows.length, rows });
+};
+
 module.exports = {
   submitTimesheet,
   getMyTimesheets,
@@ -386,5 +610,6 @@ module.exports = {
   forwardTimesheet,
   recallTimesheet,
   getAllTimesheets,
+  getTimesheetDetailedReport,
   getWeekBounds,
 };

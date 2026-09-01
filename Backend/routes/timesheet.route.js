@@ -57,6 +57,32 @@ const saOrAdmin = (req, res, next) => {
     .json({ message: "Admin or Super Admin access required" });
 };
 
+// SuperAdmin, Admin, or Manager
+const saAdminOrManager = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
+  if (["admin", "senior_admin"].includes(decoded.role))
+    return adminAuth(req, res, next);
+  if (["manager", "senior_manager"].includes(decoded.role))
+    return managerAuth(req, res, next);
+  if (decoded.role === "official") {
+    if (decoded.adminid) return adminAuth(req, res, next);
+    if (decoded.managerid) return managerAuth(req, res, next);
+  }
+
+  return res
+    .status(403)
+    .json({ message: "Admin, Manager, or Super Admin access required" });
+};
+
 // SuperAdmin only
 const saOnly = (req, res, next) => {
   const token = req.cookies?.token;
@@ -128,6 +154,7 @@ const {
   forwardTimesheet,
   recallTimesheet,
   getAllTimesheets,
+  getTimesheetDetailedReport,
 } = require("../controllers/timesheet.controller");
 
 const {
@@ -278,6 +305,14 @@ timesheetRouter.get(
   "/admin/timesheets",
   saOrAdmin,
   asyncHandler(getAllTimesheets),
+);
+// Detailed, filterable Time Sheet Report — see controller doc-comment for
+// the full filter list (date range/week, employee, department, designation,
+// project, job, status, billable).
+timesheetRouter.get(
+  "/admin/timesheet-report",
+  saAdminOrManager,
+  asyncHandler(getTimesheetDetailedReport),
 );
 
 module.exports = timesheetRouter;
