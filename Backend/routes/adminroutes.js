@@ -4,6 +4,12 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+
+// Performance Management (Review) is one of the three plan-gated features:
+// fully locked on the Basic plan, fully open on Advance/enterprise (or
+// during the free trial).
+const reviewPlanGate = restrictPlanFeature("review");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -271,12 +277,14 @@ adminrouter.post(
 adminrouter.post(
   "/reviewtomanager",
   adminauthmiddleware,
+  reviewPlanGate,
   asyncHandler(reviewtomanager),
 );
 
 adminrouter.get(
   "/allreviews",
   adminauthmiddleware,
+  reviewPlanGate,
   asyncHandler(getAllReviewsForAdmin),
 );
 
@@ -285,6 +293,7 @@ adminrouter.get(
 adminrouter.post(
   "/review/respond",
   adminauthmiddleware,
+  reviewPlanGate,
   asyncHandler(respondToMyReview),
 );
 
@@ -294,6 +303,7 @@ adminrouter.post(
 adminrouter.post(
   "/review/hr-acknowledge",
   adminauthmiddleware,
+  reviewPlanGate,
   asyncHandler(hrAcknowledgeReviewHandler),
 );
 

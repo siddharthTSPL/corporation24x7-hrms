@@ -8,7 +8,6 @@ import {
   useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
-  useArchiveJob,
   useMyWeekLog,
   useLogTime,
   useActiveTimer,
@@ -136,24 +135,26 @@ function fmtRate(rate, currency) {
 function TorchXLogo() {
   return (
     <div className="flex items-center gap-2.5 shrink-0 min-w-0">
-      <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-[0_2px_8px_rgba(115,0,66,0.15)] shrink-0">
+      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.9" />
+          <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.95" />
           <circle cx="10" cy="8" r="2" fill="white" />
         </svg>
       </div>
       <div className="hidden sm:block min-w-0">
-        <div className="font-extrabold text-sm text-gray-900 tracking-tight leading-none truncate">TorchX</div>
-        <div className="text-[10px] text-gray-400 font-medium tracking-wide truncate">TIMESHEET</div>
+        <div className="font-bold text-[14px] text-gray-900 tracking-tight leading-none truncate">TorchX</div>
+        <div className="text-[10px] text-gray-400 font-semibold tracking-[0.14em] truncate mt-0.5">TIMESHEET</div>
       </div>
     </div>
   );
 }
 
 function Badge({ status }) {
-  const s = STATUS_STYLE[status] || { text: "text-gray-400", bg: "bg-gray-50", label: status };
+  const s = STATUS_STYLE[status] || { text: "text-gray-500", bg: "bg-gray-100", label: status };
+  const dot = s.text.replace("text-", "bg-");
   return (
-    <span className={`${s.text} ${s.bg} rounded-md text-[10px] font-bold tracking-wide px-2 py-1 uppercase whitespace-nowrap shrink-0`}>
+    <span className={`${s.text} ${s.bg} inline-flex items-center gap-1.5 rounded-md text-[10px] font-bold tracking-wide px-2 py-1 whitespace-nowrap shrink-0`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
       {s.label}
     </span>
   );
@@ -161,15 +162,15 @@ function Badge({ status }) {
 
 function Chip({ color = "brand", children }) {
   const map = {
-    brand: "text-[#730042] bg-[#730042]/10",
-    green: "text-emerald-600 bg-emerald-50",
-    amber: "text-amber-600 bg-amber-50",
-    red: "text-red-600 bg-red-50",
-    blue: "text-blue-600 bg-blue-50",
-    gray: "text-gray-400 bg-gray-100",
+    brand: "text-[#730042] bg-[#730042]/[0.08]",
+    green: "text-emerald-700 bg-emerald-50",
+    amber: "text-amber-700 bg-amber-50",
+    red: "text-red-700 bg-red-50",
+    blue: "text-blue-700 bg-blue-50",
+    gray: "text-gray-600 bg-gray-100",
   };
   return (
-    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0`}>
       {children}
     </span>
   );
@@ -177,7 +178,7 @@ function Chip({ color = "brand", children }) {
 
 function PriorityChip({ priority }) {
   return (
-    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0 capitalize`}>
       {priority}
     </span>
   );
@@ -185,7 +186,7 @@ function PriorityChip({ priority }) {
 
 function JobChip({ status }) {
   return (
-    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-400 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-600 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0 capitalize`}>
       {status.replace(/_/g, " ")}
     </span>
   );
@@ -193,18 +194,20 @@ function JobChip({ status }) {
 
 function Card({ children, className = "" }) {
   return (
-    <div className={`bg-white border border-gray-200 rounded-2xl shadow-sm min-w-0 ${className}`}>
+    <div className={`bg-white border border-gray-200 rounded-lg min-w-0 ${className}`}>
       {children}
     </div>
   );
 }
 
 function StatCard({ label, value, color = "text-[#730042]", sub }) {
+  const barColor = color.replace("text-", "bg-");
   return (
-    <Card className="px-3 sm:px-[22px] py-3.5 sm:py-5">
-      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2 sm:mb-2.5 truncate">{label}</div>
-      <div className={`text-lg sm:text-[28px] font-black ${color} truncate`}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
+    <Card className="relative overflow-hidden pl-4 pr-3.5 sm:pl-5 sm:pr-5 py-3.5 sm:py-5">
+      <span className={`absolute top-0 left-0 h-full w-[3px] ${barColor}`} />
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-2.5 truncate">{label}</div>
+      <div className={`text-xl sm:text-[26px] font-bold tracking-tight ${color} truncate`}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1.5 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -218,15 +221,15 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-hidden"
+      className="fixed inset-0 z-[200] bg-gray-900/45 flex items-center justify-center p-0 sm:p-4 overflow-hidden"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
+      <div className="bg-white border border-gray-200 rounded-t-xl sm:rounded-xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
         <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0 min-w-0">
           <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer shrink-0"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-100 hover:bg-gray-200 hover:text-gray-600 border-none rounded-md cursor-pointer shrink-0 transition-colors"
           >×</button>
         </div>
         <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
@@ -238,13 +241,13 @@ function Modal({ open, onClose, title, children }) {
 function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
-      {label && <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{label}</label>}
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       {children}
     </div>
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]";
+const inputClass = "bg-white border border-gray-300 rounded-md px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors min-h-[44px]";
 
 function Input({ label, ...props }) {
   return (
@@ -266,17 +269,17 @@ function Sel({ label, children, ...props }) {
 
 function Btn({ children, variant = "primary", onClick, disabled, className = "" }) {
   const variants = {
-    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white border border-transparent shadow-sm hover:shadow-md hover:brightness-110",
-    ghost: "bg-transparent text-gray-700 border-[1.5px] border-gray-200 hover:bg-gray-50",
-    danger: "bg-red-50 text-red-600 border-[1.5px] border-red-200 hover:bg-red-100",
-    success: "bg-emerald-50 text-emerald-600 border-[1.5px] border-emerald-200 hover:bg-emerald-100",
-    amber: "bg-amber-50 text-amber-600 border-[1.5px] border-amber-200 hover:bg-amber-100",
+    primary: "bg-[#730042] text-white border border-transparent hover:bg-[#5c0034]",
+    ghost: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+    danger: "bg-white text-red-600 border border-red-300 hover:bg-red-50",
+    success: "bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50",
+    amber: "bg-white text-amber-600 border border-amber-300 hover:bg-amber-50",
   };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`${variants[variant]} rounded-[10px] px-4 py-2.5 min-h-[44px] text-[13px] font-semibold whitespace-nowrap transition-all inline-flex items-center justify-center gap-1.5 font-inherit ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${className}`}
+      className={`${variants[variant]} rounded-md px-4 py-2.5 min-h-[44px] text-[13px] font-semibold whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1.5 font-inherit ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${className}`}
     >
       {children}
     </button>
@@ -426,7 +429,7 @@ function TimerWidget({ jobs }) {
   return (
     <>
       <Card className="overflow-hidden">
-        <div className={`px-4 sm:px-5 py-3.5 flex items-center gap-2.5 min-w-0 ${isRunning ? "bg-gradient-to-br from-[#730042] to-[#CD166E]" : "bg-gray-50"}`}>
+        <div className={`px-4 sm:px-5 py-3.5 flex items-center gap-2.5 min-w-0 ${isRunning ? "bg-[#730042]" : "bg-gray-50"}`}>
           {isRunning && (
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
@@ -703,7 +706,6 @@ export default function AdminTimesheet() {
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
-  const archiveJob = useArchiveJob();
   const logTime = useLogTime();
   const submitTS = useSubmitTimesheet();
   const approveTS = useApproveTimesheet();
@@ -835,33 +837,33 @@ export default function AdminTimesheet() {
   }, []);
 
   return (
-    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F8F7FB] font-sans flex flex-col overflow-hidden">
-    <header className="w-full bg-white border-b border-gray-200 shadow-sm shrink-0 z-20">
-  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 min-w-0">
-    <div className="flex items-center h-14 sm:h-16 gap-3 min-w-0">
+    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 max-w-full bg-gray-50 font-sans flex flex-col overflow-hidden">
+    <header className="w-full bg-white border-b border-gray-200 shrink-0 z-20 min-w-0 max-w-full overflow-hidden">
+  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 min-w-0 max-w-full">
+    <div className="flex items-center h-14 sm:h-16 gap-3 min-w-0 max-w-full">
 
       <div className="shrink-0">
         <TorchXLogo />
       </div>
 
-      <div className="hidden md:block w-px h-8 bg-gray-200 shrink-0" />
+      <div className="hidden md:block w-px h-7 bg-gray-200 shrink-0" />
 
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
+      <div className="flex-1 min-w-0 overflow-hidden self-stretch">
+        <nav className="flex items-center gap-4 sm:gap-5 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth h-full">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`relative shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm transition-all border-b-2 ${
+              className={`relative shrink-0 h-full flex items-center px-0.5 text-xs sm:text-sm border-b-2 transition-colors ${
                 tab === t.id
-                  ? "bg-[#730042]/10 text-[#730042] font-semibold border-[#730042]"
-                  : "text-gray-700 border-transparent hover:bg-gray-100"
+                  ? "text-[#730042] font-bold border-[#730042]"
+                  : "text-gray-500 font-medium border-transparent hover:text-gray-800"
               }`}
             >
               {t.label}
 
               {t.id === "approvals" && approvals.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold">
+                <span className="absolute -top-1 -right-2.5 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold">
                   {approvals.length}
                 </span>
               )}
@@ -877,16 +879,15 @@ export default function AdminTimesheet() {
     onClick={() => setJobModal(true)}
     className="
       flex items-center justify-center gap-2
-      bg-gradient-to-r from-[#730042] to-[#8f0050] hover:brightness-110
-      text-white font-medium
-      rounded-lg
+      bg-[#730042] hover:bg-[#5c0034]
+      text-white font-semibold
+      rounded-md
       px-3 py-2
       sm:px-4 sm:py-2.5
       text-xs sm:text-sm
       whitespace-nowrap
-      transition-all
+      transition-colors
       min-h-[40px]
-      shadow-sm
     "
   >
     <span className="text-base font-bold leading-none">+</span>
@@ -1014,9 +1015,9 @@ export default function AdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0 sm:self-start">
-                        <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
+                        <button onClick={() => openJobDetail(j._id)} className="bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
                         {!["completed", "cancelled"].includes(j.status) && (
-                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
+                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
                         )}
                       </div>
                     </Card>
@@ -1072,6 +1073,7 @@ export default function AdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-wrap shrink-0 sm:self-start">
+
                         <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
                         {j.status !== "completed" && (
                           <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
@@ -1081,6 +1083,13 @@ export default function AdminTimesheet() {
                         )}
                         <button onClick={() => archiveJob.mutate(j._id, { onSuccess: refetchCreated })} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Archive</button>
                       </div>
+
+  <button onClick={() => openJobDetail(j._id)} className="bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
+  <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
+  {!["completed", "cancelled"].includes(j.status) && (
+    <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Complete</button>
+  )}
+</div>
                     </Card>
                   );
                 })
@@ -1365,7 +1374,7 @@ export default function AdminTimesheet() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 shrink-0">Week of</span>
-                <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto" />
+                <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors" />
               </div>
             </div>
             {orgLogs.length === 0 ? (
@@ -1403,15 +1412,15 @@ export default function AdminTimesheet() {
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-[13px] min-w-[760px]">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
+                        <tr className="bg-gray-50/80 border-b border-gray-200">
                           {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            <th key={h} className="text-left px-4 py-3 font-bold text-[11px] text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {orgLogs.map(log => (
-                          <tr key={log._id} className="border-b border-gray-200">
+                          <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
                             <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                               {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
                             </td>
@@ -1440,13 +1449,13 @@ export default function AdminTimesheet() {
                 <p className="text-xs text-gray-400 mt-1 mb-0">{orgSheets.length} timesheets</p>
               </div>
               <div className="flex gap-2 flex-col xs:flex-row">
-                <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none">
+                <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors">
                   <option value="">All Statuses</option>
                   {Object.entries(STATUS_STYLE).map(([k, v]) => (
                     <option key={k} value={k}>{v.label}</option>
                   ))}
                 </select>
-                <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none">
+                <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors">
                   <option value="">All Roles</option>
                   <option value="User">Employee</option>
                   <option value="Manager">Manager</option>

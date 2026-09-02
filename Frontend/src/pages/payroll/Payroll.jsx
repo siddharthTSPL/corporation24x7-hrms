@@ -1292,8 +1292,11 @@ function GenerateTab({ notify, directory }) {
   const handleSingle = (e) => {
     e.preventDefault();
     if (!single.employee) return notify("Select an employee", "error");
-    if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
-    setSingleResult(null);
+if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
+if (Number(single.paidDays) > Number(single.workingDays)) {
+  return notify("Paid Days cannot be greater than Working Days", "error");
+}
+setSingleResult(null);
     generate(
       {
         employee: single.employee,
@@ -1373,9 +1376,18 @@ function GenerateTab({ notify, directory }) {
             <Field label="Working Days" hint="From Pay Schedule">
               <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
             </Field>
-            <Field label="Paid Days" hint=" present — manual entry">
-              <TextInput type="number" min={0} step="0.5" value={single.paidDays} onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))} placeholder="e.g. 27" required />
-            </Field>
+            <Field label="Paid Days" hint={`Present — manual entry (max ${single.workingDays || "—"})`}>
+  <TextInput
+    type="number"
+    min={0}
+    max={single.workingDays || undefined}
+    step="0.5"
+    value={single.paidDays}
+    onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))}
+    placeholder="e.g. 27"
+    required
+  />
+</Field>
             <Field label="LOP Days" hint="Auto-calculated">
               <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted, display: "flex", alignItems: "center" }}>
                 {lopDaysPreview === null ? "—" : lopDaysPreview}
