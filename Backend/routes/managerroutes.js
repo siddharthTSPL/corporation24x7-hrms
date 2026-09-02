@@ -4,7 +4,13 @@ const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const multer = require("multer");
+
+// Performance Management (Review) is one of the three plan-gated features:
+// fully locked on the Basic plan, fully open on Advance/enterprise (or
+// during the free trial).
+const reviewPlanGate = restrictPlanFeature("review");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -50,11 +56,11 @@ managerrouter.post("/acceptforwardedleave", managermiddleware, asyncHandler(mana
 managerrouter.post("/rejectforwardedleave", managermiddleware, asyncHandler(managercontroller.rejectforwardedleave));
 managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, asyncHandler(managercontroller.forwardLeaveUpChain));
 
-managerrouter.post("/reviewtoemployee", managermiddleware, asyncHandler(managercontroller.reviewtoemployee));
-managerrouter.post("/reviewtosubmanager", managermiddleware, asyncHandler(managercontroller.reviewtosubmanager));
-managerrouter.get("/team-reviews", managermiddleware, asyncHandler(managercontroller.getMyTeamReviews));
+managerrouter.post("/reviewtoemployee", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtoemployee));
+managerrouter.post("/reviewtosubmanager", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtosubmanager));
+managerrouter.get("/team-reviews", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.getMyTeamReviews));
 // Step 2: Manager (as reviewee, reviewed by Admin/senior manager) accepts/disputes.
-managerrouter.post("/review/respond", managermiddleware, asyncHandler(managercontroller.respondToMyReview));
+managerrouter.post("/review/respond", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.respondToMyReview));
 
 managerrouter.get("/showannouncements", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.showannouncements));
 managerrouter.get("/showannouncement/:id", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.particularannouncement));
