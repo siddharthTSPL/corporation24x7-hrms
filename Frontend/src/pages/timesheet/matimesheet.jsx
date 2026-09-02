@@ -7,7 +7,6 @@ import {
   useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
-  useArchiveJob,
   useMyWeekLog,
   useLogTime,
   useUpdateTimeLog,
@@ -673,7 +672,6 @@ export default function ManagerTimesheet() {
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
-  const archiveJob = useArchiveJob();
   const submitTS = useSubmitTimesheet();
   const recallTS = useRecallTimesheet();
   const approveTS = useApproveTimesheet();
@@ -914,15 +912,14 @@ export default function ManagerTimesheet() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
-                          <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
-                            className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
-                            {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
-                              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-                            ))}
-                          </Sel>
-                          <Btn size="sm" variant="ghost" onClick={() => { if (window.confirm("Archive this job?")) archiveJob.mutate(j._id, { onSuccess: refetchCreated }); }}>Archive</Btn>
-                        </div>
+  <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
+  <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
+    className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
+    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
+      <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+    ))}
+  </Sel>
+</div>
                       </div>
                     </div>
                   );
