@@ -280,7 +280,7 @@ export default function SuperAdminRegister() {
 
             {/* Plan badge */}
             <div className="mt-6 inline-flex items-center gap-2 bg-[#730042]/10 text-[#730042] text-xs font-semibold px-4 py-2 rounded-full">
-              🎁 7-day free trial included
+              🎁 14-day free trial included
             </div>
           </div>
         </div>
