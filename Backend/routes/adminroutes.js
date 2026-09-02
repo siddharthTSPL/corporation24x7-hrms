@@ -6,10 +6,12 @@ const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.midd
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 
-// Performance Management (Review) is one of the three plan-gated features:
-// fully locked on the Basic plan, fully open on Advance/enterprise (or
-// during the free trial).
+// Performance Management (Review), Asset Management, and TorchX Voice are
+// plan-gated features: fully locked on the Basic plan, fully open on
+// Advance/enterprise (or during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
+const assetPlanGate = restrictPlanFeature("asset");
+const ticketsPlanGate = restrictPlanFeature("tickets");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -374,24 +376,28 @@ adminrouter.get(
 adminrouter.post(
   "/submitTicket",
   adminauthmiddleware,
+  ticketsPlanGate,
   checkPermission("tickets.can_raise_ticket"),
   asyncHandler(adminSubmitTicket),
 );
 adminrouter.get(
   "/getMyTickets",
   adminauthmiddleware,
+  ticketsPlanGate,
   checkPermission("tickets.can_view_all_tickets"),
   asyncHandler(adminGetMyTickets),
 );
 adminrouter.get(
   "/getTicketDetail/:ticketNumber",
   adminauthmiddleware,
+  ticketsPlanGate,
   checkPermission("tickets.can_view_all_tickets"),
   asyncHandler(adminGetTicketDetail),
 );
 adminrouter.post(
   "/rateTicket/:ticketNumber",
   adminauthmiddleware,
+  ticketsPlanGate,
   checkPermission("tickets.can_rate_ticket"),
   asyncHandler(adminRateTicket),
 );
@@ -425,23 +431,24 @@ adminrouter.get("/all-admins", adminOrSuperAdminAuth, asyncHandler(getAllAdminsF
 adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
 
-// ── Asset Management (Admin) ──────────────────────────────────────────────────
-adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
-adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
+// ── Asset Management (Admin) — plan-gated: locked on Basic ─────────────────────
+adminrouter.post("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(createAssetAdmin));
+adminrouter.get("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(getAllAssetsAdmin));
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-adminrouter.get("/assets/employees", adminauthmiddleware, asyncHandler(getEmployeesWithAssets));
+adminrouter.get("/assets/employees", adminauthmiddleware, assetPlanGate, asyncHandler(getEmployeesWithAssets));
 adminrouter.get(
   "/assets/employees/:person_id/:person_model/history",
   adminauthmiddleware,
+  assetPlanGate,
   asyncHandler(getEmployeeAssetHistory)
 );
-adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
-adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
-adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
-adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandler(assignAssetToEmployee));
-adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
-adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
-adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
+adminrouter.get("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetByIdAdmin));
+adminrouter.put("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(updateAssetAdmin));
+adminrouter.delete("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(deleteAssetAdmin));
+adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToEmployee));
+adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToManager));
+adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, assetPlanGate, asyncHandler(revokeAssetAdmin));
+adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetsOfPerson));
 
 // Assets assigned to the logged-in admin themself (e.g. by SuperAdmin) — Dashboard / Settings "My Assets" widget
 adminrouter.get("/my-assets", adminauthmiddleware, asyncHandler(getMyAssets));
