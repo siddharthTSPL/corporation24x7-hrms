@@ -263,6 +263,10 @@ const updateJob = async (req, res, next) => {
     return next(httpError("Only the assigner (or Admin/SuperAdmin) can edit this job", 403));
   }
 
+  if (job.status === "completed") {
+    return next(httpError("Completed jobs cannot be edited", 400));
+  }
+
   const allowedFields = [
     "title", "description", "priority", "billable", "hourly_rate",
     "currency", "estimated_hours", "due_date", "tags",
