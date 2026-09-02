@@ -440,9 +440,9 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 {upgradeFeatureName} isn&apos;t on your plan
               </h3>
               <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
-                {role === "admin" || role === "superadmin"
-                  ? `Your organization has the Basic plan. Upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`
-                  : `Your organization has the Basic plan, so ${upgradeFeatureName} isn't available. Ask your admin to upgrade to Advance or Enterprise to unlock it.`}
+                {role === "superadmin"
+                  ? `You're on the Basic plan, which has limited features. Upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`
+                  : `Your organization is on the Basic plan, which has limited features. Ask your admin to upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`}
               </p>
             </div>
 
@@ -452,14 +452,14 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 onClick={() => setUpgradeFeatureName(null)}
                 className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
               >
-                {role === "admin" || role === "superadmin" ? "Maybe later" : "Got it"}
+                {role === "superadmin" ? "Maybe later" : "Got it"}
               </button>
-              {(role === "admin" || role === "superadmin") && (
+              {role === "superadmin" && (
                 <button
                   type="button"
                   onClick={() => {
                     setUpgradeFeatureName(null);
-                    navigate(role === "superadmin" ? "/superadmin-management" : "/admin-management");
+                    window.open("https://torchxsuite.com/Store", "_blank", "noopener,noreferrer");
                   }}
                   className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
                   style={{ background: "#730042" }}
