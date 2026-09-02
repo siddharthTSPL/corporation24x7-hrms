@@ -4,6 +4,12 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+
+// Recruitment Management is one of the three plan-gated features: fully
+// locked on the Basic plan, fully open on Advance/enterprise (or during
+// the free trial). Runs right after auth, before permission checks.
+const recruitmentPlanGate = restrictPlanFeature("recruitment");
 
 const {
   createRequisition,
@@ -23,22 +29,22 @@ const {
   submitInterviewFeedback,
 } = require("../controllers/Recruitment.controller");
 
-recruitmentrouter.post("/manager/create", managermiddleware, checkPermission("recruitment.can_create_hiring_requisition"), asyncHandler(createRequisition));
-recruitmentrouter.get("/manager/my-requests", managermiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getMyRequisitions));
+recruitmentrouter.post("/manager/create", managermiddleware, recruitmentPlanGate, checkPermission("recruitment.can_create_hiring_requisition"), asyncHandler(createRequisition));
+recruitmentrouter.get("/manager/my-requests", managermiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getMyRequisitions));
 
-recruitmentrouter.get("/admin/all", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getAllRequisitions));
-recruitmentrouter.get("/admin/pending", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getPendingRequisitions));
-recruitmentrouter.get("/admin/detail/:id", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getRequisitionById));
-recruitmentrouter.patch("/admin/approve/:id", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(approveRequisition));
-recruitmentrouter.patch("/admin/reject/:id", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(rejectRequisition));
-recruitmentrouter.patch("/admin/hold/:id", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(holdRequisition));
-recruitmentrouter.patch("/admin/revision/:id", adminauthmiddleware, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(requestRevision));
+recruitmentrouter.get("/admin/all", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getAllRequisitions));
+recruitmentrouter.get("/admin/pending", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getPendingRequisitions));
+recruitmentrouter.get("/admin/detail/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getRequisitionById));
+recruitmentrouter.patch("/admin/approve/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(approveRequisition));
+recruitmentrouter.patch("/admin/reject/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(rejectRequisition));
+recruitmentrouter.patch("/admin/hold/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(holdRequisition));
+recruitmentrouter.patch("/admin/revision/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(requestRevision));
 
-recruitmentrouter.post("/admin/candidate/add", adminauthmiddleware, checkPermission("recruitment.can_add_candidate"), asyncHandler(addCandidate));
-recruitmentrouter.get("/admin/candidate/list/:requisition_id", adminauthmiddleware, checkPermission("recruitment.can_view_candidates"), asyncHandler(getCandidatesByRequisition));
-recruitmentrouter.get("/admin/candidate/detail/:id", adminauthmiddleware, checkPermission("recruitment.can_view_candidates"), asyncHandler(getCandidateById));
-recruitmentrouter.patch("/admin/candidate/stage/:id", adminauthmiddleware, checkPermission("recruitment.can_add_candidate"), asyncHandler(updateCandidateStage));
-recruitmentrouter.post("/admin/candidate/schedule/:id", adminauthmiddleware, checkPermission("recruitment.can_add_candidate"), asyncHandler(scheduleInterview));
-recruitmentrouter.patch("/admin/candidate/feedback/:candidateId/:roundId", adminauthmiddleware, checkPermission("recruitment.can_add_candidate"), asyncHandler(submitInterviewFeedback));
+recruitmentrouter.post("/admin/candidate/add", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(addCandidate));
+recruitmentrouter.get("/admin/candidate/list/:requisition_id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_candidates"), asyncHandler(getCandidatesByRequisition));
+recruitmentrouter.get("/admin/candidate/detail/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_candidates"), asyncHandler(getCandidateById));
+recruitmentrouter.patch("/admin/candidate/stage/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(updateCandidateStage));
+recruitmentrouter.post("/admin/candidate/schedule/:id", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(scheduleInterview));
+recruitmentrouter.patch("/admin/candidate/feedback/:candidateId/:roundId", adminauthmiddleware, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(submitInterviewFeedback));
 
 module.exports = recruitmentrouter;

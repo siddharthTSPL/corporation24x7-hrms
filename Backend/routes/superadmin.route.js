@@ -2,6 +2,12 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+
+// Performance Management (Review) is one of the three plan-gated features:
+// fully locked on the Basic plan, fully open on Advance/enterprise (or
+// during the free trial).
+const reviewPlanGate = restrictPlanFeature("review");
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
@@ -205,12 +211,14 @@ superAdminRouter.delete(
 superAdminRouter.post(
   "/reviewtoadmin",
   superAdminAuth,
+  reviewPlanGate,
   asyncHandler(reviewtoadmin),
 );
 
 superAdminRouter.get(
   "/allreviews",
   superAdminAuth,
+  reviewPlanGate,
   asyncHandler(getAllReviewsForSuperAdmin),
 );
 
@@ -230,6 +238,7 @@ superAdminRouter.get(
 superAdminRouter.post(
   "/review/acknowledge",
   superAdminAuth,
+  reviewPlanGate,
   asyncHandler(superAdminAcknowledgeReview),
 );
 
