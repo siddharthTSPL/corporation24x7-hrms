@@ -1217,7 +1217,19 @@ function StructuresTab({ notify, directory }) {
               <tbody>
                 {structures.map((s) => (
                   <tr key={s._id} style={{ borderTop: `1px solid ${C.border}` }}>
-                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, s.employee, s.employeeModel)}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {resolveName(directory, s.employee, s.employeeModel)}
+                      {(s.missingBankAccount || s.missingDateOfJoining) && (
+                        <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+                          {s.missingBankAccount && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Bank account not mentioned</span>
+                          )}
+                          {s.missingDateOfJoining && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Date of joining not added</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[s.employeeModel] || s.employeeModel}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.ctc)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.monthlyGross)}</td>
@@ -1772,13 +1784,13 @@ function isBulkSelectable(status) {
   return Boolean(BULK_ACTIONS[status]);
 }
 
-// FIX: "approved" now also allows the "hold" bulk action, so selecting
-// approved rows shows "Hold All" — putting them into on_hold, from where
-// "Resume All" (approve) already worked correctly.
+// Keep bulk actions narrow and predictable:
+// - only generated rows can be bulk-deleted
+// - only approved rows can be bulk-paid
+// - on-hold and paid rows stay out of bulk selection entirely
 const BULK_ACTIONS = {
   generated: ["approve", "hold", "delete"],
-  on_hold: ["approve", "delete"],
-  approved: ["hold", "delete"],
+  approved: ["paid", "hold"],
 };
 
 function buildPayrollExportRows(payrolls, directory) {
@@ -2065,6 +2077,11 @@ function RecordsTab({ notify, directory }) {
                 Hold All
               </GhostButton>
             )}
+            {selectedActions.includes("paid") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("paid")}>
+                Mark Paid All
+              </GhostButton>
+            )}
             {selectedActions.includes("delete") && (
               <GhostButton
                 disabled={bulkDeletePending}
@@ -2117,7 +2134,7 @@ function RecordsTab({ notify, directory }) {
                       type="checkbox"
                       checked={selectedIds.has(p._id)}
                       disabled={!isBulkSelectable(p.status)}
-                      title={!isBulkSelectable(p.status) ? "Paid records can't be bulk-selected" : ""}
+                      title={!isBulkSelectable(p.status) ? "Only generated and approved payrolls can be bulk-selected" : ""}
                       onChange={() => toggleSelectOne(p._id, p.status)}
                     />
                   </td>

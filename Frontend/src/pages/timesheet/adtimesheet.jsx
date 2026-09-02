@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -29,15 +30,23 @@ import {
   useMyProductivitySummary,
   useOrgAllTimeLogs,
   useOrgAllTimesheets,
+  useOrgAllJobs,
+  useMyProjects,
   useJobById,
+  useTimesheetDetailedReport,
 } from "../../auth/server-state/timesheet/timesheet.hook";
+import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -113,6 +122,7 @@ const TABS = [
   { id: "timesheets", label: "Timesheets" },
   { id: "org-logs", label: "All Logs" },
   { id: "org-sheets", label: "All Timesheets" },
+  { id: "report", label: "Time Sheet Report" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -509,7 +519,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISTKey();
 
   return (
     <Card className="overflow-hidden">
@@ -604,7 +614,7 @@ export default function AdminTimesheet() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
   const [editJobModal, setEditJobModal] = useState(false);
   const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
@@ -649,6 +659,50 @@ export default function AdminTimesheet() {
   });
   const orgLogs = orgLogsData?.logs ?? [];
   const orgSheets = orgSheetsData?.timesheets ?? [];
+
+  // ─── Time Sheet Report (detailed, filterable) ───────────────────────────────
+  const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportEmployeeName, setReportEmployeeName] = useState("");
+  const [reportEmployeeModel, setReportEmployeeModel] = useState("");
+  const [reportDepartment, setReportDepartment] = useState("");
+  const [reportDesignation, setReportDesignation] = useState("");
+  const [reportProject, setReportProject] = useState("");
+  const [reportJob, setReportJob] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportBillable, setReportBillable] = useState("");
+
+  const reportParams = {
+    week_start: reportWeek,
+    ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
+    ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
+    ...(reportDepartment ? { department: reportDepartment } : {}),
+    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(reportProject ? { project_id: reportProject } : {}),
+    ...(reportJob ? { job_id: reportJob } : {}),
+    ...(reportStatus ? { status: reportStatus } : {}),
+    ...(reportBillable ? { billable: reportBillable } : {}),
+  };
+  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const { data: departmentsData } = useGetAllDepartments();
+  const reportDepartments = departmentsData?.departments ?? [];
+  const allReportRows = reportData?.rows ?? [];
+  const [reportView, setReportView] = useState("detailed");
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const exportReportCSV = () => {
+    const isWeekend = reportView === "weekend";
+    downloadReportCSV(
+      reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${isWeekend ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
+
+  const { data: reportProjectsData } = useMyProjects();
+  const reportProjectOptions = reportProjectsData?.projects ?? [];
+  const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
+  const reportJobOptions = reportJobsData?.jobs ?? [];
 
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
@@ -697,7 +751,7 @@ export default function AdminTimesheet() {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
       onSuccess: (res) => {
         setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+        setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
         refetchWeek();
         if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       },
@@ -1442,6 +1496,201 @@ export default function AdminTimesheet() {
                   </Card>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+        {tab === "report" && (
+          <div className="min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </h1>
+                <p className="text-xs text-gray-400 mt-1 mb-0">
+                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportLoading && " · refreshing…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Weekend
+                  </button>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                <input
+                  type="date"
+                  value={reportWeek}
+                  onChange={(e) => setReportWeek(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                />
+                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">
+                  Export CSV
+                </Btn>
+              </div>
+            </div>
+
+            <Card className="px-4 sm:px-5 py-4 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2.5">
+                <Input
+                  label="Employee Name"
+                  placeholder="Search employee"
+                  value={reportEmployeeName}
+                  onChange={(e) => setReportEmployeeName(e.target.value)}
+                />
+                <Sel label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
+                  <option value="">All Roles</option>
+                  <option value="User">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </Sel>
+                <Sel label="Department" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {reportDepartments.map((department) => (
+                    <option key={department._id} value={department.code || department.name}>{department.name}</option>
+                  ))}
+                </Sel>
+                <Input
+                  label="Designation"
+                  placeholder="e.g. Software Engineer"
+                  value={reportDesignation}
+                  onChange={(e) => setReportDesignation(e.target.value)}
+                />
+                <Sel
+                  label="Project"
+                  value={reportProject}
+                  onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}
+                >
+                  <option value="">All Projects</option>
+                  {reportProjectOptions.map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </Sel>
+                <Sel label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                  <option value="">All Jobs</option>
+                  {reportJobOptions.map((j) => (
+                    <option key={j._id} value={j._id}>{j.title}</option>
+                  ))}
+                </Sel>
+                <Sel label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_STYLE).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </Sel>
+                <Sel label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                  <option value="">All</option>
+                  <option value="true">Billable only</option>
+                  <option value="false">Non-billable only</option>
+                </Sel>
+              </div>
+              {(reportEmployeeName || reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+                <button
+                  onClick={() => {
+                    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+                    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
+                  }}
+                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </Card>
+
+            {reportRows.length === 0 ? (
+              <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
+                <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
+                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+              </Card>
+            ) : (
+              <>
+                <div className="xl:hidden flex flex-col gap-2.5">
+                  {reportRows.map((r, i) => (
+                    <Card
+                      key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
+                      className={`px-3.5 py-3 ${r.day_type === "week_off" || r.day_type === "holiday" ? "bg-gray-50/70" : ""}`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
+                        <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
+                        {r.day_type === "week_off" || r.day_type === "holiday" ? (
+                          <Chip color="gray">{r.day_label}</Chip>
+                        ) : (
+                          <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                      {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                      <div className="flex items-center justify-between flex-wrap gap-1.5">
+                        <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
+                        <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
+                          <span className="text-gray-400">Req {r.required_hours}h</span>
+                          <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                          {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
+                        </div>
+                      </div>
+                      {(r.approved_by || r.rejected_by) && (
+                        <div className="text-[11px] text-gray-400 mt-1.5">
+                          {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+
+                <Card className="hidden xl:block overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px] min-w-[1180px]">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {["Name", "Designation", "Department", "Project", "Job", "Date", "Day", "Required", "Serving", "Overtime", "Status", "Approved/Rejected By"].map((h) => (
+                            <th key={h} className="text-left px-3 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportRows.map((r, i) => {
+                          const isOff = r.day_type === "week_off" || r.day_type === "holiday";
+                          return (
+                            <tr key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`} className={`border-b border-gray-200 ${isOff ? "bg-gray-50/60" : ""}`}>
+                              <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{r.name}</td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.designation}</td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.department}</td>
+                              <td className="px-3 py-3 text-gray-700 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">{r.project?.name || "—"}</td>
+                              <td className="px-3 py-3 text-gray-700 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{r.job?.title || "—"}</td>
+                              <td className="px-3 py-3 text-gray-400 whitespace-nowrap">{fmtShort(r.date)}</td>
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                {isOff ? <Chip color="gray">{r.day_label}</Chip> : <Chip color="brand">Working</Chip>}
+                              </td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.required_hours}h</td>
+                              <td className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">{r.serving_hours}h</td>
+                              <td className="px-3 py-3 font-bold whitespace-nowrap">
+                                {r.overtime_hours > 0 ? <span className="text-amber-600">{r.overtime_hours}h</span> : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
+                              </td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">
+                                {r.timesheet_status === "approved" && r.approved_by}
+                                {r.timesheet_status === "rejected" && r.rejected_by}
+                                {!["approved", "rejected"].includes(r.timesheet_status) && "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
             )}
           </div>
         )}

@@ -197,7 +197,33 @@ const listSalaryStructures = async (req, res) => {
   if (employeeModel) filter.employeeModel = employeeModel;
 
   const structures = await SalaryStructure.find(filter).lean();
-  res.status(200).json({ success: true, count: structures.length, structures });
+
+  // Payroll-readiness warnings — missing these doesn't block generating
+  // payroll, but the admin should see it: no bank account means this
+  // person can't actually be paid out, and no date of joining means
+  // gratuity eligibility (5-year continuous service) can't be computed.
+  const idsByModel = {};
+  for (const s of structures) {
+    (idsByModel[s.employeeModel] ||= []).push(s.employee);
+  }
+  const detailsByEmployee = new Map();
+  for (const [model, ids] of Object.entries(idsByModel)) {
+    const Model = EMPLOYEE_MODEL_MAP[model];
+    if (!Model) continue;
+    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining").lean();
+    for (const d of docs) detailsByEmployee.set(String(d._id), d);
+  }
+
+  const withWarnings = structures.map((s) => {
+    const details = detailsByEmployee.get(String(s.employee));
+    return {
+      ...s,
+      missingBankAccount: !details?.account_number,
+      missingDateOfJoining: !details?.date_of_joining,
+    };
+  });
+
+  res.status(200).json({ success: true, count: withWarnings.length, structures: withWarnings });
 };
 
 
@@ -271,6 +297,9 @@ const generatePayroll = async (req, res) => {
     ? null
     : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
+  const employeeDoc = await EMPLOYEE_MODEL_MAP[employeeModel]?.findById(employee).select("date_of_joining").lean();
+  const dateOfJoining = employeeDoc?.date_of_joining || null;
+
   const result = calculatePayrollForMonth({
     structure,
     policy,
@@ -279,6 +308,7 @@ const generatePayroll = async (req, res) => {
     year: Number(year),
     extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
     manualAttendance,
+    dateOfJoining,
   });
 
   const employeeSnapshot = await getEmployeeSnapshot(employeeModel, employee);
@@ -370,6 +400,12 @@ const bulkGeneratePayroll = async (req, res) => {
     .lean();
   const existingStatusByEmployee = new Map(existingPayrolls.map((p) => [String(p.employee), p.status]));
 
+  const employeeDocs = await EMPLOYEE_MODEL_MAP[model]
+    .find({ _id: { $in: employeeIds } })
+    .select("date_of_joining")
+    .lean();
+  const dojByEmployee = new Map(employeeDocs.map((d) => [String(d._id), d.date_of_joining || null]));
+
   const ops = [];
   const skipped = [];
 
@@ -398,6 +434,7 @@ const bulkGeneratePayroll = async (req, res) => {
       month: Number(month),
       year: Number(year),
       extras: {},
+      dateOfJoining: dojByEmployee.get(String(structure.employee)) || null,
     });
 
     const employeeSnapshot = await getEmployeeSnapshot(model, structure.employee);
@@ -487,6 +524,7 @@ const updatePayrollStatus = async (req, res) => {
   if (!["approved", "paid", "on_hold"].includes(status))
     return res.status(400).json({ success: false, message: "status must be approved, paid or on_hold" });
 
+  const allowedSourceStatuses = BULK_STATUS_SOURCE_MAP[status] || [];
   const setFields = { status };
   if (status === "approved") {
     setFields.approvedBy = req.admin._id;
@@ -494,8 +532,19 @@ const updatePayrollStatus = async (req, res) => {
   }
   if (status === "paid") setFields.paidOn = new Date();
 
-  const payroll = await Payroll.findOneAndUpdate({ _id: id, organisation_id }, { $set: setFields }, { new: true });
-  if (!payroll) return res.status(404).json({ success: false, message: "Payroll not found" });
+  const payroll = await Payroll.findOneAndUpdate(
+    { _id: id, organisation_id, status: { $in: allowedSourceStatuses } },
+    { $set: setFields },
+    { new: true }
+  );
+  if (!payroll) {
+    const existing = await Payroll.findOne({ _id: id, organisation_id }, { status: 1 }).lean();
+    if (!existing) return res.status(404).json({ success: false, message: "Payroll not found" });
+    return res.status(400).json({
+      success: false,
+      message: `Cannot mark ${existing.status} payroll as ${status.replace("_", " ")}`,
+    });
+  }
 
   res.status(200).json({ success: true, payroll });
 };
@@ -518,6 +567,11 @@ const deletePayroll = async (req, res) => {
   res.status(200).json({ success: true, message: "Payroll record deleted" });
 };
 
+const BULK_STATUS_SOURCE_MAP = {
+  approved: ["generated", "on_hold"],
+  on_hold: ["generated", "approved"],
+  paid: ["approved"],
+};
 
 const bulkUpdatePayrollStatus = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
@@ -529,6 +583,7 @@ const bulkUpdatePayrollStatus = async (req, res) => {
   if (!["approved", "paid", "on_hold"].includes(status))
     return res.status(400).json({ success: false, message: "status must be approved, paid or on_hold" });
 
+  const allowedSourceStatuses = BULK_STATUS_SOURCE_MAP[status] || [];
   const setFields = { status };
   if (status === "approved") {
     setFields.approvedBy = req.admin._id;
@@ -536,8 +591,14 @@ const bulkUpdatePayrollStatus = async (req, res) => {
   }
   if (status === "paid") setFields.paidOn = new Date();
 
+  const eligible = await Payroll.find(
+    { _id: { $in: ids }, organisation_id, status: { $in: allowedSourceStatuses } },
+    { _id: 1 }
+  ).lean();
+  const eligibleIds = eligible.map((row) => row._id);
+
   const result = await Payroll.updateMany(
-    { _id: { $in: ids }, organisation_id },
+    { _id: { $in: eligibleIds }, organisation_id },
     { $set: setFields }
   );
 
@@ -545,6 +606,7 @@ const bulkUpdatePayrollStatus = async (req, res) => {
     success: true,
     matched: result.matchedCount,
     modified: result.modifiedCount,
+    skippedCount: ids.length - eligibleIds.length,
   });
 };
 
