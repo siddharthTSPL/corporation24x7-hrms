@@ -614,8 +614,8 @@ const AttendanceMap = ({ checkins = [], loading = false }) => {
       const L = window.L;
       const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 80.0], 5);
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: "© CARTO", maxZoom: 18,
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors", maxZoom: 19,
       }).addTo(map);
       instanceRef.current = map;
     })();
