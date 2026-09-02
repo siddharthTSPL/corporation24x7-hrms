@@ -5,12 +5,14 @@ const FEATURE_LABELS = {
   review: "Performance Management (Review)",
   timesheet: "Timesheet",
   recruitment: "Recruitment Management",
+  asset: "Asset Management",
+  tickets: "TorchX Voice",
 };
 
-// Plans that unlock the three gated features below. "basic" is deliberately
-// excluded — organisations on Basic get these features fully locked, while
-// Advance and enterprise get them fully open. Update here if a new plan
-// tier is introduced.
+// Plans that unlock the gated features below (Review, Timesheet, Recruitment,
+// Asset Management, TorchX Voice). "basic" is deliberately excluded —
+// organisations on Basic get these features fully locked, while Advance and
+// enterprise get them fully open. Update here if a new plan tier is introduced.
 const UNLOCKED_PLANS = ["Advance", "enterprise"];
 
 // Every role (SuperAdmin/Admin/Manager/Employee) ultimately belongs to one
