@@ -233,7 +233,7 @@ function App() {
             <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
             <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
             <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
-            <Route path="/admin-asset-management"   element={<Adminasset />} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
 
             <Route
               path="/reimbursement-admin"
@@ -347,7 +347,7 @@ function App() {
             <Route
               path="/admin-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <AdminComplaints />
                 </ProtectedRoute>
               }
@@ -355,7 +355,7 @@ function App() {
             <Route
               path="/manager-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <ManagerComplaints />
                 </ProtectedRoute>
               }
@@ -363,7 +363,7 @@ function App() {
             <Route
               path="/employee-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <EmployeeComplaints />
                 </ProtectedRoute>
               }
