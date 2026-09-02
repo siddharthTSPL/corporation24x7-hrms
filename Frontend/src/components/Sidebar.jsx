@@ -442,7 +442,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
                 {role === "superadmin"
                   ? `You're on the Basic plan, which has limited features. Upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`
-                  : `Your organization is on the Basic plan, which has limited features. Ask your admin to upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`}
+                  : `Your organization is on the Basic plan, which has limited features. Ask your Super admin to upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`}
               </p>
             </div>
 
