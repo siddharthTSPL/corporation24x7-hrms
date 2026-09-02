@@ -7,10 +7,11 @@ const checkPermission = require("../middleware/auth/Checkpermission.middleware")
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const multer = require("multer");
 
-// Performance Management (Review) is one of the three plan-gated features:
+// Performance Management (Review) and TorchX Voice are plan-gated features:
 // fully locked on the Basic plan, fully open on Advance/enterprise (or
 // during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
+const ticketsPlanGate = restrictPlanFeature("tickets");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -73,10 +74,10 @@ managerrouter.get("/getAllExpenseDocuments", managermiddleware, checkPermission(
 managerrouter.get("/getAllPersonalDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllPersonalDocuments));
 managerrouter.get("/getDocumentDetails/:documentId", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getDocumentDetails));
 
-managerrouter.post("/submit-ticket", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
-managerrouter.get("/my-tickets", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
-managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
-managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
+managerrouter.post("/submit-ticket", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
+managerrouter.get("/my-tickets", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
+managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
+managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
 managerrouter.get(
   "/viewallleaves",
   managermiddleware,

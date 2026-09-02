@@ -233,7 +233,7 @@ function App() {
             <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
             <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
             <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
-            <Route path="/admin-asset-management"   element={<Adminasset />} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
 
             <Route
               path="/reimbursement-admin"
@@ -347,7 +347,7 @@ function App() {
             <Route
               path="/admin-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <AdminComplaints />
                 </ProtectedRoute>
               }
@@ -355,7 +355,7 @@ function App() {
             <Route
               path="/manager-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <ManagerComplaints />
                 </ProtectedRoute>
               }
@@ -363,7 +363,7 @@ function App() {
             <Route
               path="/employee-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <EmployeeComplaints />
                 </ProtectedRoute>
               }
@@ -433,9 +433,9 @@ function App() {
             <Route path="/superadmin-reviews"             element={<ProtectedRoute planFeature="review"><SuperAdminReviews /></ProtectedRoute>} />
             <Route path="/superadmin-settings"            element={<SuperAdminSettings />} />
             <Route path="/superadmin-documents"           element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints"          element={<SuperAdminComplaints />} />
+            <Route path="/superadmin-complaints"          element={<ProtectedRoute planFeature="tickets"><SuperAdminComplaints /></ProtectedRoute>} />
             <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
-            <Route path="/superadmin-asset-management"    element={<Superadminasset />} />
+            <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
