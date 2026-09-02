@@ -725,18 +725,18 @@ function Pricing() {
     {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
-      inherits: null, // Basic ke neeche kuch nahi dikhana
-      monthlyPrice: 47,
-      yearlyPrice: Math.round(47 * 12 * 0.83), // 17% off on annual total
+      inherits: null,
+      monthlyPrice: 39,
+      yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
       features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
       crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
       desc: 'For growing businesses that need more',
-      inherits: 'Everything in Basic +', // <- price ke neeche dark/bold highlighted dikhega
-      monthlyPrice: 119,
-      yearlyPrice: Math.round(119 * 12 * 0.83), // 17% off on annual total
+      inherits: 'Everything in Basic +',
+      monthlyPrice: 99,
+      yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
       features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
       crossFeatures: []
