@@ -6,7 +6,7 @@ const { UNLOCKED_PLANS } = require("../middleware/auth/planFeatureGate.middlewar
 // the actual enforcement; this endpoint just tells the frontend what to
 // show ahead of time so users see a clear "upgrade required" state instead
 // of a failed API call.
-const GATED_FEATURES = ["review", "timesheet", "recruitment"];
+const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets"];
 
 const getPlanFeatureAccess = async (req, res, next) => {
   try {

@@ -6,10 +6,11 @@ const checkPermission = require("../middleware/auth/Checkpermission.middleware")
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const multer = require("multer");
 
-// Performance Management (Review) is one of the three plan-gated features:
+// Performance Management (Review) and TorchX Voice are plan-gated features:
 // fully locked on the Basic plan, fully open on Advance/enterprise (or
 // during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
+const ticketsPlanGate = restrictPlanFeature("tickets");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -87,10 +88,10 @@ userrouter.get("/documents", employeemiddleware, checkPermission("documents.can_
 userrouter.put("/documents/:id", employeemiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
 userrouter.delete("/documents/:id", employeemiddleware, checkPermission("documents.can_upload_documents"), deleteDocument);
 
-userrouter.post("/submitTicket", employeemiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeSubmitTicket));
-userrouter.get("/getMyTickets", employeemiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetMyTickets));
-userrouter.post("/rateTicket", employeemiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(employeeRateTicket));
-userrouter.get("/getTicketDetail/:ticketNumber", employeemiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetTicketDetail));
+userrouter.post("/submitTicket", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeSubmitTicket));
+userrouter.get("/getMyTickets", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetMyTickets));
+userrouter.post("/rateTicket", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_rate_ticket"), asyncHandler(employeeRateTicket));
+userrouter.get("/getTicketDetail/:ticketNumber", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetTicketDetail));
 
 
 userrouter.get("/getExpenseDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getExpenseDocuments));
