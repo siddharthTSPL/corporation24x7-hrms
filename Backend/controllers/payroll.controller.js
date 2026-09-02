@@ -10,6 +10,10 @@ const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/p
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 // Regular monthly payroll is only for currently-working people. Once someone
 // has resigned/been fired/terminated, their settlement moves to the
@@ -20,6 +24,25 @@ const getWorkingStatusMap = async (employeeModel, employeeIds) => {
   const docs = await Model.find({ _id: { $in: employeeIds } }).select("working_status").lean();
   return new Map(docs.map((d) => [String(d._id), d.working_status || "working"]));
 };
+
+const hasBankDetailsForPayroll = (employeeModel, person) => {
+  const Model = EMPLOYEE_MODEL_MAP[employeeModel];
+  if (!Model?.schema?.path("account_number")) return true;
+  return !!String(person?.account_number || "").trim();
+};
+
+const getEffectiveJoinDate = (person) => person?.date_of_joining || person?.createdAt || null;
+
+const isPayrollMonthBeforeJoinDate = (month, year, joinDate) => {
+  if (!joinDate) return false;
+  const parsed = new Date(joinDate);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const payrollMonthStart = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+  const joinMonthStart = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), 1));
+  return payrollMonthStart < joinMonthStart;
+};
+
+const formatMonthYear = (month, year) => `${MONTH_NAMES[Number(month) - 1] || "Unknown"} ${year}`;
 
 
 
@@ -297,8 +320,25 @@ const generatePayroll = async (req, res) => {
     ? null
     : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
-  const employeeDoc = await EMPLOYEE_MODEL_MAP[employeeModel]?.findById(employee).select("date_of_joining").lean();
-  const dateOfJoining = employeeDoc?.date_of_joining || null;
+  const employeeDoc = await EMPLOYEE_MODEL_MAP[employeeModel]
+    ?.findById(employee)
+    .select("account_number date_of_joining createdAt")
+    .lean();
+  const dateOfJoining = getEffectiveJoinDate(employeeDoc);
+
+  if (!hasBankDetailsForPayroll(employeeModel, employeeDoc)) {
+    return res.status(400).json({
+      success: false,
+      message: "Bank account details are missing for this employee. Add bank details before generating payroll.",
+    });
+  }
+
+  if (isPayrollMonthBeforeJoinDate(month, year, dateOfJoining)) {
+    return res.status(400).json({
+      success: false,
+      message: `Cannot generate payroll for ${formatMonthYear(month, year)} because this employee joined in ${formatMonthYear(new Date(dateOfJoining).getUTCMonth() + 1, new Date(dateOfJoining).getUTCFullYear())}.`,
+    });
+  }
 
   const result = calculatePayrollForMonth({
     structure,
@@ -402,9 +442,9 @@ const bulkGeneratePayroll = async (req, res) => {
 
   const employeeDocs = await EMPLOYEE_MODEL_MAP[model]
     .find({ _id: { $in: employeeIds } })
-    .select("date_of_joining")
+    .select("account_number date_of_joining createdAt")
     .lean();
-  const dojByEmployee = new Map(employeeDocs.map((d) => [String(d._id), d.date_of_joining || null]));
+  const employeeDocById = new Map(employeeDocs.map((d) => [String(d._id), d]));
 
   const ops = [];
   const skipped = [];
@@ -417,6 +457,22 @@ const bulkGeneratePayroll = async (req, res) => {
 
     if (!structure.breakup?.monthlyGross) {
       skipped.push({ employee: structure.employee, reason: "breakup missing, re-set CTC" });
+      continue;
+    }
+
+    const employeeDoc = employeeDocById.get(String(structure.employee)) || null;
+    const effectiveJoinDate = getEffectiveJoinDate(employeeDoc);
+
+    if (!hasBankDetailsForPayroll(model, employeeDoc)) {
+      skipped.push({ employee: structure.employee, reason: "bank account details missing" });
+      continue;
+    }
+
+    if (isPayrollMonthBeforeJoinDate(month, year, effectiveJoinDate)) {
+      skipped.push({
+        employee: structure.employee,
+        reason: `joined in ${formatMonthYear(new Date(effectiveJoinDate).getUTCMonth() + 1, new Date(effectiveJoinDate).getUTCFullYear())}`,
+      });
       continue;
     }
 
@@ -434,7 +490,7 @@ const bulkGeneratePayroll = async (req, res) => {
       month: Number(month),
       year: Number(year),
       extras: {},
-      dateOfJoining: dojByEmployee.get(String(structure.employee)) || null,
+      dateOfJoining: effectiveJoinDate,
     });
 
     const employeeSnapshot = await getEmployeeSnapshot(model, structure.employee);
