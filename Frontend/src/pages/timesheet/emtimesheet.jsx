@@ -20,12 +20,16 @@ import {
   useJobById,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -81,9 +85,9 @@ const PRIORITY_META = {
 };
 
 const TABS = [
-  { id: "work",       label: "My Work",   },
-  { id: "jobs",       label: "My Jobs",  },
-  { id: "timesheets", label: "Timesheets", },
+  { id: "work",       label: "My Work",   icon: "◷" },
+  { id: "jobs",       label: "My Jobs",   icon: "⬡" },
+  { id: "timesheets", label: "Timesheets",icon: "◈" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -504,7 +508,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayISTKey();
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
@@ -660,7 +664,7 @@ export default function EmployeeTimesheet() {
   const [tab, setTab] = useState("work");
   const [weekStart, setWeekStart] = useState(getMonday());
   const [logModal, setLogModal] = useState(false);
-  const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [logDate, setLogDate] = useState(todayISTKey());
   const [logForm, setLogForm] = useState({ job: "", log_date: "", duration_minutes: "", note: "" });
   const [editLog, setEditLog] = useState(null);
   const [editForm, setEditForm] = useState({ duration_minutes: "", note: "", reason: "" });
@@ -815,7 +819,7 @@ export default function EmployeeTimesheet() {
               )}
               <Btn
                 size="sm"
-                onClick={() => openAddLog(new Date().toISOString().slice(0, 10))}
+                onClick={() => openAddLog(todayISTKey())}
               >
                 <span className="hidden sm:inline">+ Log Time</span>
                 <span className="sm:hidden">+ Log</span>
@@ -1022,7 +1026,7 @@ export default function EmployeeTimesheet() {
                           View
                         </Btn>
                         {!["completed", "cancelled"].includes(job.status) && (
-                          <Btn size="sm" onClick={() => openAddLog(new Date().toISOString().slice(0, 10))}>
+                          <Btn size="sm" onClick={() => openAddLog(todayISTKey())}>
                             + Log
                           </Btn>
                         )}
