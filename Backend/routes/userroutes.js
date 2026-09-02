@@ -3,7 +3,13 @@ const userrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const multer = require("multer");
+
+// Performance Management (Review) is one of the three plan-gated features:
+// fully locked on the Basic plan, fully open on Advance/enterprise (or
+// during the free trial).
+const reviewPlanGate = restrictPlanFeature("review");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -60,7 +66,7 @@ userrouter.post("/firstloginpasswordchange", asyncHandler(firstLoginPasswordChan
 userrouter.post("/logout", employeemiddleware, asyncHandler(userlogout));
 userrouter.get("/getme", employeemiddleware, asyncHandler(getme));
 // Step 2: Employee accepts/disputes the review their manager gave them.
-userrouter.post("/review/respond", employeemiddleware, asyncHandler(respondToMyReview));
+userrouter.post("/review/respond", employeemiddleware, reviewPlanGate, asyncHandler(respondToMyReview));
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));
 userrouter.put("/changepassword", employeemiddleware, asyncHandler(changepassword));
 userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));
