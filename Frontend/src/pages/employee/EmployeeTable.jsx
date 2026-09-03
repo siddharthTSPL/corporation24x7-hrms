@@ -15,6 +15,7 @@ import {
 import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api"; 
 // ^ actual path apne project structure ke hisaab se adjust karo — jis file me aapne ye upload wala code (uploadDocument function) rakha hai
+import BulkOnboardingModal from "./BulkOnboardingModal";
 
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
@@ -2229,6 +2230,7 @@ function getErrorSummary(err){
 export default function EmployeeTable(){
   const { options: deptOptions } = useDepartmentOptions();
   const [open,setOpen]=useState(false);
+  const [openBulkOnboard,setOpenBulkOnboard]=useState(false);
   const [openManager,setOpenManager]=useState(false);
   const [showFilters,setShowFilters]=useState(false);
   const [popup,setPopup]=useState({show:false,type:"success",message:""});
@@ -2652,6 +2654,13 @@ return(
                   onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
                   <FaUserTie size={12}/><span>Add Manager</span>
                 </button>
+                <button onClick={()=>setOpenBulkOnboard(true)}
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
+                  style={{borderColor:"#085041",color:"#085041"}}
+                  onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+                  <FaFileExcel size={12}/><span>Bulk Onboard</span>
+                </button>
                 <button onClick={()=>{setOpen(true);setEmpStep(0);}}
                   className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 w-full sm:w-auto"
                   style={{background:"#730042"}}>
@@ -2863,6 +2872,8 @@ return(
           <MgrStepFields step={mgrStep} form={mgrForm} onChange={handleMgrChange} errors={mgrErrors} managersOnly={managersOnly} managersWithAdmin={managersWithAdmin} perms={mgrPerms} onPermChange={handleMgrPermChange}/>
         </StepModal>
       )}
+
+      <BulkOnboardingModal open={openBulkOnboard} onClose={()=>setOpenBulkOnboard(false)}/>
 
       {openEdit&&editTarget&&(
         <Modal
