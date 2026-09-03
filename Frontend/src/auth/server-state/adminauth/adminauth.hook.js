@@ -9,6 +9,9 @@ import {
   resetAdminPassword,
   addManager,
   addEmployee,
+  downloadBulkEmployeeTemplate,
+  bulkUploadEmployees,
+  bulkImportEmployeesFromSheet,
   findAllManagers,
   findAllEmployeesFull,
   findAllManagerswithoutAdmin,
@@ -94,6 +97,32 @@ export const useAddEmployee = () => {
     mutationFn: addEmployee,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+};
+
+export const useDownloadBulkEmployeeTemplate = () => {
+  return useMutation({
+    mutationFn: downloadBulkEmployeeTemplate,
+  });
+};
+
+export const useBulkUploadEmployees = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkUploadEmployees,
+    onSuccess: (data) => {
+      if (data?.success) queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+};
+
+export const useBulkImportEmployeesFromSheet = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkImportEmployeesFromSheet,
+    onSuccess: (data) => {
+      if (data?.success) queryClient.invalidateQueries({ queryKey: ["employees"] });
     },
   });
 };
