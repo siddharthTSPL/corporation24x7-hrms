@@ -17,6 +17,12 @@ const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
+const bulkOnboardingUpload = require("../middleware/upload/Bulkonboarding.middleware");
+const {
+  downloadEmployeeTemplate,
+  bulkUploadEmployees,
+  bulkImportFromGoogleSheet,
+} = require("../controllers/bulkOnboarding.controller");
 
 const {
   verifyAdmin,
@@ -153,6 +159,23 @@ adminrouter.post(
   "/addemployee",
   adminauthmiddleware,
   asyncHandler(addemployee),
+);
+
+adminrouter.get(
+  "/employees/bulk-template",
+  adminauthmiddleware,
+  asyncHandler(downloadEmployeeTemplate),
+);
+adminrouter.post(
+  "/employees/bulk-upload",
+  adminauthmiddleware,
+  bulkOnboardingUpload.single("file"),
+  asyncHandler(bulkUploadEmployees),
+);
+adminrouter.post(
+  "/employees/bulk-import-sheet",
+  adminauthmiddleware,
+  asyncHandler(bulkImportFromGoogleSheet),
 );
 adminrouter.get(
   "/findallmanagers",
