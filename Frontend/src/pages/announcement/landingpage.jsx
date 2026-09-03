@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
   FiLinkedin, FiInstagram, FiMail,
@@ -924,6 +925,8 @@ function Pricing() {
   )
 } 
 
+
+
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
@@ -951,25 +954,25 @@ function Testimonials() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 mb-12">
             {visibleTestimonials.map((t, i) => (
               <motion.div
-                key={t.name}
-                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
-                className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
-              >
-                <div className="text-5xl font-display font-black text-[#7A004B] leading-[0.7] mb-3.5">"</div>
-                <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
-                <hr className="border-none border-t border-[#E6D6DF] mb-4" />
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
-                    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
-                    <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
-                  </div>
-                  <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
-                </div>
-              </motion.div>
+  key={t.name}
+  initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
+  className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
+>
+  <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
+  <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
+  <hr className="border-none border-t border-[#E6D6DF] mb-4" />
+  <div className="flex items-center gap-2.5">
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+      <span className="text-white text-xs font-display font-bold">{t.initials}</span>
+    </div>
+    <div className="flex-1">
+      <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
+      <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
+    </div>
+    <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
+  </div>
+</motion.div>
             ))}
           </div>
 
@@ -1023,7 +1026,6 @@ function Testimonials() {
     </section>
   )
 }
-
 const legalDocs = {
   privacy: {
     title: 'Privacy Policy', effective: 'April 01, 2026',
