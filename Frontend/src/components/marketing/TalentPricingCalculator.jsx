@@ -130,7 +130,7 @@ function ComparePanel({ plan, employees, monthlyTotal, competitorId, onCompetito
             <button onClick={() => setHasRun(true)} disabled={!hasQuote} className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#9c1d60] px-5 py-3 font-ui text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-[#9c1d60] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0">
               <FiPlay size={14} /> Run comparison
             </button>
-            <button onClick={handleReset} className="flex items-center justify-center gap-2 rounded-full border border-[#9c1d60] px-5 py-3 font-ui text-sm font-bold text-white transition hover:bg-[#9c1d60]">
+            <button onClick={handleReset} className="flex items-center justify-center gap-2 rounded-full border border-[#9c1d60] px-5 py-3 font-ui text-sm font-bold text-black transition hover:bg-[#9c1d60]">
               <FiRefreshCw size={14} /> Reset
             </button>
           </div>
