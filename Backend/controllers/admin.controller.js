@@ -308,7 +308,7 @@ const {
   mergePermissions,
   assignDefaultPermissions,
   resolveReportingManager,
-} = require("../utils/onboardingDefaults.utils");
+} = require("../utils/Onboardingdefaults.utils");
 
 const addmanager = async (req, res, next) => {
   try {
