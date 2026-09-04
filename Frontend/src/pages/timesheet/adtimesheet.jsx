@@ -1074,7 +1074,9 @@ export default function AdminTimesheet() {
                       </div>
                       <div className="flex gap-1.5 flex-wrap shrink-0 sm:self-start">
   <button onClick={() => openJobDetail(j._id)} className="bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
-  <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
+  {j.status !== "completed" && (
+    <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
+  )}
   {!["completed", "cancelled"].includes(j.status) && (
     <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Complete</button>
   )}
