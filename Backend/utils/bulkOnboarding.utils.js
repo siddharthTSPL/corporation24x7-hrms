@@ -1,6 +1,7 @@
 const XLSX = require("xlsx");
 const crypto = require("crypto");
 const https = require("https");
+const jwt = require("jsonwebtoken");
 
 const Usermodel = require("../Models/user.model");
 const Managermodel = require("../Models/manager.model");
@@ -11,56 +12,66 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const { sendEmail } = require("./nodemailer.utils");
 const { incrementActiveUserCount } = require("./Licensecheck");
-
-// Kept intentionally separate from admin.controller.js's assignDefaultPermissions
-// so this file has no dependency on admin.controller.js (avoids a require cycle).
-// Mirrors the "employee" default permission set used there.
-const PermissionModel = require("../Models/permission.model");
-const DEFAULT_EMPLOYEE_PERMISSIONS = {
-  announcements: { can_view_announcements: true, can_create_announcement: false, can_edit_announcement: false, can_delete_announcement: false },
-  documents: { can_upload_documents: true, can_view_all_documents: false },
-  tickets: { can_raise_ticket: true, can_view_all_tickets: false, can_resolve_ticket: false, can_rate_ticket: true },
-  recruitment: { can_view_hiring_requisitions: false, can_create_hiring_requisition: false, can_view_candidates: false, can_add_candidate: false },
-};
+const { assignDefaultPermissions } = require("./onboardingDefaults.utils");
 
 const LEGACY_DEPARTMENT_CODES = ["OPR", "BPO", "ENG", "HR", "MGMT"];
+const MANAGER_ROLES = new Set(["manager", "official"]);
 
-// Column definition for the downloadable template AND for parsing any
-// incoming file/sheet. `aliases` are extra header spellings we'll accept
-// on upload so a hand-built Google Sheet doesn't have to match the
-// template's exact wording.
-const COLUMNS = [
-  { key: "empid", label: "Employee ID*", required: true, aliases: ["empid", "employee id"] },
-  { key: "f_name", label: "First Name*", required: true, aliases: ["f_name", "first name"] },
-  { key: "l_name", label: "Last Name*", required: true, aliases: ["l_name", "last name"] },
-  { key: "work_email", label: "Work Email*", required: true, aliases: ["work_email", "email", "work email"] },
-  { key: "gender", label: "Gender* (male/female)", required: true, aliases: ["gender"] },
-  { key: "personal_contact", label: "Personal Contact*", required: true, aliases: ["personal_contact", "phone", "mobile", "personal contact"] },
-  { key: "e_contact", label: "Emergency Contact*", required: true, aliases: ["e_contact", "emergency contact"] },
-  { key: "department", label: "Department Code*", required: true, aliases: ["department", "department code", "dept"] },
-  { key: "designation", label: "Designation*", required: true, aliases: ["designation"] },
-  { key: "office_location", label: "Office Location*", required: true, aliases: ["office_location", "office location", "location"] },
-  { key: "password", label: "Temporary Password (optional - auto-generated if blank)", required: false, aliases: ["password", "temporary password"] },
-  { key: "marital_status", label: "Marital Status (single/married/divorced)", required: false, aliases: ["marital_status", "marital status"] },
-  { key: "manager_empid", label: "Reporting Manager Employee ID (optional)", required: false, aliases: ["manager_empid", "reporting manager", "manager id", "under_manager"] },
-  { key: "role", label: "Role (employee/official)", required: false, aliases: ["role"] },
-  { key: "is_fresher", label: "Is Fresher (yes/no)", required: false, aliases: ["is_fresher", "is fresher", "fresher"] },
-  { key: "total_experience", label: "Total Experience (years)", required: false, aliases: ["total_experience", "total experience"] },
-  { key: "previous_company", label: "Previous Company", required: false, aliases: ["previous_company", "previous company"] },
-  { key: "previous_designation", label: "Previous Designation", required: false, aliases: ["previous_designation", "previous designation"] },
-  { key: "date_of_birth", label: "Date of Birth (YYYY-MM-DD)", required: false, aliases: ["date_of_birth", "date of birth", "dob"] },
-  { key: "address", label: "Address", required: false, aliases: ["address"] },
-  { key: "city", label: "City", required: false, aliases: ["city"] },
-  { key: "state", label: "State", required: false, aliases: ["state"] },
-  { key: "pincode", label: "Pincode", required: false, aliases: ["pincode"] },
-  { key: "country", label: "Country", required: false, aliases: ["country"] },
-  { key: "aadhaar_number", label: "Aadhaar Number", required: false, aliases: ["aadhaar_number", "aadhaar number"] },
-  { key: "pan_number", label: "PAN Number", required: false, aliases: ["pan_number", "pan number"] },
-  { key: "bank_name", label: "Bank Name", required: false, aliases: ["bank_name", "bank name"] },
-  { key: "account_holder_name", label: "Account Holder Name", required: false, aliases: ["account_holder_name", "account holder name"] },
-  { key: "account_number", label: "Account Number", required: false, aliases: ["account_number", "account number"] },
-  { key: "ifsc_code", label: "IFSC Code", required: false, aliases: ["ifsc_code", "ifsc code"] },
-];
+// ---------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------
+// Employee (User model) and Manager model share almost all fields; the
+// differences are: Manager's `role` is required and restricted to a fixed
+// set of values, and a Manager's "reports to" can be either another
+// Manager or an Admin, whereas an Employee can only report to a Manager
+// (this mirrors addemployee/addmanager's own restrictions exactly).
+const getColumns = (type) => {
+  const isManager = type === "manager";
+  return [
+    { key: "empid", label: "Employee ID*", required: true, aliases: ["empid", "employee id"] },
+    { key: "f_name", label: "First Name*", required: true, aliases: ["f_name", "first name"] },
+    { key: "l_name", label: "Last Name*", required: true, aliases: ["l_name", "last name"] },
+    { key: "work_email", label: "Work Email*", required: true, aliases: ["work_email", "email", "work email"] },
+    { key: "gender", label: "Gender* (male/female)", required: true, aliases: ["gender"] },
+    { key: "personal_contact", label: "Personal Contact*", required: true, aliases: ["personal_contact", "phone", "mobile", "personal contact"] },
+    { key: "e_contact", label: "Emergency Contact*", required: true, aliases: ["e_contact", "emergency contact"] },
+    { key: "department", label: "Department Code*", required: true, aliases: ["department", "department code", "dept"] },
+    { key: "designation", label: "Designation*", required: true, aliases: ["designation"] },
+    { key: "office_location", label: "Office Location*", required: true, aliases: ["office_location", "office location", "location"] },
+    {
+      key: "role",
+      label: isManager ? "Role* (manager/official)" : "Role (employee/official)",
+      required: isManager,
+      aliases: ["role"],
+    },
+    { key: "password", label: "Temporary Password (optional - auto-generated if blank)", required: false, aliases: ["password", "temporary password"] },
+    { key: "marital_status", label: "Marital Status (single/married/divorced)", required: false, aliases: ["marital_status", "marital status"] },
+    {
+      key: "reporting_manager_email",
+      label: isManager
+        ? "Reporting Manager/Admin Email (optional)"
+        : "Reporting Manager Email (optional)",
+      required: false,
+      aliases: ["reporting_manager_email", "reporting manager email", "reporting manager", "manager email", "under_manager", "reports to"],
+    },
+    { key: "is_fresher", label: "Is Fresher (yes/no)", required: false, aliases: ["is_fresher", "is fresher", "fresher"] },
+    { key: "total_experience", label: "Total Experience (years)", required: false, aliases: ["total_experience", "total experience"] },
+    { key: "previous_company", label: "Previous Company", required: false, aliases: ["previous_company", "previous company"] },
+    { key: "previous_designation", label: "Previous Designation", required: false, aliases: ["previous_designation", "previous designation"] },
+    { key: "date_of_birth", label: "Date of Birth (YYYY-MM-DD)", required: false, aliases: ["date_of_birth", "date of birth", "dob"] },
+    { key: "address", label: "Address", required: false, aliases: ["address"] },
+    { key: "city", label: "City", required: false, aliases: ["city"] },
+    { key: "state", label: "State", required: false, aliases: ["state"] },
+    { key: "pincode", label: "Pincode", required: false, aliases: ["pincode"] },
+    { key: "country", label: "Country", required: false, aliases: ["country"] },
+    { key: "aadhaar_number", label: "Aadhaar Number", required: false, aliases: ["aadhaar_number", "aadhaar number"] },
+    { key: "pan_number", label: "PAN Number", required: false, aliases: ["pan_number", "pan number"] },
+    { key: "bank_name", label: "Bank Name", required: false, aliases: ["bank_name", "bank name"] },
+    { key: "account_holder_name", label: "Account Holder Name", required: false, aliases: ["account_holder_name", "account holder name"] },
+    { key: "account_number", label: "Account Number", required: false, aliases: ["account_number", "account number"] },
+    { key: "ifsc_code", label: "IFSC Code", required: false, aliases: ["ifsc_code", "ifsc code"] },
+  ];
+};
 
 const normalize = (str) =>
   String(str || "")
@@ -71,28 +82,30 @@ const normalize = (str) =>
     .replace(/[\s_-]+/g, " ")
     .trim();
 
-// header text (as it appears in the uploaded file) -> internal key
-const HEADER_TO_KEY = {};
-COLUMNS.forEach((col) => {
-  HEADER_TO_KEY[normalize(col.label)] = col.key;
-  col.aliases.forEach((alias) => {
-    HEADER_TO_KEY[normalize(alias)] = col.key;
+// Built once per type so header aliases resolve correctly regardless of
+// which template (employee/manager) the file was originally downloaded from -
+// a file's headers are matched by meaning, not by which tab produced them.
+const buildHeaderToKeyMap = (type) => {
+  const map = {};
+  getColumns(type).forEach((col) => {
+    map[normalize(col.label)] = col.key;
+    col.aliases.forEach((alias) => {
+      map[normalize(alias)] = col.key;
+    });
   });
-});
+  return map;
+};
 
 // ---------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------
 
-// Turns a raw sheet (array of {header: value} objects, as returned by
-// XLSX.utils.sheet_to_json) into rows keyed by our internal field names,
-// dropping any completely blank rows.
-const mapSheetRowsToFields = (sheetRows) => {
+const mapSheetRowsToFields = (sheetRows, headerToKey) => {
   return sheetRows
     .map((raw, idx) => {
       const row = { __rowNumber: idx + 2 }; // +2: header row is row 1, data starts row 2
       Object.entries(raw).forEach(([header, value]) => {
-        const key = HEADER_TO_KEY[normalize(header)];
+        const key = headerToKey[normalize(header)];
         if (key) row[key] = typeof value === "string" ? value.trim() : value;
       });
       return row;
@@ -100,12 +113,12 @@ const mapSheetRowsToFields = (sheetRows) => {
     .filter((row) => Object.keys(row).some((k) => k !== "__rowNumber" && String(row[k] ?? "").length > 0));
 };
 
-const parseWorkbookBuffer = (buffer) => {
+const parseWorkbookBuffer = (buffer, type) => {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
   const sheetRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
-  return mapSheetRowsToFields(sheetRows);
+  return mapSheetRowsToFields(sheetRows, buildHeaderToKeyMap(type));
 };
 
 // Accepts any regular Google Sheets URL (edit link, view link, etc.) and
@@ -139,7 +152,7 @@ const fetchUrlText = (url) =>
       .on("error", reject);
   });
 
-const parseGoogleSheetUrl = async (sheetUrl) => {
+const parseGoogleSheetUrl = async (sheetUrl, type) => {
   const sheetId = extractSheetId(sheetUrl);
   if (!sheetId) {
     throw Object.assign(new Error("That doesn't look like a valid Google Sheets link."), { statusCode: 400 });
@@ -166,18 +179,20 @@ const parseGoogleSheetUrl = async (sheetUrl) => {
   const workbook = XLSX.read(csvText, { type: "string" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const sheetRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
-  return mapSheetRowsToFields(sheetRows);
+  return mapSheetRowsToFields(sheetRows, buildHeaderToKeyMap(type));
 };
 
 // ---------------------------------------------------------------------
 // Template generation
 // ---------------------------------------------------------------------
 
-const buildTemplateWorkbook = (departmentOptions) => {
-  const headers = COLUMNS.map((c) => c.label);
-  const exampleRow = COLUMNS.map((c) => {
+const buildTemplateWorkbook = (departmentOptions, type) => {
+  const isManager = type === "manager";
+  const columns = getColumns(type);
+  const headers = columns.map((c) => c.label);
+  const exampleRow = columns.map((c) => {
     switch (c.key) {
-      case "empid": return "EMP1001";
+      case "empid": return isManager ? "MGR2001" : "EMP1001";
       case "f_name": return "Jane";
       case "l_name": return "Doe";
       case "work_email": return "jane.doe@company.com";
@@ -185,12 +200,12 @@ const buildTemplateWorkbook = (departmentOptions) => {
       case "personal_contact": return "9876543210";
       case "e_contact": return "9876500000";
       case "department": return departmentOptions[0] || "ENG";
-      case "designation": return "Software Engineer";
+      case "designation": return isManager ? "Engineering Manager" : "Software Engineer";
       case "office_location": return "Noida";
       case "password": return "";
       case "marital_status": return "single";
-      case "manager_empid": return "";
-      case "role": return "employee";
+      case "reporting_manager_email": return "";
+      case "role": return isManager ? "manager" : "employee";
       case "is_fresher": return "yes";
       default: return "";
     }
@@ -201,7 +216,7 @@ const buildTemplateWorkbook = (departmentOptions) => {
   sheet["!cols"] = headers.map(() => ({ wch: 26 }));
 
   const instructions = [
-    ["Bulk Employee Onboarding - Instructions"],
+    [`Bulk ${isManager ? "Manager" : "Employee"} Onboarding - Instructions`],
     [""],
     ["1. Do not rename or remove the header row."],
     ["2. Fields marked with * are required."],
@@ -209,16 +224,21 @@ const buildTemplateWorkbook = (departmentOptions) => {
     ["4. Marital Status (if provided) must be: single, married or divorced"],
     ["5. Department Code must match one of your organisation's departments:"],
     [departmentOptions.join(", ")],
-    ["6. Reporting Manager Employee ID (if provided) must belong to an existing manager in your organisation."],
-    ["7. If Temporary Password is left blank, a secure password is generated automatically and emailed to the employee."],
-    ["8. If any row in the file fails validation, no employees will be created - fix the errors and re-upload."],
-    ["9. To import from Google Sheets instead, set sharing to 'Anyone with the link can view' and paste the link in the app."],
+    isManager
+      ? ["6. Role is required and must be exactly: manager or official"]
+      : ["6. Role (if provided) is free text, e.g. employee or official"],
+    isManager
+      ? ["7. Reporting Manager/Admin Email (if provided) must match the work email of an existing Manager or Admin in your organisation."]
+      : ["7. Reporting Manager Email (if provided) must match the work email of an existing manager in your organisation."],
+    ["8. If Temporary Password is left blank, a secure password is generated automatically and emailed."],
+    ["9. If any row in the file fails validation, no accounts will be created - fix the errors and re-upload."],
+    ["10. To import from Google Sheets instead, set sharing to 'Anyone with the link can view' and paste the link in the app."],
   ];
   const instructionsSheet = XLSX.utils.aoa_to_sheet(instructions);
   instructionsSheet["!cols"] = [{ wch: 90 }];
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, "Employees");
+  XLSX.utils.book_append_sheet(workbook, sheet, isManager ? "Managers" : "Employees");
   XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instructions");
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 };
@@ -238,10 +258,14 @@ const generateTempPassword = () => {
   return `Welcome@${random}`;
 };
 
-// Validates the whole batch against itself and against the database in
-// as few queries as possible, and returns either a list of row errors
+// Validates the whole batch against itself and against the database in as
+// few queries as possible, and returns either a list of row errors
 // (nothing gets created) or a list of ready-to-insert row objects.
-const validateBulkRows = async (rows, organisation_id) => {
+// `type` is "employee" or "manager" and controls which collection is
+// checked for uniqueness targets and which reporting-manager rules apply.
+const validateBulkRows = async (rows, organisation_id, type) => {
+  const isManager = type === "manager";
+  const columns = getColumns(type);
   const errors = [];
 
   if (!rows.length) {
@@ -260,7 +284,8 @@ const validateBulkRows = async (rows, organisation_id) => {
       .map((d) => String(d).toUpperCase())
   );
 
-  // License / seat check up front, since it applies to the whole batch.
+  // License / seat check up front, since it applies to the whole batch -
+  // both employees and managers draw from the same seat pool.
   if (superAdmin) {
     const activeCount = superAdmin.active_user_count || 0;
     const trialActive = superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
@@ -276,14 +301,14 @@ const validateBulkRows = async (rows, organisation_id) => {
     if (remainingSeats < rows.length) {
       errors.push({
         row: null,
-        message: `Not enough license seats: ${Math.max(remainingSeats, 0)} remaining, but the file has ${rows.length} employees. Upgrade your plan at torchxsuite.com or reduce the batch size.`,
+        message: `Not enough license seats: ${Math.max(remainingSeats, 0)} remaining, but the file has ${rows.length} ${isManager ? "managers" : "employees"}. Upgrade your plan at torchxsuite.com or reduce the batch size.`,
       });
     }
   }
 
   const emails = rows.map((r) => String(r.work_email || "").toLowerCase().trim()).filter(Boolean);
   const empids = rows.map((r) => String(r.empid || "").trim()).filter(Boolean);
-  const managerEmpids = rows.map((r) => String(r.manager_empid || "").trim()).filter(Boolean);
+  const reportsToEmails = rows.map((r) => String(r.reporting_manager_email || "").toLowerCase().trim()).filter(Boolean);
 
   const [existingUsersByEmail, existingManagersByEmail, existingAdminsByEmail] = await Promise.all([
     Usermodel.find({ work_email: { $in: emails } }).select("work_email").lean(),
@@ -305,10 +330,23 @@ const validateBulkRows = async (rows, organisation_id) => {
     [...existingUsersByEmpid, ...existingManagersByEmpid, ...existingAdminsByEmpid].map((u) => u.empid)
   );
 
-  const managers = managerEmpids.length
-    ? await Managermodel.find({ empid: { $in: managerEmpids }, organisation_id }).select("empid").lean()
+  // Employees can only report to a Manager (matches addemployee's own
+  // restriction). Managers can report to either a Manager or an Admin
+  // (matches addmanager/resolveReportingManager). Looked up by work email,
+  // since that's easier for whoever's filling in the sheet to know than an
+  // internal Employee ID.
+  const managersByEmail = reportsToEmails.length
+    ? await Managermodel.find({ work_email: { $in: reportsToEmails }, organisation_id }).select("work_email").lean()
     : [];
-  const managerEmpidToId = new Map(managers.map((m) => [m.empid, m._id]));
+  const reportsToMap = new Map(managersByEmail.map((m) => [m.work_email.toLowerCase(), { id: m._id, model: "Manager" }]));
+
+  if (isManager && reportsToEmails.length) {
+    const adminsByEmail = await Adminmodel.find({ work_email: { $in: reportsToEmails }, organisation_id }).select("work_email").lean();
+    adminsByEmail.forEach((a) => {
+      const key = a.work_email.toLowerCase();
+      if (!reportsToMap.has(key)) reportsToMap.set(key, { id: a._id, model: "Admin" });
+    });
+  }
 
   const seenEmails = new Set();
   const seenEmpids = new Set();
@@ -318,7 +356,7 @@ const validateBulkRows = async (rows, organisation_id) => {
     const rowErrors = [];
     const rowNum = row.__rowNumber;
 
-    COLUMNS.filter((c) => c.required).forEach((c) => {
+    columns.filter((c) => c.required).forEach((c) => {
       if (!String(row[c.key] ?? "").trim()) rowErrors.push(`${c.label.replace("*", "")} is required`);
     });
 
@@ -353,11 +391,24 @@ const validateBulkRows = async (rows, organisation_id) => {
       rowErrors.push("Date of Birth is not a valid date (use YYYY-MM-DD)");
     }
 
-    let managerId = null;
-    const managerEmpid = String(row.manager_empid || "").trim();
-    if (managerEmpid) {
-      managerId = managerEmpidToId.get(managerEmpid) || null;
-      if (!managerId) rowErrors.push(`Reporting Manager with Employee ID '${managerEmpid}' was not found`);
+    const roleRaw = String(row.role || "").toLowerCase().trim();
+    if (isManager && !MANAGER_ROLES.has(roleRaw)) {
+      rowErrors.push("Role must be manager or official");
+    }
+
+    let reportsTo = { id: null, model: null };
+    const reportsToEmail = String(row.reporting_manager_email || "").toLowerCase().trim();
+    if (reportsToEmail) {
+      const match = reportsToMap.get(reportsToEmail);
+      if (!match) {
+        rowErrors.push(
+          isManager
+            ? `Reporting Manager/Admin with email '${reportsToEmail}' was not found`
+            : `Reporting Manager with email '${reportsToEmail}' was not found`
+        );
+      } else {
+        reportsTo = match;
+      }
     }
 
     let isFresher = true;
@@ -371,9 +422,10 @@ const validateBulkRows = async (rows, organisation_id) => {
       normalizedRows.push({
         rowNumber: rowNum,
         empid,
-        profile_image: undefined,
         department,
-        Under_manager: managerId,
+        Under_manager: isManager ? undefined : reportsTo.id, // Employee model field
+        reporting_manager: isManager ? reportsTo.id : undefined, // Manager model fields
+        reporting_manager_model: isManager ? reportsTo.model : undefined,
         f_name: String(row.f_name || "").trim(),
         l_name: String(row.l_name || "").trim(),
         work_email: email,
@@ -389,10 +441,10 @@ const validateBulkRows = async (rows, organisation_id) => {
         state: row.state || undefined,
         pincode: row.pincode || undefined,
         country: row.country || undefined,
-        role: String(row.role || "employee").trim() || "employee",
+        role: isManager ? roleRaw : (String(row.role || "employee").trim() || "employee"),
         designation: String(row.designation || "").trim(),
         office_location: String(row.office_location || "").trim(),
-        date_of_birth: row.date_of_birth ? new Date(row.date_of_birth) : undefined,
+        date_of_birth: dobRaw ? new Date(dobRaw) : undefined,
         is_fresher: isFresher,
         total_experience: row.total_experience ? Number(row.total_experience) || 0 : 0,
         previous_company: row.previous_company || undefined,
@@ -412,6 +464,22 @@ const validateBulkRows = async (rows, organisation_id) => {
 // Creation
 // ---------------------------------------------------------------------
 
+const buildWelcomeEmailHtml = ({ f_name, empid, department, office_location, tempPassword, verifyLink, isManager }) => `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center">
+<table width="600" style="background:#fff;border-radius:14px;overflow:hidden;">
+<tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr>
+<tr><td style="padding:40px;">
+<h2>Hello ${f_name}</h2>
+<p>Your ${isManager ? "manager" : "employee"} account has been created as part of a bulk onboarding import.</p>
+<p><strong>Employee ID:</strong> ${empid}</p>
+<p><strong>Department:</strong> ${department}</p>
+<p><strong>Location:</strong> ${office_location}</p>
+<p><strong>Temporary Password:</strong> ${tempPassword}</p>
+<a href="${verifyLink}" style="background:#730042;color:white;padding:14px 30px;text-decoration:none;border-radius:8px;display:inline-block;">Verify Account</a>
+<p>This link will expire in 7 days. For security, please log in and change this password immediately after verifying your account.</p>
+</td></tr></table></td></tr></table></body></html>`;
+
 // Rows have already been fully validated (including uniqueness) by
 // validateBulkRows, so failures here should be rare. If one does happen
 // partway through, we roll back everything we already created in this
@@ -419,19 +487,20 @@ const validateBulkRows = async (rows, organisation_id) => {
 // avoiding a mongoose transaction/session here since that requires a
 // replica-set deployment, which isn't guaranteed for every environment
 // this runs in.
-const createEmployeesBulk = async (normalizedRows, admin) => {
+const createRecordsBulk = async (normalizedRows, admin, type) => {
+  const isManager = type === "manager";
+  const Model = isManager ? Managermodel : Usermodel;
   const organisation_id = admin.organisation_id;
   const created = [];
 
   try {
     for (const row of normalizedRows) {
       const uid = await generateUID(row.department, organisation_id);
-      const newuser = await Usermodel.create({
+      const docFields = {
         organisation_id,
         empid: row.empid,
         uid,
         department: row.department,
-        Under_manager: row.Under_manager,
         f_name: row.f_name,
         l_name: row.l_name,
         work_email: row.work_email,
@@ -450,6 +519,7 @@ const createEmployeesBulk = async (normalizedRows, admin) => {
         role: row.role,
         designation: row.designation,
         office_location: row.office_location,
+        date_of_birth: row.date_of_birth,
         is_fresher: row.is_fresher,
         total_experience: row.total_experience,
         previous_company: row.previous_company,
@@ -458,54 +528,84 @@ const createEmployeesBulk = async (normalizedRows, admin) => {
         account_holder_name: row.account_holder_name,
         account_number: row.account_number,
         ifsc_code: row.ifsc_code,
-        date_of_birth: row.date_of_birth,
         date_of_joining: new Date(),
-      });
+      };
 
-      created.push({ user: newuser, tempPassword: row.password });
+      if (isManager) {
+        docFields.reporting_manager = row.reporting_manager || null;
+        docFields.reporting_manager_model = row.reporting_manager_model || null;
+      } else {
+        docFields.Under_manager = row.Under_manager || null;
+      }
+
+      const newRecord = await Model.create(docFields);
+      created.push({ record: newRecord, tempPassword: row.password });
     }
   } catch (err) {
     // Best-effort rollback of everything created so far in this batch.
-    await Usermodel.deleteMany({ _id: { $in: created.map((c) => c.user._id) } }).catch(() => {});
+    await Model.deleteMany({ _id: { $in: created.map((c) => c.record._id) } }).catch(() => {});
     throw err;
   }
 
-  // Side effects (leave defaults, permissions, license count, emails) -
-  // fire these after every row is safely in the DB.
+  // Side effects (leave defaults, permissions, license count, verification
+  // emails) - fire these after every row is safely in the DB, exactly
+  // mirroring what addemployee/addmanager do for a single add.
   await Promise.all(
-    created.map(({ user }) =>
+    created.map(({ record }) =>
       Promise.all([
-        assignDefaultLeave(user, false),
-        PermissionModel.findOneAndUpdate(
-          { user_id: user._id, user_model: "User", organisation_id },
-          { $set: { user_id: user._id, user_model: "User", organisation_id, granted_by: admin._id, granted_by_model: "Admin", ...DEFAULT_EMPLOYEE_PERMISSIONS } },
-          { upsert: true, new: true, runValidators: true }
+        assignDefaultLeave(record, false),
+        assignDefaultPermissions(
+          record._id,
+          record.role || (isManager ? "manager" : "employee"),
+          organisation_id,
+          admin._id,
+          "Admin",
+          null,
+          undefined
         ),
         incrementActiveUserCount(organisation_id),
       ])
     )
   );
 
-  // Welcome emails are sent best-effort and don't block the response -
+  // Verification emails are sent best-effort and don't block the response -
   // a slow mail provider shouldn't hold up a bulk import of 100+ rows.
   Promise.all(
-    created.map(({ user, tempPassword }) =>
-      sendEmail({
-        to: user.work_email,
-        subject: "Welcome! Your Employee Account Has Been Created",
-        html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:Segoe UI,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h1>Welcome Aboard</h1></td></tr><tr><td style="padding:40px;"><h2>Hello ${user.f_name}</h2><p>Your employee account has been created as part of a bulk onboarding import.</p><p><strong>Employee ID:</strong> ${user.empid}</p><p><strong>Department:</strong> ${user.department}</p><p><strong>Location:</strong> ${user.office_location}</p><p><strong>Temporary Password:</strong> ${tempPassword}</p><p>For security, please log in and change this password immediately.</p></td></tr></table></td></tr></table></body></html>`,
-      }).catch(() => {})
-    )
+    created.map(({ record, tempPassword }) => {
+      const token = isManager
+        ? jwt.sign({ managerid: record._id, work_email: record.work_email }, process.env.JWT_SECRET, { expiresIn: "7d" })
+        : jwt.sign({ userid: record._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+      const verifyLink = `${process.env.BASE_URL}talent/api/${isManager ? "manager" : "user"}/verify/${token}`;
+
+      return sendEmail({
+        to: record.work_email,
+        subject: `Welcome! Verify Your ${isManager ? "Manager" : "Employee"} Account`,
+        html: buildWelcomeEmailHtml({
+          f_name: record.f_name,
+          empid: record.empid,
+          department: record.department,
+          office_location: record.office_location,
+          tempPassword,
+          verifyLink,
+          isManager,
+        }),
+      }).catch(() => {});
+    })
   );
 
-  return created.map(({ user }) => ({ empid: user.empid, uid: user.uid, work_email: user.work_email, name: `${user.f_name} ${user.l_name}` }));
+  return created.map(({ record }) => ({
+    empid: record.empid,
+    uid: record.uid,
+    work_email: record.work_email,
+    name: `${record.f_name} ${record.l_name}`,
+  }));
 };
 
 module.exports = {
-  COLUMNS,
+  getColumns,
   parseWorkbookBuffer,
   parseGoogleSheetUrl,
   buildTemplateWorkbook,
   validateBulkRows,
-  createEmployeesBulk,
+  createRecordsBulk,
 };
