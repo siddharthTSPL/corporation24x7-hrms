@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -692,7 +692,7 @@ export default function AdminTimesheet() {
   const exportReportCSV = () => {
     const isWeekend = reportView === "weekend";
     downloadReportCSV(
-      reportRows,
+      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
       TIMESHEET_REPORT_CSV_COLUMNS,
       `${isWeekend ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
     );
