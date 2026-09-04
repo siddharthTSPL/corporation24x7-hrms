@@ -11,7 +11,7 @@ import {
   useRecallTimesheet, useMyProductivitySummary, useJobById,
   useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
-import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS } from "../utils/csvExport";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
 import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -613,7 +613,7 @@ export default function SuperAdminTimesheet() {
 
   const exportReportCSV = () => {
     downloadReportCSV(
-      reportRows,
+      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
       TIMESHEET_REPORT_CSV_COLUMNS,
       `${reportView === "weekend" ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
     );
