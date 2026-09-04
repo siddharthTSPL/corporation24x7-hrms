@@ -102,12 +102,12 @@ const PRIORITY_META = {
 };
 
 const TABS = [
-  { id: "work",      label: "My Work",    icon: "◷" },
-  { id: "team",      label: "Team Jobs",  icon: "⬡" },
-  { id: "approvals", label: "Approvals",  icon: "◈" },
-  { id: "insights",  label: "Insights",   icon: "◎" },
-  { id: "sheets",    label: "Timesheets", icon: "▦" },
-  { id: "report",    label: "Time Sheet Report", icon: "▤" },
+  { id: "work",      label: "My Work",  },
+  { id: "team",      label: "Team Jobs"  },
+  { id: "approvals", label: "Approvals",  },
+  { id: "insights",  label: "Insights",  },
+  { id: "sheets",    label: "Timesheets",  },
+  { id: "report",    label: "Time Sheet Report", },
 ];
 
 function cn(...a) { return a.filter(Boolean).join(" "); }

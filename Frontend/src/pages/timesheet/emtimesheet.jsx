@@ -85,9 +85,9 @@ const PRIORITY_META = {
 };
 
 const TABS = [
-  { id: "work",       label: "My Work",   icon: "◷" },
-  { id: "jobs",       label: "My Jobs",   icon: "⬡" },
-  { id: "timesheets", label: "Timesheets",icon: "◈" },
+  { id: "work",       label: "My Work",  },
+  { id: "jobs",       label: "My Jobs",  },
+  { id: "timesheets", label: "Timesheets", },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
