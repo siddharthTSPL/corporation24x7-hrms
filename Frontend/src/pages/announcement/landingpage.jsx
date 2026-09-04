@@ -423,7 +423,7 @@ function DashboardMockup() {
   )
 }
 
-function Hero() {
+function Hero({ onOpenCalculator }) {
   return (
     <section className="bg-white overflow-hidden pt-20 pb-[72px]">
       <Wrap>
@@ -459,7 +459,21 @@ function Hero() {
 >
   Talk To Expert
 </a>
+ <button
+              type="button"
+              onClick={onOpenCalculator}
+             className="inline-flex items-center gap-2 rounded-2xl border border-[#EAC7D7] bg-[#FDF4F8] px-4 py-3 text-left shadow-[0_5px_18px_rgba(122,0,75,.07)] transition hover:-translate-y-0.5 hover:border-[#c88ba8]"
+            >
+              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#7A004B] text-sm font-display font-extrabold text-white">₹</span>
+              <span>
+                <span className="block font-ui text-sm font-bold text-[#3c162a]">Calculate Your Plan</span>
+                <span className="block font-body text-xs text-[#7c6270]">Get an instant estimate for your team</span>
+              </span>
+              <FiArrowRight className="ml-2 text-[#7A004B]" />
+            </button>
             </div>
+
+           
           </motion.div>
 
           <motion.div
@@ -728,8 +742,8 @@ function Pricing() {
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
+      features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave Management', 'Basic Payroll', 'Analytical and Digital Dashboard'],
+      crossFeatures: []
     },
     {
       name: 'Advance',
@@ -738,7 +752,7 @@ function Pricing() {
       monthlyPrice: 99,
       yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
+      features: ['Live Map Tracking', 'Recruitment / Applicant Tracking', 'Face Attendance', 'Performance Management', 'Integrated Advanced Payroll'],
       crossFeatures: []
     },
     {
@@ -748,13 +762,11 @@ function Pricing() {
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
-        'Free Smartphone gifthamper',
-        'Face Attendence',
+        'Free Smartphone gift/offer',
+        'Face Attendance',
         'Custom Integrations',
         'Single Sign-On',
-        'API access',
-        'On-premises/ Private cloud hosting',
-        'Dedicated account manager',
+        'API Access',
       ],
       crossFeatures: []
     }
@@ -1238,7 +1250,7 @@ export default function LandingPage() {
     <div ref={scrollContainerRef} style={{ height: '100vh', overflowY: 'auto' }}>
       <style>{fontStyles}</style>
       <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} scrollContainerRef={scrollContainerRef} />
-      <Hero />
+      <Hero onOpenCalculator={() => navigate('/pricing-calculator')} />
       <Stats />
       <Divider />
       <Features />
