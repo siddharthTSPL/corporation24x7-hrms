@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
-  useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
+  useMyProjects, useCreateProject, useUpdateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
   useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
@@ -530,6 +530,8 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
 export default function SuperAdminTimesheet() {
   const [tab, setTab] = useState("overview");
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [editProject, setEditProject] = useState(null);
+  const [editProjectName, setEditProjectName] = useState("");
   const [createJobOpen, setCreateJobOpen] = useState(false);
   const [approveModal, setApproveModal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
@@ -620,6 +622,7 @@ export default function SuperAdminTimesheet() {
   };
 
   const createProject   = useCreateProject();
+  const updateProject   = useUpdateProject();
   const addProjectMembers = useAddProjectMembers();
   const removeProjectMember = useRemoveProjectMember();
   const createJob       = useCreateJob();
@@ -660,6 +663,22 @@ export default function SuperAdminTimesheet() {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
     setCreateProjectOpen(false);
     setProjectForm({ name: "", description: "", billing_type: "billable", currency: "INR", default_hourly_rate: "", member_ids: [] });
+    refetchProjects();
+  };
+
+  const openEditProject = (project) => {
+    setEditProject(project);
+    setEditProjectName(project.name || "");
+  };
+
+  const handleUpdateProjectName = async () => {
+    if (!editProject || !editProjectName.trim()) return;
+    await updateProject.mutateAsync({
+      id: editProject._id,
+      data: { name: editProjectName.trim() },
+    });
+    setEditProject(null);
+    setEditProjectName("");
     refetchProjects();
   };
 
@@ -988,7 +1007,10 @@ export default function SuperAdminTimesheet() {
                       <Badge tw="text-amber-600 bg-amber-50 border-amber-200">{p.members?.length || 0} members</Badge>
                     </div>
                     {p.description && <div className="text-[12px] text-gray-400 mt-3 line-clamp-2 break-words">{p.description}</div>}
-                    <Btn variant="ghost" onClick={() => openMembersModal(p)} className="mt-3 w-full text-[12px]">Manage Members</Btn>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Btn variant="ghost" onClick={() => openEditProject(p)} className="text-[12px]">Edit Name</Btn>
+                      <Btn variant="ghost" onClick={() => openMembersModal(p)} className="text-[12px]">Manage Members</Btn>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -1508,6 +1530,18 @@ export default function SuperAdminTimesheet() {
             <Btn variant="ghost" onClick={() => setCreateProjectOpen(false)} className="w-full sm:w-auto">Cancel</Btn>
             <Btn onClick={handleCreateProject} disabled={!projectForm.name || createProject.isPending} className="w-full sm:w-auto">
               {createProject.isPending ? "Creating…" : "Create Project"}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!editProject} onClose={() => { setEditProject(null); setEditProjectName(""); }} title="Edit Project Name">
+        <div className="flex flex-col gap-4">
+          <Input label="Project Name" value={editProjectName} onChange={e => setEditProjectName(e.target.value)} />
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Btn variant="ghost" onClick={() => { setEditProject(null); setEditProjectName(""); }} className="w-full sm:w-auto">Cancel</Btn>
+            <Btn onClick={handleUpdateProjectName} disabled={!editProjectName.trim() || updateProject.isPending} className="w-full sm:w-auto">
+              {updateProject.isPending ? "Saving..." : "Save Name"}
             </Btn>
           </div>
         </div>
