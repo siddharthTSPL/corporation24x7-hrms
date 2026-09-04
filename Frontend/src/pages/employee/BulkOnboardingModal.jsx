@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FaTimes, FaFileExcel, FaDownload, FaUpload, FaLink, FaCheckCircle,
-  FaExclamationTriangle, FaSpinner,
+  FaExclamationTriangle, FaSpinner, FaUserPlus, FaUserTie,
 } from "react-icons/fa";
 import {
   useDownloadBulkEmployeeTemplate, useBulkUploadEmployees, useBulkImportEmployeesFromSheet,
@@ -11,6 +11,7 @@ import {
 const ACCENT = "#730042";
 
 export default function BulkOnboardingModal({ open, onClose }) {
+  const [importAs, setImportAs] = useState("employee"); // "employee" | "manager"
   const [tab, setTab] = useState("file"); // "file" | "sheet"
   const [file, setFile] = useState(null);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -26,6 +27,7 @@ export default function BulkOnboardingModal({ open, onClose }) {
   if (!open) return null;
 
   const reset = () => {
+    setImportAs("employee");
     setFile(null);
     setSheetUrl("");
     setResult(null);
@@ -38,16 +40,32 @@ export default function BulkOnboardingModal({ open, onClose }) {
     onClose();
   };
 
+  const handleTypeChange = (type) => {
+    // Switching type mid-flow would apply the wrong sheet's rules to a
+    // file/link picked for the other type, so clear the picks + result.
+    setImportAs(type);
+    setFile(null);
+    setSheetUrl("");
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleUpload = () => {
     if (!file) return;
     setResult(null);
-    uploadFile(file, { onSuccess: setResult, onError: (err) => setResult({ success: false, message: err?.message || "Upload failed" }) });
+    uploadFile(
+      { file, type: importAs },
+      { onSuccess: setResult, onError: (err) => setResult({ success: false, message: err?.message || "Upload failed" }) }
+    );
   };
 
   const handleImportSheet = () => {
     if (!sheetUrl.trim()) return;
     setResult(null);
-    importSheet(sheetUrl.trim(), { onSuccess: setResult, onError: (err) => setResult({ success: false, message: err?.message || "Import failed" }) });
+    importSheet(
+      { sheetUrl: sheetUrl.trim(), type: importAs },
+      { onSuccess: setResult, onError: (err) => setResult({ success: false, message: err?.message || "Import failed" }) }
+    );
   };
 
   return createPortal(
@@ -56,19 +74,38 @@ export default function BulkOnboardingModal({ open, onClose }) {
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b sticky top-0 bg-white rounded-t-2xl z-10">
           <div className="flex items-center gap-2">
             <FaFileExcel style={{ color: ACCENT }} />
-            <h2 className="text-base sm:text-lg font-bold" style={{ color: ACCENT }}>Bulk Employee Onboarding</h2>
+            <h2 className="text-base sm:text-lg font-bold" style={{ color: ACCENT }}>Bulk Onboarding</h2>
           </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-700"><FaTimes /></button>
         </div>
 
         <div className="p-5 sm:p-6 space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">Import as</label>
+            <div className="flex gap-2">
+              <ImportAsButton
+                active={importAs === "employee"}
+                onClick={() => handleTypeChange("employee")}
+                icon={<FaUserPlus size={13} />}
+                label="Employees"
+              />
+              <ImportAsButton
+                active={importAs === "manager"}
+                onClick={() => handleTypeChange("manager")}
+                icon={<FaUserTie size={13} />}
+                label="Managers"
+              />
+            </div>
+          </div>
+
           <div className="flex items-start gap-3 p-3 rounded-xl bg-[#F9F8F2] border border-[#EEE]">
             <p className="text-xs sm:text-sm text-gray-600 flex-1">
-              Onboard many employees at once from an Excel/CSV file or a Google Sheet. Start with the template so your
-              columns line up correctly — if any row fails validation, no employees are created until it's fixed.
+              Onboard many {importAs === "manager" ? "managers" : "employees"} at once from an Excel/CSV file or a
+              Google Sheet. Start with the template so your columns line up correctly — if any row fails
+              validation, no accounts are created until it's fixed.
             </p>
             <button
-              onClick={() => downloadTemplate()}
+              onClick={() => downloadTemplate(importAs)}
               disabled={downloading}
               className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 text-xs font-semibold whitespace-nowrap"
               style={{ borderColor: ACCENT, color: ACCENT }}
@@ -113,7 +150,7 @@ export default function BulkOnboardingModal({ open, onClose }) {
                 className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
                 style={{ background: ACCENT }}
               >
-                {uploading ? <span className="flex items-center justify-center gap-2"><FaSpinner className="animate-spin" />Uploading…</span> : "Upload & Onboard"}
+                {uploading ? <span className="flex items-center justify-center gap-2"><FaSpinner className="animate-spin" />Uploading…</span> : `Upload & Onboard ${importAs === "manager" ? "Managers" : "Employees"}`}
               </button>
             </div>
           ) : (
@@ -138,7 +175,7 @@ export default function BulkOnboardingModal({ open, onClose }) {
                 className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-50"
                 style={{ background: ACCENT }}
               >
-                {importing ? <span className="flex items-center justify-center gap-2"><FaSpinner className="animate-spin" />Importing…</span> : "Import & Onboard"}
+                {importing ? <span className="flex items-center justify-center gap-2"><FaSpinner className="animate-spin" />Importing…</span> : `Import & Onboard ${importAs === "manager" ? "Managers" : "Employees"}`}
               </button>
             </div>
           )}
@@ -148,6 +185,18 @@ export default function BulkOnboardingModal({ open, onClose }) {
       </div>
     </div>,
     document.body
+  );
+}
+
+function ImportAsButton({ active, onClick, icon, label }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all"
+      style={active ? { borderColor: ACCENT, background: ACCENT, color: "#fff" } : { borderColor: "#D1D5DB", color: "#6B7280" }}
+    >
+      {icon}{label}
+    </button>
   );
 }
 
