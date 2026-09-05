@@ -51,36 +51,36 @@ const LOCATION_DATA = {
 };
 
 const C = {
-  brand:      "#CD166E",
-  brandDark:  "#730042",
+  brand: "#CD166E",
+  brandDark: "#730042",
   brandLight: "rgba(205,22,110,0.08)",
-  green:      "#1D9E75",
-  greenBg:    "#e8f5e9",
-  blue:       "#378ADD",
-  blueBg:     "#e6f1fb",
-  amber:      "#BA7517",
-  amberBg:    "#faeeda",
-  red:        "#E24B4A",
-  redBg:      "#fcebeb",
-  surface:    "#ffffff",
-  page:       "#F9F8F2",
-  border:     "#ede5e0",
-  text:       "#2a1a16",
-  muted:      "#b0948a",
-  mutedMid:   "#c9bab5",
+  green: "#1D9E75",
+  greenBg: "#e8f5e9",
+  blue: "#378ADD",
+  blueBg: "#e6f1fb",
+  amber: "#BA7517",
+  amberBg: "#faeeda",
+  red: "#E24B4A",
+  redBg: "#fcebeb",
+  surface: "#ffffff",
+  page: "#F9F8F2",
+  border: "#ede5e0",
+  text: "#2a1a16",
+  muted: "#b0948a",
+  mutedMid: "#c9bab5",
 };
 
 const TABS = [
-  { key: "profile",   label: "Profile" },
-  { key: "contact",   label: "Contact" },
-  { key: "address",   label: "Address" },
-  { key: "identity",  label: "Identity" },
+  { key: "profile", label: "Profile" },
+  { key: "contact", label: "Contact" },
+  { key: "address", label: "Address" },
+  { key: "identity", label: "Identity" },
   { key: "documents", label: "Documents & Banking" },
-  { key: "leave",     label: "Leave Balance" },
-  { key: "reviews",   label: "Reviews" },
-  { key: "assets",    label: "My Assets" },
-  { key: "password",  label: "Password" },
-  { key: "avatar",    label: "Avatar" },
+  { key: "leave", label: "Leave Balance" },
+  { key: "reviews", label: "Reviews" },
+  { key: "assets", label: "My Assets" },
+  { key: "password", label: "Password" },
+  { key: "avatar", label: "Avatar" },
 ];
 
 
@@ -114,6 +114,8 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("title", label);
+      formData.append("fileType", "personal");
       const res = await uploadDocument(formData);
       const url =
         res?.url ||
@@ -121,6 +123,8 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
         res?.document?.url ||
         res?.data?.document?.url ||
         res?.fileUrl ||
+        res?.document?.fileUrl ||
+        res?.data?.document?.fileUrl ||
         res?.data?.fileUrl;
       if (!url) {
         console.warn("Upload response did not contain a recognizable URL field:", res);
@@ -158,7 +162,7 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
           border: `1px solid ${C.border}`, background: C.page,
         }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M4 1.5h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" stroke={C.brand} strokeWidth="1.2"/>
+            <path d="M4 1.5h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z" stroke={C.brand} strokeWidth="1.2" />
           </svg>
           <a href={value} target="_blank" rel="noopener noreferrer"
             className="truncate"
@@ -283,8 +287,8 @@ function Toast({ message, type, onClose }) {
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
       }}>
         {ok
-          ? <svg width="13" height="13" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round"/></svg>
-          : <svg width="13" height="13" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round"/></svg>
+          ? <svg width="13" height="13" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" /></svg>
+          : <svg width="13" height="13" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /></svg>
         }
       </div>
       <span className="flex-1 min-w-0 break-words" style={{ fontSize: 13, fontWeight: 500, color: ok ? "#1a5c3a" : "#7a1a1a" }}>{message}</span>
@@ -505,7 +509,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
     });
   }, [adminData]);
 
-  const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+    const setPhone = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value.replace(/\D/g, "").slice(0, 10) }));
 
   const setCountry = (e) => {
     const countryIso = e.target.value;
@@ -527,9 +531,10 @@ function ContactTab({ adminData, onSuccess, onError }) {
     ? [{ name: form.city }, ...cities]
     : cities;
 
-  const handleSave = () => {
+    const handleSave = () => {
     if (!PHONE_REGEX.test(form.personal_contact)) { onError("Phone number must be a valid 10-digit number"); return; }
     if (form.e_contact && !PHONE_REGEX.test(form.e_contact)) { onError("Emergency contact must be a valid 10-digit number"); return; }
+    if (form.e_contact && form.personal_contact && form.e_contact === form.personal_contact) { onError("Emergency contact must be different from personal contact"); return; }
     if (form.date_of_birth && new Date(form.date_of_birth) > new Date()) { onError("Date of birth cannot be in the future"); return; }
     mutate(
       { personal_contact: form.personal_contact, e_contact: form.e_contact, office_location: form.city, date_of_joining: form.date_of_joining, date_of_birth: form.date_of_birth },
@@ -545,8 +550,19 @@ function ContactTab({ adminData, onSuccess, onError }) {
 
   return (
     <SectionCard title="Contact & office" subtitle="Fields you can update" accent={C.green}>
-      <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
-      <InputField label="Emergency contact" type="tel" value={form.e_contact} onChange={setPhone("e_contact")} placeholder="Emergency contact" hint="Reached in case of emergency" />
+            <InputField label="Phone number" type="tel" value={form.personal_contact} onChange={setPhone("personal_contact")} placeholder="10-digit phone number" />
+      <InputField
+        label="Emergency contact"
+        type="tel"
+        value={form.e_contact}
+        onChange={setPhone("e_contact")}
+        placeholder="Emergency contact"
+        hint={
+          form.personal_contact && form.e_contact && form.personal_contact === form.e_contact
+            ? "Emergency contact must be different from personal contact"
+            : "Reached in case of emergency"
+        }
+      />
       <Grid cols={3}>
         <SelectField
           label="Country"
@@ -581,7 +597,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
         onChange={e => setForm(p => ({ ...p, date_of_birth: e.target.value }))}
         hint="Used to wish you (and the team) on your birthday"
       />
-     <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
+      <PrimaryButton onClick={handleSave} loading={isPending} color={C.brandDark}>Save contact info</PrimaryButton>
     </SectionCard>
   );
 }
@@ -875,15 +891,15 @@ function PasswordTab({ onSuccess, onError }) {
   };
 
   const s = strength(form.newPassword);
-  const sLabel = ["","Weak","Fair","Good","Strong","Very strong"][s];
-  const sColor = ["",C.red,C.amber,"#f9a825",C.green,C.green][s];
+  const sLabel = ["", "Weak", "Fair", "Good", "Strong", "Very strong"][s];
+  const sColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
 
   const EyeBtn = () => (
     <button type="button" onClick={() => setShow(v => !v)}
       style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}>
       {show
-        ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3"/></svg>
-        : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3"/><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round"/></svg>
+        ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" /></svg>
+        : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" /></svg>
       }
     </button>
   );
@@ -910,7 +926,7 @@ function PasswordTab({ onSuccess, onError }) {
         {form.newPassword && (
           <div style={{ marginTop: -6, marginBottom: 12 }}>
             <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
-              {[1,2,3,4,5].map(i => (
+              {[1, 2, 3, 4, 5].map(i => (
                 <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= s ? sColor : C.border, transition: "background 0.2s" }} />
               ))}
             </div>
@@ -920,7 +936,7 @@ function PasswordTab({ onSuccess, onError }) {
         <InputField label="Confirm new password *" type={show ? "text" : "password"} value={form.confirm} onChange={set("confirm")} placeholder="Confirm password"
           hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
         />
-       <PrimaryButton onClick={handleChange} loading={isPending} color={C.brandDark}>Update password</PrimaryButton>
+        <PrimaryButton onClick={handleChange} loading={isPending} color={C.brandDark}>Update password</PrimaryButton>
         <div style={{ marginTop: 14, padding: "11px 14px", background: C.brandLight, borderRadius: 9, fontSize: 12, color: C.brandDark, lineHeight: 1.6 }}>
           Use 10+ characters with uppercase, numbers and symbols for a strong password.
         </div>
@@ -1053,7 +1069,7 @@ function MobileTabBar({ tab, setTab, onClose }) {
               fontSize: 14, fontWeight: tab === t.key ? 600 : 400,
             }}>
             {t.label}
-            {tab === t.key && <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="4,8 7,11 12,5" stroke={C.brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            {tab === t.key && <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="4,8 7,11 12,5" stroke={C.brand} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
           </button>
         ))}
       </div>
@@ -1072,7 +1088,7 @@ export default function AdminSettingsPage() {
   const reviews = auth?.data?.reviews || auth?.reviews || [];
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
-  const showError   = (msg) => setToast({ message: msg, type: "error" });
+  const showError = (msg) => setToast({ message: msg, type: "error" });
 
   const displayName = adminData?.f_name
     ? `${adminData.f_name} ${adminData.l_name || ""}`.trim()
@@ -1130,7 +1146,7 @@ export default function AdminSettingsPage() {
                 color: C.brand, fontFamily: "inherit",
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="7" x2="13" y2="7" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="3.5" x2="13" y2="3.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" /><line x1="1" y1="7" x2="13" y2="7" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" /><line x1="1" y1="10.5" x2="13" y2="10.5" stroke={C.brand} strokeWidth="1.5" strokeLinecap="round" /></svg>
               {currentTabLabel}
             </button>
           </div>
@@ -1192,16 +1208,16 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="flex-1 min-w-0">
-              {tab === "profile"   && <ProfileTab adminData={adminData} />}
-              {tab === "contact"   && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-              {tab === "address"   && <AddressTab adminData={adminData} />}
-              {tab === "identity"  && <IdentityTab adminData={adminData} />}
+              {tab === "profile" && <ProfileTab adminData={adminData} />}
+              {tab === "contact" && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
+              {tab === "address" && <AddressTab adminData={adminData} />}
+              {tab === "identity" && <IdentityTab adminData={adminData} />}
               {tab === "documents" && <DocumentsBankingTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
-              {tab === "leave"     && <LeaveTab leaveBalance={leaveBalance} />}
-              {tab === "reviews"   && <ReviewsTab reviews={reviews} />}
-              {tab === "assets"    && <AssetsTab />}
-              {tab === "password"  && <PasswordTab onSuccess={showSuccess} onError={showError} />}
-              {tab === "avatar"    && <AvatarTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
+              {tab === "leave" && <LeaveTab leaveBalance={leaveBalance} />}
+              {tab === "reviews" && <ReviewsTab reviews={reviews} />}
+              {tab === "assets" && <AssetsTab />}
+              {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
+              {tab === "avatar" && <AvatarTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
 
               <div style={{ textAlign: "center", fontSize: 11, color: C.mutedMid, marginTop: 8, paddingBottom: 16 }}>
                 Changes are saved to your account automatically

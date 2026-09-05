@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
 import {
   useMyAssignedJobs,
   useJobsCreatedByMe,
@@ -7,7 +8,6 @@ import {
   useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
-  useArchiveJob,
   useMyWeekLog,
   useLogTime,
   useActiveTimer,
@@ -29,15 +29,23 @@ import {
   useMyProductivitySummary,
   useOrgAllTimeLogs,
   useOrgAllTimesheets,
+  useOrgAllJobs,
+  useMyProjects,
   useJobById,
+  useTimesheetDetailedReport,
 } from "../../auth/server-state/timesheet/timesheet.hook";
+import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -113,6 +121,7 @@ const TABS = [
   { id: "timesheets", label: "Timesheets" },
   { id: "org-logs", label: "All Logs" },
   { id: "org-sheets", label: "All Timesheets" },
+  { id: "report", label: "Time Sheet Report" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -126,24 +135,26 @@ function fmtRate(rate, currency) {
 function TorchXLogo() {
   return (
     <div className="flex items-center gap-2.5 shrink-0 min-w-0">
-      <div className="w-8 h-8 sm:w-[34px] sm:h-[34px] rounded-[10px] bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-[0_2px_8px_rgba(115,0,66,0.15)] shrink-0">
+      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-[#730042] flex items-center justify-center shrink-0">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.9" />
+          <path d="M10 2L3 7v11h5v-6h4v6h5V7L10 2z" fill="white" fillOpacity="0.95" />
           <circle cx="10" cy="8" r="2" fill="white" />
         </svg>
       </div>
       <div className="hidden sm:block min-w-0">
-        <div className="font-extrabold text-sm text-gray-900 tracking-tight leading-none truncate">TorchX</div>
-        <div className="text-[10px] text-gray-400 font-medium tracking-wide truncate">TIMESHEET</div>
+        <div className="font-bold text-[14px] text-gray-900 tracking-tight leading-none truncate">TorchX</div>
+        <div className="text-[10px] text-gray-400 font-semibold tracking-[0.14em] truncate mt-0.5">TIMESHEET</div>
       </div>
     </div>
   );
 }
 
 function Badge({ status }) {
-  const s = STATUS_STYLE[status] || { text: "text-gray-400", bg: "bg-gray-50", label: status };
+  const s = STATUS_STYLE[status] || { text: "text-gray-500", bg: "bg-gray-100", label: status };
+  const dot = s.text.replace("text-", "bg-");
   return (
-    <span className={`${s.text} ${s.bg} rounded-md text-[10px] font-bold tracking-wide px-2 py-1 uppercase whitespace-nowrap shrink-0`}>
+    <span className={`${s.text} ${s.bg} inline-flex items-center gap-1.5 rounded-md text-[10px] font-bold tracking-wide px-2 py-1 whitespace-nowrap shrink-0`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
       {s.label}
     </span>
   );
@@ -151,15 +162,15 @@ function Badge({ status }) {
 
 function Chip({ color = "brand", children }) {
   const map = {
-    brand: "text-[#730042] bg-[#730042]/10",
-    green: "text-emerald-600 bg-emerald-50",
-    amber: "text-amber-600 bg-amber-50",
-    red: "text-red-600 bg-red-50",
-    blue: "text-blue-600 bg-blue-50",
-    gray: "text-gray-400 bg-gray-100",
+    brand: "text-[#730042] bg-[#730042]/[0.08]",
+    green: "text-emerald-700 bg-emerald-50",
+    amber: "text-amber-700 bg-amber-50",
+    red: "text-red-700 bg-red-50",
+    blue: "text-blue-700 bg-blue-50",
+    gray: "text-gray-600 bg-gray-100",
   };
   return (
-    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${map[color] || map.brand} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0`}>
       {children}
     </span>
   );
@@ -167,7 +178,7 @@ function Chip({ color = "brand", children }) {
 
 function PriorityChip({ priority }) {
   return (
-    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${PRIORITY_CHIP[priority] || PRIORITY_CHIP.low} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0 capitalize`}>
       {priority}
     </span>
   );
@@ -175,7 +186,7 @@ function PriorityChip({ priority }) {
 
 function JobChip({ status }) {
   return (
-    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-400 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 uppercase tracking-wide whitespace-nowrap shrink-0`}>
+    <span className={`${JOB_STATUS_CHIP[status] || "text-gray-600 bg-gray-100"} rounded-md text-[10px] font-bold px-2 py-1 tracking-wide whitespace-nowrap shrink-0 capitalize`}>
       {status.replace(/_/g, " ")}
     </span>
   );
@@ -183,18 +194,20 @@ function JobChip({ status }) {
 
 function Card({ children, className = "" }) {
   return (
-    <div className={`bg-white border border-gray-200 rounded-2xl shadow-sm min-w-0 ${className}`}>
+    <div className={`bg-white border border-gray-200 rounded-lg min-w-0 ${className}`}>
       {children}
     </div>
   );
 }
 
 function StatCard({ label, value, color = "text-[#730042]", sub }) {
+  const barColor = color.replace("text-", "bg-");
   return (
-    <Card className="px-3 sm:px-[22px] py-3.5 sm:py-5">
-      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2 sm:mb-2.5 truncate">{label}</div>
-      <div className={`text-lg sm:text-[28px] font-black ${color} truncate`}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
+    <Card className="relative overflow-hidden pl-4 pr-3.5 sm:pl-5 sm:pr-5 py-3.5 sm:py-5">
+      <span className={`absolute top-0 left-0 h-full w-[3px] ${barColor}`} />
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-2.5 truncate">{label}</div>
+      <div className={`text-xl sm:text-[26px] font-bold tracking-tight ${color} truncate`}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1.5 truncate">{sub}</div>}
     </Card>
   );
 }
@@ -208,15 +221,15 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[200] bg-gray-900/55 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 overflow-hidden"
+      className="fixed inset-0 z-[200] bg-gray-900/45 flex items-center justify-center p-0 sm:p-4 overflow-hidden"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
+      <div className="bg-white border border-gray-200 rounded-t-xl sm:rounded-xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
         <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0 min-w-0">
           <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-50 border-none rounded-lg cursor-pointer shrink-0"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 text-lg bg-gray-100 hover:bg-gray-200 hover:text-gray-600 border-none rounded-md cursor-pointer shrink-0 transition-colors"
           >×</button>
         </div>
         <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
@@ -228,13 +241,13 @@ function Modal({ open, onClose, title, children }) {
 function Field({ label, children }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
-      {label && <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">{label}</label>}
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       {children}
     </div>
   );
 }
 
-const inputClass = "bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]";
+const inputClass = "bg-white border border-gray-300 rounded-md px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full max-w-full box-border font-inherit focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors min-h-[44px]";
 
 function Input({ label, ...props }) {
   return (
@@ -256,17 +269,17 @@ function Sel({ label, children, ...props }) {
 
 function Btn({ children, variant = "primary", onClick, disabled, className = "" }) {
   const variants = {
-    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white border border-transparent shadow-sm hover:shadow-md hover:brightness-110",
-    ghost: "bg-transparent text-gray-700 border-[1.5px] border-gray-200 hover:bg-gray-50",
-    danger: "bg-red-50 text-red-600 border-[1.5px] border-red-200 hover:bg-red-100",
-    success: "bg-emerald-50 text-emerald-600 border-[1.5px] border-emerald-200 hover:bg-emerald-100",
-    amber: "bg-amber-50 text-amber-600 border-[1.5px] border-amber-200 hover:bg-amber-100",
+    primary: "bg-[#730042] text-white border border-transparent hover:bg-[#5c0034]",
+    ghost: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+    danger: "bg-white text-red-600 border border-red-300 hover:bg-red-50",
+    success: "bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50",
+    amber: "bg-white text-amber-600 border border-amber-300 hover:bg-amber-50",
   };
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`${variants[variant]} rounded-[10px] px-4 py-2.5 min-h-[44px] text-[13px] font-semibold whitespace-nowrap transition-all inline-flex items-center justify-center gap-1.5 font-inherit ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${className}`}
+      className={`${variants[variant]} rounded-md px-4 py-2.5 min-h-[44px] text-[13px] font-semibold whitespace-nowrap transition-colors inline-flex items-center justify-center gap-1.5 font-inherit ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${className}`}
     >
       {children}
     </button>
@@ -416,7 +429,7 @@ function TimerWidget({ jobs }) {
   return (
     <>
       <Card className="overflow-hidden">
-        <div className={`px-4 sm:px-5 py-3.5 flex items-center gap-2.5 min-w-0 ${isRunning ? "bg-gradient-to-br from-[#730042] to-[#CD166E]" : "bg-gray-50"}`}>
+        <div className={`px-4 sm:px-5 py-3.5 flex items-center gap-2.5 min-w-0 ${isRunning ? "bg-[#730042]" : "bg-gray-50"}`}>
           {isRunning && (
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
@@ -505,7 +518,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISTKey();
 
   return (
     <Card className="overflow-hidden">
@@ -600,7 +613,7 @@ export default function AdminTimesheet() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [jobForm, setJobForm] = useState({ title: "", description: "", assigned_to: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
   const [editJobModal, setEditJobModal] = useState(false);
   const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: false, hourly_rate: "", due_date: "" });
 
@@ -646,10 +659,53 @@ export default function AdminTimesheet() {
   const orgLogs = orgLogsData?.logs ?? [];
   const orgSheets = orgSheetsData?.timesheets ?? [];
 
+  // ─── Time Sheet Report (detailed, filterable) ───────────────────────────────
+  const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportEmployeeName, setReportEmployeeName] = useState("");
+  const [reportEmployeeModel, setReportEmployeeModel] = useState("");
+  const [reportDepartment, setReportDepartment] = useState("");
+  const [reportDesignation, setReportDesignation] = useState("");
+  const [reportProject, setReportProject] = useState("");
+  const [reportJob, setReportJob] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportBillable, setReportBillable] = useState("");
+
+  const reportParams = {
+    week_start: reportWeek,
+    ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
+    ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
+    ...(reportDepartment ? { department: reportDepartment } : {}),
+    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(reportProject ? { project_id: reportProject } : {}),
+    ...(reportJob ? { job_id: reportJob } : {}),
+    ...(reportStatus ? { status: reportStatus } : {}),
+    ...(reportBillable ? { billable: reportBillable } : {}),
+  };
+  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const { data: departmentsData } = useGetAllDepartments();
+  const reportDepartments = departmentsData?.departments ?? [];
+  const allReportRows = reportData?.rows ?? [];
+  const [reportView, setReportView] = useState("detailed");
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const exportReportCSV = () => {
+    const isWeekend = reportView === "weekend";
+    downloadReportCSV(
+      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${isWeekend ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
+
+  const { data: reportProjectsData } = useMyProjects();
+  const reportProjectOptions = reportProjectsData?.projects ?? [];
+  const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
+  const reportJobOptions = reportJobsData?.jobs ?? [];
+
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
-  const archiveJob = useArchiveJob();
   const logTime = useLogTime();
   const submitTS = useSubmitTimesheet();
   const approveTS = useApproveTimesheet();
@@ -693,7 +749,7 @@ export default function AdminTimesheet() {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
       onSuccess: (res) => {
         setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+        setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
         refetchWeek();
         if (res?.warning) toast(res.warning, { icon: "⏱️", duration: 6000 });
       },
@@ -781,33 +837,33 @@ export default function AdminTimesheet() {
   }, []);
 
   return (
-    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 bg-[#F8F7FB] font-sans flex flex-col overflow-hidden">
-    <header className="w-full bg-white border-b border-gray-200 shadow-sm shrink-0 z-20">
-  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 min-w-0">
-    <div className="flex items-center h-14 sm:h-16 gap-3 min-w-0">
+    <div ref={rootRef} className="h-full w-full min-h-0 min-w-0 max-w-full bg-gray-50 font-sans flex flex-col overflow-hidden">
+    <header className="w-full bg-white border-b border-gray-200 shrink-0 z-20 min-w-0 max-w-full overflow-hidden">
+  <div className="w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 min-w-0 max-w-full">
+    <div className="flex items-center h-14 sm:h-16 gap-3 min-w-0 max-w-full">
 
       <div className="shrink-0">
         <TorchXLogo />
       </div>
 
-      <div className="hidden md:block w-px h-8 bg-gray-200 shrink-0" />
+      <div className="hidden md:block w-px h-7 bg-gray-200 shrink-0" />
 
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth">
+      <div className="flex-1 min-w-0 overflow-hidden self-stretch">
+        <nav className="flex items-center gap-4 sm:gap-5 overflow-x-auto whitespace-nowrap no-scrollbar scroll-smooth h-full">
           {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`relative shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm transition-all border-b-2 ${
+              className={`relative shrink-0 h-full flex items-center px-0.5 text-xs sm:text-sm border-b-2 transition-colors ${
                 tab === t.id
-                  ? "bg-[#730042]/10 text-[#730042] font-semibold border-[#730042]"
-                  : "text-gray-700 border-transparent hover:bg-gray-100"
+                  ? "text-[#730042] font-bold border-[#730042]"
+                  : "text-gray-500 font-medium border-transparent hover:text-gray-800"
               }`}
             >
               {t.label}
 
               {t.id === "approvals" && approvals.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold">
+                <span className="absolute -top-1 -right-2.5 flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold">
                   {approvals.length}
                 </span>
               )}
@@ -823,16 +879,15 @@ export default function AdminTimesheet() {
     onClick={() => setJobModal(true)}
     className="
       flex items-center justify-center gap-2
-      bg-gradient-to-r from-[#730042] to-[#8f0050] hover:brightness-110
-      text-white font-medium
-      rounded-lg
+      bg-[#730042] hover:bg-[#5c0034]
+      text-white font-semibold
+      rounded-md
       px-3 py-2
       sm:px-4 sm:py-2.5
       text-xs sm:text-sm
       whitespace-nowrap
-      transition-all
+      transition-colors
       min-h-[40px]
-      shadow-sm
     "
   >
     <span className="text-base font-bold leading-none">+</span>
@@ -960,9 +1015,9 @@ export default function AdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 shrink-0 sm:self-start">
-                        <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
+                        <button onClick={() => openJobDetail(j._id)} className="bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors px-3 py-1.5 text-[11px] font-semibold cursor-pointer">View</button>
                         {!["completed", "cancelled"].includes(j.status) && (
-                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
+                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors px-3 py-1.5 text-[11px] font-semibold cursor-pointer">Complete</button>
                         )}
                       </div>
                     </Card>
@@ -1018,13 +1073,12 @@ export default function AdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex gap-1.5 flex-wrap shrink-0 sm:self-start">
-                        <button onClick={() => openJobDetail(j._id)} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
-                        <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
-                        {!["completed", "cancelled"].includes(j.status) && (
-                          <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border-none rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Complete</button>
-                        )}
-                        <button onClick={() => archiveJob.mutate(j._id, { onSuccess: refetchCreated })} className="bg-gray-50 text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Archive</button>
-                      </div>
+  <button onClick={() => openJobDetail(j._id)} className="bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">View</button>
+  <button onClick={() => openEditJob(j)} className="bg-blue-50 text-blue-600 border border-blue-200 rounded-lg px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Edit</button>
+  {!["completed", "cancelled"].includes(j.status) && (
+    <button onClick={() => updateJobStatus.mutate({ id: j._id, status: "completed" }, { onSuccess: refetchCreated })} className="bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors px-3 py-1.5 min-h-[36px] text-[11px] font-semibold cursor-pointer">Complete</button>
+  )}
+</div>
                     </Card>
                   );
                 })
@@ -1111,13 +1165,17 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
+                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
                             <div className="flex items-center gap-2 mb-2 min-w-0">
                               <div className="w-7 h-7 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] shrink-0">
                                 {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
                               </div>
-                              <span className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</span>
+                              <div className="min-w-0">
+                                <div className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</div>
+                                {meta && <div className="text-[10px] text-gray-400 truncate">{meta}</div>}
+                              </div>
                             </div>
                             <div className="grid grid-cols-7 gap-1">
                               {dayKeys.map((dk, di) => {
@@ -1140,7 +1198,7 @@ export default function AdminTimesheet() {
                     </div>
 
                     <div className="hidden lg:block min-w-0">
-                      <div className="flex items-center gap-2.5 mb-2.5 pl-11">
+                      <div className="flex items-center gap-2.5 mb-2.5 pl-[7.5rem]">
                         {DAY_NAMES.map((d) => (
                           <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>
                         ))}
@@ -1151,10 +1209,15 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
+                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="flex items-center gap-2.5 mb-2">
                             <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">
                               {row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase()}
+                            </div>
+                            <div className="w-[7.5rem] min-w-0 shrink-0 pr-2">
+                              <div className="text-[11px] font-semibold text-gray-800 truncate">{row.name || row.person}</div>
+                              {meta && <div className="text-[9px] text-gray-400 truncate">{meta}</div>}
                             </div>
                             {dayKeys.map((dk) => {
                               const pct = row.days[dk]?.loadPercent || 0;
@@ -1300,7 +1363,7 @@ export default function AdminTimesheet() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 shrink-0">Week of</span>
-                <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto" />
+                <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors" />
               </div>
             </div>
             {orgLogs.length === 0 ? (
@@ -1338,15 +1401,15 @@ export default function AdminTimesheet() {
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-[13px] min-w-[760px]">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
+                        <tr className="bg-gray-50/80 border-b border-gray-200">
                           {["Member", "Role", "Job", "Date", "Duration", "Mode", "Status"].map(h => (
-                            <th key={h} className="text-left px-4 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            <th key={h} className="text-left px-4 py-3 font-bold text-[11px] text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {orgLogs.map(log => (
-                          <tr key={log._id} className="border-b border-gray-200">
+                          <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
                             <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                               {log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}
                             </td>
@@ -1375,13 +1438,13 @@ export default function AdminTimesheet() {
                 <p className="text-xs text-gray-400 mt-1 mb-0">{orgSheets.length} timesheets</p>
               </div>
               <div className="flex gap-2 flex-col xs:flex-row">
-                <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none">
+                <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors">
                   <option value="">All Statuses</option>
                   {Object.entries(STATUS_STYLE).map(([k, v]) => (
                     <option key={k} value={k}>{v.label}</option>
                   ))}
                 </select>
-                <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none">
+                <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)} className="bg-white border border-gray-300 rounded-md px-3 py-1.5 min-h-[40px] text-xs text-gray-900 outline-none flex-1 sm:flex-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors">
                   <option value="">All Roles</option>
                   <option value="User">Employee</option>
                   <option value="Manager">Manager</option>
@@ -1430,6 +1493,201 @@ export default function AdminTimesheet() {
                   </Card>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+        {tab === "report" && (
+          <div className="min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </h1>
+                <p className="text-xs text-gray-400 mt-1 mb-0">
+                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportLoading && " · refreshing…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                  >
+                    Weekend
+                  </button>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                <input
+                  type="date"
+                  value={reportWeek}
+                  onChange={(e) => setReportWeek(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                />
+                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">
+                  Export CSV
+                </Btn>
+              </div>
+            </div>
+
+            <Card className="px-4 sm:px-5 py-4 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2.5">
+                <Input
+                  label="Employee Name"
+                  placeholder="Search employee"
+                  value={reportEmployeeName}
+                  onChange={(e) => setReportEmployeeName(e.target.value)}
+                />
+                <Sel label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
+                  <option value="">All Roles</option>
+                  <option value="User">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </Sel>
+                <Sel label="Department" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {reportDepartments.map((department) => (
+                    <option key={department._id} value={department.code || department.name}>{department.name}</option>
+                  ))}
+                </Sel>
+                <Input
+                  label="Designation"
+                  placeholder="e.g. Software Engineer"
+                  value={reportDesignation}
+                  onChange={(e) => setReportDesignation(e.target.value)}
+                />
+                <Sel
+                  label="Project"
+                  value={reportProject}
+                  onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}
+                >
+                  <option value="">All Projects</option>
+                  {reportProjectOptions.map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </Sel>
+                <Sel label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                  <option value="">All Jobs</option>
+                  {reportJobOptions.map((j) => (
+                    <option key={j._id} value={j._id}>{j.title}</option>
+                  ))}
+                </Sel>
+                <Sel label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_STYLE).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </Sel>
+                <Sel label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                  <option value="">All</option>
+                  <option value="true">Billable only</option>
+                  <option value="false">Non-billable only</option>
+                </Sel>
+              </div>
+              {(reportEmployeeName || reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+                <button
+                  onClick={() => {
+                    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+                    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
+                  }}
+                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </Card>
+
+            {reportRows.length === 0 ? (
+              <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
+                <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
+                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+              </Card>
+            ) : (
+              <>
+                <div className="xl:hidden flex flex-col gap-2.5">
+                  {reportRows.map((r, i) => (
+                    <Card
+                      key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
+                      className={`px-3.5 py-3 ${r.day_type === "week_off" || r.day_type === "holiday" ? "bg-gray-50/70" : ""}`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
+                        <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
+                        {r.day_type === "week_off" || r.day_type === "holiday" ? (
+                          <Chip color="gray">{r.day_label}</Chip>
+                        ) : (
+                          <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                      {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                      <div className="flex items-center justify-between flex-wrap gap-1.5">
+                        <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
+                        <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
+                          <span className="text-gray-400">Req {r.required_hours}h</span>
+                          <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                          {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
+                        </div>
+                      </div>
+                      {(r.approved_by || r.rejected_by) && (
+                        <div className="text-[11px] text-gray-400 mt-1.5">
+                          {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+
+                <Card className="hidden xl:block overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px] min-w-[1180px]">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {["Name", "Designation", "Department", "Project", "Job", "Date", "Day", "Required", "Serving", "Overtime", "Status", "Approved/Rejected By"].map((h) => (
+                            <th key={h} className="text-left px-3 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportRows.map((r, i) => {
+                          const isOff = r.day_type === "week_off" || r.day_type === "holiday";
+                          return (
+                            <tr key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`} className={`border-b border-gray-200 ${isOff ? "bg-gray-50/60" : ""}`}>
+                              <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{r.name}</td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.designation}</td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.department}</td>
+                              <td className="px-3 py-3 text-gray-700 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">{r.project?.name || "—"}</td>
+                              <td className="px-3 py-3 text-gray-700 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{r.job?.title || "—"}</td>
+                              <td className="px-3 py-3 text-gray-400 whitespace-nowrap">{fmtShort(r.date)}</td>
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                {isOff ? <Chip color="gray">{r.day_label}</Chip> : <Chip color="brand">Working</Chip>}
+                              </td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.required_hours}h</td>
+                              <td className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">{r.serving_hours}h</td>
+                              <td className="px-3 py-3 font-bold whitespace-nowrap">
+                                {r.overtime_hours > 0 ? <span className="text-amber-600">{r.overtime_hours}h</span> : <span className="text-gray-300">—</span>}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap">
+                                <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
+                              </td>
+                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">
+                                {r.timesheet_status === "approved" && r.approved_by}
+                                {r.timesheet_status === "rejected" && r.rejected_by}
+                                {!["approved", "rejected"].includes(r.timesheet_status) && "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </>
             )}
           </div>
         )}

@@ -8,6 +8,7 @@ require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
 require('../automatic/Birthdaynotify');
+require('../automatic/Noticeperiodautoexit');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -78,41 +79,18 @@ const timesheetroute = require('../routes/timesheet.route');
 const kioskrouter = require('../routes/kiosk.routes');
 const faceattendancerouter = require('../routes/faceattendance.routes');
 const shiftrouter = require('../routes/shift.routes');
+const departmentrouter = require('../routes/department.routes');
 const holidaypolicyrouter = require('../routes/holidaypolicy.route');
 const unifiedauthrouter = require('../routes/Unified.auth.route');
 const payrollrouter = require('../routes/payroll.route');
 const payrollpolicyrouter = require('../routes/payrollpolicy.route');
+const fnfrouter = require('../routes/Fnf.route');
 const reimbursementrouter = require('../routes/reimbursement.route');
 const notificationrouter = require('../routes/Notification.routes');
+const reviewrouter = require('../routes/review.route');
+const analyticsrouter = require('../routes/Analytics.route');
+const planFeatureRouter = require('../routes/planFeature.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
-
-// DEBUG — remove after fix
-const routes = {
-  adminrouter,
-  managerrouter,
-  userrouter,
-  attendancerouter,
-  superadminrouter,
-  ticketroute,
-  recruitmentroute,
-  wfhroute,
-  permissionroute,
-  timesheetroute,
-  kioskrouter,
-  faceattendancerouter,
-  shiftrouter,
-  holidaypolicyrouter,
-  unifiedauthrouter,
-  payrollrouter,
-  payrollpolicyrouter,
-  reimbursementrouter,
-  notificationrouter,
-};
-Object.entries(routes).forEach(([name, r]) => {
-  if (!r) console.error(`❌ UNDEFINED: ${name}`);
-  else if (typeof r !== 'function') console.error(`❌ NOT A FUNCTION: ${name} — type: ${typeof r}, value:`, r);
-  else console.log(`✅ ${name} loaded`);
-});
 
 app.use('/auth', unifiedauthrouter);
 app.use('/admin', adminrouter);
@@ -128,15 +106,23 @@ app.use('/timesheet', timesheetroute);
 app.use('/kiosk', kioskrouter);
 app.use('/faceattendance', faceattendancerouter);
 app.use('/admin', shiftrouter);
+app.use('/admin', departmentrouter);
 app.use('/admin/holiday-policy', holidaypolicyrouter);   // was: app.use('/admin', holidaypolicyrouter);
 app.use('/superadmin', shiftrouter);
+app.use('/superadmin', departmentrouter);
 app.use('/superadmin/', holidaypolicyrouter); // was: app.use('/superadmin', holidaypolicyrouter);
 app.use('/admin/payroll', payrollrouter);
 app.use('/admin/payroll', payrollpolicyrouter);
 app.use('/superadmin/payroll', payrollrouter);
 app.use('/superadmin/payroll', payrollpolicyrouter);
+app.use('/admin/payroll/fnf', fnfrouter);
+app.use('/superadmin/payroll/fnf', fnfrouter);
 app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
+app.use('/review', reviewrouter);
+app.use('/plan-features', planFeatureRouter);
+app.use('/admin/analytics', analyticsrouter);
+app.use('/superadmin/analytics', analyticsrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

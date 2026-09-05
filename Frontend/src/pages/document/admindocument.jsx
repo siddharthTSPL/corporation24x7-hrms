@@ -132,13 +132,13 @@ export default function AdminDocument() {
     setModalOpen(true);
   };
 
-  const openEdit = (doc) => {
-    setEditDoc(doc);
-    setFile(null);
-    setTitle(doc.title);
-    setFileType(doc.fileType);
-    setModalOpen(true);
-  };
+const openEdit = (doc) => {
+  setEditDoc(doc);
+  setFile(null);
+  setTitle(doc.title);
+  setFileType(doc.fileType);
+  setModalOpen(true);
+};
 
   const closeModal = () => setModalOpen(false);
 
@@ -151,7 +151,7 @@ export default function AdminDocument() {
 
     if (editDoc) {
       editMut.mutate(
-        { id: editDoc._id, data: fd },
+        {id: editDoc.id, data: fd},
         {
           onSuccess: () => { closeModal(); showToast("Document updated."); },
           onError:   () => showToast("Update failed.", "err"),
@@ -259,7 +259,7 @@ export default function AdminDocument() {
         <div className="flex flex-col gap-2">
           {filtered.map((doc) => (
             <div
-              key={doc._id}
+           key={doc.id}
               className="bg-white border border-[rgba(115,0,66,0.12)] rounded-xl px-3.5 sm:px-4 py-3.5 flex items-center gap-3 hover:shadow-[0_4px_16px_rgba(115,0,66,0.09)] transition-shadow"
             >
               <div
@@ -324,7 +324,7 @@ export default function AdminDocument() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDelete(doc._id)}
+                   onClick={() => handleDelete(doc.id)}
                     title="Delete"
                     className="w-8 h-8 rounded-lg border border-[rgba(205,22,110,0.2)] bg-transparent cursor-pointer flex items-center justify-center hover:bg-red-50 transition-colors"
                   >

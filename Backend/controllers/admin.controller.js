@@ -15,7 +15,7 @@ const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
 const Leave = require("../Models/leave.model");
 const Review = require("../Models/review.model");
-const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
+const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee, hrAcknowledgeReview } = require("../utils/reviewWorkflow.utils");
 const generateOTP = require("../automatic/otpgenerator");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const leavebalanceModel = require("../Models/leavebalance.model");
@@ -30,7 +30,7 @@ const { startOfDay } = require("../automatic/weekoffcalendar");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
-const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/Licensecheck");
 const AssetModel = require("../Models/asset.model");
 const { notifyLeaveDecision, notifyAssetAssigned, notifyLeaveApplied } = require("../utils/notify.utils");
 const { isEmailTaken, isEmpidTaken } = require("../utils/emailAvailability.utils");
@@ -302,174 +302,13 @@ const adminlogout = async (req, res, next) => {
   res.status(200).json({ message: "Admin logout successful" });
 };
 
-const resolveReportingManager = async (reporting_manager_id, organisation_id) => {
-  if (!reporting_manager_id) return { reportingManagerId: null, reportingManagerModel: null };
-
-  const manager = await Managermodel.findOne({ _id: reporting_manager_id, organisation_id })
-    .select("_id")
-    .lean();
-  if (manager) return { reportingManagerId: manager._id, reportingManagerModel: "Manager" };
-
-  const admin = await Adminmodel.findOne({ _id: reporting_manager_id, organisation_id })
-    .select("_id")
-    .lean();
-  if (admin) return { reportingManagerId: admin._id, reportingManagerModel: "Admin" };
-
-  return { reportingManagerId: null, reportingManagerModel: null };
-};
-
-// ─── Role-based default permissions ───────────────────────────────────────────
-// admin   : announcements + documents + tickets + recruitment  (all features)
-// manager : announcements + documents + tickets + recruitment  (all features)
-// employee: announcements + documents + tickets only           (NO recruitment)
-const DEFAULT_PERMISSIONS = {
-  admin: {
-    announcements: {
-      can_view_announcements: true,
-      can_create_announcement: true,
-      can_edit_announcement: true,
-      can_delete_announcement: true,
-    },
-    documents: {
-      can_upload_documents: true,
-      can_view_all_documents: true,
-    },
-    tickets: {
-      can_raise_ticket: true,
-      can_view_all_tickets: true,
-      can_resolve_ticket: true,
-      can_rate_ticket: true,
-    },
-    recruitment: {
-      can_view_hiring_requisitions: true,
-      can_create_hiring_requisition: true,
-      can_view_candidates: true,
-      can_add_candidate: true,
-    },
-  },
-  manager: {
-    announcements: {
-      can_view_announcements: true,
-      can_create_announcement: true,
-      can_edit_announcement: true,
-      can_delete_announcement: true,
-    },
-    documents: {
-      can_upload_documents: true,
-      can_view_all_documents: true,
-    },
-    tickets: {
-      can_raise_ticket: true,
-      can_view_all_tickets: true,
-      can_resolve_ticket: true,
-      can_rate_ticket: true,
-    },
-    recruitment: {
-      can_view_hiring_requisitions: true,
-      can_create_hiring_requisition: true,
-      can_view_candidates: true,
-      can_add_candidate: true,
-    },
-  },
-  employee: {
-    announcements: {
-      can_view_announcements: true,
-      can_create_announcement: false,
-      can_edit_announcement: false,
-      can_delete_announcement: false,
-    },
-    documents: {
-      can_upload_documents: true,
-      can_view_all_documents: false,
-    },
-    tickets: {
-      can_raise_ticket: true,
-      can_view_all_tickets: false,
-      can_resolve_ticket: false,
-      can_rate_ticket: true,
-    },
-    // Employees have NO recruitment access
-    recruitment: {
-      can_view_hiring_requisitions: false,
-      can_create_hiring_requisition: false,
-      can_view_candidates: false,
-      can_add_candidate: false,
-    },
-  },
-};
-
-const USER_MODEL_MAP = {
-  admin: "Admin",
-  senior_admin: "Admin",
-  official: "Admin",
-  manager: "Manager",
-  senior_manager: "Manager",
-  employee: "User",
-};
-
-const mergePermissions = (role, overrides) => {
-  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
-    ? "admin"
-    : ["manager", "senior_manager"].includes(role)
-    ? "manager"
-    : "employee";
-
-  const defaults = DEFAULT_PERMISSIONS[permissionRole];
-  if (!overrides) return defaults;
-
-  return {
-    announcements: {
-      can_view_announcements: overrides.announcements?.can_view_announcements ?? defaults.announcements.can_view_announcements,
-      can_create_announcement: overrides.announcements?.can_create_announcement ?? defaults.announcements.can_create_announcement,
-      can_edit_announcement: overrides.announcements?.can_edit_announcement ?? defaults.announcements.can_edit_announcement,
-      can_delete_announcement: overrides.announcements?.can_delete_announcement ?? defaults.announcements.can_delete_announcement,
-    },
-    documents: {
-      can_upload_documents: overrides.documents?.can_upload_documents ?? defaults.documents.can_upload_documents,
-      can_view_all_documents: overrides.documents?.can_view_all_documents ?? defaults.documents.can_view_all_documents,
-    },
-    tickets: {
-      can_raise_ticket: overrides.tickets?.can_raise_ticket ?? defaults.tickets.can_raise_ticket,
-      can_view_all_tickets: overrides.tickets?.can_view_all_tickets ?? defaults.tickets.can_view_all_tickets,
-      can_resolve_ticket: overrides.tickets?.can_resolve_ticket ?? defaults.tickets.can_resolve_ticket,
-      can_rate_ticket: overrides.tickets?.can_rate_ticket ?? defaults.tickets.can_rate_ticket,
-    },
-    recruitment: {
-      can_view_hiring_requisitions: overrides.recruitment?.can_view_hiring_requisitions ?? defaults.recruitment.can_view_hiring_requisitions,
-      can_create_hiring_requisition: overrides.recruitment?.can_create_hiring_requisition ?? defaults.recruitment.can_create_hiring_requisition,
-      can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
-      can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
-    },
-  };
-};
-
-const assignDefaultPermissions = async (
-  user_id,
-  role,
-  organisation_id,
-  granted_by,
-  granted_by_model,
-  session,
-  overrides
-) => {
-  const user_model = USER_MODEL_MAP[role] || "User";
-  const perms = mergePermissions(role, overrides);
-
-  await PermissionModel.findOneAndUpdate(
-    { user_id, user_model, organisation_id },
-    {
-      $set: {
-        user_id,
-        user_model,
-        organisation_id,
-        granted_by,
-        granted_by_model,
-        ...perms,
-      },
-    },
-    { upsert: true, new: true, runValidators: true, session: session || undefined }
-  );
-};
+const {
+  DEFAULT_PERMISSIONS,
+  USER_MODEL_MAP,
+  mergePermissions,
+  assignDefaultPermissions,
+  resolveReportingManager,
+} = require("../utils/Onboardingdefaults.utils");
 
 const addmanager = async (req, res, next) => {
   try {
@@ -2395,6 +2234,71 @@ const applyleave = async (req, res, next) => {
   res.status(201).json({ success: true, message: "Leave request submitted to super admin", leave });
 };
 
+const editleaveadmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.admin.organisation_id;
+
+  const leave = await AdminLeave.findOne({
+    _id: req.params.id,
+    organisation_id,
+    admin: req.admin._id,
+  });
+  if (!leave)
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  if (leave.status !== "pending_superadmin")
+    return next(
+      Object.assign(
+        new Error("Cannot edit leave that is already processed or forwarded"),
+        { statusCode: 400 },
+      ),
+    );
+
+  const { leaveType, startDate, endDate, reason } = req.body;
+  if (startDate && endDate) {
+    const start = parseISTDateOnly(startDate);
+    const end = parseISTDateOnly(endDate);
+    if (end < start)
+      return next(
+        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+      );
+    leave.startDate = start;
+    leave.endDate = end;
+    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  }
+  if (leaveType) leave.leaveType = leaveType;
+  if (reason) leave.reason = reason;
+
+  await leave.save();
+  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
+};
+
+const deleteleaveadmin = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const organisation_id = req.admin.organisation_id;
+
+  const leave = await AdminLeave.findOne({
+    _id: req.params.id,
+    organisation_id,
+    admin: req.admin._id,
+  });
+  if (!leave)
+    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+  if (leave.status !== "pending_superadmin")
+    return next(
+      Object.assign(
+        new Error("Cannot delete leave that is already processed or forwarded"),
+        { statusCode: 400 },
+      ),
+    );
+
+  await AdminLeave.findByIdAndDelete(req.params.id);
+  res.status(200).json({ success: true, message: "Leave deleted successfully" });
+};
+
 const getmyleavehistory = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
@@ -2539,71 +2443,93 @@ const reviewtomanager = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
-  const { managerid, assignedDays, actualDays, behaviourScore, comment } = req.body;
-  if (!managerid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
-    return next(Object.assign(new Error("managerid, assignedDays, actualDays and behaviourScore are required"), { statusCode: 400 }));
+  const { managerid } = req.body;
+  if (!managerid)
+    return next(Object.assign(new Error("managerid is required"), { statusCode: 400 }));
 
   const organisation_id = req.admin.organisation_id;
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
 
-  const [manager, existingreview] = await Promise.all([
-    Managermodel.findOne({ _id: managerid, organisation_id }).select("role").lean(),
-    Review.findOne({ reviewer: req.admin._id, reviewee: managerid, monthYear, organisation_id })
-      .select("_id")
-      .lean(),
-  ]);
-
+  const manager = await Managermodel.findOne({ _id: managerid, organisation_id })
+    .select("role designation department")
+    .lean();
   if (!manager)
     return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
-  if (existingreview)
-    return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
 
   try {
-    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
-    const behaviourEthics = computeBehaviour(behaviourScore);
+    const fields = buildReviewFields(req.body);
 
-    const summary = await AttendanceSummary.findOne({
-      employee: managerid,
-      role: "manager",
-      month,
-      year,
-    }).lean();
-    const attendance = computeAttendance({
-      presentDays: summary?.presentDays ?? 0,
-      halfDays: summary?.halfDays ?? 0,
-      absentDays: summary?.absentDays ?? 0,
-    });
-
-    const overall = computeOverall({
-      taskScore: taskSubmission.score,
-      behaviourScore: behaviourEthics.score,
-      attendanceScore: attendance.score,
-    });
-
-    const review = await Review.create({
-      organisation_id,
-      reviewerRole: "admin",
-      reviewer: req.admin._id,
-      reviewerRoleModel: "Admin",
-      revieweeRole: manager.role,
-      reviewee: managerid,
-      revieweeRoleModel: "Manager",
-      taskSubmission,
-      behaviourEthics,
-      attendance,
-      overallScore: overall.score,
-      overallRating: overall.rating,
-      comment: comment || "",
-      monthYear,
-    });
+    const review = await createReviewOrThrow(
+      Review,
+      {
+        organisation_id,
+        reviewerRole: "admin",
+        reviewer: req.admin._id,
+        reviewerRoleModel: "Admin",
+        revieweeRole: manager.role,
+        reviewee: managerid,
+        revieweeRoleModel: "Manager",
+        revieweeDepartment: fields.revieweeDepartment || manager.department || "",
+        revieweeDesignation: fields.revieweeDesignation || manager.designation || "",
+        ...fields,
+      },
+      "You have already reviewed this manager this month."
+    );
 
     res.status(201).json({ message: "Review submitted successfully", review });
   } catch (err) {
-    if (err.code === 11000)
-      return next(Object.assign(new Error("You have already reviewed this manager this month."), { statusCode: 400 }));
+    next(err);
+  }
+};
+
+// Step 2 — an Admin, when they are the *reviewee* (reviewed by SuperAdmin),
+// accepts or disputes that review.
+const respondToMyReview = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { reviewId, status, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await respondToReviewAsReviewee(Review, {
+      reviewId,
+      revieweeId: req.admin._id,
+      revieweeRoleModel: "Admin",
+      organisation_id: req.admin.organisation_id,
+      status,
+      comment,
+    });
+    res.status(200).json({ success: true, message: "Response recorded", review });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Step 3 — FINAL approval. Only an Admin with isHR === true can call this,
+// and it applies to any review in the organisation (Admin visibility is
+// org-wide), regardless of who the reviewer/reviewee were.
+const hrAcknowledgeReviewHandler = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  if (!req.admin.isHR)
+    return next(Object.assign(new Error("Only an Admin designated as HR can give the final acknowledgement"), { statusCode: 403 }));
+
+  const { reviewId, decision, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await hrAcknowledgeReview(Review, {
+      reviewId,
+      hrAdminId: req.admin._id,
+      organisation_id: req.admin.organisation_id,
+      decision,
+      comment,
+    });
+    res.status(200).json({ success: true, message: `Review ${decision}`, review });
+  } catch (err) {
     next(err);
   }
 };
@@ -2778,6 +2704,10 @@ const getme = async (req, res, next) => {
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      // Reviewee here is always this admin, but ReviewCard still reads
+      // review.reviewee.f_name for the card title — without this the
+      // frontend showed "Unknown" on every card in "My Review".
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
       .lean(),
   ]);
 
@@ -3788,7 +3718,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3809,6 +3739,42 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
 
     if (!existingUser)
       return next(Object.assign(new Error("Employee not found"), { statusCode: 404 }));
+
+    // Notice period path: employee stays "working" (normal payroll keeps
+    // running for the notice-period months) — the actual status flip and
+    // FnF generation happen automatically on lastWorkingDay via the
+    // Noticeperiodautoexit cron. No asset check here since they haven't
+    // left yet.
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Usermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingUser.f_name} ${existingUser.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        employee: updated,
+      });
+    }
 
     const wasWorking = existingUser.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -3849,6 +3815,7 @@ const setEmployeeWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
@@ -3880,7 +3847,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.admin.organisation_id;
 
     if (!working_status)
@@ -3901,6 +3868,37 @@ const setManagerWorkingStatus = async (req, res, next) => {
 
     if (!existingManager)
       return next(Object.assign(new Error("Manager not found"), { statusCode: 404 }));
+
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await Managermodel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.admin._id,
+              initiatedByModel: req.actorModel || "Admin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingManager.f_name} ${existingManager.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        manager: updated,
+      });
+    }
 
     const wasWorking = existingManager.working_status === "working";
     const willBeWorking = working_status === "working";
@@ -3941,6 +3939,7 @@ const setManagerWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(willBeWorking ? { status: "active" } : { status: "inactive" }),
         },
       },
@@ -4100,6 +4099,8 @@ module.exports = {
   acceptLeave,
   rejectLeave,
   applyleave,
+  editleaveadmin,
+  deleteleaveadmin,
   getmyleavehistory,
   noofemployee,
   createannouncement,
@@ -4108,6 +4109,8 @@ module.exports = {
   deleteAnnouncement,
   reviewtomanager,
   getAllReviewsForAdmin,
+  respondToMyReview,
+  hrAcknowledgeReviewHandler,
   forgetpasswordloginotp,
   verifyAotp,
   resetAdminPassword,

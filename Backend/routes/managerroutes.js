@@ -4,7 +4,14 @@ const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const multer = require("multer");
+
+// Performance Management (Review) and TorchX Voice are plan-gated features:
+// fully locked on the Basic plan, fully open on Advance/enterprise (or
+// during the free trial).
+const reviewPlanGate = restrictPlanFeature("review");
+const ticketsPlanGate = restrictPlanFeature("tickets");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -35,8 +42,11 @@ managerrouter.get("/getOrgInfo", managermiddleware, asyncHandler(managercontroll
 managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontroller.getattendance));
 
 managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
+managerrouter.get("/submanagers", managermiddleware, asyncHandler(managercontroller.getSubManagers));
 
 managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
+managerrouter.put("/editleavem/:id", managermiddleware, asyncHandler(managercontroller.editleavem));
+managerrouter.delete("/deleteleavem/:id", managermiddleware, asyncHandler(managercontroller.deleteleavem));
 managerrouter.get("/getmyleaves", managermiddleware, asyncHandler(managercontroller.getmyleaves));
 managerrouter.get("/myleavehistory", managermiddleware, asyncHandler(managercontroller.getmyleavehistory));
 managerrouter.post("/acceptleaverequest", managermiddleware, asyncHandler(managercontroller.acceptleaverequest));
@@ -47,7 +57,11 @@ managerrouter.post("/acceptforwardedleave", managermiddleware, asyncHandler(mana
 managerrouter.post("/rejectforwardedleave", managermiddleware, asyncHandler(managercontroller.rejectforwardedleave));
 managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, asyncHandler(managercontroller.forwardLeaveUpChain));
 
-managerrouter.post("/reviewtoemployee", managermiddleware, asyncHandler(managercontroller.reviewtoemployee));
+managerrouter.post("/reviewtoemployee", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtoemployee));
+managerrouter.post("/reviewtosubmanager", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtosubmanager));
+managerrouter.get("/team-reviews", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.getMyTeamReviews));
+// Step 2: Manager (as reviewee, reviewed by Admin/senior manager) accepts/disputes.
+managerrouter.post("/review/respond", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.respondToMyReview));
 
 managerrouter.get("/showannouncements", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.showannouncements));
 managerrouter.get("/showannouncement/:id", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.particularannouncement));
@@ -60,10 +74,10 @@ managerrouter.get("/getAllExpenseDocuments", managermiddleware, checkPermission(
 managerrouter.get("/getAllPersonalDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllPersonalDocuments));
 managerrouter.get("/getDocumentDetails/:documentId", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getDocumentDetails));
 
-managerrouter.post("/submit-ticket", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
-managerrouter.get("/my-tickets", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
-managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
-managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
+managerrouter.post("/submit-ticket", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
+managerrouter.get("/my-tickets", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
+managerrouter.post("/rate-ticket/:ticketNumber", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_rate_ticket"), asyncHandler(managercontroller.managerRateTicket));
+managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetTicketDetail));
 managerrouter.get(
   "/viewallleaves",
   managermiddleware,

@@ -8,6 +8,7 @@ import {
   removePayrollAllowance,
   getPaySchedule,
   setPaySchedule,
+  getOrgOwner,
   setEmployeeCTC,
   listSalaryStructures,
   getSalaryStructure,
@@ -18,9 +19,18 @@ import {
   getPayslip,
   updatePayrollStatus,
   deletePayroll,
+  bulkUpdatePayrollStatus,
+  bulkDeletePayroll,
+  listEligibleForFnF,
+  generateFnF,
+  listFnF,
+  getFnFSlip,
+  updateFnF,
+  updateFnFStatus,
+  deleteFnF,
 } from "../../api/payroll/payroll.api";
 
-// ── Policy ───────────────────────────────────────────────────────────────────
+
 
 export const useGetPayrollPolicy = () => {
   return useQuery({
@@ -82,7 +92,7 @@ export const useRemovePayrollAllowance = () => {
   });
 };
 
-// ── Pay Schedule ─────────────────────────────────────────────────────────────
+
 
 export const useGetPaySchedule = () => {
   return useQuery({
@@ -104,7 +114,16 @@ export const useSetPaySchedule = () => {
   });
 };
 
-// ── Salary Structure ─────────────────────────────────────────────────────────
+
+
+export const useGetOrgOwner = () => {
+  return useQuery({
+    queryKey: ["payroll-org-owner"],
+    queryFn: getOrgOwner,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
 
 export const useListSalaryStructures = (params) => {
   return useQuery({
@@ -145,7 +164,7 @@ export const useReapplyPolicy = () => {
   });
 };
 
-// ── Payroll generation ────────────────────────────────────────────────────────
+
 
 export const useGeneratePayroll = () => {
   const queryClient = useQueryClient();
@@ -167,7 +186,7 @@ export const useBulkGeneratePayroll = () => {
   });
 };
 
-// ── Retrieval ──────────────────────────────────────────────────────────────────
+
 
 export const useListPayrolls = (params) => {
   return useQuery({
@@ -204,6 +223,101 @@ export const useDeletePayroll = () => {
     mutationFn: (id) => deletePayroll(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+export const useBulkUpdatePayrollStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, status }) => bulkUpdatePayrollStatus(ids, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+export const useBulkDeletePayroll = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids) => bulkDeletePayroll(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+    },
+  });
+};
+
+
+
+// --- Full & Final (FnF) ---
+
+export const useListEligibleForFnF = () => {
+  return useQuery({
+    queryKey: ["fnf-eligible"],
+    queryFn: listEligibleForFnF,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useGenerateFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: generateFnF,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-eligible"] });
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useListFnF = (params) => {
+  return useQuery({
+    queryKey: ["fnf-records", params],
+    queryFn: () => listFnF(params),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useGetFnFSlip = (id, enabled) => {
+  return useQuery({
+    queryKey: ["fnf-slip", id],
+    queryFn: () => getFnFSlip(id),
+    enabled: Boolean(enabled && id),
+    staleTime: 0,
+  });
+};
+
+export const useUpdateFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }) => updateFnF(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useUpdateFnFStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }) => updateFnFStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
+    },
+  });
+};
+
+export const useDeleteFnF = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => deleteFnF(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fnf-eligible"] });
+      queryClient.invalidateQueries({ queryKey: ["fnf-records"] });
     },
   });
 };

@@ -7,7 +7,6 @@ import {
   useUpdateJob,
   useAssignableTargets,
   useUpdateJobStatus,
-  useArchiveJob,
   useMyWeekLog,
   useLogTime,
   useUpdateTimeLog,
@@ -31,14 +30,22 @@ import {
   useIdleJobs,
   useMyProductivitySummary,
   useJobById,
+  useTimesheetDetailedReport,
+  useMyProjects,
+  useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -95,11 +102,12 @@ const PRIORITY_META = {
 };
 
 const TABS = [
-  { id: "work",      label: "My Work",    icon: "◷" },
-  { id: "team",      label: "Team Jobs",  icon: "⬡" },
-  { id: "approvals", label: "Approvals",  icon: "◈" },
-  { id: "insights",  label: "Insights",   icon: "◎" },
-  { id: "sheets",    label: "Timesheets", icon: "▦" },
+  { id: "work",      label: "My Work",  },
+  { id: "team",      label: "Team Jobs"  },
+  { id: "approvals", label: "Approvals",  },
+  { id: "insights",  label: "Insights",  },
+  { id: "sheets",    label: "Timesheets",  },
+  { id: "report",    label: "Time Sheet Report", },
 ];
 
 function cn(...a) { return a.filter(Boolean).join(" "); }
@@ -113,7 +121,7 @@ function fmtRate(rate, currency) {
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.draft;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap", m.color, m.bg)}>
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold whitespace-nowrap", m.color, m.bg)}>
       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", m.dot)} />
       {m.label}
     </span>
@@ -122,18 +130,18 @@ function StatusBadge({ status }) {
 
 function Chip({ children, color = "gray", size = "sm" }) {
   const map = {
-    gray:  "text-gray-500 bg-gray-100",
-    amber: "text-amber-600 bg-amber-50",
-    red:   "text-red-600 bg-red-50",
-    green: "text-emerald-600 bg-emerald-50",
-    blue:  "text-blue-600 bg-blue-50",
-    brand: "text-[#730042] bg-[#730042]/10",
-    purple:"text-purple-600 bg-purple-50",
+    gray:  "text-gray-600 bg-gray-100",
+    amber: "text-amber-700 bg-amber-50",
+    red:   "text-red-700 bg-red-50",
+    green: "text-emerald-700 bg-emerald-50",
+    blue:  "text-blue-700 bg-blue-50",
+    brand: "text-[#730042] bg-[#730042]/[0.08]",
+    purple:"text-purple-700 bg-purple-50",
   };
   return (
     <span className={cn(
-      "inline-flex items-center rounded-md font-semibold whitespace-nowrap",
-      size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-0.5",
+      "inline-flex items-center rounded-md font-bold whitespace-nowrap",
+      size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-1",
       map[color] || map.gray
     )}>{children}</span>
   );
@@ -141,15 +149,15 @@ function Chip({ children, color = "gray", size = "sm" }) {
 
 function Btn({ children, variant = "primary", onClick, disabled, type = "button", size = "md", className = "" }) {
   const base = cn(
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
+    "inline-flex items-center justify-center gap-1.5 rounded-md font-semibold transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed",
     size === "sm" ? "text-[12px] px-3 py-1.5 min-h-[34px]" : "text-[13px] px-4 py-2 min-h-[40px]"
   );
   const v = {
-    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white shadow-sm hover:shadow-md hover:brightness-110",
-    ghost:   "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
-    danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
-    success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
-    amber:   "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100",
+    primary: "bg-[#730042] text-white hover:bg-[#5c0034]",
+    ghost:   "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+    danger:  "bg-white text-red-600 border border-red-300 hover:bg-red-50",
+    success: "bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50",
+    amber:   "bg-white text-amber-600 border border-amber-300 hover:bg-amber-50",
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={cn(base, v[variant], className)}>
@@ -160,12 +168,12 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function Input({ label, error, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+    <div className="flex flex-col gap-1.5 min-w-0">
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       <input {...props} className={cn(
-        "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
-        "focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all placeholder:text-gray-300",
-        error && "border-red-300", className
+        "bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
+        "focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors placeholder:text-gray-400",
+        error && "border-red-400", className
       )} />
       {error && <span className="text-[11px] text-red-500">{error}</span>}
     </div>
@@ -174,10 +182,10 @@ function Input({ label, error, className = "", ...props }) {
 
 function Sel({ label, children, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+    <div className="flex flex-col gap-1.5 min-w-0">
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       <select {...props} className={cn(
-        "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0 focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all appearance-none cursor-pointer",
+        "bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0 focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors appearance-none cursor-pointer",
         className
       )}>{children}</select>
     </div>
@@ -192,12 +200,12 @@ function Modal({ open, onClose, title, children, width = "max-w-[500px]" }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/45 backdrop-blur-sm p-0 sm:p-4"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/45 p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={cn("bg-white rounded-t-2xl sm:rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] min-w-0", width)}>
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-gray-100 shrink-0">
+      <div className={cn("bg-white rounded-t-xl sm:rounded-xl w-full shadow-xl flex flex-col max-h-[92vh] sm:max-h-[90vh] min-w-0", width)}>
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-gray-200 shrink-0">
           <span className="font-bold text-[14px] sm:text-[15px] text-gray-900 truncate min-w-0">{title}</span>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg shrink-0">×</button>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg shrink-0">×</button>
         </div>
         <div className="p-4 sm:p-5 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
       </div>
@@ -318,10 +326,10 @@ function TimerBlock({ assignedJobs, onTimerLog }) {
 
   return (
     <>
-      <div className={cn("rounded-2xl overflow-hidden border transition-all min-w-0",
-        isRunning ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#CD166E] shadow-md shadow-[#730042]/15"
+      <div className={cn("rounded-lg overflow-hidden border transition-colors min-w-0",
+        isRunning ? "border-[#730042] bg-[#730042]"
         : isPaused ? "border-amber-200 bg-amber-50"
-        : "border-gray-200 bg-white shadow-sm")}>
+        : "border-gray-200 bg-white")}>
         <div className="px-3 sm:px-4 py-3 flex items-center gap-2.5 min-w-0">
           {isRunning && (
             <span className="relative flex h-2 w-2 shrink-0">
@@ -399,9 +407,9 @@ function TimerBlock({ assignedJobs, onTimerLog }) {
 
 function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayISTKey();
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
       {/* Mobile: stacked day list, no horizontal scroll */}
       <div className="flex flex-col divide-y divide-gray-100 sm:hidden">
         {days.map((d, i) => {
@@ -506,11 +514,15 @@ function WorkloadHeatmap({ weekStart, heatmap }) {
       <div className="flex flex-col gap-2.5 lg:hidden">
         {heatmap.map((row, i) => {
           const label = row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase();
+          const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
           return (
             <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
               <div className="flex items-center gap-2 mb-2 min-w-0">
                 <div className="w-7 h-7 bg-[#730042]/[0.08] rounded-full flex items-center justify-center text-[10px] font-extrabold text-[#730042] shrink-0">{label}</div>
-                <span className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</span>
+                <div className="min-w-0">
+                  <div className="text-[12px] font-semibold text-gray-900 truncate">{row.name || row.person}</div>
+                  {meta && <div className="text-[10px] text-gray-400 truncate">{meta}</div>}
+                </div>
               </div>
               <div className="grid grid-cols-7 gap-1">
                 {dayKeys.map((dk, di) => {
@@ -534,14 +546,19 @@ function WorkloadHeatmap({ weekStart, heatmap }) {
 
       {/* Desktop: full-width row grid */}
       <div className="hidden lg:block min-w-0">
-        <div className="flex items-center gap-2 mb-2 pl-10">
+        <div className="flex items-center gap-2 mb-2 pl-[7.5rem]">
           {DAY_KEYS.map((d) => <div key={d} className="flex-1 text-center text-[10px] text-gray-400 font-bold">{d}</div>)}
         </div>
         {heatmap.map((row, i) => {
           const label = row.name ? row.name.slice(0, 2).toUpperCase() : String(row.person).slice(-2).toUpperCase();
+          const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
           return (
             <div key={i} className="flex items-center gap-2 mb-1.5">
               <div className="w-8 h-8 bg-[#730042]/[0.08] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">{label}</div>
+              <div className="w-[7.5rem] min-w-0 shrink-0 pr-2">
+                <div className="text-[11px] font-semibold text-gray-800 truncate">{row.name || row.person}</div>
+                {meta && <div className="text-[9px] text-gray-400 truncate">{meta}</div>}
+              </div>
               {dayKeys.map((dk) => {
                 const pct = row.days[dk]?.loadPercent || 0;
                 const bg = pct === 0 ? "bg-gray-50" : pct < 60 ? "bg-emerald-100" : pct < 90 ? "bg-amber-100" : "bg-red-100";
@@ -561,11 +578,13 @@ function WorkloadHeatmap({ weekStart, heatmap }) {
 }
 
 function StatCard({ label, value, sub, valueColor = "text-[#730042]" }) {
+  const barColor = valueColor.replace("text-", "bg-");
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3.5 sm:py-4 min-w-0 shadow-sm">
-      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5 truncate">{label}</div>
-      <div className={cn("text-lg sm:text-2xl font-extrabold leading-none truncate", valueColor)}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
+    <div className="relative overflow-hidden bg-white border border-gray-200 rounded-lg pl-4 pr-3 sm:pr-4 py-3.5 sm:py-4 min-w-0">
+      <span className={cn("absolute top-0 left-0 h-full w-[3px]", barColor)} />
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 truncate">{label}</div>
+      <div className={cn("text-lg sm:text-2xl font-bold tracking-tight leading-none truncate", valueColor)}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1.5 truncate">{sub}</div>}
     </div>
   );
 }
@@ -610,13 +629,49 @@ export default function ManagerTimesheet() {
   const idleJobs = idleData?.jobs || [];
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
+  // ─── Time Sheet Report (detailed + weekend, filterable) ─────────────────
+  const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportView, setReportView] = useState("detailed");
+  const [reportDepartment, setReportDepartment] = useState("");
+  const [reportDesignation, setReportDesignation] = useState("");
+  const [reportProject, setReportProject] = useState("");
+  const [reportJob, setReportJob] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportBillable, setReportBillable] = useState("");
+
+  const reportParams = {
+    week_start: reportWeek,
+    ...(reportDepartment ? { department: reportDepartment } : {}),
+    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(reportProject ? { project_id: reportProject } : {}),
+    ...(reportJob ? { job_id: reportJob } : {}),
+    ...(reportStatus ? { status: reportStatus } : {}),
+    ...(reportBillable ? { billable: reportBillable } : {}),
+  };
+  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const allReportRows = reportData?.rows ?? [];
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const { data: reportProjectsData } = useMyProjects();
+  const reportProjectOptions = reportProjectsData?.projects ?? [];
+  const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
+  const reportJobOptions = reportJobsData?.jobs ?? [];
+
+  const exportReportCSV = () => {
+    downloadReportCSV(
+      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${reportView === "weekend" ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
+
   const logTime = useLogTime();
   const updateTimeLog = useUpdateTimeLog();
   const deleteTimeLog = useDeleteTimeLog();
   const createJob = useCreateJob();
   const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
-  const archiveJob = useArchiveJob();
   const submitTS = useSubmitTimesheet();
   const recallTS = useRecallTimesheet();
   const approveTS = useApproveTimesheet();
@@ -711,33 +766,33 @@ export default function ManagerTimesheet() {
   const canRecall = currentWeekSheet && ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   return (
-    <div className="min-h-screen w-full bg-[#F8F7FB] font-['Inter',system-ui,sans-serif] overflow-x-hidden">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <div className="min-h-screen w-full max-w-full bg-gray-50 font-['Inter',system-ui,sans-serif] overflow-x-hidden">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 min-w-0 max-w-full overflow-hidden">
         <div className={CONTAINER}>
           <div className="flex items-center h-14 sm:h-16 gap-2 sm:gap-3 min-w-0">
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-sm">
+              <div className="w-7 h-7 rounded-md bg-[#730042] flex items-center justify-center">
                 <span className="text-white text-[11px] font-black">T</span>
               </div>
-              <span className="font-bold text-[14px] text-gray-900 hidden sm:block">TorchX</span>
-              <span className="hidden md:inline text-[11px] font-semibold text-[#730042] bg-[#730042]/10 px-1.5 py-0.5 rounded-md">Manager</span>
+              <span className="font-bold text-[14px] text-gray-900 hidden sm:block tracking-tight">TorchX</span>
+              <span className="hidden md:inline text-[11px] font-bold text-[#730042] bg-[#730042]/[0.08] px-2 py-0.5 rounded-md">Manager</span>
             </div>
-            <nav className="flex items-center gap-0.5 flex-1 overflow-x-auto no-scrollbar min-w-0">
+            <nav className="flex items-center gap-4 flex-1 overflow-x-auto no-scrollbar min-w-0 max-w-full h-14">
               {TABS.map((t) => (
                 <button key={t.id} onClick={() => setTab(t.id)}
-                  className={cn("relative flex items-center gap-1.5 px-2 py-1.5 sm:px-3 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
-                    tab === t.id ? "bg-[#730042]/10 text-[#730042] font-semibold" : "text-gray-600 hover:bg-gray-100")}>
+                  className={cn("relative flex items-center gap-1.5 h-full px-0.5 border-b-2 text-[12px] sm:text-[13px] font-medium transition-colors whitespace-nowrap shrink-0",
+                    tab === t.id ? "text-[#730042] font-bold border-[#730042]" : "text-gray-500 border-transparent hover:text-gray-800")}>
                   <span className="text-[11px]">{t.icon}</span>
                   <span className="hidden sm:inline">{t.label}</span>
                   {t.id === "approvals" && approvals.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
+                    <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center">{approvals.length}</span>
                   )}
                 </button>
               ))}
             </nav>
             <div className="flex gap-1.5 sm:gap-2 shrink-0">
               <Btn size="sm" variant="ghost" onClick={() => setJobModal(true)} className="hidden md:inline-flex">+ Job</Btn>
-              <Btn size="sm" onClick={() => { setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" }); setLogModal(true); }}>
+              <Btn size="sm" onClick={() => { setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" }); setLogModal(true); }}>
                 <span className="hidden sm:inline">+ Log</span>
                 <span className="sm:hidden">+</span>
               </Btn>
@@ -751,9 +806,9 @@ export default function ManagerTimesheet() {
         {tab === "work" && (
           <div className="flex flex-col gap-4 min-w-0">
             <div className="flex items-center gap-2">
-              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">‹</button>
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 text-[14px] shrink-0 transition-colors">‹</button>
               <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center sm:text-left min-w-0 truncate">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
-              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[14px] shrink-0">›</button>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 text-[14px] shrink-0 transition-colors">›</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 lg:gap-4">
               <StatCard label="This Week" value={fmtDuration(totalWeekMins)} sub={`${prodData?.capacityPercent || Math.round((totalWeekMins / 2400) * 100)}% capacity`} />
@@ -767,7 +822,7 @@ export default function ManagerTimesheet() {
               onEditLog={(log) => { setEditLog(log); setEditForm({ duration_minutes: String(log.duration_minutes), note: log.note || "", reason: "" }); }}
               onDeleteLog={handleDeleteLog} />
             {prodData?.byJob?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Time by Job</div>
                 <div className="flex flex-col gap-2">
                   {prodData.byJob.map((b, i) => (
@@ -782,7 +837,7 @@ export default function ManagerTimesheet() {
                 </div>
               </div>
             )}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
@@ -816,7 +871,7 @@ export default function ManagerTimesheet() {
               <Btn size="sm" onClick={() => setJobModal(true)} className="shrink-0">+ Create Job</Btn>
             </div>
             {createdJobs.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                 <div className="text-3xl mb-2">⬡</div>
                 <div className="font-semibold text-gray-700 mb-3">No jobs created yet</div>
                 <Btn size="sm" onClick={() => setJobModal(true)}>+ Create Job</Btn>
@@ -826,7 +881,7 @@ export default function ManagerTimesheet() {
                 {createdJobs.map((j) => {
                   const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
                   return (
-                    <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/25 hover:shadow-md transition-all shadow-sm min-w-0">
+                    <div key={j._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-[#730042]/40 transition-colors min-w-0">
                       <div className="flex flex-col gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -857,15 +912,14 @@ export default function ManagerTimesheet() {
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
-                          <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
-                          <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
-                            className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
-                            {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
-                              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
-                            ))}
-                          </Sel>
-                          <Btn size="sm" variant="ghost" onClick={() => { if (window.confirm("Archive this job?")) archiveJob.mutate(j._id, { onSuccess: refetchCreated }); }}>Archive</Btn>
-                        </div>
+  <button onClick={() => openEditJob(j)} className="text-[11px] font-semibold rounded-lg px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">Edit</button>
+  <Sel value={j.status} onChange={(e) => updateJobStatus.mutate({ id: j._id, status: e.target.value }, { onSuccess: refetchCreated })}
+    className="text-[11px] py-1 px-2 w-full sm:w-auto sm:min-w-[100px]">
+    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map((s) => (
+      <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+    ))}
+  </Sel>
+</div>
                       </div>
                     </div>
                   );
@@ -877,7 +931,7 @@ export default function ManagerTimesheet() {
               <div className="font-bold text-[16px] sm:text-[17px] text-gray-900 mb-0.5">My Jobs</div>
               <div className="text-[12px] text-gray-400 mb-3">{assignedJobs.length} job{assignedJobs.length !== 1 ? "s" : ""} assigned to you</div>
               {assignedJobs.length === 0 ? (
-                <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4 shadow-sm">
+                <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                   <div className="text-3xl mb-2">📭</div>
                   <div className="font-semibold text-gray-700">No jobs assigned to you</div>
                   <div className="text-[12px] text-gray-400 mt-1">Jobs assigned to you will show up here</div>
@@ -887,7 +941,7 @@ export default function ManagerTimesheet() {
                   {assignedJobs.map((j) => {
                     const pct = j.estimated_hours > 0 ? Math.round((j.logged_hours_cache / j.estimated_hours) * 100) : 0;
                     return (
-                      <div key={j._id} className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/25 hover:shadow-md transition-all shadow-sm min-w-0">
+                      <div key={j._id} className="bg-white border border-gray-200 rounded-lg p-4 hover:border-[#730042]/40 transition-colors min-w-0">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1.5">
                             <span className="font-semibold text-[14px] text-gray-900 break-words">{j.title}</span>
@@ -925,12 +979,12 @@ export default function ManagerTimesheet() {
               <div className="text-[12px] text-gray-400 mt-0.5">{approvals.length} timesheet{approvals.length !== 1 ? "s" : ""} in your queue</div>
             </div>
             {approvals.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                 <div className="text-3xl mb-2">✓</div>
                 <div className="font-semibold text-gray-700">All clear — no pending approvals</div>
               </div>
             ) : approvals.map((ts) => (
-              <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 shadow-sm min-w-0">
+              <div key={ts._id} className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 min-w-0">
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                   <div className="flex gap-3 sm:gap-3.5 min-w-0">
                     <div className="w-10 h-10 bg-[#730042]/[0.08] rounded-xl flex items-center justify-center text-[14px] font-extrabold text-[#730042] shrink-0">
@@ -973,7 +1027,7 @@ export default function ManagerTimesheet() {
               <StatCard label="Idle Jobs" value={idleJobs.length} valueColor={idleJobs.length > 0 ? "text-amber-600" : "text-gray-400"} sub="7+ days no activity" />
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
               <div className="px-4 py-3.5 border-b border-gray-100">
                 <div className="font-semibold text-[14px] text-gray-900">Workload Heatmap</div>
                 <div className="text-[11px] text-gray-400 mt-0.5">Daily capacity (8h = 100%)</div>
@@ -984,7 +1038,7 @@ export default function ManagerTimesheet() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                   <span className="font-semibold text-[14px] text-red-600">⚠ Overrun Risk</span>
                   <Chip color="red" size="xs">{overrunJobs.length}</Chip>
@@ -1001,7 +1055,7 @@ export default function ManagerTimesheet() {
                     </div>
                   ))}
               </div>
-              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                   <span className="font-semibold text-[14px] text-gray-700">💤 Idle Jobs</span>
                   <Chip color="gray" size="xs">{idleJobs.length}</Chip>
@@ -1026,7 +1080,7 @@ export default function ManagerTimesheet() {
           <div className="flex flex-col gap-3 min-w-0">
             <div className="font-bold text-[16px] sm:text-[17px] text-gray-900">My Timesheets</div>
             {timesheets.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center px-4 shadow-sm">
+              <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                 <div className="text-3xl mb-2">▦</div>
                 <div className="font-semibold text-gray-700 mb-3">No timesheets yet</div>
                 <Btn size="sm" onClick={() => setTab("work")}>Go to My Work</Btn>
@@ -1036,7 +1090,7 @@ export default function ManagerTimesheet() {
                 {timesheets.map((ts) => {
                   const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
                   return (
-                    <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+                    <div key={ts._id} className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1.5">
@@ -1061,11 +1115,123 @@ export default function ManagerTimesheet() {
             )}
           </div>
         )}
+
+        {tab === "report" && (
+          <div className="min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
+              <div className="min-w-0">
+                <div className="font-bold text-[16px] sm:text-[17px] text-gray-900">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </div>
+                <p className="text-xs text-gray-400 mt-1 mb-0">
+                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)} · your team only
+                  {reportLoading && " · refreshing…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Weekend
+                  </button>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                <input
+                  type="date"
+                  value={reportWeek}
+                  onChange={(e) => setReportWeek(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                />
+                <Btn size="sm" variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length}>Export CSV</Btn>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-2xl px-4 sm:px-5 py-4 mb-4 shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                <Input label="Department" placeholder="e.g. Engineering" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)} />
+                <Input label="Designation" placeholder="e.g. Software Engineer" value={reportDesignation} onChange={(e) => setReportDesignation(e.target.value)} />
+                <Sel label="Project" value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
+                  <option value="">All Projects</option>
+                  {reportProjectOptions.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </Sel>
+                <Sel label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                  <option value="">All Jobs</option>
+                  {reportJobOptions.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
+                </Sel>
+                <Sel label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </Sel>
+                <Sel label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                  <option value="">All</option>
+                  <option value="true">Billable only</option>
+                  <option value="false">Non-billable only</option>
+                </Sel>
+              </div>
+              {(reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+                <button
+                  onClick={() => { setReportDepartment(""); setReportDesignation(""); setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable(""); }}
+                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+
+            {reportRows.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl px-6 sm:px-8 py-12 sm:py-16 text-center shadow-sm">
+                <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
+                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {reportRows.map((r, i) => (
+                  <div
+                    key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
+                    className={cn("bg-white border border-gray-200 rounded-xl px-3.5 py-3 shadow-sm", (r.day_type === "week_off" || r.day_type === "holiday") && "bg-gray-50/70")}
+                  >
+                    <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
+                      <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
+                      {r.day_type === "week_off" || r.day_type === "holiday" ? (
+                        <Chip color="gray">{r.day_label}</Chip>
+                      ) : (
+                        <StatusBadge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
+                      )}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                    {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                    <div className="flex items-center justify-between flex-wrap gap-1.5">
+                      <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
+                      <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
+                        <span className="text-gray-400">Req {r.required_hours}h</span>
+                        <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">OT {r.overtime_hours}h</span>}
+                      </div>
+                    </div>
+                    {(r.approved_by || r.rejected_by) && (
+                      <div className="text-[11px] text-gray-400 mt-1.5">
+                        {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <button
         onClick={() => setJobModal(true)}
-        className="md:hidden fixed bottom-5 right-4 z-40 w-12 h-12 rounded-full bg-gradient-to-br from-[#730042] to-[#CD166E] text-white shadow-lg shadow-[#730042]/30 flex items-center justify-center text-xl font-bold active:scale-95 transition-transform"
+        className="md:hidden fixed bottom-5 right-4 z-40 w-12 h-12 rounded-full bg-[#730042] text-white shadow-lg flex items-center justify-center text-xl font-bold transition-colors"
         aria-label="Create job"
       >
         ⬡

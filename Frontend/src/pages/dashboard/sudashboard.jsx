@@ -8,7 +8,7 @@ import {
   FaShieldAlt, FaBuilding, FaPhone, FaEnvelope,
   FaIdCard, FaUniversity, FaGlobe, FaBriefcase,
   FaLock, FaUserSlash, FaExclamationTriangle, FaToggleOn,
-  FaCrown, FaMagic,
+  FaCrown, FaMagic, FaHome,
 } from "react-icons/fa";
 
 import { Country, State, City } from "country-state-city";
@@ -27,6 +27,8 @@ import { useGetAllAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin, useRev
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 import NotificationBell from "../../components/notifications/NotificationBell";
+import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 
 const DEPT_OPTIONS = [ "OPR","BPO", "ENG", "HR", "MGMT"];
 export const DEPT_FULL_FORMS = {
@@ -40,6 +42,23 @@ export const DEPT_FULL_FORMS = {
 
 export const getDepartmentName = (dept) =>
   DEPT_FULL_FORMS[dept] || dept || "—";
+
+// Departments are now custom/dynamic per organisation (added from TorchX
+// Management -> Departments). This pulls the live list for the Add/Edit
+// Admin form, falling back to the legacy OPR/BPO/ENG/HR/MGMT list while it
+// loads or if no custom departments have been added yet.
+function useDepartmentOptions() {
+  const { data, isLoading } = useGetAllDepartmentsSuperAdmin();
+  const departments = data?.departments;
+
+  const options =
+    departments && departments.length
+      ? departments.map((d) => ({ value: d.code || d.name, label: d.name }))
+      : DEPT_OPTIONS.map((code) => ({ value: code, label: DEPT_FULL_FORMS[code] }));
+
+  return { options, loading: isLoading };
+}
+
 const ROLE_LABEL = {
   admin: "Admin",
   senior_admin: "Senior Admin",
@@ -165,8 +184,8 @@ const validateForm = (form, isEdit) => {
   if (!form.f_name.trim()) e.f_name = "First name is required";
   else if (!NAME_REGEX_NONEMPTY.test(form.f_name.trim())) e.f_name = "Only letters and spaces are allowed";
 
-  if (!form.l_name.trim()) e.l_name = "Last name is required";
-  else if (!NAME_REGEX_NONEMPTY.test(form.l_name.trim())) e.l_name = "Only letters and spaces are allowed";
+   
+  if (form.l_name.trim() && !NAME_REGEX_NONEMPTY.test(form.l_name.trim())) e.l_name = "Only letters and spaces are allowed";
 
   if (!form.work_email.trim()) e.work_email = "Work email is required";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.work_email)) e.work_email = "Enter a valid email address";
@@ -183,8 +202,9 @@ const validateForm = (form, isEdit) => {
   if (!form.personal_contact.trim()) e.personal_contact = "Personal contact is required";
   else if (!/^[6-9]\d{9}$/.test(form.personal_contact)) e.personal_contact = "Enter a valid 10-digit mobile number";
 
-  if (!form.e_contact.trim()) e.e_contact = "Emergency contact is required";
+   if (!form.e_contact.trim()) e.e_contact = "Emergency contact is required";
   else if (!/^[6-9]\d{9}$/.test(form.e_contact)) e.e_contact = "Enter a valid 10-digit mobile number";
+  else if (form.personal_contact && form.e_contact === form.personal_contact) e.e_contact = "Emergency contact must be different from personal contact";
 
   if (!form.designation.trim()) e.designation = "Designation is required";
   if (!form.department) e.department = "Department is required";
@@ -438,9 +458,15 @@ function PermissionEditor({ permissions, onChange }) {
 function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [step, setStep] = useState(1);
+  const [noticePeriodAllowed, setNoticePeriodAllowed] = useState(null);
+  const [noticePeriodMonths, setNoticePeriodMonths] = useState("");
+  const [lastWorkingDay, setLastWorkingDay] = useState("");
 
   useEffect(() => {
-    if (open) { setSelectedStatus(""); setStep(1); }
+    if (open) {
+      setSelectedStatus(""); setStep(1);
+      setNoticePeriodAllowed(null); setNoticePeriodMonths(""); setLastWorkingDay("");
+    }
   }, [open]);
 
   if (!open || !admin) return null;
@@ -450,11 +476,29 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
 
   const handleNext = () => {
     if (!selectedStatus) return;
+    setStep("noticeAsk");
+  };
+
+  const handleNoticeChoice = (allowed) => {
+    setNoticePeriodAllowed(allowed);
+    setStep(allowed ? "noticeDetails" : 2);
+  };
+
+  const handleNoticeDetailsContinue = () => {
+    if (!noticePeriodMonths || !lastWorkingDay) return;
     setStep(2);
   };
 
   const handleConfirm = () => {
-    onConfirm({ id: admin._id, working_status: selectedStatus });
+    onConfirm({
+      id: admin._id,
+      working_status: selectedStatus,
+      ...(noticePeriodAllowed ? {
+        noticePeriodAllowed: true,
+        noticePeriodMonths: Number(noticePeriodMonths),
+        lastWorkingDay,
+      } : {}),
+    });
   };
 
   return (
@@ -503,6 +547,59 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
             </>
           )}
 
+          {step === "noticeAsk" && (
+            <>
+              <p className="text-[13px] font-bold text-[#0d0209] mb-1">Does your company allow a notice period?</p>
+              <p className="text-[12px] text-[#7a5568] mb-4 leading-relaxed">
+                Choose <strong>Yes</strong> to run a notice period first (normal payroll continues) before marking{" "}
+                <strong>{name}</strong> as <strong style={{ color: meta.color }}>{meta.label}</strong>, or <strong>No</strong> to mark them {meta.label} right away.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNoticeChoice(false)}
+                  className="flex-1 px-3 py-3 rounded-xl border-2 border-[#e8d5e2] text-[13px] font-semibold text-[#0d0209] hover:border-[#730042] transition-all"
+                >
+                  No, direct {meta.label}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNoticeChoice(true)}
+                  className="flex-1 px-3 py-3 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] transition-all"
+                >
+                  Yes, notice period
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "noticeDetails" && (
+            <>
+              <p className="text-[13px] font-bold text-[#0d0209] mb-3">Notice period details</p>
+              <label className="block text-[11px] font-semibold text-[#7a5568] mb-1">Notice period (months)</label>
+              <input
+                type="number"
+                min="1"
+                value={noticePeriodMonths}
+                onChange={(e) => setNoticePeriodMonths(e.target.value)}
+                placeholder="e.g. 3"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] mb-3 focus:outline-none focus:border-[#730042]"
+              />
+              <label className="block text-[11px] font-semibold text-[#7a5568] mb-1">Last working day (notice period end date)</label>
+              <input
+                type="date"
+                value={lastWorkingDay}
+                onChange={(e) => setLastWorkingDay(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] mb-3 focus:outline-none focus:border-[#730042]"
+              />
+              <p className="text-[11px] text-[#7a5568] leading-relaxed">
+                {name} stays <strong>Working</strong> and gets normal payroll till this date. On this date the system
+                will automatically mark them <strong style={{ color: meta.color }}>{meta.label}</strong> and generate
+                their Full &amp; Final settlement for that last month.
+              </p>
+            </>
+          )}
+
           {step === 2 && (
             <>
               <div className="flex items-start gap-3 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl mb-4 sm:mb-5">
@@ -526,13 +623,23 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
                   </span>
                 </div>
               </div>
+              {noticePeriodAllowed && (
+                <p className="text-[11px] text-red-700 mt-2 font-medium">
+                  Notice period: {noticePeriodMonths} month(s), last working day {new Date(lastWorkingDay).toDateString()}.
+                </p>
+              )}
             </>
           )}
         </div>
 
         <div className="px-4 sm:px-6 pb-4 sm:pb-5 flex gap-2 sm:gap-3">
           <button
-            onClick={step === 1 ? onClose : () => setStep(1)}
+            onClick={
+              step === 1 ? onClose
+              : step === "noticeAsk" ? () => setStep(1)
+              : step === "noticeDetails" ? () => setStep("noticeAsk")
+              : () => setStep(noticePeriodAllowed ? "noticeDetails" : "noticeAsk")
+            }
             className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl border border-[#e8d5e2] text-[13px] font-medium text-[#7a5568] hover:border-[#730042] hover:text-[#730042] transition-colors min-h-[44px]"
           >
             {step === 1 ? "Cancel" : "Back"}
@@ -545,6 +652,21 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
             >
               Continue <FaChevronRight size={9} />
             </button>
+          ) : step === "noticeDetails" ? (
+            <button
+              onClick={handleNoticeDetailsContinue}
+              disabled={!noticePeriodMonths || !lastWorkingDay}
+              className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-[#730042] text-white text-[13px] font-semibold hover:bg-[#4a0029] active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+            >
+              Continue <FaChevronRight size={9} />
+            </button>
+          ) : step === "noticeAsk" ? (
+            <button
+              disabled
+              className="flex-1 px-3 sm:px-5 py-2.5 rounded-xl bg-[#f3e6ee] text-[#c499b4] text-[13px] font-semibold min-h-[44px] cursor-not-allowed"
+            >
+              Choose above
+            </button>
           ) : (
             <button
               onClick={handleConfirm}
@@ -552,7 +674,7 @@ function WorkingStatusModal({ open, onClose, admin, onConfirm, loading }) {
               className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl bg-red-600 text-white text-[13px] font-semibold hover:bg-red-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               <FaCheck size={10} />
-              {loading ? "Updating…" : "Confirm"}
+              {loading ? "Updating…" : noticePeriodAllowed ? "Start Notice Period" : "Confirm"}
             </button>
           )}
         </div>
@@ -652,6 +774,7 @@ function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
 }
 
 function AdminModal({ open, onClose, initial, onSave, loading }) {
+  const { options: deptOptions } = useDepartmentOptions();
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -930,7 +1053,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               <FieldErr msg={showErr("f_name")} />
             </div>
             <div>
-              <FLabel required>Last Name</FLabel>
+              <FLabel>Last Name</FLabel>
               <FInput placeholder="e.g. Sharma" value={form.l_name} onChange={setFiltered("l_name", NAME_REGEX)} onBlur={blur("l_name")} err={showErr("l_name")} />
               <FieldErr msg={showErr("l_name")} />
             </div>
@@ -1032,8 +1155,8 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
             <FLabel required>Department</FLabel>
             <FSel value={form.department} onChange={set("department")} onBlur={blur("department")} err={showErr("department")}>
   <option value="">Select department</option>
-  {DEPT_OPTIONS.map((d) => (
-    <option key={d} value={d}>{DEPT_FULL_FORMS[d] || d}</option>
+  {deptOptions.map((d) => (
+    <option key={d.value} value={d.value}>{d.label}</option>
   ))}
 </FSel>
             <FieldErr msg={showErr("department")} />
@@ -1412,7 +1535,7 @@ const AttendanceMap = ({ checkins = [], loading }) => {
       const L = window.L;
       const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 80.0], 5);
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { attribution: "© CARTO", maxZoom: 18 }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_2rmj_1_70182d7daf2ea5f395d53791', { attribution: '© OpenStreetMap, © CARTO', subdomains: 'abcd', maxZoom: 20 }).addTo(map);
       instRef.current = map;
     })();
     return () => { alive = false; };
@@ -1595,6 +1718,7 @@ function SuperAdminDashboard() {
   const [empExpand, setEmpExpand] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
   const [attendanceDetailsOpen, setAttendanceDetailsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("overview"); // "overview" | "analytics"
 
   useEffect(() => {
     const REFRESH_FLAG_KEY = "dashboardAutoRefreshed";
@@ -1774,6 +1898,49 @@ function SuperAdminDashboard() {
     return "bg-[#f7ecf3] text-[#730042] border border-[#e8d5e2]";
   };
 
+  // Top-right pill switch shown in both views so the super admin can hop
+  // between the day-to-day overview and the data-heavy analytics dashboard
+  // without leaving the page.
+  const ViewToggle = () => (
+    <div className="flex gap-1 bg-white border border-[#ede5e0] rounded-full p-1 shadow-sm">
+      <button
+        onClick={() => setViewMode("overview")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "overview" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaHome size={10} /> Overview
+      </button>
+      <button
+        onClick={() => setViewMode("analytics")}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full transition-colors ${
+          viewMode === "analytics" ? "bg-[#730042] text-white" : "text-[#8a6f68] hover:text-[#730042]"
+        }`}
+      >
+        <FaChartBar size={10} /> Analytics
+      </button>
+    </div>
+  );
+
+  if (viewMode === "analytics") {
+    return (
+      <div className="min-h-screen bg-[#fdf5f9] p-3 sm:p-5 lg:p-7 font-[system-ui,sans-serif] text-[#0d0209]">
+        <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold m-0 tracking-tight" style={{ fontFamily: "'Lora',serif" }}>
+              Analytics
+            </h1>
+            <p className="text-[12px] text-[#8a6f68] mt-0.5">
+              Organisation-wide insights across attendance, leave, payroll & more
+            </p>
+          </div>
+          <ViewToggle />
+        </div>
+        <AnalyticsDashboard role="superadmin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fdf5f9] p-3 sm:p-5 lg:p-7 font-[system-ui,sans-serif] text-[#0d0209]">
       <style>{`
@@ -1801,6 +1968,7 @@ function SuperAdminDashboard() {
               <p className="text-xs sm:text-sm text-white/60 max-w-lg leading-relaxed mb-4 sm:mb-5">"{thought}"</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0 mt-1">
+              <ViewToggle />
               <div className="bg-white rounded-full shadow-md">
                 <NotificationBell />
               </div>
@@ -1823,6 +1991,9 @@ function SuperAdminDashboard() {
           </div>
 
           <div className="flex sm:hidden gap-2 mt-3 items-center">
+            <div className="flex-shrink-0">
+              <ViewToggle />
+            </div>
             <div className="bg-white rounded-full shadow-md flex-shrink-0">
               <NotificationBell />
             </div>

@@ -12,7 +12,7 @@ const leavebalanceModel = require("../Models/leavebalance.model");
 const reviewModel = require("../Models/review.model");
 const Attendance = require("../Models/attendance.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
-const { computeTaskSubmission, computeBehaviour, computeAttendance, computeOverall } = require("../utils/reviewScoring.utils");
+const { buildReviewFields, createReviewOrThrow, hrAcknowledgeReview } = require("../utils/reviewWorkflow.utils");
 const { startOfDay } = require("../automatic/weekoffcalendar");
 const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
@@ -26,7 +26,7 @@ const PermissionModel = require("../Models/permission.model");
 const Document = require("../Models/document.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const AdminLeave = require("../Models/adleave.model");
-const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/licenseCheck");
+const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = require("../utils/Licensecheck");
 const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
@@ -1128,7 +1128,7 @@ const updateAdmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Admin not found"), { statusCode: 404 }),
     );
-  ["f_name", "l_name", "phone", "gender", "designation", "profile_image"].forEach(
+  ["f_name", "l_name", "phone", "gender", "designation", "profile_image", "department", "office_location"].forEach(
     (field) => {
       if (req.body[field] !== undefined) admin[field] = req.body[field];
     },
@@ -1145,6 +1145,8 @@ const updateAdmin = async (req, res, next) => {
       phone: admin.phone,
       gender: admin.gender,
       designation: admin.designation,
+      department: admin.department,
+      office_location: admin.office_location,
       status: admin.status,
     },
   });
@@ -1765,100 +1767,103 @@ const deleteAnnouncement = async (req, res, next) => {
 };
 
 const reviewtoadmin = async (req, res, next) => {
-  const { adminid, assignedDays, actualDays, behaviourScore, comment } = req.body;
+  const { adminid } = req.body;
   const organisation_id = req.superAdmin._id;
 
-  if (!adminid || !assignedDays || !actualDays || behaviourScore === undefined || behaviourScore === null)
-    return next(
-      Object.assign(new Error("adminid, assignedDays, actualDays and behaviourScore are required"), {
-        statusCode: 400,
-      }),
-    );
+  if (!adminid)
+    return next(Object.assign(new Error("adminid is required"), { statusCode: 400 }));
 
-  const admin = await AdminModel.findOne({
-    _id: adminid,
-    organisation_id,
-  })
-    .select("role")
+  const admin = await AdminModel.findOne({ _id: adminid, organisation_id })
+    .select("role designation department")
     .lean();
   if (!admin)
     return next(
-      Object.assign(
-        new Error("Admin not found or does not belong to your organisation"),
-        { statusCode: 404 },
-      ),
-    );
-
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
-  const monthYear = `${year}-${String(month).padStart(2, "0")}`;
-
-  const existingreview = await Review.findOne({
-    organisation_id,
-    reviewer: req.superAdmin._id,
-    reviewee: adminid,
-    monthYear,
-  })
-    .select("_id")
-    .lean();
-  if (existingreview)
-    return next(
-      Object.assign(
-        new Error("You have already reviewed this admin this month."),
-        { statusCode: 400 },
-      ),
+      Object.assign(new Error("Admin not found or does not belong to your organisation"), { statusCode: 404 }),
     );
 
   try {
-    const taskSubmission = computeTaskSubmission(assignedDays, actualDays);
-    const behaviourEthics = computeBehaviour(behaviourScore);
+    const fields = buildReviewFields(req.body);
 
-    const summary = await AttendanceSummary.findOne({
-      employee: adminid,
-      role: "admin",
-      month,
-      year,
-    }).lean();
-    const attendance = computeAttendance({
-      presentDays: summary?.presentDays ?? 0,
-      halfDays: summary?.halfDays ?? 0,
-      absentDays: summary?.absentDays ?? 0,
-    });
+    const review = await createReviewOrThrow(
+      Review,
+      {
+        organisation_id,
+        reviewerRole: "super_admin",
+        reviewer: req.superAdmin._id,
+        reviewerRoleModel: "SuperAdmin",
+        revieweeRole: admin.role || "admin",
+        reviewee: adminid,
+        revieweeRoleModel: "Admin",
+        revieweeDepartment: fields.revieweeDepartment || admin.department || "",
+        revieweeDesignation: fields.revieweeDesignation || admin.designation || "",
+        ...fields,
+      },
+      "You have already reviewed this admin this month."
+    );
 
-    const overall = computeOverall({
-      taskScore: taskSubmission.score,
-      behaviourScore: behaviourEthics.score,
-      attendanceScore: attendance.score,
-    });
-
-    const review = await Review.create({
-      organisation_id,
-      reviewerRole: "super_admin",
-      reviewer: req.superAdmin._id,
-      reviewerRoleModel: "SuperAdmin",
-      revieweeRole: "admin",
-      reviewee: adminid,
-      revieweeRoleModel: "Admin",
-      taskSubmission,
-      behaviourEthics,
-      attendance,
-      overallScore: overall.score,
-      overallRating: overall.rating,
-      comment: comment || "",
-      monthYear,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Review submitted successfully",
-      review,
-    });
+    res.status(201).json({ success: true, message: "Review submitted successfully", review });
   } catch (err) {
-    if (err.code === 11000)
-      return next(
-        Object.assign(new Error("You have already reviewed this admin this month."), { statusCode: 400 }),
-      );
+    next(err);
+  }
+};
+
+// SuperAdmin grants/revokes the HR flag on an Admin. Any number of Admins
+// can hold isHR = true; each one can independently give the final HR
+// acknowledgement on any review in the organisation.
+const setAdminHRRole = async (req, res, next) => {
+  const { adminid, isHR } = req.body;
+  const organisation_id = req.superAdmin._id;
+
+  if (!adminid || typeof isHR !== "boolean")
+    return next(Object.assign(new Error("adminid and isHR (boolean) are required"), { statusCode: 400 }));
+
+  const admin = await AdminModel.findOneAndUpdate(
+    { _id: adminid, organisation_id },
+    { $set: { isHR } },
+    { new: true }
+  ).select("f_name l_name work_email role designation isHR");
+
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found or does not belong to your organisation"), { statusCode: 404 }),
+    );
+
+  res.status(200).json({
+    success: true,
+    message: isHR ? "Admin granted HR approval rights" : "Admin's HR approval rights revoked",
+    admin,
+  });
+};
+
+// List every Admin currently flagged as HR — for the SuperAdmin's HR
+// management screen and for other UIs that need to show "who can approve".
+const getHRAdmins = async (req, res, next) => {
+  const organisation_id = req.superAdmin._id;
+  const admins = await AdminModel.find({ organisation_id, isHR: true })
+    .select("f_name l_name work_email role designation department isHR")
+    .lean();
+  res.status(200).json({ success: true, count: admins.length, admins });
+};
+
+// SuperAdmin owns the organisation, so it can also give the final review
+// acknowledgement directly (equivalent to an HR admin's approval), without
+// needing to be flagged isHR itself.
+const superAdminAcknowledgeReview = async (req, res, next) => {
+  const { reviewId, decision, comment } = req.body;
+  if (!reviewId)
+    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+
+  try {
+    const review = await hrAcknowledgeReview(Review, {
+      reviewId,
+      hrAdminId: req.superAdmin._id,
+      hrAdminModel: "SuperAdmin",
+      organisation_id: req.superAdmin._id,
+      decision,
+      comment,
+    });
+    res.status(200).json({ success: true, message: `Review ${decision}`, review });
+  } catch (err) {
     next(err);
   }
 };
@@ -2618,7 +2623,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
     const { id } = req.params;
-    const { working_status } = req.body;
+    const { working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay } = req.body;
     const organisation_id = req.superAdmin._id;
 
     if (!working_status)
@@ -2639,6 +2644,37 @@ const setAdminWorkingStatus = async (req, res, next) => {
 
     if (!existingAdmin)
       return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+    if (working_status !== "working" && noticePeriodAllowed) {
+      if (!noticePeriodMonths || !lastWorkingDay)
+        return next(Object.assign(new Error("noticePeriodMonths and lastWorkingDay are required when noticePeriodAllowed is true"), { statusCode: 400 }));
+
+      const updated = await AdminModel.findOneAndUpdate(
+        { _id: id, organisation_id },
+        {
+          $set: {
+            noticePeriod: {
+              active: true,
+              exitType: working_status,
+              months: Number(noticePeriodMonths),
+              initiatedOn: new Date(),
+              lastWorkingDay: new Date(lastWorkingDay),
+              initiatedBy: req.superAdmin._id,
+              initiatedByModel: "SuperAdmin",
+            },
+          },
+        },
+        { new: true, runValidators: true }
+      )
+        .select("_id uid f_name l_name work_email role department designation working_status status noticePeriod")
+        .lean();
+
+      return res.status(200).json({
+        success: true,
+        message: `Notice period started. ${existingAdmin.f_name} ${existingAdmin.l_name} will be marked '${working_status}' automatically on ${new Date(lastWorkingDay).toDateString()}.`,
+        admin: updated,
+      });
+    }
 
     if (working_status !== "working") {
       const pendingAssets = await AssetModel.find({
@@ -2669,6 +2705,7 @@ const setAdminWorkingStatus = async (req, res, next) => {
       {
         $set: {
           working_status,
+          "noticePeriod.active": false,
           ...(working_status !== "working" && { status: "inactive" }),
           ...(working_status === "working" && { status: "active" }),
         },
@@ -2889,6 +2926,9 @@ module.exports = {
   deleteAnnouncement,
   reviewtoadmin,
   getAllReviewsForSuperAdmin,
+  setAdminHRRole,
+  getHRAdmins,
+  superAdminAcknowledgeReview,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
@@ -2904,4 +2944,4 @@ module.exports = {
   getLeavePolicy,
   setLeavePolicy,
   getperticularadmin
-};
+};  

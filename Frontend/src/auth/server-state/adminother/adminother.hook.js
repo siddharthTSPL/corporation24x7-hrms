@@ -7,7 +7,8 @@ import {
   promoteEmployeeToAdmin, promoteManagerToAdmin, getTodayLeaves,
   getAllPersonalDocuments, getAllExpenseDocuments, getDocumentDetails,
   adminActionOnLeave, setEmployeeWorkingStatus, setManagerWorkingStatus,
-  getInactiveUsers, getActiveUserCount, getAllAdmins, getAttendanceHistory
+  getInactiveUsers, getActiveUserCount, getAllAdmins, getAttendanceHistory,
+  respondToMyReviewAsAdmin, hrAcknowledgeReview
 } from "../../api/adminapi/other/ad.other.api";
 
 export const useGetAllEmployee = () => {
@@ -192,6 +193,26 @@ export const useGetAllReviews = (params = {}) => {
   });
 };
 
+export const useRespondToMyReviewAsAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: respondToMyReviewAsAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+};
+
+export const useHrAcknowledgeReview = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: hrAcknowledgeReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allReviews"] });
+    },
+  });
+};
+
 export const useGetEmployeeStats = () => {
   return useQuery({
     queryKey: ["employeeStats"],
@@ -306,7 +327,7 @@ export const useAdminActionOnLeave = () => {
 export const useSetEmployeeWorkingStatus = (id) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (working_status) => setEmployeeWorkingStatus(id, working_status),
+    mutationFn: (payload) => setEmployeeWorkingStatus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["employee", id] });
@@ -319,7 +340,7 @@ export const useSetEmployeeWorkingStatus = (id) => {
 export const useSetManagerWorkingStatus = (id) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (working_status) => setManagerWorkingStatus(id, working_status),
+    mutationFn: (payload) => setManagerWorkingStatus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["managers"] });

@@ -20,12 +20,16 @@ import {
   useJobById,
 } from "../../auth/server-state/timesheet/timesheet.hook";
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -81,9 +85,9 @@ const PRIORITY_META = {
 };
 
 const TABS = [
-  { id: "work",       label: "My Work",   icon: "◷" },
-  { id: "jobs",       label: "My Jobs",   icon: "⬡" },
-  { id: "timesheets", label: "Timesheets",icon: "◈" },
+  { id: "work",       label: "My Work",  },
+  { id: "jobs",       label: "My Jobs",  },
+  { id: "timesheets", label: "Timesheets", },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -91,7 +95,7 @@ function cn(...args) { return args.filter(Boolean).join(" "); }
 function StatusBadge({ status }) {
   const m = STATUS_META[status] || STATUS_META.draft;
   return (
-    <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold", m.color, m.bg)}>
+    <span className={cn("inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-bold", m.color, m.bg)}>
       <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", m.dot)} />
       {m.label}
     </span>
@@ -100,18 +104,18 @@ function StatusBadge({ status }) {
 
 function Chip({ children, color = "gray", size = "sm" }) {
   const colors = {
-    gray:    "text-gray-500 bg-gray-100",
-    amber:   "text-amber-600 bg-amber-50",
-    red:     "text-red-600 bg-red-50",
-    green:   "text-emerald-600 bg-emerald-50",
-    blue:    "text-blue-600 bg-blue-50",
-    brand:   "text-[#730042] bg-[#730042]/10",
-    purple:  "text-purple-600 bg-purple-50",
+    gray:    "text-gray-600 bg-gray-100",
+    amber:   "text-amber-700 bg-amber-50",
+    red:     "text-red-700 bg-red-50",
+    green:   "text-emerald-700 bg-emerald-50",
+    blue:    "text-blue-700 bg-blue-50",
+    brand:   "text-[#730042] bg-[#730042]/[0.08]",
+    purple:  "text-purple-700 bg-purple-50",
   };
   return (
     <span className={cn(
-      "inline-flex items-center rounded-md font-semibold whitespace-nowrap",
-      size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-0.5",
+      "inline-flex items-center rounded-md font-bold whitespace-nowrap",
+      size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-[11px] px-2 py-1",
       colors[color] || colors.gray
     )}>
       {children}
@@ -121,16 +125,16 @@ function Chip({ children, color = "gray", size = "sm" }) {
 
 function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "", size = "md" }) {
   const base = cn(
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-all whitespace-nowrap",
+    "inline-flex items-center justify-center gap-1.5 rounded-md font-semibold transition-colors whitespace-nowrap",
     "disabled:opacity-50 disabled:cursor-not-allowed",
     size === "sm" ? "text-[12px] px-3 py-1.5 min-h-[34px]" : "text-[13px] px-4 py-2 min-h-[40px]"
   );
   const variants = {
-    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white shadow-sm hover:shadow-md hover:brightness-110",
-    ghost:   "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",
-    danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
-    success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
-    amber:   "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100",
+    primary: "bg-[#730042] text-white hover:bg-[#5c0034]",
+    ghost:   "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
+    danger:  "bg-white text-red-600 border border-red-300 hover:bg-red-50",
+    success: "bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50",
+    amber:   "bg-white text-amber-600 border border-amber-300 hover:bg-amber-50",
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={cn(base, variants[variant], className)}>
@@ -141,15 +145,15 @@ function Btn({ children, variant = "primary", onClick, disabled, type = "button"
 
 function Input({ label, error, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+    <div className="flex flex-col gap-1.5 min-w-0">
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       <input
         {...props}
         className={cn(
-          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
-          "focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all",
-          "placeholder:text-gray-300",
-          error && "border-red-300",
+          "bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
+          "focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors",
+          "placeholder:text-gray-400",
+          error && "border-red-400",
           className
         )}
       />
@@ -160,13 +164,13 @@ function Input({ label, error, className = "", ...props }) {
 
 function Select({ label, children, className = "", ...props }) {
   return (
-    <div className="flex flex-col gap-1 min-w-0">
-      {label && <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{label}</label>}
+    <div className="flex flex-col gap-1.5 min-w-0">
+      {label && <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{label}</label>}
       <select
         {...props}
         className={cn(
-          "bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
-          "focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-all appearance-none cursor-pointer",
+          "bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-900 outline-none w-full min-w-0",
+          "focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors appearance-none cursor-pointer",
           className
         )}
       >
@@ -186,15 +190,15 @@ function Modal({ open, onClose, title, children, width = "max-w-[500px]" }) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/45 backdrop-blur-sm p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/45 p-0 sm:p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className={cn("bg-white rounded-t-2xl sm:rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] min-w-0", width)}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+      <div className={cn("bg-white rounded-t-xl sm:rounded-xl w-full shadow-xl flex flex-col max-h-[90vh] min-w-0", width)}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">
           <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none shrink-0"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-lg leading-none shrink-0"
           >×</button>
         </div>
         <div className="p-5 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
@@ -357,12 +361,12 @@ function TimerSection({ assignedJobs, onTimerLog }) {
   return (
     <>
       <div className={cn(
-        "rounded-2xl overflow-hidden border transition-all min-w-0",
+        "rounded-lg overflow-hidden border transition-colors min-w-0",
         isRunning
-          ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#CD166E] shadow-md shadow-[#730042]/15"
+          ? "border-[#730042] bg-[#730042]"
           : isPaused
           ? "border-amber-200 bg-amber-50"
-          : "border-gray-200 bg-white shadow-sm"
+          : "border-gray-200 bg-white"
       )}>
         <div className="px-4 py-3 flex items-center gap-2.5 min-w-0">
           {isRunning && (
@@ -504,10 +508,10 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
     d.setDate(d.getDate() + i);
     return d;
   });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayISTKey();
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm min-w-0">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
       {/* Mobile: stacked day list — sized to the viewport, never scrolls sideways */}
       <div className="flex flex-col divide-y divide-gray-100 sm:hidden">
         {days.map((d, i) => {
@@ -645,11 +649,13 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
 }
 
 function StatCard({ label, value, sub, valueColor = "text-[#730042]" }) {
+  const barColor = valueColor.replace("text-", "bg-");
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl px-3 sm:px-4 py-3.5 sm:py-4 min-w-0 shadow-sm">
-      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5 truncate">{label}</div>
-      <div className={cn("text-lg sm:text-2xl font-extrabold leading-none truncate", valueColor)}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1 truncate">{sub}</div>}
+    <div className="relative overflow-hidden bg-white border border-gray-200 rounded-lg pl-4 pr-3 sm:pl-4 sm:pr-4 py-3.5 sm:py-4 min-w-0">
+      <span className={cn("absolute top-0 left-0 h-full w-[3px]", barColor)} />
+      <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 truncate">{label}</div>
+      <div className={cn("text-lg sm:text-2xl font-bold tracking-tight leading-none truncate", valueColor)}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[11px] text-gray-400 mt-1.5 truncate">{sub}</div>}
     </div>
   );
 }
@@ -658,7 +664,7 @@ export default function EmployeeTimesheet() {
   const [tab, setTab] = useState("work");
   const [weekStart, setWeekStart] = useState(getMonday());
   const [logModal, setLogModal] = useState(false);
-  const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [logDate, setLogDate] = useState(todayISTKey());
   const [logForm, setLogForm] = useState({ job: "", log_date: "", duration_minutes: "", note: "" });
   const [editLog, setEditLog] = useState(null);
   const [editForm, setEditForm] = useState({ duration_minutes: "", note: "", reason: "" });
@@ -771,27 +777,27 @@ export default function EmployeeTimesheet() {
   const rootRef = useRef(null);
 
   return (
-    <div ref={rootRef} className="min-h-screen w-full bg-[#F9F8F2] overflow-x-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+    <div ref={rootRef} className="min-h-screen w-full max-w-full bg-gray-50 overflow-x-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 min-w-0 max-w-full overflow-hidden">
         <div className={CONTAINER}>
-          <div className="flex items-center h-14 gap-2 sm:gap-4">
+          <div className="flex items-center h-14 gap-2 sm:gap-4 min-w-0 max-w-full">
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shadow-sm">
+              <div className="w-7 h-7 rounded-md bg-[#730042] flex items-center justify-center">
                 <span className="text-white text-[11px] font-black">T</span>
               </div>
-              <span className="font-bold text-[14px] text-gray-900 hidden sm:block">TorchX Timesheet</span>
+              <span className="font-bold text-[14px] text-gray-900 hidden sm:block tracking-tight">TorchX Timesheet</span>
             </div>
 
-            <nav className="flex items-center gap-0.5 flex-1 min-w-0">
+            <nav className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 overflow-x-auto no-scrollbar h-full">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-[12px] sm:text-[13px] font-medium transition-all whitespace-nowrap shrink-0",
+                    "flex items-center gap-1.5 h-full px-0.5 border-b-2 text-[12px] sm:text-[13px] font-medium transition-colors whitespace-nowrap shrink-0",
                     tab === t.id
-                      ? "bg-[#730042]/10 text-[#730042] font-semibold"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "text-[#730042] font-bold border-[#730042]"
+                      : "text-gray-500 border-transparent hover:text-gray-800"
                   )}
                 >
                   <span className="text-[11px] sm:text-[12px]">{t.icon}</span>
@@ -803,17 +809,17 @@ export default function EmployeeTimesheet() {
 
             <div className="shrink-0 flex items-center gap-2">
               {tab === "work" && (
-                <div className="hidden sm:flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5">
-                  <button onClick={() => shiftWeek(-1)} className="text-gray-500 hover:text-gray-900 text-[15px] leading-none">‹</button>
+                <div className="hidden sm:flex items-center gap-1.5 bg-white border border-gray-300 rounded-md px-2.5 py-1.5">
+                  <button onClick={() => shiftWeek(-1)} className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-[15px] leading-none transition-colors">‹</button>
                   <span className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">
                     {fmtShort(weekStart)} – {fmtShort(weekEnd)}
                   </span>
-                  <button onClick={() => shiftWeek(1)} className="text-gray-500 hover:text-gray-900 text-[15px] leading-none">›</button>
+                  <button onClick={() => shiftWeek(1)} className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-[15px] leading-none transition-colors">›</button>
                 </div>
               )}
               <Btn
                 size="sm"
-                onClick={() => openAddLog(new Date().toISOString().slice(0, 10))}
+                onClick={() => openAddLog(todayISTKey())}
               >
                 <span className="hidden sm:inline">+ Log Time</span>
                 <span className="sm:hidden">+ Log</span>
@@ -828,11 +834,11 @@ export default function EmployeeTimesheet() {
         {tab === "work" && (
           <div className="flex flex-col gap-4 min-w-0">
             <div className="flex items-center gap-2 sm:hidden">
-              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px] shrink-0">‹</button>
+              <button onClick={() => shiftWeek(-1)} className="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 text-[15px] shrink-0 transition-colors">‹</button>
               <span className="text-[13px] font-semibold text-gray-700 flex-1 text-center min-w-0 truncate">
                 {fmtShort(weekStart)} – {fmtShort(weekEnd)}
               </span>
-              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-500 hover:text-gray-900 text-[15px] shrink-0">›</button>
+              <button onClick={() => shiftWeek(1)} className="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 text-[15px] shrink-0 transition-colors">›</button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
@@ -876,7 +882,7 @@ export default function EmployeeTimesheet() {
             />
 
             {prodData?.byJob?.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+              <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-3">Time by Job</div>
                 <div className="flex flex-col gap-2">
                   {prodData.byJob.map((b, i) => (
@@ -895,7 +901,7 @@ export default function EmployeeTimesheet() {
               </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">
@@ -947,7 +953,7 @@ export default function EmployeeTimesheet() {
             </div>
 
             {assignedJobs.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center shadow-sm px-4">
+              <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                 <div className="text-3xl mb-2">⬡</div>
                 <div className="font-semibold text-gray-700 mb-1">No jobs assigned yet</div>
                 <div className="text-[12px] text-gray-400">Jobs assigned to you will appear here</div>
@@ -962,7 +968,7 @@ export default function EmployeeTimesheet() {
                 return (
                   <div
                     key={job._id}
-                    className="bg-white border border-gray-200 rounded-2xl p-4 hover:border-[#730042]/25 hover:shadow-md transition-all shadow-sm min-w-0"
+                    className="bg-white border border-gray-200 rounded-lg p-4 hover:border-[#730042]/40 transition-colors min-w-0"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
                       <div className="flex-1 min-w-0">
@@ -1020,7 +1026,7 @@ export default function EmployeeTimesheet() {
                           View
                         </Btn>
                         {!["completed", "cancelled"].includes(job.status) && (
-                          <Btn size="sm" onClick={() => openAddLog(new Date().toISOString().slice(0, 10))}>
+                          <Btn size="sm" onClick={() => openAddLog(todayISTKey())}>
                             + Log
                           </Btn>
                         )}
@@ -1038,7 +1044,7 @@ export default function EmployeeTimesheet() {
             <div className="font-bold text-[17px] text-gray-900">My Timesheets</div>
 
             {timesheets.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl py-12 text-center shadow-sm px-4">
+              <div className="bg-white border border-gray-200 rounded-lg py-12 text-center px-4">
                 <div className="text-3xl mb-2">◈</div>
                 <div className="font-semibold text-gray-700 mb-1">No timesheets yet</div>
                 <div className="text-[12px] text-gray-400">Log time and submit a week to see timesheets</div>
@@ -1048,7 +1054,7 @@ export default function EmployeeTimesheet() {
               timesheets.map((ts) => {
                 const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
                 return (
-                  <div key={ts._id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm min-w-0">
+                  <div key={ts._id} className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">

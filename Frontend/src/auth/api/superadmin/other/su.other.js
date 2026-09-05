@@ -16,6 +16,16 @@ export const getAllReviews = async (params = {}) => {
   return res.data;
 };
 
+export const setAdminHRRole = async (data) => {
+  const res = await api.post("superadmin/set-hr-role", data);
+  return res.data;
+};
+
+export const superAdminAcknowledgeReview = async (data) => {
+  const res = await api.post("superadmin/review/acknowledge", data);
+  return res.data;
+};
+
 export const getTodayCheckins = async () => {
   const res = await api.get("superadmin/getTodayCheckins");
   return res.data;
@@ -168,8 +178,8 @@ export const updatePermissions = async ({ id, data }) => {
 };
 
 
-export const setAdminWorkingStatus = async (id, working_status) => {
-  const res = await api.patch(`superadmin/admin/${id}/working-status`, { working_status });
+export const setAdminWorkingStatus = async (id, working_status, extra = {}) => {
+  const res = await api.patch(`superadmin/admin/${id}/working-status`, { working_status, ...extra });
   return res.data;
 };
 

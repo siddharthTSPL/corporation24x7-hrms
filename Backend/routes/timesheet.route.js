@@ -6,37 +6,32 @@ const superAdminAuth = require("../middleware/auth/superadmin.middleware");
 const adminAuth = require("../middleware/auth/admin.middleware");
 const managerAuth = require("../middleware/auth/manager.middleware");
 const employeeAuth = require("../middleware/auth/employee.middleware");
+const anyRoleBase = require("../middleware/auth/Planfeatureanyrole.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const jwt = require("jsonwebtoken");
 
-// ─── role-detection middlewares ───────────────────────────────────────────────
+// Timesheet is one of the three plan-gated features (locked fully on the
+// Basic plan; open on Advance/enterprise, or during the free trial). This
+// runs after auth so req.superAdmin/req.admin/req.manager/req.employee is
+// already populated.
+const timesheetPlanGate = restrictPlanFeature("timesheet");
 
-// Accepts any authenticated role (SA / Admin / Manager / Employee)
-const anyRole = (req, res, next) => {
-  const token = req.cookies?.token;
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-  let decoded;
-  try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
-    return res.status(401).json({ message: "Invalid or expired token" });
-  }
-
-  if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
-  if (decoded.role === "official") {
-    if (decoded.managerid) return managerAuth(req, res, next);
-    if (decoded.adminid) return adminAuth(req, res, next);
-  }
-  if (["admin", "senior_admin"].includes(decoded.role))
-    return adminAuth(req, res, next);
-  if (["manager", "senior_manager"].includes(decoded.role))
-    return managerAuth(req, res, next);
-  if (decoded.role === "employee") return employeeAuth(req, res, next);
-
-  return res.status(403).json({ message: "Access denied" });
+// Wraps a role-check middleware so that, once it succeeds (calls next()
+// with no error), the plan gate runs before control reaches the route
+// handler. If the role check itself fails, its error/response passes
+// straight through untouched.
+const withPlanGate = (authMiddleware) => (req, res, next) => {
+  authMiddleware(req, res, (err) => {
+    if (err) return next(err);
+    timesheetPlanGate(req, res, next);
+  });
 };
 
+// ─── role-detection middlewares ───────────────────────────────────────────────
+// (anyRoleBase now comes from the shared middleware/auth/planFeatureAnyRole.middleware)
+
 // SuperAdmin or Admin only
-const saOrAdmin = (req, res, next) => {
+const saOrAdminBase = (req, res, next) => {
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ message: "Unauthorized" });
   let decoded;
@@ -57,8 +52,34 @@ const saOrAdmin = (req, res, next) => {
     .json({ message: "Admin or Super Admin access required" });
 };
 
+// SuperAdmin, Admin, or Manager
+const saAdminOrManagerBase = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  if (decoded.role === "super_admin") return superAdminAuth(req, res, next);
+  if (["admin", "senior_admin"].includes(decoded.role))
+    return adminAuth(req, res, next);
+  if (["manager", "senior_manager"].includes(decoded.role))
+    return managerAuth(req, res, next);
+  if (decoded.role === "official") {
+    if (decoded.adminid) return adminAuth(req, res, next);
+    if (decoded.managerid) return managerAuth(req, res, next);
+  }
+
+  return res
+    .status(403)
+    .json({ message: "Admin, Manager, or Super Admin access required" });
+};
+
 // SuperAdmin only
-const saOnly = (req, res, next) => {
+const saOnlyBase = (req, res, next) => {
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ message: "Unauthorized" });
   let decoded;
@@ -72,6 +93,14 @@ const saOnly = (req, res, next) => {
 
   return res.status(403).json({ message: "Super Admin access required" });
 };
+
+// Every one of these now runs the Timesheet plan gate right after the role
+// check succeeds, so every route below stays locked out for Basic-plan
+// organisations without needing to touch each route individually.
+const anyRole = withPlanGate(anyRoleBase);
+const saOrAdmin = withPlanGate(saOrAdminBase);
+const saAdminOrManager = withPlanGate(saAdminOrManagerBase);
+const saOnly = withPlanGate(saOnlyBase);
 
 // ─── controller imports ───────────────────────────────────────────────────────
 
@@ -128,6 +157,7 @@ const {
   forwardTimesheet,
   recallTimesheet,
   getAllTimesheets,
+  getTimesheetDetailedReport,
 } = require("../controllers/timesheet.controller");
 
 const {
@@ -262,8 +292,11 @@ timesheetRouter.get(
   asyncHandler(getMyProductivitySummary),
 );
 
-// ─── Admin / SuperAdmin: org-wide visibility ──────────────────────────────────
-timesheetRouter.get("/admin/jobs", saOrAdmin, asyncHandler(getAllJobsAdmin));
+// ─── Admin / SuperAdmin / Manager: job + timesheet visibility ────────────────
+// getAllJobsAdmin itself scopes Managers down to their own team (see
+// controller) so this is safe to open up beyond saOrAdmin — Managers use it
+// to populate the Job filter on their timesheet report tab.
+timesheetRouter.get("/admin/jobs", saAdminOrManager, asyncHandler(getAllJobsAdmin));
 timesheetRouter.get(
   "/admin/jobs/:id/timeline",
   saOrAdmin,
@@ -278,6 +311,14 @@ timesheetRouter.get(
   "/admin/timesheets",
   saOrAdmin,
   asyncHandler(getAllTimesheets),
+);
+// Detailed, filterable Time Sheet Report — see controller doc-comment for
+// the full filter list (date range/week, employee, department, designation,
+// project, job, status, billable).
+timesheetRouter.get(
+  "/admin/timesheet-report",
+  saAdminOrManager,
+  asyncHandler(getTimesheetDetailedReport),
 );
 
 module.exports = timesheetRouter;

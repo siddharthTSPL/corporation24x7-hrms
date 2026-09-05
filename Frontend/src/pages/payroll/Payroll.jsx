@@ -9,6 +9,7 @@ import {
   useRemovePayrollAllowance,
   useGetPaySchedule,
   useSetPaySchedule,
+  useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
   useReapplyPolicy,
@@ -17,6 +18,14 @@ import {
   useListPayrolls,
   useUpdatePayrollStatus,
   useDeletePayroll,
+  useBulkUpdatePayrollStatus,
+  useBulkDeletePayroll,
+  useListEligibleForFnF,
+  useGenerateFnF,
+  useListFnF,
+  useUpdateFnF,
+  useUpdateFnFStatus,
+  useDeleteFnF,
 } from "../../auth/server-state/payroll/payroll.hook";
 import {
   useGetAllEmployee,
@@ -51,6 +60,7 @@ const TABS = [
   { key: "structures", label: "Salary Structures" },
   { key: "generate", label: "Generate Payroll" },
   { key: "records", label: "Payroll Records" },
+  { key: "fnf", label: "Full & Final" },
 ];
 
 const COMPONENT_CATEGORIES = [
@@ -66,8 +76,8 @@ const CALC_TYPES = [
   { key: "formula", label: "Custom Formula" },
 ];
 
-const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin" };
-const MODELS = ["User", "Manager", "Admin"];
+const MODEL_LABEL = { User: "Employee", Manager: "Manager", Admin: "Admin", SuperAdmin: "Super Admin" };
+const MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
 const DEPARTMENT_LABEL = {
   OPR: "Operations",
   BPO: "Business Process Outsourcing",
@@ -96,6 +106,10 @@ function fmtINR(n) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(num);
+}
+
+function roundINR(n) {
+  return Math.round(Number(n) || 0);
 }
 
 function getErrorMessage(err) {
@@ -241,9 +255,9 @@ function Badge({ children, color, bg }) {
   );
 }
 
-// Inner sub-tab strip used inside Statutory Components / Salary Components /
-// Claims & Declarations — mirrors Zoho's secondary tab row (e.g. EPF | ESI |
-// Professional Tax | ...).
+
+
+
 function SubTabs({ items, active, onChange }) {
   return (
     <div className="flex items-center gap-1 flex-wrap mb-5" style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -317,6 +331,13 @@ function GhostButton({ children, ...rest }) {
 function useEmployeeDirectory() {
   const { data: empData, isLoading: empLoading } = useGetAllEmployee();
   const { data: adminData, isLoading: adminLoading } = useGetAllAdmins();
+  const { data: ownerData, isLoading: ownerLoading } = useGetOrgOwner();
+
+  // The org-owner (SuperAdmin) record now comes from a shared endpoint that
+  // both Admin and SuperAdmin tokens can call — so Admin can set CTC /
+  // generate payroll for the SuperAdmin too, same as SuperAdmin already could
+  // for themself.
+  const owner = ownerData?.owner;
 
   return useMemo(() => {
     const users = (empData?.users || []).map((e) => ({
@@ -333,15 +354,33 @@ function useEmployeeDirectory() {
       empid: a.empid || a.uid,
       model: "Admin",
     }));
-    const all = [...users, ...admins];
+    // A SuperAdmin has no roster to fetch — it's a single person, the org
+    // owner. Both Admin and SuperAdmin logins see them here so either can
+    // build the SuperAdmin's salary structure/payroll, same flow as everyone else.
+    const superAdmins = owner?._id
+      ? [{
+          _id: owner._id,
+          name: `${owner.f_name || ""} ${owner.l_name || ""}`.trim() || "Super Admin",
+          uid: "OWNER",
+          empid: "OWNER",
+          model: "SuperAdmin",
+        }]
+      : [];
+
+    const all = [...users, ...admins, ...superAdmins];
     const byId = new Map(all.map((p) => [String(p._id), p]));
     const byModel = {
       User: all.filter((p) => p.model === "User"),
       Manager: all.filter((p) => p.model === "Manager"),
       Admin: all.filter((p) => p.model === "Admin"),
+      SuperAdmin: superAdmins,
     };
-    return { byId, byModel, loading: empLoading || adminLoading };
-  }, [empData, adminData]);
+    // Both Admin and SuperAdmin can see "Super Admin" as a selectable
+    // employee type now — only shown once the owner record has loaded.
+    const visibleModels = superAdmins.length ? MODELS : MODELS.filter((m) => m !== "SuperAdmin");
+
+    return { byId, byModel, visibleModels, loading: empLoading || adminLoading || ownerLoading };
+  }, [empData, adminData, owner, empLoading, adminLoading, ownerLoading]);
 }
 
 function resolveName(directory, id, fallbackModel) {
@@ -497,7 +536,7 @@ function PayScheduleTab({ notify }) {
 }
 
 
-// ---------- Statutory Components (EPF / ESI / Professional Tax / LWF / Statutory Bonus) ----------
+
 
 const STATUTORY_SUBTABS = [
   { key: "epf", label: "EPF" },
@@ -686,7 +725,7 @@ function StatutoryTab({ notify }) {
   );
 }
 
-// ---------- Salary Components (Earnings / Deductions / Benefits / Reimbursements) ----------
+
 
 function emptyComponentForm(category) {
   return {
@@ -697,10 +736,7 @@ function emptyComponentForm(category) {
 }
 
 function ComponentValueFields({ value, onChange, disabled, onUnlock }) {
-  // A component still flagged isBalancing always absorbs whatever gross is
-  // left over — its calculationType/formula is never actually used, so
-  // don't offer a dropdown that would look editable but silently do
-  // nothing. Offer a one-click way to convert it into a normal component.
+
   if (value.isBalancing) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
@@ -749,9 +785,7 @@ function ComponentsTab({ notify }) {
   useEffect(() => {
     if (data?.policy) {
       const policy = JSON.parse(JSON.stringify(data.policy));
-      // Stable client-side key = the name this component was saved under,
-      // so renaming the "name" field in the input doesn't lose track of
-      // which server-side record to PUT/rename.
+
       policy.allowances = (policy.allowances || []).map((a) => ({ ...a, _key: a.name }));
       setForm(policy);
     }
@@ -799,8 +833,7 @@ function ComponentsTab({ notify }) {
     );
   };
 
-  // Natural order (whatever order they were added in) — nothing is forced
-  // to the top.
+
   const rows = (form.allowances || []).filter((a) => (a.category || "earning") === category);
 
   const handleField = (key, patch) => {
@@ -840,9 +873,7 @@ function ComponentsTab({ notify }) {
     );
   };
 
-  // Converts a legacy locked/auto-balancing component (e.g. an old "Special
-  // Allowance") into a normal one, so its calculation type/formula actually
-  // takes effect from then on.
+
   const handleUnlock = (a) => {
     updateAllowance(
       { name: a._key, data: { isBalancing: false } },
@@ -1023,7 +1054,7 @@ function ComponentsTab({ notify }) {
   );
 }
 
-// ---------- Claims & Declarations ----------
+
 
 const CLAIMS_SUBTABS = [
   { key: "fbp", label: "Flexible Benefit Plan" },
@@ -1136,7 +1167,7 @@ function StructuresTab({ notify, directory }) {
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Employee">
@@ -1160,7 +1191,7 @@ function StructuresTab({ notify, directory }) {
         right={
           <Select value={modelFilter} onChange={(e) => setModelFilter(e.target.value)} style={{ maxWidth: 160 }}>
             <option value="">All Types</option>
-            {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+            {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
           </Select>
         }
       >
@@ -1186,7 +1217,19 @@ function StructuresTab({ notify, directory }) {
               <tbody>
                 {structures.map((s) => (
                   <tr key={s._id} style={{ borderTop: `1px solid ${C.border}` }}>
-                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, s.employee, s.employeeModel)}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {resolveName(directory, s.employee, s.employeeModel)}
+                      {(s.missingBankAccount || s.missingDateOfJoining) && (
+                        <div style={{ marginTop: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+                          {s.missingBankAccount && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Bank account not mentioned</span>
+                          )}
+                          {s.missingDateOfJoining && (
+                            <span style={{ fontSize: 10.5, fontWeight: 500, color: "#B45309" }}>⚠ Date of joining not added</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[s.employeeModel] || s.employeeModel}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.ctc)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.monthlyGross)}</td>
@@ -1230,8 +1273,7 @@ function GenerateTab({ notify, directory }) {
 
   const numOrUndef = (v) => (v === "" || v === null || v === undefined ? undefined : Number(v));
 
-  // Keep Calendar/Working Days sensible defaults when month/year change,
-  // unless the admin already typed something different in by hand.
+
   const handleMonthYear = (field, value) => {
     setSingle((p) => {
       const next = { ...p, [field]: value };
@@ -1250,8 +1292,11 @@ function GenerateTab({ notify, directory }) {
   const handleSingle = (e) => {
     e.preventDefault();
     if (!single.employee) return notify("Select an employee", "error");
-    if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
-    setSingleResult(null);
+if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
+if (Number(single.paidDays) > Number(single.workingDays)) {
+  return notify("Paid Days cannot be greater than Working Days", "error");
+}
+setSingleResult(null);
     generate(
       {
         employee: single.employee,
@@ -1304,7 +1349,7 @@ function GenerateTab({ notify, directory }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end mb-5">
             <Field label="Employee Type">
               <Select value={single.employeeModel} onChange={(e) => setSingle((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
-                {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+                {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
               </Select>
             </Field>
             <Field label="Employee">
@@ -1331,9 +1376,18 @@ function GenerateTab({ notify, directory }) {
             <Field label="Working Days" hint="From Pay Schedule">
               <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
             </Field>
-            <Field label="Paid Days" hint=" present — manual entry">
-              <TextInput type="number" min={0} step="0.5" value={single.paidDays} onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))} placeholder="e.g. 27" required />
-            </Field>
+            <Field label="Paid Days" hint={`Present — manual entry (max ${single.workingDays || "—"})`}>
+  <TextInput
+    type="number"
+    min={0}
+    max={single.workingDays || undefined}
+    step="0.5"
+    value={single.paidDays}
+    onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))}
+    placeholder="e.g. 27"
+    required
+  />
+</Field>
             <Field label="LOP Days" hint="Auto-calculated">
               <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted, display: "flex", alignItems: "center" }}>
                 {lopDaysPreview === null ? "—" : lopDaysPreview}
@@ -1379,7 +1433,7 @@ function GenerateTab({ notify, directory }) {
         <form onSubmit={handleBulk} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <Field label="Employee Type">
             <Select value={bulk.employeeModel} onChange={(e) => setBulk((p) => ({ ...p, employeeModel: e.target.value }))}>
-              {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+              {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Month">
@@ -1435,18 +1489,18 @@ function PayslipSection({ title, children }) {
   );
 }
 
-// Turns a camelCase field name into a readable label when we don't have a
-// nicer override for it, e.g. "otherEarnings" -> "Other Earnings". This is
-// what lets a brand-new field the backend starts sending show up on the
-// payslip with a sane label, with zero frontend changes needed.
+
+
+
+
 function humanizeKey(key) {
   const spaced = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-// Nicer labels for known fields; anything not listed here falls back to
-// humanizeKey() automatically, so unknown/future fields still get a
-// reasonable label instead of being skipped.
+
+
+
 const EARNINGS_LABELS = { other: "Other Earnings" };
 const DEDUCTIONS_LABELS = {
   pf: "Employee PF",
@@ -1460,28 +1514,28 @@ const DEDUCTIONS_LABELS = {
 };
 const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
 
-// Aggregate/derived fields that shouldn't appear as their own line item
-// (they're either shown as the section's Total row, or they're the sum of
-// components we already itemize elsewhere, e.g. `benefits` = total of
-// breakup.benefitComponents).
+
+
+
+
 const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];
 const DEDUCTIONS_EXCLUDE = ["lossOfPay", "components", "totalDeductions"];
 
-// Reads every numeric, non-zero field off a payroll sub-object (earnings /
-// deductions / employerContribution) and turns it into a {label, amount}
-// row — no fixed list of field names, so anything the backend starts
-// filling in (a new manual-entry field, a new statutory line, etc.) shows
-// up on the payslip automatically instead of needing a matching JSX row
-// added by hand every time.
+
+
+
+
+
+
 function dynamicRows(obj, excludeKeys, labelOverrides) {
   return Object.entries(obj || {})
     .filter(([key, value]) => !excludeKeys.includes(key) && typeof value === "number" && value !== 0)
     .map(([key, value]) => ({ label: labelOverrides[key] || humanizeKey(key), amount: value }));
 }
 
-// Builds the full set of Earnings / Deductions / Employer Contribution line
-// items for one payroll record. Used by both the on-screen PayslipModal and
-// the downloadable/print HTML, so the two never drift out of sync.
+
+
+
 function getPayslipLineItems(payroll) {
   const breakup = payroll.breakup || {};
 
@@ -1504,10 +1558,10 @@ function getPayslipLineItems(payroll) {
   return { earnings, deductions, employerContribution };
 }
 
-// Opens a print-formatted payslip in a new tab (via a Blob URL, not
-// document.write — see note below) and triggers the browser's print
-// dialog, where "Save as PDF" gives a real downloadable file — no extra
-// PDF library/dependency needed.
+
+
+
+
 function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
@@ -1577,18 +1631,13 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
 </body>
 </html>`;
 
-  // Open via a Blob URL rather than window.open("") + document.write().
-  // The write-into-blank-tab approach breaks (leaves an empty "about:blank"
-  // tab) on browsers that enforce Cross-Origin-Opener-Policy, which severs
-  // the reference to the new tab right after it opens. A Blob URL is a real,
-  // same-document navigation target, so it always renders.
+
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
   const win = window.open(url, "_blank");
 
   if (!win) {
-    // Popup blocked entirely — fall back to a direct file download so the
-    // person still gets their payslip.
+
     const link = document.createElement("a");
     link.href = url;
     link.download = `Payslip - ${name} - ${period}.html`;
@@ -1597,7 +1646,7 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
     document.body.removeChild(link);
   }
 
-  // Release the blob once the tab/download has had time to load it.
+
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
@@ -1635,7 +1684,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           </div>
         </div>
 
-        {/* Employee details */}
         <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
           <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
           <PayslipRow label="Employee ID" value={employeeId} />
@@ -1644,7 +1692,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
 
-        {/* Attendance */}
         <PayslipSection title="Attendance">
           <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
           <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
@@ -1652,7 +1699,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
         </PayslipSection>
 
-        {/* Earnings */}
         <PayslipSection title="Earnings">
           {earnings.map((r, i) => (
             <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1661,7 +1707,6 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
         </PayslipSection>
 
-        {/* Deductions */}
         <PayslipSection title="Deductions">
           {deductions.map((r, i) => (
             <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1670,13 +1715,11 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
         </PayslipSection>
 
-        {/* Net pay */}
         <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
           <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
         </div>
 
-        {/* Employer contributions */}
         <PayslipSection title="Employer Contributions">
           {employerContribution.map((r, i) => (
             <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
@@ -1741,22 +1784,27 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
-// Computes what's actually been paid and what's still outstanding for a
-// payroll record. A record only counts as "Paid" once its status is paid;
-// generated/approved/on_hold records are fully outstanding.
+
 function getPaidAndBalance(p) {
-  const total = Number(p.netSalary) || 0;
+  const total = roundINR(p.netSalary);
   const paid = p.status === "paid" ? total : 0;
   const balance = total - paid;
   return { total, paid, balance };
 }
 
-// Builds one export row per payroll record with every earning / deduction /
-// employer-contribution component as its own column. The column set is the
-// union across ALL records, so employees whose components differ still line
-// up correctly (missing components show as blank instead of breaking the
-// sheet). Reuses getPayslipLineItems() so the export never drifts out of
-// sync with what the payslip itself shows.
+function isBulkSelectable(status) {
+  return Boolean(BULK_ACTIONS[status]);
+}
+
+// Keep bulk actions narrow and predictable:
+// - only generated rows can be bulk-deleted
+// - only approved rows can be bulk-paid
+// - on-hold and paid rows stay out of bulk selection entirely
+const BULK_ACTIONS = {
+  generated: ["approve", "hold", "delete"],
+  approved: ["paid", "hold"],
+};
+
 function buildPayrollExportRows(payrolls, directory) {
   const perRecord = payrolls.map((p) => {
     const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
@@ -1769,9 +1817,9 @@ function buildPayrollExportRows(payrolls, directory) {
       employeeId: snap.employeeId || person?.empid || "—",
       department: departmentLabel(snap.department || person?.department || "—"),
       designation: snap.designation || person?.designation || "—",
-      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
-      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
-      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, roundINR(e.amount)])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, roundINR(d.amount)])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, roundINR(c.amount)])),
       earnings, deductions, employerContribution,
       total, paid, balance,
     };
@@ -1795,22 +1843,20 @@ function buildPayrollExportRows(payrolls, directory) {
     r.name, r.employeeId, r.department, r.designation,
     MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
     ...earningKeys.map((k) => r.earnMap[k] ?? ""),
-    r.p.earnings?.totalEarnings ?? "",
+    roundINR(r.p.earnings?.totalEarnings),
     ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
-    r.p.deductions?.totalDeductions ?? "",
+    roundINR(r.p.deductions?.totalDeductions),
     ...employerKeys.map((k) => r.empMap[k] ?? ""),
     r.total, r.paid, r.balance,
   ]);
 
-  // Grand-total row: sums every amount column across all filtered records.
-  // Only added to the CSV, not shown in the on-screen table.
   const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
   const totalsRow = [
     "TOTAL", "", "", "", "", "", "",
     ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
-    sumOf((r) => r.p.earnings?.totalEarnings),
+    sumOf((r) => roundINR(r.p.earnings?.totalEarnings)),
     ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
-    sumOf((r) => r.p.deductions?.totalDeductions),
+    sumOf((r) => roundINR(r.p.deductions?.totalDeductions)),
     ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
     sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
   ];
@@ -1818,21 +1864,16 @@ function buildPayrollExportRows(payrolls, directory) {
   return [header, ...rows, totalsRow];
 }
 
-// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
-// only when the value contains a comma, quote, or newline.
 function csvEscape(val) {
   const s = String(val ?? "");
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
-// Builds the full payroll sheet CSV (every component as its own column)
-// and triggers a browser download. No extra library needed — CSV opens
-// directly in Excel/Google Sheets.
 function exportPayrollCSV(payrolls, directory) {
   const table = buildPayrollExportRows(payrolls, directory);
   const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
-  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1855,14 +1896,60 @@ function RecordsTab({ notify, directory }) {
   });
   const { mutate: updateStatus } = useUpdatePayrollStatus();
   const { mutate: removePayroll } = useDeletePayroll();
+  const { mutate: bulkUpdateStatus, isPending: bulkStatusPending } = useBulkUpdatePayrollStatus();
+  const { mutate: bulkDelete, isPending: bulkDeletePending } = useBulkDeletePayroll();
   const [selected, setSelected] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const payrolls = data?.payrolls || [];
 
-  // Aggregate Total / Paid / Balance across whatever is currently filtered.
-  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
-  // filters above change and useListPayrolls refetches).
+  const selectableIds = useMemo(
+    () => payrolls.filter((p) => isBulkSelectable(p.status)).map((p) => p._id),
+    [payrolls]
+  );
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters.month, filters.year, filters.employeeModel, filters.status]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const allowed = new Set(selectableIds);
+      const next = new Set([...prev].filter((id) => allowed.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [selectableIds]);
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const selectedStatuses = [...selectedIds]
+    .map((id) => payrolls.find((row) => row._id === id)?.status)
+    .filter(Boolean);
+  const isPureOnHold = selectedStatuses.length > 0 && selectedStatuses.every((s) => s === "on_hold");
+  const selectedActions = selectedStatuses.length === 0
+    ? []
+    : selectedStatuses.reduce((common, status, idx) => {
+        const actions = BULK_ACTIONS[status] || [];
+        return idx === 0 ? actions : common.filter((a) => actions.includes(a));
+      }, []);
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(selectableIds));
+  };
+
+  const toggleSelectOne = (id, status) => {
+    if (!isBulkSelectable(status)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const summary = useMemo(() => {
     return payrolls.reduce(
       (acc, p) => {
@@ -1901,6 +1988,35 @@ function RecordsTab({ notify, directory }) {
     });
   };
 
+  const handleBulkStatus = (status) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    bulkUpdateStatus(
+      { ids, status },
+      {
+        onSuccess: (data) => {
+          notify(`${data.modified} record${data.modified === 1 ? "" : "s"} marked as ${status.replace("_", " ")}`, "success");
+          setSelectedIds(new Set());
+        },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const confirmBulkDelete = () => {
+    const ids = [...selectedIds];
+    setBulkDeleteOpen(false);
+    if (ids.length === 0) return;
+    bulkDelete(ids, {
+      onSuccess: (data) => {
+        const skippedNote = data.skippedCount ? `, ${data.skippedCount} skipped` : "";
+        notify(`${data.deletedCount} record${data.deletedCount === 1 ? "" : "s"} deleted${skippedNote}`, "success");
+        setSelectedIds(new Set());
+      },
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
+  };
+
   return (
     <Card
       title="Payroll Records"
@@ -1913,7 +2029,7 @@ function RecordsTab({ notify, directory }) {
           <TextInput type="number" value={filters.year} onChange={(e) => setFilters((p) => ({ ...p, year: e.target.value }))} style={{ maxWidth: 100 }} />
           <Select value={filters.employeeModel} onChange={(e) => setFilters((p) => ({ ...p, employeeModel: e.target.value }))} style={{ maxWidth: 140 }}>
             <option value="">All Types</option>
-            {MODELS.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
+            {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
           </Select>
           <Select value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value }))} style={{ maxWidth: 140 }}>
             <option value="">All Statuses</option>
@@ -1923,7 +2039,7 @@ function RecordsTab({ notify, directory }) {
             <option value="on_hold">On Hold</option>
           </Select>
           <button
-           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-auto ml-auto"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto sm:ml-auto"
             style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
             onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
@@ -1955,10 +2071,64 @@ function RecordsTab({ notify, directory }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
           </div>
         </div>
+        {selectedIds.size > 0 && (
+          <div
+            className="flex items-center gap-2 flex-wrap"
+            style={{ marginBottom: 14, padding: "10px 14px", borderRadius: 10, background: C.brandLight }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.brandDark }}>
+              {selectedIds.size} selected
+            </span>
+            {selectedActions.includes("approve") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("approved")}>
+                {isPureOnHold ? "Resume All" : "Approve All"}
+              </GhostButton>
+            )}
+            {selectedActions.includes("hold") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("on_hold")}>
+                Hold All
+              </GhostButton>
+            )}
+            {selectedActions.includes("paid") && (
+              <GhostButton disabled={bulkStatusPending} onClick={() => handleBulkStatus("paid")}>
+                Mark Paid All
+              </GhostButton>
+            )}
+            {selectedActions.includes("delete") && (
+              <GhostButton
+                disabled={bulkDeletePending}
+                onClick={() => setBulkDeleteOpen(true)}
+                style={{ color: C.red, borderColor: C.red }}
+              >
+                Delete All
+              </GhostButton>
+            )}
+            {selectedActions.length === 0 && (
+              <span style={{ fontSize: 12.5, color: C.muted }}>
+                No common bulk action for this mix of statuses
+              </span>
+            )}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ marginLeft: "auto", fontSize: 12.5, color: C.muted, background: "transparent", border: "none", cursor: "pointer", textDecoration: "underline" }}
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1060 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                <th style={{ padding: "6px 10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    disabled={selectableIds.length === 0}
+                    ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th style={{ padding: "6px 10px" }}>Employee</th>
                 <th style={{ padding: "6px 10px" }}>Period</th>
                 <th style={{ padding: "6px 10px" }}>Total</th>
@@ -1971,7 +2141,20 @@ function RecordsTab({ notify, directory }) {
             <tbody>
               {payrolls.map((p) => (
                 <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{resolveName(directory, p.employee, p.employeeModel)}</td>
+                  <td style={{ padding: "8px 10px" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(p._id)}
+                      disabled={!isBulkSelectable(p.status)}
+                      title={!isBulkSelectable(p.status) ? "Only generated and approved payrolls can be bulk-selected" : ""}
+                      onChange={() => toggleSelectOne(p._id, p.status)}
+                    />
+                  </td>
+                  <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                    {p.employeeSnapshot?.name
+                      ? `${p.employeeSnapshot.name}${p.employeeSnapshot.employeeId ? ` (${p.employeeSnapshot.employeeId})` : ""}`
+                      : resolveName(directory, p.employee, p.employeeModel)}
+                  </td>
                   <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MONTH_NAMES[p.month - 1]} {p.year}</td>
                   {(() => {
                     const { total, paid, balance } = getPaidAndBalance(p);
@@ -2029,13 +2212,604 @@ function RecordsTab({ notify, directory }) {
         title="Delete this payroll record?"
         message={
           confirmTarget
-            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
+            ? `This will permanently delete the ${MONTH_NAMES[confirmTarget.month - 1]} ${confirmTarget.year} payroll for ${confirmTarget.employeeSnapshot?.name || resolveName(directory, confirmTarget.employee, confirmTarget.employeeModel)}. This cannot be undone.`
             : ""
         }
         onConfirm={confirmDelete}
         onCancel={() => setConfirmTarget(null)}
       />
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title={`Delete ${selectedIds.size} selected record${selectedIds.size === 1 ? "" : "s"}?`}
+        message="This will permanently delete the selected payroll records. This cannot be undone."
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
+      />
     </Card>
+  );
+}
+
+
+const EXIT_TYPE_LABEL = { resigned: "Resigned", fired: "Fired", terminated: "Terminated" };
+
+function FnFFormModal({ open, mode, person, record, onClose, onSaved, notify }) {
+  const { mutate: generate, isPending: generating } = useGenerateFnF();
+  const { mutate: update, isPending: updating } = useUpdateFnF();
+
+  const [form, setForm] = useState({
+    lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+    otherEarnings: 0, deductions: 0, otherDeductions: 0,
+    pan: "", bankAccountNumber: "", bankName: "", remarks: "",
+  });
+
+  useEffect(() => {
+    if (mode === "edit" && record) {
+      const namedAmount = (particular) =>
+        (record.otherIncome?.items || []).find((i) => i.particular === particular)?.amount || 0;
+      setForm({
+        lastWorkingDay: record.dateOfLeaving ? record.dateOfLeaving.slice(0, 10) : "",
+        leaveEncashment: namedAmount("Leave Encashment"),
+        gratuity: namedAmount("Gratuity"),
+        bonus: namedAmount("Bonus"),
+        otherEarnings: namedAmount("Other Earnings"),
+        deductions: record.deductions?.recoveries || 0,
+        otherDeductions: record.deductions?.other || 0,
+        pan: record.employeeSnapshot?.pan || "",
+        bankAccountNumber: record.employeeSnapshot?.bankAccountNumber || "",
+        bankName: record.employeeSnapshot?.bankName || "",
+        remarks: record.remarks || "",
+      });
+    } else if (mode === "generate" && person) {
+      setForm({
+        lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+        otherEarnings: 0, deductions: 0, otherDeductions: 0,
+        pan: person.pan || "",
+        bankAccountNumber: person.bankAccountNumber || "",
+        bankName: person.bankName || "",
+        remarks: "",
+      });
+    } else {
+      setForm({
+        lastWorkingDay: "", leaveEncashment: 0, gratuity: 0, bonus: 0,
+        otherEarnings: 0, deductions: 0, otherDeductions: 0,
+        pan: "", bankAccountNumber: "", bankName: "", remarks: "",
+      });
+    }
+  }, [mode, record, person, open]);
+
+  if (!open) return null;
+
+  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  // Generate mode gets this straight from the eligible-list flag the backend
+  // already computes. Edit mode (record already exists) derives the same
+  // thing from the saved snapshot, since bankInfoMissing isn't part of the record.
+  const bankInfoMissing =
+    mode === "generate"
+      ? Boolean(person?.bankInfoMissing)
+      : !(record?.employeeSnapshot?.pan && record?.employeeSnapshot?.bankAccountNumber && record?.employeeSnapshot?.bankName);
+
+  const submit = () => {
+    if (mode === "generate") {
+      generate(
+        { employee: person._id, employeeModel: person.employeeModel, ...form },
+        {
+          onSuccess: () => { notify("Full & Final generated", "success"); onSaved(); },
+          onError: (err) => notify(getErrorMessage(err), "error"),
+        }
+      );
+    } else {
+      update(
+        { id: record._id, data: form },
+        {
+          onSuccess: () => { notify("Full & Final updated", "success"); onSaved(); },
+          onError: (err) => notify(getErrorMessage(err), "error"),
+        }
+      );
+    }
+  };
+
+  const pending = generating || updating;
+  const name = mode === "generate" ? person?.name : record?.employeeSnapshot?.name;
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 800, color: C.text }}>
+          {mode === "generate" ? "Generate Full & Final" : "Edit Full & Final"}
+        </h3>
+        <p style={{ margin: "0 0 16px", fontSize: 12.5, color: C.muted }}>{name}</p>
+
+        {mode === "generate" && (
+          <p style={{ margin: "0 0 14px", fontSize: 12, color: C.muted, background: C.brandLight, padding: "8px 10px", borderRadius: 8 }}>
+            Pending salary from any unpaid regular payroll months is added in automatically. Fill in the rest below — everything stays editable until this is approved.
+          </p>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Last Working Day">
+            <TextInput type="date" value={form.lastWorkingDay} onChange={set("lastWorkingDay")} />
+          </Field>
+          <Field label="Leave Encashment (₹)">
+            <TextInput type="number" value={form.leaveEncashment} onChange={set("leaveEncashment")} />
+          </Field>
+          <Field label="Gratuity (₹)">
+            <TextInput type="number" value={form.gratuity} onChange={set("gratuity")} />
+          </Field>
+          <Field label="Bonus (₹)">
+            <TextInput type="number" value={form.bonus} onChange={set("bonus")} />
+          </Field>
+          <Field label="Other Earnings (₹)">
+            <TextInput type="number" value={form.otherEarnings} onChange={set("otherEarnings")} />
+          </Field>
+          <Field label="Deductions / Recoveries (₹)">
+            <TextInput type="number" value={form.deductions} onChange={set("deductions")} />
+          </Field>
+          <Field label="Other Deductions (₹)">
+            <TextInput type="number" value={form.otherDeductions} onChange={set("otherDeductions")} />
+          </Field>
+          {bankInfoMissing ? (
+            <>
+              <Field label="PAN">
+                <TextInput type="text" value={form.pan} onChange={set("pan")} />
+              </Field>
+              <Field label="Bank Account Number">
+                <TextInput type="text" value={form.bankAccountNumber} onChange={set("bankAccountNumber")} />
+              </Field>
+              <Field label="Bank Name">
+                <TextInput type="text" value={form.bankName} onChange={set("bankName")} />
+              </Field>
+            </>
+          ) : (
+            <div
+              className="sm:col-span-2"
+              style={{
+                fontSize: 12.5,
+                color: C.text,
+                background: C.brandLight,
+                padding: "10px 12px",
+                borderRadius: 8,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "4px 20px",
+              }}
+            >
+              <span><strong>Bank Name:</strong> {form.bankName}</span>
+              <span><strong>A/C No:</strong> {form.bankAccountNumber}</span>
+              <span style={{ color: C.muted, fontStyle: "italic" }}>Auto-filled from employee profile</span>
+            </div>
+          )}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <Field label="Remarks">
+            <textarea
+              value={form.remarks}
+              onChange={set("remarks")}
+              rows={2}
+              className="min-w-0"
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </Field>
+        </div>
+
+        <div className="flex gap-2.5" style={{ marginTop: 20 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: "#fff", color: C.text, fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <PrimaryButton loading={pending} onClick={submit} style={{ flex: 1 }}>
+            {mode === "generate" ? "Generate" : "Save Changes"}
+          </PrimaryButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-GB");
+}
+
+function FnFSlipSection({ title, rows, total, totalLabel = "Total" }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: C.brandDark, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>{title}</div>
+      <table className="w-full" style={{ borderCollapse: "collapse", fontSize: 13 }}>
+        <tbody>
+          {rows.map(([label, amt], i) => (
+            <tr key={i} style={{ borderTop: `1px solid ${C.border}` }}>
+              <td style={{ padding: "5px 4px", color: C.text }}>{label}</td>
+              <td style={{ padding: "5px 4px", textAlign: "right", color: C.text, whiteSpace: "nowrap" }}>{fmtINR(amt)}</td>
+            </tr>
+          ))}
+          <tr style={{ borderTop: `1px solid ${C.border}` }}>
+            <td style={{ padding: "5px 4px", fontWeight: 800, color: C.text }}>{totalLabel}</td>
+            <td style={{ padding: "5px 4px", textAlign: "right", fontWeight: 800, color: C.text, whiteSpace: "nowrap" }}>{fmtINR(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function downloadFnFSlip(fnf) {
+  const income = fnf.income || { basic: 0, hra: 0, allowances: [], total: 0 };
+  const otherIncome = fnf.otherIncome || { items: [], total: 0 };
+  const holding = fnf.holding || { salaryOnHold: 0, reimbursementOnHold: 0, assetRecovery: 0, total: 0 };
+  const deductions = fnf.deductions || { pf: 0, professionalTax: 0, tds: 0, recoveries: 0, other: 0, total: 0 };
+
+  const incomeRows = [
+    ["Basic Salary", income.basic],
+    ["House Rent Allowance", income.hra],
+    ...(income.allowances || []).map((a) => [a.name, a.amount]),
+  ];
+  const otherIncomeRows = (otherIncome.items || []).map((i) => [i.particular, i.amount]);
+  const holdingRows = [
+    ["Salary payable on hold", holding.salaryOnHold],
+    ["Reimbursement payable on hold", holding.reimbursementOnHold],
+    ["Asset Recovery", holding.assetRecovery],
+  ];
+  const deductionRows = [
+    ["Provident Fund", deductions.pf],
+    ["Professional Tax", deductions.professionalTax],
+    ["TDS", deductions.tds],
+    ["Deductions / Recoveries", deductions.recoveries || 0],
+    ["Other Deductions", deductions.other],
+  ];
+
+  const rowsHtml = (rows) => rows.map(([label, amt]) => `<tr><td>${label}</td><td class="amt">${fmtINR(amt)}</td></tr>`).join("");
+  const sectionHtml = (title, rows, total, totalLabel = "Total") => `
+  <table>
+    <thead><tr><th>${title}</th><th class="amt">Amount</th></tr></thead>
+    <tbody>
+      ${rowsHtml(rows)}
+      <tr class="total-row"><td>${totalLabel}</td><td class="amt">${fmtINR(total)}</td></tr>
+    </tbody>
+  </table>`;
+
+  const orgName = fnf.organisationSnapshot?.name || "";
+  const name = fnf.employeeSnapshot?.name || "";
+  const monthLabel = fnf.settlementMonth ? `${MONTH_NAMES[fnf.settlementMonth - 1]}, ${String(fnf.settlementYear).slice(-2)}` : "—";
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${orgName ? orgName + " - " : ""}Full & Final Settlement - ${name}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
+  .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
+  td { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f3ede9; }
+  td.amt, th.amt { text-align: right; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 20px; font-size: 13px; }
+  .grid .lbl { color: #8a7a74; }
+  .total-row td { font-weight: 700; border-top: 2px solid #2a1a16; border-bottom: none; }
+  .net { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 2px solid #2a1a16; border-bottom: 2px solid #2a1a16; margin: 18px 0; }
+  .net .lbl { font-size: 14px; font-weight: 700; }
+  .net .val { font-size: 18px; font-weight: 800; }
+  .remarks { font-size: 12.5px; color: #8a7a74; margin-top: 10px; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  ${orgName ? `<p class="org">${orgName}</p>` : ""}
+  <h1>Full & Final Settlement Statement</h1>
+
+  <div class="grid">
+    <div><span class="lbl">Employee Name: </span>${name}</div>
+    <div><span class="lbl">Employee ID: </span>${fnf.employeeSnapshot?.employeeId || "—"}</div>
+    <div><span class="lbl">Designation: </span>${fnf.employeeSnapshot?.designation || "—"}</div>
+    <div><span class="lbl">Department: </span>${departmentLabel(fnf.employeeSnapshot?.department)}</div>
+    <div><span class="lbl">PAN: </span>${fnf.employeeSnapshot?.pan || "—"}</div>
+    <div><span class="lbl">Date of Joining: </span>${fmtDate(fnf.dateOfJoining)}</div>
+    <div><span class="lbl">Date of Resignation: </span>${fmtDate(fnf.dateOfResignation)}</div>
+    <div><span class="lbl">Date of Leaving: </span>${fmtDate(fnf.dateOfLeaving)}</div>
+    <div><span class="lbl">Total Days in ${monthLabel}: </span>${fnf.totalDaysInMonth ?? "—"}</div>
+    <div><span class="lbl">Payable Days in ${monthLabel}: </span>${fnf.payableDaysInMonth ?? "—"}</div>
+    <div><span class="lbl">Bank Account Number: </span>${fnf.employeeSnapshot?.bankAccountNumber || "—"}</div>
+    <div><span class="lbl">Bank Name: </span>${fnf.employeeSnapshot?.bankName || "—"}</div>
+  </div>
+
+  ${sectionHtml("Income", incomeRows, income.total)}
+  ${sectionHtml("Other Income", otherIncomeRows, otherIncome.total)}
+  ${sectionHtml("Holding", holdingRows, holding.total)}
+  ${sectionHtml("Deductions", deductionRows, deductions.total)}
+
+  <div class="net">
+    <span class="lbl">NET AMOUNT PAYABLE</span>
+    <span class="val">${fmtINR(fnf.netPayable)}</span>
+  </div>
+
+  ${fnf.remarks ? `<p class="remarks">${fnf.remarks}</p>` : ""}
+
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+
+  if (!win) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FnF Statement - ${name}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function FnFSlipModal({ fnf, onClose }) {
+  if (!fnf) return null;
+  const canDownload = fnf.status === "approved" || fnf.status === "paid";
+
+  const income = fnf.income || { basic: 0, hra: 0, allowances: [], total: 0 };
+  const otherIncome = fnf.otherIncome || { items: [], total: 0 };
+  const holding = fnf.holding || { salaryOnHold: 0, reimbursementOnHold: 0, assetRecovery: 0, total: 0 };
+  const deductions = fnf.deductions || { pf: 0, professionalTax: 0, tds: 0, recoveries: 0, other: 0, total: 0 };
+
+  const incomeRows = [
+    ["Basic Salary", income.basic],
+    ["House Rent Allowance", income.hra],
+    ...(income.allowances || []).map((a) => [a.name, a.amount]),
+  ];
+
+  const otherIncomeRows = (otherIncome.items || []).map((i) => [i.particular, i.amount]);
+
+  const holdingRows = [
+    ["Salary payable on hold", holding.salaryOnHold],
+    ["Reimbursement payable on hold", holding.reimbursementOnHold],
+    ["Asset Recovery", holding.assetRecovery],
+  ];
+
+  const deductionRows = [
+    ["Provident Fund", deductions.pf],
+    ["Professional Tax", deductions.professionalTax],
+    ["TDS", deductions.tds],
+    ["Deductions / Recoveries", deductions.recoveries || 0],
+    ["Other Deductions", deductions.other],
+  ];
+
+  const monthLabel = fnf.settlementMonth ? `${MONTH_NAMES[fnf.settlementMonth - 1]}, ${String(fnf.settlementYear).slice(-2)}` : "—";
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-center justify-center p-3 sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="p-5 sm:p-6" style={{ background: "#fff", borderRadius: 16, maxWidth: 560, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <div>
+            {fnf.organisationSnapshot?.name && <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.brand }}>{fnf.organisationSnapshot.name}</p>}
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: C.brandDark }}>Full & Final Settlement Statement</h3>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {canDownload && (
+              <GhostButton onClick={() => downloadFnFSlip(fnf)}>Download</GhostButton>
+            )}
+            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
+          </div>
+        </div>
+
+        <table className="w-full" style={{ borderCollapse: "collapse", fontSize: 12.5, color: C.text }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Employee Name</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.name}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Joining</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfJoining)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Employee ID</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.employeeId}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Resignation</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfResignation)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Designation</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.designation}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Date of Leaving</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fmtDate(fnf.dateOfLeaving)}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Department</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{departmentLabel(fnf.employeeSnapshot?.department)}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Total Days in {monthLabel}</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.totalDaysInMonth}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>PAN</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.pan || "—"}</td>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Payable Days in {monthLabel}</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.payableDaysInMonth}</td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Bank Account Number</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.bankAccountNumber || "—"}</td>
+              <td></td><td></td>
+            </tr>
+            <tr>
+              <td style={{ padding: "3px 4px", color: C.muted }}>Bank Name</td>
+              <td style={{ padding: "3px 4px", fontWeight: 600 }}>{fnf.employeeSnapshot?.bankName || "—"}</td>
+              <td></td><td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <FnFSlipSection title="Income" rows={incomeRows} total={income.total} />
+        <FnFSlipSection title="Other Income" rows={otherIncomeRows} total={otherIncome.total} />
+        <FnFSlipSection title="Holding" rows={holdingRows} total={holding.total} />
+        <FnFSlipSection title="Deductions" rows={deductionRows} total={deductions.total} />
+
+        <div className="flex justify-between" style={{ padding: "14px 4px 4px", fontSize: 16, fontWeight: 800, borderTop: `2px solid ${C.text}`, marginTop: 14 }}>
+          <span>Net Amount Payable</span>
+          <span style={{ color: C.brandDark }}>{fmtINR(fnf.netPayable)}</span>
+        </div>
+
+        <div style={{ marginTop: 12 }}>{statusBadge(fnf.status)}</div>
+        {fnf.remarks && <p style={{ fontSize: 12.5, color: C.muted, marginTop: 10 }}>{fnf.remarks}</p>}
+      </div>
+    </div>
+  );
+}
+
+function FnFTab({ notify }) {
+  const { data: eligibleData, isLoading: eligibleLoading } = useListEligibleForFnF();
+  const [statusFilter, setStatusFilter] = useState("");
+  const { data: recordsData, isLoading: recordsLoading } = useListFnF({ status: statusFilter || undefined });
+
+  const { mutate: updateStatus } = useUpdateFnFStatus();
+  const { mutate: removeFnF } = useDeleteFnF();
+
+  const [formModal, setFormModal] = useState(null); // { mode: 'generate'|'edit', person?, record? }
+  const [viewSlip, setViewSlip] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+
+  const people = (eligibleData?.people || []).filter((p) => !p.fnfStatus);
+  const records = recordsData?.records || [];
+
+  const handleStatus = (id, status) => {
+    updateStatus(
+      { id, status },
+      {
+        onSuccess: () => notify(`Marked as ${status.replace("_", " ")}`, "success"),
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget) return;
+    const id = confirmTarget._id;
+    setConfirmTarget(null);
+    removeFnF(id, {
+      onSuccess: () => notify("Full & Final record deleted", "success"),
+      onError: (err) => notify(getErrorMessage(err), "error"),
+    });
+  };
+
+  return (
+    <>
+      <Card
+        title="Eligible for Full & Final"
+        subtitle="People whose working status is resigned, fired, or terminated — their regular monthly payroll no longer generates. Settle them here, once."
+      >
+        {eligibleLoading ? (
+          <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+        ) : people.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13 }}>No one is currently pending Full & Final settlement.</p>
+        ) : (
+          <div className="overflow-x-auto overscroll-x-contain -mx-1">
+            <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
+              <thead>
+                <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  <th style={{ padding: "6px 10px" }}>Name</th>
+                  <th style={{ padding: "6px 10px" }}>Type</th>
+                  <th style={{ padding: "6px 10px" }}>Exit Reason</th>
+                  <th style={{ padding: "6px 10px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((p) => (
+                  <tr key={p._id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>{p.name} ({p.employeeId})</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{MODEL_LABEL[p.employeeModel] || p.employeeModel}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <Badge color={C.red} bg={C.redBg}>{EXIT_TYPE_LABEL[p.workingStatus] || p.workingStatus}</Badge>
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <PrimaryButton onClick={() => setFormModal({ mode: "generate", person: p })} style={{ padding: "7px 14px", minHeight: 32, fontSize: 12.5 }}>
+                        Generate F&F
+                      </PrimaryButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Card
+        title="Full & Final Records"
+        right={
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ maxWidth: 160 }}>
+            <option value="">All Statuses</option>
+            <option value="generated">Generated</option>
+            <option value="approved">Approved</option>
+            <option value="paid">Paid</option>
+            <option value="on_hold">On Hold</option>
+          </Select>
+        }
+      >
+        {recordsLoading ? (
+          <div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading…</div>
+        ) : records.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13 }}>No Full & Final records yet.</p>
+        ) : (
+          <div className="overflow-x-auto overscroll-x-contain -mx-1">
+            <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 820 }}>
+              <thead>
+                <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                  <th style={{ padding: "6px 10px" }}>Name</th>
+                  <th style={{ padding: "6px 10px" }}>Exit Reason</th>
+                  <th style={{ padding: "6px 10px" }}>Net Payable</th>
+                  <th style={{ padding: "6px 10px" }}>Status</th>
+                  <th style={{ padding: "6px 10px" }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((f) => (
+                  <tr key={f._id} style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 600, color: C.text }}>
+                      {f.employeeSnapshot?.name} ({f.employeeSnapshot?.employeeId})
+                    </td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{EXIT_TYPE_LABEL[f.exitType] || f.exitType}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.brandDark }}>{fmtINR(f.netPayable)}</td>
+                    <td style={{ padding: "8px 10px" }}>{statusBadge(f.status)}</td>
+                    <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
+                      <GhostButton onClick={() => setViewSlip(f)} style={{ marginRight: 8 }}>View</GhostButton>
+                      {f.status === "generated" && (
+                        <GhostButton onClick={() => setFormModal({ mode: "edit", record: f })} style={{ marginRight: 8 }}>Edit</GhostButton>
+                      )}
+                      {f.status === "generated" && <GhostButton onClick={() => handleStatus(f._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
+                      {f.status === "approved" && <GhostButton onClick={() => handleStatus(f._id, "paid")} style={{ marginRight: 8 }}>Mark Paid</GhostButton>}
+                      {f.status !== "on_hold" && f.status !== "paid" && <GhostButton onClick={() => handleStatus(f._id, "on_hold")} style={{ marginRight: 8 }}>Hold</GhostButton>}
+                      {f.status === "on_hold" && <GhostButton onClick={() => handleStatus(f._id, "approved")} style={{ marginRight: 8 }}>Resume</GhostButton>}
+                      {f.status === "generated" && (
+                        <GhostButton onClick={() => setConfirmTarget(f)} style={{ color: C.red, borderColor: C.red }}>Delete</GhostButton>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <FnFFormModal
+        open={Boolean(formModal)}
+        mode={formModal?.mode}
+        person={formModal?.person}
+        record={formModal?.record}
+        notify={notify}
+        onClose={() => setFormModal(null)}
+        onSaved={() => setFormModal(null)}
+      />
+      <FnFSlipModal fnf={viewSlip} onClose={() => setViewSlip(null)} />
+      <ConfirmDialog
+        open={Boolean(confirmTarget)}
+        title="Delete this Full & Final record?"
+        message={confirmTarget ? `This will permanently delete the Full & Final settlement for ${confirmTarget.employeeSnapshot?.name}. This cannot be undone.` : ""}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </>
   );
 }
 
@@ -2061,6 +2835,9 @@ const TAB_ICONS = {
   ),
   records: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4V4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
+  fnf: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75M9 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
   ),
 };
 
@@ -2144,9 +2921,10 @@ export default function Payroll() {
         {tab === "structures" && <StructuresTab notify={notify} directory={directory} />}
         {tab === "generate" && <GenerateTab notify={notify} directory={directory} />}
         {tab === "records" && <RecordsTab notify={notify} directory={directory} />}
+        {tab === "fnf" && <FnFTab notify={notify} />}
         </div>
       </div>
     </div>
   );
-  
+
 }

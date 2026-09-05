@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
   FiLinkedin, FiInstagram, FiMail,
@@ -83,8 +84,6 @@ function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   }, [])
 
   const scrollToTop = () => {
-    // Jo bhi actually scroll ho raha ho — ref wala div, ya window/document —
-    // sabko try karo taaki chahe jahan bhi scrolling ho rahi ho, kaam kare.
     scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
     document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
@@ -220,7 +219,6 @@ function TalkToExpertButton({ phone = '+917017415604', className }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
-    // mobile pe default tel: link behavior chalne do
   }
 
   return (
@@ -728,34 +726,38 @@ function Pricing() {
     {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
-      monthlyPrice: 47,
-      yearlyPrice: Math.round(47 * 0.8),
-      suffix: '/mo/user',
-      features: ['Employee database','Attendance tracking','Leave management','Basic payroll','Employee self-service portal','Email support (24/7)']
+      inherits: null,
+      monthlyPrice: 39,
+      yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
-      desc: 'For growing businesses that need more. Everything in Starter +',
-      monthlyPrice: 119,
-      yearlyPrice: Math.round(119 * 0.8),
-      suffix: '/mo/user',
+      desc: 'For growing businesses that need more',
+      inherits: 'Everything in Basic +',
+      monthlyPrice: 99,
+      yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Recruitment / Applicant tracking','Performance management','Advanced payroll','Custom policies/workflows','Reports & analytics','Telephonic support (24/7)']
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
+      crossFeatures: []
     },
     {
       name: 'Enterprise',
-      desc: 'Ultimate power and flexibility. Everything in Growth +',
+      desc: 'Ultimate power and flexibility',
+      inherits: 'Everything in Advance +', // <- price ke neeche dark/bold highlighted dikhega
       monthlyPrice: null,
       yearlyPrice: null,
-      suffix: '',
       features: [
-        'Multi-company support',
-        'Role-based permissions',
-        'SSO',
+        'Free Smartphone gifthamper',
+        'Face Attendence',
+        'Custom Integrations',
+        'Single Sign-On',
         'API access',
-        'Custom integrations',
+        'On-premises/ Private cloud hosting',
         'Dedicated account manager',
       ],
+      crossFeatures: []
     }
   ]
 
@@ -797,19 +799,31 @@ function Pricing() {
               </button>
               <span className={`text-sm font-ui font-semibold px-2 flex items-center gap-1.5 ${billing === 'yearly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
                 Yearly
-                <span className="text-[10px] bg-[#7A004B] text-white font-bold px-2 py-0.5 rounded-full">Save 20%</span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-opacity duration-300 ${
+                    billing === 'yearly'
+                      ? 'bg-[#7A004B] text-white opacity-100'
+                      : 'bg-[#7A004B] text-white opacity-40'
+                  }`}
+                >
+                  Save 17%
+                </span>
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-center mb-6 pt-5">
+          {/* items-stretch (not items-center) so every card fills the row's full height —
+              combined with h-full below, this keeps Basic / Advance / Enterprise
+              all exactly the same size regardless of how many features each lists. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
+              const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] transition-transform duration-300 ${
-                    p.popular ? 'lg:scale-[1.045] relative z-[5]' : 'hover:scale-[1.02]'
+                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
+                    p.popular ? 'relative z-[5]' : 'hover:scale-[1.02]'
                   }`}
                 >
                   {p.popular && (
@@ -826,13 +840,23 @@ function Pricing() {
                       {price !== null ? `₹${price}` : 'Custom'}
                     </span>
                     {price !== null && (
-                      <span className="text-sm font-body text-[#999] ml-1">{p.suffix}</span>
+                      <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
+                    )}
+                    {p.inherits && (
+                      <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">
+                        {p.inherits}
+                      </div>
                     )}
                   </div>
-                  <ul className="list-none p-0 m-0 flex flex-col gap-2.5">
+                  <ul className="list-none p-0 m-0 flex flex-col gap-2.5 flex-1">
                     {p.features.map(f => (
                       <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
-                        <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />{f}
+                        {p.crossFeatures?.includes(f) ? (
+                          <FiX className="text-[#7A004B] shrink-0 mt-0.5" />
+                        ) : (
+                          <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />
+                        )}
+                        {f}
                       </li>
                     ))}
                   </ul>
@@ -899,15 +923,18 @@ function Pricing() {
       </Wrap>
     </section>
   )
-}
+} 
+
+
+
 function Testimonials() {
   const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
-    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'Alexa', role: 'HR Manager', co: 'LOGOIPSUM', initials: 'AL' },
-    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', co: 'LOGOIPSUM', initials: 'AV' },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', co: 'LOGOIPSUM', initials: 'RS' },
-    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', co: 'LOGOIPSUM', initials: 'KM' },
-    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', co: 'LOGOIPSUM', initials: 'MP' },
+    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'AL' },
+    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director',  initials: 'AV' },
+    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead' , initials: 'RS' },
+    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources',  initials: 'KM' },
+    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer',  initials: 'MP' },
   ]
   const visibleTestimonials = testimonials.slice(startIndex, startIndex + 3)
 
@@ -927,25 +954,25 @@ function Testimonials() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 mb-12">
             {visibleTestimonials.map((t, i) => (
               <motion.div
-                key={t.name}
-                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
-                className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
-              >
-                <div className="text-5xl font-display font-black text-[#7A004B] leading-[0.7] mb-3.5">"</div>
-                <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
-                <hr className="border-none border-t border-[#E6D6DF] mb-4" />
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
-                    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
-                    <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
-                  </div>
-                  <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
-                </div>
-              </motion.div>
+  key={t.name}
+  initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
+  className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
+>
+  <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
+  <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
+  <hr className="border-none border-t border-[#E6D6DF] mb-4" />
+  <div className="flex items-center gap-2.5">
+    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+      <span className="text-white text-xs font-display font-bold">{t.initials}</span>
+    </div>
+    <div className="flex-1">
+      <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
+      <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
+    </div>
+    <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
+  </div>
+</motion.div>
             ))}
           </div>
 
@@ -999,7 +1026,6 @@ function Testimonials() {
     </section>
   )
 }
-
 const legalDocs = {
   privacy: {
     title: 'Privacy Policy', effective: 'April 01, 2026',

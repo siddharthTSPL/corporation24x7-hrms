@@ -41,7 +41,9 @@ import {
   setKioskPassword,
   getLeavePolicy,
   setLeavePolicy,
-  getParticularAdmin
+  getParticularAdmin,
+  setAdminHRRole,
+  superAdminAcknowledgeReview
 } from "../../../api/superadmin/other/su.other";
 
 
@@ -59,6 +61,26 @@ export const useGetAllReviews = (params = {}) => {
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useSetAdminHRRole = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setAdminHRRole,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+    },
+  });
+};
+
+export const useSuperAdminAcknowledgeReview = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: superAdminAcknowledgeReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allReviews"] });
+    },
   });
 };
 
@@ -431,9 +453,9 @@ export const useSuperAdminInactiveUsers = () => {
 export const useSetAdminWorkingStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, working_status }) => {
+    mutationFn: async ({ id, working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay }) => {
       try {
-        return await setAdminWorkingStatus(id, working_status);
+        return await setAdminWorkingStatus(id, working_status, { noticePeriodAllowed, noticePeriodMonths, lastWorkingDay });
       } catch (err) {
         const payload = err?.response?.data || err?.data || err;
         throw payload;

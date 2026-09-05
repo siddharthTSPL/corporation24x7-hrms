@@ -18,7 +18,7 @@ const payrollSchema = new mongoose.Schema(
     employeeModel: {
       type: String,
       required: true,
-      enum: ["User", "Manager", "Admin"],
+      enum: ["User", "Manager", "Admin", "SuperAdmin"],
     },
 
     month: { type: Number, required: true, min: 1, max: 12 },

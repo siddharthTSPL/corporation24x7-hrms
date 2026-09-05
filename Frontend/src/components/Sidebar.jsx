@@ -19,7 +19,8 @@ import {
   FaShieldAlt,
   FaUsersCog,
   FaLock,
-  FaMoneyCheckAlt,
+  FaFileInvoiceDollar,  
+  FaFileSignature,       
   FaClipboardCheck,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
@@ -28,6 +29,7 @@ import { useLogoutManager } from "../auth/server-state/manager/managerauth/manag
 import { useLogoutUser } from "../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { useLogoutSuperAdmin } from "../auth/server-state/superadmin/auth/suauth.hook";
 import { usePermissionStore } from "../auth/store/permission/permissionStore";
+import { usePlanFeatures } from "../auth/server-state/planFeature/planFeature.hook";
 import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
 import FloatingHelp from "./help/FloatingHelp";
@@ -39,14 +41,14 @@ const superAdminMenu = [
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
   { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn />, blurb: "Broadcast announcements across all organisations." },
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt />, blurb: "See and manage leave requests across every organisation." },
-  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations." },
-  {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history." },
+  { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations.", planFeature: "review" },
+  {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history.", planFeature: "asset" },
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt />, blurb: "Access documents uploaded by teams across organisations." },
-  { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide." },
+  { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide.", planFeature: "timesheet" },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
-  { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaMoneyCheckAlt />, blurb: "Oversee payroll runs across every organisation." },
-  { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaMoneyCheckAlt />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
-  { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees." },
+  { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
+  { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
+  { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
 ];
 
@@ -55,19 +57,19 @@ const adminMenu = [
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers />, blurb: "Add and manage employees and managers." },
   { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />, blurb: "Create and publish announcements for your organisation.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-create"]', title: "Creating an announcement", content: "Click here to write a new announcement. Once published, it's instantly visible to your managers and employees." } },
-  { name: "Review",        path: "/review-admin",        icon: <FaClipboardCheck />, blurb: "Run and track performance reviews for your team." },
+  { name: "Review",        path: "/review-admin",        icon: <FaClipboardCheck />, blurb: "Run and track performance reviews for your team.", planFeature: "review" },
   { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt />, blurb: "Approve or reject leave requests from managers and employees.",
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review pending requests, check your own leave balance, or apply for your own leave and WFH." } },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets." },
+  { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", planFeature: "asset" },
   { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt />, blurb: "Enroll employee faces for kiosk-based attendance." },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, blurb: "Post hiring requisitions and track candidates.",
-    permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
-  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+    permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
+  { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
-  { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets." },
-  { name: "Payroll",       path: "/payroll",             icon: <FaMoneyCheckAlt />, blurb: "Run payroll and manage payslips." },
-  { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaMoneyCheckAlt />, blurb: "Review claims from employees and managers, and submit your own." },
+  { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets.", planFeature: "timesheet" },
+  { name: "Payroll",       path: "/payroll",             icon: <FaFileInvoiceDollar />, blurb: "Run payroll and manage payslips." },
+  { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaFileSignature />, blurb: "Review claims from employees and managers, and submit your own." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
@@ -81,12 +83,12 @@ const managerMenu = [
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />, blurb: "View and share announcements with your team.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Announcements published by your admin show up here, newest first." } },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees." },
-  { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets." },
-  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees.", planFeature: "review" },
+  { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets.", planFeature: "timesheet" },
+  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"] },
-  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+  { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
+  { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
@@ -98,10 +100,10 @@ const employeeMenu = [
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet." },
-  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaMoneyCheckAlt />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet.", planFeature: "timesheet" },
+  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"],
+  { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
 ];
@@ -127,6 +129,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const can = usePermissionStore((state) => state.can);
   const permRole = usePermissionStore((state) => state.role);
   const clearPermissions = usePermissionStore((state) => state.clearPermissions);
+  const { data: planFeatures } = usePlanFeatures();
 
   const { mutate: logoutSuperAdmin, isPending: pendingSuperAdmin } = useLogoutSuperAdmin();
   const { mutate: logoutAdmin,      isPending: pendingAdmin }      = useAdminLogout();
@@ -139,6 +142,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showSupport, setShowSupport] = useState(false);
   const [showDocs,    setShowDocs]    = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [upgradeFeatureName, setUpgradeFeatureName] = useState(null);
 
   const menu = menuByRole[role] ?? employeeMenu;
 
@@ -152,17 +156,17 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     return item.permissionGroup.some((p) => can(p));
   };
 
-  // Built straight from the role's own menu so the tour never drifts out of
-  // sync with what's actually in the sidebar. Items hidden by a permission
-  // gate are left out — HelpTour also self-skips if a target ever vanishes
-  // mid-tour (e.g. permissions load in late).
-  //
-  // Each menu item contributes at least one step (pointing at its sidebar
-  // entry). Items that carry a `pageStep` (Announcement, Leave, TorchX
-  // Voice) contribute a second step right after it — that one sets `path`,
-  // so HelpTour navigates into the actual page and spotlights the real
-  // control (the "New Announcement" button, the "Apply Leave" tab, etc.)
-  // instead of only describing it from the sidebar.
+  // Review / Timesheet / Recruitment are locked on the Basic plan and open
+  // on Advance/enterprise (or during the free trial). Until plan data has
+  // loaded we don't block on it — permission checks (isAllowed) already
+  // gate the item, and once planFeatures resolves this recomputes.
+  const isPlanLocked = (item) => {
+    if (!item.planFeature) return false;
+    if (!planFeatures) return false;
+    return planFeatures.features?.[item.planFeature] === false;
+  };
+
+
   const tourSteps = [
     {
       selector: '[data-tour="sidebar-brand"]',
@@ -170,7 +174,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
       content: "Here's a quick walkthrough of what you can do from here — it takes less than a minute.",
     },
     ...menu
-      .filter((item) => isAllowed(item) && item.blurb)
+      .filter((item) => isAllowed(item) && !isPlanLocked(item) && item.blurb)
       .flatMap((item) => {
         const navStep = {
           selector: `[data-tour="menu-${item.path}"]`,
@@ -294,15 +298,26 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
           {open && (
             <nav className="px-2 flex flex-col gap-1">
               {menu.map((item, index) => {
-                const active  = location.pathname === item.path;
-                const allowed = isAllowed(item);
+                const active     = location.pathname === item.path;
+                const planLocked = isPlanLocked(item);
+                const allowed    = isAllowed(item) && !planLocked;
 
                 return (
                   <Link
                     key={index}
                     to={allowed ? item.path : location.pathname}
-                    onClick={(e) => { if (!allowed) e.preventDefault(); }}
-                    title={!allowed && collapsed ? `${item.name} — No permission` : undefined}
+                    onClick={(e) => {
+                      if (allowed) return;
+                      e.preventDefault();
+                      if (planLocked) setUpgradeFeatureName(item.name);
+                    }}
+                    title={
+                      !allowed && collapsed
+                        ? planLocked
+                          ? `${item.name} — Upgrade to Advance or Enterprise`
+                          : `${item.name} — No permission`
+                        : undefined
+                    }
                     data-tour={`menu-${item.path}`}
                     className={`flex items-center gap-3 p-3 rounded-lg transition-colors
                       ${active && allowed  ? "bg-[#730042] text-white" : ""}
@@ -318,7 +333,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                     {!collapsed && (
                       <span className="flex-1 flex items-center justify-between text-sm">
                         <span className={!allowed ? "opacity-50" : ""}>{item.name}</span>
-                        {!allowed && (
+                        {!allowed && planLocked && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wide text-[#CD166E] flex-shrink-0" title="Upgrade to Advance or Enterprise">
+                            Upgrade
+                          </span>
+                        )}
+                        {!allowed && !planLocked && (
                           <FaLock size={9} className="text-gray-400 flex-shrink-0" />
                         )}
                       </span>
@@ -399,6 +419,54 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               >
                 {isPending ? "Logging out..." : "Yes, Logout"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {upgradeFeatureName && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+          style={{ background: "rgba(115,0,66,0.32)", backdropFilter: "blur(2px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setUpgradeFeatureName(null);
+          }}
+        >
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#F4C0D1] bg-white shadow-2xl">
+            <div className="px-6 pt-6 pb-4" style={{ background: "#FBEAF0" }}>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
+                <FaLock className="text-[#730042]" size={16} />
+              </div>
+              <h3 className="text-center text-[15px] font-semibold text-[#730042]">
+                {upgradeFeatureName} isn&apos;t on your plan
+              </h3>
+              <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
+                {role === "superadmin"
+                  ? `You're on the Basic plan, which has limited features. Upgrade to Advance or Enterprise to unlock ${upgradeFeatureName}.`
+                  : `Your organization is on the Basic plan, which has limited features.`}
+              </p>
+            </div>
+
+            <div className="flex gap-3 px-6 py-5">
+              <button
+                type="button"
+                onClick={() => setUpgradeFeatureName(null)}
+                className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0]"
+              >
+                {role === "superadmin" ? "Maybe later" : "Got it"}
+              </button>
+              {role === "superadmin" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUpgradeFeatureName(null);
+                    window.open("https://torchxsuite.com/Store", "_blank", "noopener,noreferrer");
+                  }}
+                  className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
+                  style={{ background: "#730042" }}
+                >
+                  Upgrade Plan
+                </button>
+              )}
             </div>
           </div>
         </div>

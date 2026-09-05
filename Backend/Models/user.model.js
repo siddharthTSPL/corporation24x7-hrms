@@ -24,9 +24,13 @@ const userSchema = new mongoose.Schema(
     },
 
     department: {
+      // Free-text department name/code. Used to be a fixed enum
+      // (OPR/BPO/ENG/HR/MGMT) - now each organisation manages its own list
+      // of departments (see Models/department.model.js) via TorchX Management,
+      // so this just stores whatever department name was picked.
       type: String,
-      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: [true, "Department is required"],
+      trim: true,
     },
 
     Under_manager: {
@@ -136,12 +140,25 @@ const userSchema = new mongoose.Schema(
       enum:["working","resigned","fired","terminated"],
       default:"working"
     },
+    noticePeriod: {
+      active: { type: Boolean, default: false },
+      exitType: { type: String, enum: ["resigned", "fired", "terminated", null], default: null },
+      months: { type: Number, default: null },
+      initiatedOn: { type: Date, default: null },
+      lastWorkingDay: { type: Date, default: null },
+      initiatedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+      initiatedByModel: { type: String, enum: ["Admin", "SuperAdmin", null], default: null },
+    },
 
     isFirstLogin: { type: Boolean, default: true },
     passwordupdatedAt: { type: Date, default: Date.now },
     isverified: { type: Boolean, default: false },
     date_of_joining: { type: Date, default: null },
     date_of_birth: { type: Date, default: null },
+    // Calendar year the "Happy Birthday" popup was last shown/dismissed for
+    // this person, so it appears once on their birthday (first login of that
+    // day) and then stays quiet for the rest of the year.
+    lastBirthdayWishYear: { type: Number, default: null },
   },
   { timestamps: true }
 );

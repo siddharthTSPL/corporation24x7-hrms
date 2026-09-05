@@ -24,9 +24,11 @@ const adminSchema = new mongoose.Schema(
     },
 
     department: {
+      // Free-text department name/code - see Models/department.model.js;
+      // organisations manage their own custom department list now.
       type: String,
-      enum: ["OPR", "BPO", "ENG", "HR", "MGMT"],
       required: true,
+      trim: true,
     },
 
     f_name: {
@@ -107,6 +109,14 @@ const adminSchema = new mongoose.Schema(
       type: String,
       enum: ["admin", "senior_admin", "official"],
       default: "admin",
+    },
+
+    // Set only by SuperAdmin. When true, this Admin can give the final
+    // "HR Acknowledgement" approval on any performance review in the
+    // organisation. Multiple admins can hold this flag at once.
+    isHR: {
+      type: Boolean,
+      default: false,
     },
 
     designation: {
@@ -213,6 +223,16 @@ const adminSchema = new mongoose.Schema(
       trim: true,
     },
 
+    noticePeriod: {
+      active: { type: Boolean, default: false },
+      exitType: { type: String, enum: ["resigned", "fired", "terminated", null], default: null },
+      months: { type: Number, default: null },
+      initiatedOn: { type: Date, default: null },
+      lastWorkingDay: { type: Date, default: null },
+      initiatedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+      initiatedByModel: { type: String, enum: ["Admin", "SuperAdmin", null], default: null },
+    },
+
     isVerified: {
       type: Boolean,
       default: false,
@@ -235,6 +255,14 @@ const adminSchema = new mongoose.Schema(
 
     date_of_birth: {
       type: Date,
+      default: null,
+    },
+
+    // Calendar year the "Happy Birthday" popup was last shown/dismissed for
+    // this person, so it appears once on their birthday (first login of that
+    // day) and then stays quiet for the rest of the year.
+    lastBirthdayWishYear: {
+      type: Number,
       default: null,
     },
   },

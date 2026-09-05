@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   useMyProjects, useCreateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
-  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus, useArchiveJob,
+  useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
   useOverrunRiskJobs, useIdleJobs, useTeamWorkloadHeatmap,
   usePendingApprovals, useApproveTimesheet, useRejectTimesheet,
   useOrgAllTimeLogs, useOrgAllTimesheets,
@@ -9,15 +9,21 @@ import {
   useResumeTimer, useStopTimer, useDiscardTimer, useHeartbeatTimer,
   useMyWeekLog, useLogTime, useSubmitTimesheet, useMyTimesheets,
   useRecallTimesheet, useMyProductivitySummary, useJobById,
-  useForwardTimesheet,
+  useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
+import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
+import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+const todayISTKey = (d = new Date()) =>
+  new Date(new Date(d).getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 
 const getMonday = (d = new Date()) => {
-  const dt = new Date(d);
-  const day = dt.getDay();
+  const dt = new Date(`${todayISTKey(d)}T00:00:00.000Z`);
+  const day = dt.getUTCDay();
   const diff = day === 0 ? -6 : 1 - day;
-  dt.setDate(dt.getDate() + diff);
-  dt.setHours(0, 0, 0, 0);
+  dt.setUTCDate(dt.getUTCDate() + diff);
   return dt.toISOString().slice(0, 10);
 };
 
@@ -41,6 +47,15 @@ const nonNegative = (v) => {
   const n = Number(v);
   if (Number.isNaN(n)) return v;
   return n < 0 ? "0" : v;
+};
+
+const clampMaxHoursPerDay = (v) => {
+  if (v === "") return "";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  if (n < 0) return "0";
+  if (n > 24) return "24";
+  return v;
 };
 
 const STATUS_STYLE = {
@@ -79,6 +94,7 @@ const NAV_TABS = [
   { id: "org-logs",   label: "All Logs"       },
   { id: "org-sheets", label: "All Timesheets" },
   { id: "analytics",  label: "Analytics"      },
+  { id: "report",     label: "Time Sheet Report" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -89,9 +105,9 @@ function fmtRate(rate, currency) {
   return `${symbol}${rate}/hr`;
 }
 
-function Badge({ tw = "text-gray-400 bg-gray-100 border-gray-200", children }) {
+function Badge({ tw = "text-gray-500 bg-gray-100 border-gray-200", children }) {
   return (
-    <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border whitespace-nowrap shrink-0", tw)}>
+    <span className={cn("inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap shrink-0", tw)}>
       {children}
     </span>
   );
@@ -101,7 +117,7 @@ function Card({ children, className = "", onClick }) {
   return (
     <div
       onClick={onClick}
-      className={cn("bg-white border border-[#E4E6EF] rounded-2xl shadow-sm min-w-0 overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/30 transition-colors", className)}
+      className={cn("bg-white border border-gray-200 rounded-lg min-w-0 overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/40 transition-colors", className)}
     >
       {children}
     </div>
@@ -109,10 +125,12 @@ function Card({ children, className = "", onClick }) {
 }
 
 function StatTile({ label, value, sub, colorClass = "text-[#730042]" }) {
+  const barColor = colorClass.replace("text-", "bg-");
   return (
-    <Card className="px-3 sm:px-6 py-3.5 sm:py-5">
+    <Card className="relative pl-4 pr-3.5 sm:pl-6 sm:pr-6 py-3.5 sm:py-5">
+      <span className={cn("absolute top-0 left-0 h-full w-[3px]", barColor)} />
       <div className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 sm:mb-1.5 truncate">{label}</div>
-      <div className={cn("text-lg sm:text-3xl lg:text-4xl font-extrabold leading-none mb-1 truncate", colorClass)}>{value}</div>
+      <div className={cn("text-lg sm:text-3xl lg:text-4xl font-bold tracking-tight leading-none mb-1 truncate", colorClass)}>{value}</div>
       {sub && <div className="text-[10px] sm:text-[12px] text-gray-400 truncate">{sub}</div>}
     </Card>
   );
@@ -126,11 +144,11 @@ function Modal({ open, onClose, title, children }) {
   }, [open]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-[6px] overflow-hidden">
-      <div className="bg-white border border-[#E4E6EF] sm:rounded-[18px] w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#E4E6EF] shrink-0 min-w-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-gray-900/45 overflow-hidden">
+      <div className="bg-white border border-gray-200 sm:rounded-xl w-full h-full sm:h-auto sm:w-[95vw] md:w-[80vw] lg:max-w-[520px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden shadow-xl">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 shrink-0 min-w-0">
           <span className="font-bold text-[14px] sm:text-[15px] text-gray-900 truncate min-w-0">{title}</span>
-          <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
+          <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
         </div>
         <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0">{children}</div>
       </div>
@@ -142,7 +160,7 @@ function Input({ label, className = "", ...props }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <input {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors placeholder:text-gray-300 min-h-[44px]", className)} />
+      <input {...props} className={cn("bg-white border border-gray-300 rounded-md px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors placeholder:text-gray-400 min-h-[44px]", className)} />
     </div>
   );
 }
@@ -151,7 +169,7 @@ function Select({ label, children, className = "", ...props }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-0">
       {label && <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</label>}
-      <select {...props} className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-[10px] px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 appearance-none cursor-pointer focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/15 transition-colors min-h-[44px]", className)}>
+      <select {...props} className={cn("bg-white border border-gray-300 rounded-md px-3.5 py-2.5 text-[13px] text-gray-900 outline-none w-full min-w-0 appearance-none cursor-pointer focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors min-h-[44px]", className)}>
         {children}
       </select>
     </div>
@@ -159,13 +177,15 @@ function Select({ label, children, className = "", ...props }) {
 }
 
 function Btn({ children, variant = "primary", onClick, disabled, type = "button", className = "" }) {
-  const base = "inline-flex items-center justify-center rounded-[10px] px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-all disabled:opacity-55 disabled:cursor-not-allowed min-h-[44px]";
+  const base = cn(
+    "inline-flex items-center justify-center rounded-md px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors disabled:opacity-55 disabled:cursor-not-allowed min-h-[44px]"
+  );
   const variants = {
-    primary: "bg-gradient-to-r from-[#730042] to-[#8f0050] text-white shadow-sm hover:shadow-md hover:brightness-110",
-    ghost:   "bg-transparent text-gray-600 border border-[#E4E6EF] hover:bg-gray-50",
-    danger:  "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100",
-    success: "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100",
-    amber:   "bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100",
+    primary: "bg-[#730042] text-white hover:bg-[#5c0034]",
+    ghost:   "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50",
+    danger:  "bg-white text-red-600 border border-red-300 hover:bg-red-50",
+    success: "bg-white text-emerald-600 border border-emerald-300 hover:bg-emerald-50",
+    amber:   "bg-white text-amber-600 border border-amber-300 hover:bg-amber-50",
   };
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={cn(base, variants[variant], className)}>
@@ -178,7 +198,7 @@ function SectionHeader({ title, sub, action }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-5 min-w-0">
       <div className="min-w-0">
-        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900 truncate">{title}</div>
+        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900 truncate tracking-tight">{title}</div>
         {sub && <div className="text-[12px] text-gray-400 mt-0.5 truncate">{sub}</div>}
       </div>
       {action && <div className="shrink-0 w-full sm:w-auto min-w-0">{action}</div>}
@@ -214,31 +234,31 @@ function JobDetailModal({ jobId, open, onClose }) {
             {job.description && <div className="text-[13px] text-gray-500 leading-relaxed break-words">{job.description}</div>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_to_info?.name || "—"}</div>
               <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_to_info?.model === "User" ? "Employee" : (job.assigned_to_info?.role || job.assigned_to_info?.model || "")}</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned By</div>
               <div className="text-[13px] font-bold text-gray-900 truncate">{job.assigned_by_info?.name || "—"}</div>
               <div className="text-[11px] text-[#730042] font-semibold truncate">{job.assigned_by_info?.model === "User" ? "Employee" : (job.assigned_by_info?.role || job.assigned_by_info?.model || "")}</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</div>
               <Badge tw={JOB_STATUS_TW[job.status] ? `${JOB_STATUS_TW[job.status]} bg-gray-50 border-gray-200` : "text-gray-400 bg-gray-50 border-gray-200"}>
                 {job.status.replace(/_/g, " ")}
               </Badge>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Priority</div>
               <Badge tw={PRIORITY_TW[job.priority] || PRIORITY_TW.medium}>{job.priority}</Badge>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Logged</div>
               <div className="text-[15px] font-bold text-[#730042]">{job.logged_hours_cache?.toFixed(1) || 0}h</div>
             </div>
-            <div className="bg-[#F8F9FC] rounded-xl p-3 min-w-0">
+            <div className="bg-gray-50/80 rounded-xl p-3 min-w-0 ring-1 ring-gray-100">
               <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Estimated</div>
               <div className="text-[15px] font-bold text-gray-900">{job.estimated_hours || 0}h</div>
             </div>
@@ -251,7 +271,7 @@ function JobDetailModal({ jobId, open, onClose }) {
                   {Math.round((job.logged_hours_cache / job.estimated_hours) * 100)}%
                 </span>
               </div>
-              <div className="h-1.5 bg-[#E4E6EF] rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{ width: `${Math.min(100, (job.logged_hours_cache / job.estimated_hours) * 100)}%`, background: job.overrun_flagged ? "#DC2626" : "#730042" }}
@@ -340,10 +360,10 @@ function TimerWidget({ assignedJobs }) {
 
   return (
     <>
-      <div className={cn("rounded-2xl overflow-hidden border transition-all min-w-0",
-        isRunning ? "border-[#730042]/20 bg-gradient-to-br from-[#730042] to-[#9a0058] shadow-md shadow-[#730042]/15"
+      <div className={cn("rounded-lg overflow-hidden border transition-colors min-w-0",
+        isRunning ? "border-[#730042] bg-[#730042]"
         : isPaused ? "border-amber-200 bg-amber-50"
-        : "border-[#E4E6EF] bg-white shadow-sm")}>
+        : "border-gray-200 bg-white")}>
         <div className="px-4 py-3 flex items-center gap-2.5 min-w-0">
           {isRunning && (
             <span className="relative flex h-2 w-2 shrink-0">
@@ -426,11 +446,11 @@ function TimerWidget({ assignedJobs }) {
 
 function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
-  const todayISO = new Date().toISOString().slice(0, 10);
+  const todayISO = todayISTKey();
   return (
-    <div className="bg-white border border-[#E4E6EF] rounded-2xl overflow-hidden shadow-sm min-w-0">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
       {/* Mobile: stacked day-by-day list — no horizontal scroll needed */}
-      <div className="flex flex-col divide-y divide-[#E4E6EF] sm:hidden">
+      <div className="flex flex-col divide-y divide-gray-100 sm:hidden">
         {days.map((d, i) => {
           const iso = d.toISOString().slice(0, 10);
           const isToday = iso === todayISO;
@@ -464,13 +484,13 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
 
       {/* Tablet/desktop: 7-column grid */}
       <div className="hidden sm:block min-w-0">
-        <div className="grid grid-cols-7 border-b border-[#E4E6EF]">
+        <div className="grid grid-cols-7 border-b border-gray-100">
           {days.map((d, i) => {
             const iso = d.toISOString().slice(0, 10);
             const isToday = iso === todayISO;
             const mins = weekDays[iso]?.totalMinutes || 0;
             return (
-              <div key={iso} className={cn("px-1 sm:px-2 pt-3 pb-2 text-center min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
+              <div key={iso} className={cn("px-1 sm:px-2 pt-3 pb-2 text-center min-w-0", i < 6 ? "border-r border-gray-100" : "", isToday ? "bg-[#730042]/[0.05]" : "")}>
                 <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wide">{DAY_NAMES[i]}</div>
                 <div className={cn("text-base sm:text-lg font-extrabold mt-0.5", isToday ? "text-[#730042]" : "text-gray-800")}>{d.getDate()}</div>
                 {mins > 0
@@ -486,7 +506,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
             const logs = weekDays[iso]?.logs || [];
             const isToday = iso === todayISO;
             return (
-              <div key={iso} className={cn("px-1 sm:px-1.5 py-2 flex flex-col gap-1 min-w-0", i < 6 ? "border-r border-[#E4E6EF]" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
+              <div key={iso} className={cn("px-1 sm:px-1.5 py-2 flex flex-col gap-1 min-w-0", i < 6 ? "border-r border-gray-100" : "", isToday ? "bg-[#730042]/[0.02]" : "")}>
                 {logs.map((log) => (
                   <div key={log._id}
                     className={cn("border rounded-lg px-1.5 sm:px-2 py-1.5 cursor-default min-w-0",
@@ -518,7 +538,7 @@ export default function SuperAdminTimesheet() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [jobDetailOpen, setJobDetailOpen] = useState(false);
   const [logModal, setLogModal] = useState(false);
-  const [logForm, setLogForm] = useState({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+  const [logForm, setLogForm] = useState({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
   const [editJobOpen, setEditJobOpen] = useState(false);
   const [editJobForm, setEditJobForm] = useState({ id: "", title: "", description: "", priority: "medium", estimated_hours: "", max_hours_per_day: "", billable: true, hourly_rate: "", currency: "INR", due_date: "" });
 
@@ -558,6 +578,47 @@ export default function SuperAdminTimesheet() {
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
+  // ─── Time Sheet Report (detailed + weekend, filterable, org-wide) ────────
+  const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportView, setReportView] = useState("detailed");
+  const [reportEmployeeName, setReportEmployeeName] = useState("");
+  const [reportEmployeeModel, setReportEmployeeModel] = useState("");
+  const [reportDepartment, setReportDepartment] = useState("");
+  const [reportDesignation, setReportDesignation] = useState("");
+  const [reportProject, setReportProject] = useState("");
+  const [reportJob, setReportJob] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reportBillable, setReportBillable] = useState("");
+
+  const reportParams = {
+    week_start: reportWeek,
+    ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
+    ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
+    ...(reportDepartment ? { department: reportDepartment } : {}),
+    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(reportProject ? { project_id: reportProject } : {}),
+    ...(reportJob ? { job_id: reportJob } : {}),
+    ...(reportStatus ? { status: reportStatus } : {}),
+    ...(reportBillable ? { billable: reportBillable } : {}),
+  };
+  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  const { data: departmentsData } = useGetAllDepartmentsSuperAdmin();
+  const reportDepartments = departmentsData?.departments ?? [];
+  const allReportRows = reportData?.rows ?? [];
+  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
+  const reportJobOptions = reportJobsData?.jobs ?? [];
+
+  const exportReportCSV = () => {
+    downloadReportCSV(
+      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
+      TIMESHEET_REPORT_CSV_COLUMNS,
+      `${reportView === "weekend" ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+    );
+  };
+
   const createProject   = useCreateProject();
   const addProjectMembers = useAddProjectMembers();
   const removeProjectMember = useRemoveProjectMember();
@@ -565,7 +626,6 @@ export default function SuperAdminTimesheet() {
   const updateJob       = useUpdateJob();
   const approveTS       = useApproveTimesheet();
   const rejectTS        = useRejectTimesheet();
-  const archiveJob      = useArchiveJob();
   const updateJobStatus = useUpdateJobStatus();
   const logTime         = useLogTime();
   const submitTS        = useSubmitTimesheet();
@@ -696,7 +756,7 @@ export default function SuperAdminTimesheet() {
     logTime.mutate({ ...logForm, duration_minutes: Number(logForm.duration_minutes) }, {
       onSuccess: () => {
         setLogModal(false);
-        setLogForm({ job: "", log_date: new Date().toISOString().slice(0, 10), duration_minutes: "", note: "" });
+        setLogForm({ job: "", log_date: todayISTKey(), duration_minutes: "", note: "" });
         refetchWeek();
       }
     });
@@ -710,77 +770,53 @@ export default function SuperAdminTimesheet() {
   const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
 
   return (
-    <div className="min-h-screen w-full max-w-full bg-[#F8F7FB] overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen w-full max-w-full bg-gray-50 overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      <header className="bg-white border-b border-[#E4E6EF] sticky top-0 z-20 min-w-0 max-w-full overflow-hidden">
-        <div className="flex items-center gap-2 px-3 sm:px-6 min-w-0 max-w-full">
-          <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-6 border-r border-[#E4E6EF] mr-1 sm:mr-2 shrink-0 py-2.5 sm:py-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center shrink-0 shadow-sm">
-              <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-20 min-w-0 max-w-full">
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 min-w-0">
+          <div className="flex items-center justify-between gap-3 py-2.5 sm:py-3 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-[#730042] to-[#94005a] flex items-center justify-center shrink-0 shadow-sm shadow-[#730042]/30">
+                <span className="text-white text-[12px] sm:text-[13px] font-black">S</span>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[13px] font-bold text-gray-900 tracking-tight leading-none">TorchX</div>
+                <div className="text-[9px] sm:text-[10px] text-[#730042] font-bold tracking-wide mt-0.5">SUPER ADMIN</div>
+              </div>
             </div>
-            <div className="hidden sm:block">
-              <div className="text-[13px] font-bold text-gray-900">TorchX</div>
-              <div className="text-[10px] text-gray-400">Super Admin</div>
+
+            <div className="flex gap-2 shrink-0">
+              <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4">
+                <span className="hidden sm:inline">＋ New Job</span>
+                <span className="sm:hidden">＋ Job</span>
+              </Btn>
+              <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ Project</Btn>
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-1 min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar scroll-smooth py-2">
-            {NAV_TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={cn("relative shrink-0 px-3.5 lg:px-4 py-2 rounded-full text-[12px] lg:text-[13px] whitespace-nowrap transition-all border",
-                  tab === t.id
-                    ? "font-bold text-white bg-gradient-to-r from-[#730042] to-[#8f0050] border-transparent shadow-sm"
-                    : "font-medium text-gray-600 border-transparent hover:bg-gray-100 hover:text-gray-900")}>
-                {t.label}
-                {t.id === "approvals" && approvals.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center ring-2 ring-white">
-                    {approvals.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-
-          <div className="md:hidden flex items-center gap-2 flex-1 min-w-0">
-            <button onClick={() => setMobileNavOpen(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E4E6EF] text-[13px] font-semibold text-gray-700 bg-[#F8F9FC] min-h-[40px] max-w-full min-w-0">
-              <span className="truncate min-w-0">{currentTabLabel}</span>
-              <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 16 16">
-                <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {approvals.length > 0 && (
-                <span className="w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shrink-0">{approvals.length}</span>
-              )}
-            </button>
-          </div>
-
-          <div className="flex gap-2 shrink-0 pl-2 sm:pl-4 py-2 sm:py-2.5 border-l border-[#E4E6EF] ml-auto">
-            <Btn onClick={() => setCreateJobOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ New Job</Btn>
-            <Btn variant="ghost" onClick={() => setCreateProjectOpen(true)} className="text-[12px] px-3 sm:px-4 hidden sm:inline-flex">＋ Project</Btn>
-            <Btn onClick={() => setCreateJobOpen(true)} className="text-[11px] px-2.5 sm:hidden">＋ Job</Btn>
+          <div className="pb-2.5 sm:pb-3">
+            <nav className="flex flex-wrap items-center gap-1 bg-gray-50 border border-gray-100 rounded-xl p-1 min-w-0">
+              {NAV_TABS.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={cn("flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-lg text-[12px] lg:text-[13px] font-semibold whitespace-nowrap transition-all",
+                    tab === t.id
+                      ? "bg-[#730042] text-white shadow-sm shadow-[#730042]/30"
+                      : "text-gray-500 hover:text-gray-900 hover:bg-white")}>
+                  {t.label}
+                  {t.id === "approvals" && approvals.length > 0 && (
+                    <span className={cn("inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black",
+                      tab === t.id ? "bg-white/25 text-white" : "bg-red-500 text-white")}>
+                      {approvals.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
-
-        {mobileNavOpen && (
-          <div className="md:hidden border-t border-[#E4E6EF] bg-white max-h-[70vh] overflow-y-auto overflow-x-hidden">
-            {NAV_TABS.map(t => (
-              <button key={t.id} onClick={() => { setTab(t.id); setMobileNavOpen(false); }}
-                className={cn("w-full flex items-center justify-between px-4 sm:px-5 py-3 text-[13px] font-medium border-b border-[#E4E6EF] last:border-0 transition-colors min-h-[44px]",
-                  tab === t.id ? "text-[#730042] bg-[#730042]/[0.04] font-bold" : "text-gray-700 hover:bg-gray-50")}>
-                {t.label}
-                <div className="flex items-center gap-2 shrink-0">
-                  {t.id === "approvals" && approvals.length > 0 && (
-                    <span className="w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center">{approvals.length}</span>
-                  )}
-                  {tab === t.id && <span className="text-[#730042]">✓</span>}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
       </header>
 
-      <div className="bg-[#730042]/[0.07] border-b border-[#730042]/[0.18] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden min-w-0">
+      <div className="bg-gradient-to-r from-[#730042]/[0.08] to-[#730042]/[0.03] border-b border-[#730042]/[0.15] px-3 sm:px-6 py-1.5 flex items-center gap-2 overflow-hidden min-w-0">
         <span className="text-[11px] font-bold text-[#730042] shrink-0">⬡ Super Admin</span>
         <span className="text-[11px] text-[#730042]/70 hidden sm:inline truncate">— Organisation-wide visibility across all roles</span>
       </div>
@@ -804,13 +840,13 @@ export default function SuperAdminTimesheet() {
                 ) : (
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {overrunJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-gray-50/80 border border-gray-200 rounded-xl min-w-0">
                         <span className="text-[12px] font-black text-red-600 min-w-[36px] shrink-0">{job.riskPercent}%</span>
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
                           <div className="text-[11px] text-gray-400">{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
                         </div>
-                        <div className="w-12 sm:w-16 h-1 bg-[#E4E6EF] rounded-full overflow-hidden shrink-0">
+                        <div className="w-12 sm:w-16 h-1 bg-gray-100 rounded-full overflow-hidden shrink-0">
                           <div className="h-full rounded-full" style={{ width: `${Math.min(job.riskPercent, 100)}%`, background: job.riskPercent >= 100 ? "#DC2626" : "#D97706" }} />
                         </div>
                       </div>
@@ -826,7 +862,7 @@ export default function SuperAdminTimesheet() {
                 ) : (
                   <div className="flex flex-col gap-2 max-h-64 overflow-y-auto overflow-x-hidden pr-0.5">
                     {idleJobs.map(job => (
-                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl min-w-0">
+                      <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-gray-50/80 border border-gray-200 rounded-xl min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="text-[12px] font-semibold truncate">{job.title}</div>
@@ -857,13 +893,15 @@ export default function SuperAdminTimesheet() {
                         return row.days?.[d.toISOString().slice(0, 10)];
                       });
                       const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                      const memberMeta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                       return (
                         <div key={i} className="min-w-0">
-                          <div className="text-[12px] font-semibold text-gray-700 truncate mb-1.5">{memberName}</div>
+                          <div className="text-[12px] font-semibold text-gray-700 truncate">{memberName}</div>
+                          {memberMeta && <div className="text-[10px] text-gray-400 truncate mb-1.5">{memberMeta}</div>}
                           <div className="grid grid-cols-7 gap-1">
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
-                              const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
+                              const cellClass = pct === 0 ? "bg-gray-50 text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
                               return (
                                 <div key={j} className="min-w-0 text-center">
                                   <div className="text-[8px] font-bold text-gray-400 mb-0.5">{DAY_NAMES[j][0]}</div>
@@ -884,7 +922,7 @@ export default function SuperAdminTimesheet() {
                     <table className="w-full border-collapse text-[12px] table-fixed">
                       <thead>
                         <tr>
-                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[18%]">Member</th>
+                          <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[24%]">Member</th>
                           {DAY_NAMES.map(d => (
                             <th key={d} className="text-center py-2 px-1.5 text-gray-400 font-semibold">{d}</th>
                           ))}
@@ -898,12 +936,16 @@ export default function SuperAdminTimesheet() {
                             return row.days?.[d.toISOString().slice(0, 10)];
                           });
                           const memberName = row.name || row.member_name || `Member ${i + 1}`;
+                          const memberMeta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                           return (
-                            <tr key={i} className="border-t border-[#E4E6EF]">
-                              <td className="py-2.5 pr-4 pl-1 text-gray-700 font-medium truncate">{memberName}</td>
+                            <tr key={i} className="border-t border-gray-100">
+                              <td className="py-2.5 pr-4 pl-1 text-gray-700 min-w-0">
+                                <div className="font-medium truncate">{memberName}</div>
+                                {memberMeta && <div className="text-[10px] text-gray-400 truncate">{memberMeta}</div>}
+                              </td>
                               {days.map((day, j) => {
                                 const pct = day?.loadPercent ?? 0;
-                                const cellClass = pct === 0 ? "bg-[#F8F9FC] text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
+                                const cellClass = pct === 0 ? "bg-gray-50 text-gray-400" : pct < 50 ? "bg-emerald-50 text-emerald-600" : pct < 80 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600";
                                 return (
                                   <td key={j} className="text-center py-1.5 px-1.5">
                                     <div className={cn("rounded-lg py-1.5 px-1 text-[11px] font-bold", cellClass)}>
@@ -987,19 +1029,18 @@ export default function SuperAdminTimesheet() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <button onClick={() => openJobDetail(job._id)} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px]">View</button>
-                        <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
-                        <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
-                          className={cn("bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px]", JOB_STATUS_TW[job.status] || "text-gray-900")}>
-                          {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
-                            <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
-                          ))}
-                        </select>
-                        <Btn variant="ghost" onClick={() => archiveJob.mutate(job._id, { onSuccess: refetchJobs })} className="text-[12px] px-3 min-h-[36px]">Archive</Btn>
-                      </div>
+  <button onClick={() => openJobDetail(job._id)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px] hover:bg-gray-50 hover:border-gray-300 transition-colors">View</button>
+  <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
+  <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
+    className={cn("bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px] hover:bg-gray-50 transition-colors", JOB_STATUS_TW[job.status] || "text-gray-900")}>
+    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
+      <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
+    ))}
+  </select>
+</div>
                     </div>
                     {job.estimated_hours > 0 && (
-                      <div className="h-0.5 bg-[#E4E6EF] rounded-full mt-3 overflow-hidden">
+                      <div className="h-0.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
                         <div className="h-full rounded-full transition-all"
                           style={{ width: `${Math.min((job.logged_hours_cache / job.estimated_hours) * 100, 100)}%`, background: job.overrun_flagged ? "#DC2626" : "#730042" }} />
                       </div>
@@ -1049,7 +1090,7 @@ export default function SuperAdminTimesheet() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
               <div className="flex gap-2 items-center flex-wrap">
-                <div className="flex items-center gap-1.5 bg-white border border-[#E4E6EF] rounded-[10px] px-2.5 py-1.5">
+                <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-md px-2.5 py-1.5">
                   <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">‹</button>
                   <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">{fmtShort(weekStart)} – {fmtShort(weekEnd)}</span>
                   <button onClick={() => shiftWeek(1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">›</button>
@@ -1076,7 +1117,7 @@ export default function SuperAdminTimesheet() {
             <WeekGrid weekStart={weekStart} weekDays={weekDays}
               onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }} />
 
-            <div className="bg-white border border-[#E4E6EF] rounded-2xl p-4 shadow-sm min-w-0">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
@@ -1110,7 +1151,7 @@ export default function SuperAdminTimesheet() {
               action={
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <input type="date" value={logsWeek} onChange={e => setLogsWeek(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none min-w-0 focus:border-[#730042] transition-colors min-h-[40px] flex-1 sm:flex-initial" />
+                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-[12px] text-gray-900 outline-none min-w-0 focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors min-h-[40px] flex-1 sm:flex-initial" />
                   <span className="text-[11px] text-gray-400 hidden sm:inline shrink-0">week of</span>
                 </div>
               }
@@ -1122,7 +1163,7 @@ export default function SuperAdminTimesheet() {
                 <Card className="hidden lg:block">
                   <table className="w-full border-collapse text-[13px] table-fixed">
                     <thead>
-                      <tr className="bg-[#F8F9FC] border-b border-[#E4E6EF]">
+                      <tr className="bg-gray-50/80 border-b border-gray-100">
                         <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[16%]">Member</th>
                         <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[12%]">Role</th>
                         <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[26%]">Job</th>
@@ -1134,7 +1175,7 @@ export default function SuperAdminTimesheet() {
                     </thead>
                     <tbody>
                       {orgLogs.map(log => (
-                        <tr key={log._id} className="border-b border-[#E4E6EF] hover:bg-[#F8F9FC] transition-colors">
+                        <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
                           <td className="px-4 py-3 font-semibold text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
                           <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
                           <td className="px-4 py-3 truncate text-gray-700">{log.job?.title || "—"}</td>
@@ -1186,12 +1227,12 @@ export default function SuperAdminTimesheet() {
               action={
                 <div className="flex gap-2 flex-wrap">
                   <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
+                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
                     <option value="">All Statuses</option>
                     {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                   <select value={sheetsOwnerModel} onChange={e => setSheetsOwnerModel(e.target.value)}
-                    className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-lg px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
+                    className="bg-white border border-gray-300 rounded-md px-3 py-2 text-[12px] text-gray-900 outline-none focus:border-[#730042] focus:ring-1 focus:ring-[#730042] transition-colors cursor-pointer appearance-none min-h-[40px] flex-1 sm:flex-initial min-w-0">
                     <option value="">All Roles</option>
                     <option value="User">Employee</option>
                     <option value="Manager">Manager</option>
@@ -1229,7 +1270,7 @@ export default function SuperAdminTimesheet() {
                         </div>
                       </div>
                       {ts.remarks && (
-                        <div className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-[#F8F9FC] rounded-lg border-l-[3px] border-l-[#730042] break-words">{ts.remarks}</div>
+                        <div className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-gray-50/80 rounded-lg border-l-[3px] border-l-[#730042] break-words">{ts.remarks}</div>
                       )}
                     </Card>
                   );
@@ -1253,7 +1294,7 @@ export default function SuperAdminTimesheet() {
                 {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => {
                   const count = jobs.filter(j => j.status === s).length;
                   return (
-                    <div key={s} className="bg-[#F8F9FC] border border-[#E4E6EF] rounded-xl p-3 sm:p-4 text-center min-w-0">
+                    <div key={s} className="bg-gray-50/80 border border-gray-200 rounded-xl p-3 sm:p-4 text-center min-w-0">
                       <div className={cn("text-2xl sm:text-3xl font-extrabold", JOB_STATUS_TW[s] || "text-gray-400")}>{count}</div>
                       <div className="text-[11px] text-gray-400 mt-1 capitalize truncate">{s.replace(/_/g, " ")}</div>
                     </div>
@@ -1261,6 +1302,135 @@ export default function SuperAdminTimesheet() {
                 })}
               </div>
             </Card>
+          </div>
+        )}
+
+        {tab === "report" && (
+          <div className="min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
+                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                </h1>
+                <p className="text-xs text-gray-400 mt-1 mb-0">
+                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportLoading && " · refreshing…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setReportView("detailed")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Detailed
+                  </button>
+                  <button
+                    onClick={() => setReportView("weekend")}
+                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                  >
+                    Weekend
+                  </button>
+                </div>
+                <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                <input
+                  type="date"
+                  value={reportWeek}
+                  onChange={(e) => setReportWeek(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                />
+                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">Export CSV</Btn>
+              </div>
+            </div>
+
+            <Card className="px-4 sm:px-5 py-4 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2.5">
+                <Input label="Employee Name" placeholder="Search employee" value={reportEmployeeName} onChange={(e) => setReportEmployeeName(e.target.value)} />
+                <Select label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
+                  <option value="">All Roles</option>
+                  <option value="User">Employee</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </Select>
+                <Select label="Department" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {reportDepartments.map((department) => (
+                    <option key={department._id} value={department.code || department.name}>{department.name}</option>
+                  ))}
+                </Select>
+                <Input label="Designation" placeholder="e.g. Software Engineer" value={reportDesignation} onChange={(e) => setReportDesignation(e.target.value)} />
+                <Select label="Project" value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
+                  <option value="">All Projects</option>
+                  {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </Select>
+                <Select label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                  <option value="">All Jobs</option>
+                  {reportJobOptions.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
+                </Select>
+                <Select label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </Select>
+                <Select label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                  <option value="">All</option>
+                  <option value="true">Billable only</option>
+                  <option value="false">Non-billable only</option>
+                </Select>
+              </div>
+              {(reportEmployeeName || reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
+                <button
+                  onClick={() => {
+                    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+                    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
+                  }}
+                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </Card>
+
+            {reportRows.length === 0 ? (
+              <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
+                <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
+                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {reportRows.map((r, i) => (
+                  <Card
+                    key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
+                    className={cn("px-3.5 py-3", (r.day_type === "week_off" || r.day_type === "holiday") && "bg-gray-50/70")}
+                  >
+                    <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
+                      <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
+                      {r.day_type === "week_off" || r.day_type === "holiday" ? (
+                        <Badge>{r.day_label}</Badge>
+                      ) : (
+                        <Badge tw={(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).tw}>
+                          {(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).label}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                    {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                    <div className="flex items-center justify-between flex-wrap gap-1.5">
+                      <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
+                      <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
+                        <span className="text-gray-400">Req {r.required_hours}h</span>
+                        <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
+                      </div>
+                    </div>
+                    {(r.approved_by || r.rejected_by) && (
+                      <div className="text-[11px] text-gray-400 mt-1.5">
+                        {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -1313,7 +1483,7 @@ export default function SuperAdminTimesheet() {
           <Input label="Default Hourly Rate" type="number" min="0" placeholder="0.00" value={projectForm.default_hourly_rate} onChange={e => setProjectForm(p => ({ ...p, default_hourly_rate: nonNegative(e.target.value) }))} />
           <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members (optional)</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
+            <div className="border border-gray-200 rounded-xl max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets.length === 0 ? (
                 <div className="text-[12px] text-gray-400 px-1.5 py-1">No team members found</div>
               ) : targets.map(t => (
@@ -1355,7 +1525,7 @@ export default function SuperAdminTimesheet() {
                   const mid = (m.member?._id || m.member || "").toString();
                   const info = targets.find(t => t.id.toString() === mid);
                   return (
-                    <div key={mid} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-[#F8F9FC] border border-[#E4E6EF] min-w-0">
+                    <div key={mid} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-gray-50/80 border border-gray-200 min-w-0">
                       <span className="text-[13px] text-gray-700 truncate min-w-0">{info?.name || mid} — {m.member_model}</span>
                       <button onClick={() => handleRemoveMember(mid)} className="text-red-500 hover:text-red-700 text-[12px] font-semibold shrink-0">Remove</button>
                     </div>
@@ -1366,7 +1536,7 @@ export default function SuperAdminTimesheet() {
           </div>
           <div className="flex flex-col gap-1.5 min-w-0">
             <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Add Members</label>
-            <div className="border border-[#E4E6EF] rounded-[10px] max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
+            <div className="border border-gray-200 rounded-xl max-h-[160px] overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-1">
               {targets
                 .filter(t => !(membersModal?.members || []).some(m => (m.member?._id || m.member || "").toString() === t.id.toString()))
                 .map(t => (
@@ -1420,7 +1590,7 @@ export default function SuperAdminTimesheet() {
             </Select>
           </div>
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+          <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">
@@ -1459,7 +1629,7 @@ export default function SuperAdminTimesheet() {
           </div>
           <Input label="Due Date" type="date" value={editJobForm.due_date} onChange={e => setEditJobForm(p => ({ ...p, due_date: e.target.value }))} />
           <div>
-            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: nonNegative(e.target.value) }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={editJobForm.max_hours_per_day} onChange={e => setEditJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">

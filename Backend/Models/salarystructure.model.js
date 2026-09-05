@@ -25,7 +25,7 @@ const salaryStructureSchema = new mongoose.Schema(
     employeeModel: {
       type: String,
       required: true,
-      enum: ["User", "Manager", "Admin"],
+      enum: ["User", "Manager", "Admin", "SuperAdmin"],
     },
 
     ctc: { type: Number, required: true, min: 0 }, // annual, in rupees
@@ -49,6 +49,13 @@ const salaryStructureSchema = new mongoose.Schema(
           _id: false,
         },
       ],
+      // Custom Deduction / Benefit / Reimbursement Salary Components
+      // (Zoho-style tabs) — kept alongside `allowances` so they don't get
+      // silently stripped by Mongoose's strict schema when the cached
+      // breakup is (re)computed by calculateSalaryBreakup().
+      deductionComponents: [{ name: String, amount: Number, _id: false }],
+      benefitComponents: [{ name: String, amount: Number, isFBP: Boolean, _id: false }],
+      reimbursementComponents: [{ name: String, amount: Number, isFBP: Boolean, _id: false }],
       employerPF: { type: Number, default: 0 }, // informational (cost to company), not deducted from employee
       employerESI: { type: Number, default: 0 }, // informational
     },

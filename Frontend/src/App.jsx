@@ -227,15 +227,13 @@ function App() {
             <Route path="/organisation"             element={<Organisation />} />
             <Route path="/organisation-employee"    element={<Organisationem />} />
             <Route path="/organisation-manager"     element={<Organisationma />} />
-            <Route path="/review-admin"             element={<Reviewad />} />
-            <Route path="/review-manager"           element={<Reviewma />} />
+            <Route path="/review-admin"             element={<ProtectedRoute planFeature="review"><Reviewad /></ProtectedRoute>} />
+            <Route path="/review-manager"           element={<ProtectedRoute planFeature="review"><Reviewma /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
-            <Route path="/admin-timesheet"          element={<Adminrimesheet />} />
-            <Route path="/manager-timesheet"        element={<Managertimesheet />} />
-            <Route path="/employee-timesheet"       element={<Employeetimesheet />} />
-            <Route path="/admin-asset-management"   element={<Adminasset />} />
-            <Route path="/help-center"               element={<HelpCenter />} />
-            <Route path="/notifications"             element={<NotificationsPage />} />
+            <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
+            <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
+            <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
 
             <Route
               path="/reimbursement-admin"
@@ -349,7 +347,7 @@ function App() {
             <Route
               path="/admin-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <AdminComplaints />
                 </ProtectedRoute>
               }
@@ -357,7 +355,7 @@ function App() {
             <Route
               path="/manager-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <ManagerComplaints />
                 </ProtectedRoute>
               }
@@ -365,7 +363,7 @@ function App() {
             <Route
               path="/employee-complaints"
               element={
-                <ProtectedRoute permission="tickets.can_raise_ticket">
+                <ProtectedRoute permission="tickets.can_raise_ticket" planFeature="tickets">
                   <EmployeeComplaints />
                 </ProtectedRoute>
               }
@@ -375,6 +373,7 @@ function App() {
               path="/recruitment-admin"
               element={
                 <ProtectedRoute
+                  planFeature="recruitment"
                   permissionGroup={[
                     "recruitment.can_view_hiring_requisitions",
                     "recruitment.can_create_hiring_requisition",
@@ -390,6 +389,7 @@ function App() {
               path="/recruitment-manager"
               element={
                 <ProtectedRoute
+                  planFeature="recruitment"
                   permissionGroup={[
                     "recruitment.can_view_hiring_requisitions",
                     "recruitment.can_create_hiring_requisition",
@@ -405,6 +405,7 @@ function App() {
               path="/manager/recruitment"
               element={
                 <ProtectedRoute
+                  planFeature="recruitment"
                   permissionGroup={[
                     "recruitment.can_view_hiring_requisitions",
                     "recruitment.can_create_hiring_requisition",
@@ -429,17 +430,34 @@ function App() {
             <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
             <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
             <Route path="/superadmin-leaves"              element={<SuperAdminLeaves />} />
-            <Route path="/superadmin-reviews"             element={<SuperAdminReviews />} />
+            <Route path="/superadmin-reviews"             element={<ProtectedRoute planFeature="review"><SuperAdminReviews /></ProtectedRoute>} />
             <Route path="/superadmin-settings"            element={<SuperAdminSettings />} />
             <Route path="/superadmin-documents"           element={<SuperAdminDocuments />} />
-            <Route path="/superadmin-complaints"          element={<SuperAdminComplaints />} />
-            <Route path="/superadmin-timesheet"           element={<SuperAdmintimesheet />} />
-            <Route path="/superadmin-asset-management"    element={<Superadminasset />} />
+            <Route path="/superadmin-complaints"          element={<ProtectedRoute planFeature="tickets"><SuperAdminComplaints /></ProtectedRoute>} />
+            <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
+            <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
-            <Route path="/help-center"                     element={<HelpCenter />} />
-            <Route path="/notifications"                   element={<NotificationsPage />} />
+          </Route>
+
+          {/* Shared across every logged-in role. These previously lived duplicated
+              inside both the admin/manager/employee block and the superadmin block;
+              since react-router resolves ties between equal-specificity routes by
+              declaration order, the first (admin/manager/employee-only) block always
+              won the match — so a super admin hitting /notifications or /help-center
+              was matched against an allowedRoles list that didn't include "superadmin"
+              and got bounced to Access Restricted. Single shared block, single
+              source of truth, fixes that for every role at once. */}
+          <Route
+            element={
+              <ProtectedRoute allowedRoles={["admin", "manager", "employee", "superadmin"]}>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/help-center"    element={<HelpCenter />} />
+            <Route path="/notifications"  element={<NotificationsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

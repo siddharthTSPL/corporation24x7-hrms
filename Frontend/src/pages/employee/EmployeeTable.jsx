@@ -15,6 +15,7 @@ import {
 import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api"; 
 // ^ actual path apne project structure ke hisaab se adjust karo — jis file me aapne ye upload wala code (uploadDocument function) rakha hai
+import BulkOnboardingModal from "./BulkOnboardingModal";
 
 import {
   useGetAllEmployee, useDeleteUser, useEditEmployee, useEditManager,
@@ -25,6 +26,7 @@ import {
   useAdminInactiveUsers, useGetActiveUserCount,
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
+import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
 import axios from "axios";
 
 import * as XLSX from "xlsx";
@@ -52,6 +54,22 @@ export const DEPT_FULL_FORMS = {
   HR: "Human Resources",
   MGMT: "Management",
 };
+
+// Departments are now custom/dynamic per organisation (added from TorchX
+// Management -> Departments). This pulls the live list for onboarding/edit
+// dropdowns, falling back to the legacy OPR/BPO/ENG/HR/MGMT list while it
+// loads or if the org hasn't got any departments back yet.
+export function useDepartmentOptions() {
+  const { data, isLoading } = useGetAllDepartments();
+  const departments = data?.departments;
+
+  const options =
+    departments && departments.length
+      ? departments.map((d) => ({ value: d.code || d.name, label: d.name }))
+      : DEPT_OPTIONS.map((code) => ({ value: code, label: DEPT_FULL_FORMS[code] }));
+
+  return { options, loading: isLoading };
+}
 
 const LOCATIONS = [
   "Noida", "Bareilly", "Delhi", "Mumbai",
@@ -929,36 +947,69 @@ function AssetReturnBlockedModal({ data, personName, onClose }) {
 
 function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismissBlock}){
   const [selected,setSelected]=useState(currentStatus||"working");
-  const [awaitingConfirm,setAwaitingConfirm]=useState(false);
+  const [step,setStep]=useState("select"); // select | noticeAsk | noticeDetails | confirm
+  const [noticePeriodAllowed,setNoticePeriodAllowed]=useState(null);
+  const [noticePeriodMonths,setNoticePeriodMonths]=useState("");
+  const [lastWorkingDay,setLastWorkingDay]=useState("");
 
   const isIrreversible = IRREVERSIBLE_STATUSES.includes(selected);
   const isAlreadyIrreversible = IRREVERSIBLE_STATUSES.includes(currentStatus);
   const noChange = selected === currentStatus;
 
+  const resetFlow=()=>{
+    setStep("select");
+    setNoticePeriodAllowed(null);
+    setNoticePeriodMonths("");
+    setLastWorkingDay("");
+  };
+
   const handleSelectChange=(e)=>{
     setSelected(e.target.value);
-    setAwaitingConfirm(false);
+    resetFlow();
     onDismissBlock&&onDismissBlock();
   };
 
   const handleUpdateClick=async ()=>{
     onDismissBlock&&onDismissBlock();
     if(isIrreversible){
-      setAwaitingConfirm(true);
+      setStep("noticeAsk");
     } else {
-      const ok = await onSave(selected);
+      const ok = await onSave({working_status:selected});
       if(!ok) setSelected(currentStatus||"working");
     }
   };
 
+  const handleNoticeChoice=(allowed)=>{
+    setNoticePeriodAllowed(allowed);
+    setStep(allowed?"noticeDetails":"confirm");
+  };
+
+  const handleNoticeDetailsContinue=()=>{
+    if(!noticePeriodMonths||!lastWorkingDay) return;
+    setStep("confirm");
+  };
+
+  const buildPayload=()=>{
+    if(noticePeriodAllowed){
+      return {
+        working_status:selected,
+        noticePeriodAllowed:true,
+        noticePeriodMonths:Number(noticePeriodMonths),
+        lastWorkingDay,
+      };
+    }
+    return {working_status:selected};
+  };
+
   const handleConfirm=async ()=>{
-    setAwaitingConfirm(false);
-    const ok = await onSave(selected);
-    if(!ok) setSelected(currentStatus||"working");
+    const payload=buildPayload();
+    const ok = await onSave(payload);
+    if(!ok){ setSelected(currentStatus||"working"); }
+    resetFlow();
   };
 
   const handleCancel=()=>{
-    setAwaitingConfirm(false);
+    resetFlow();
     setSelected(currentStatus||"working");
   };
 
@@ -995,22 +1046,80 @@ function WorkingStatusSelector({currentStatus,onSave,loading,blockedInfo,onDismi
         </div>
       )}
 
-      {awaitingConfirm ? (
+      {step==="noticeAsk" ? (
+        <div className="rounded-xl border border-[#F4C0D1] bg-white p-3">
+          <p className="text-xs font-bold text-[#730042] mb-1">Does your company allow a notice period?</p>
+          <p className="text-[11px] text-[#993556] mb-3 leading-relaxed">
+            Choose <strong>Yes</strong> to run a notice period first (normal payroll continues) before marking
+            this person <strong>{statusLabel}</strong>, or <strong>No</strong> to mark them {statusLabel} right away.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={()=>handleNoticeChoice(false)} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">
+              No, direct {statusLabel}
+            </button>
+            <button onClick={()=>handleNoticeChoice(true)} className="flex-1 py-2 rounded-lg text-white text-xs font-bold transition-all" style={{background:"#730042"}}>
+              Yes, notice period
+            </button>
+          </div>
+        </div>
+      ) : step==="noticeDetails" ? (
+        <div className="rounded-xl border border-[#F4C0D1] bg-white p-3">
+          <p className="text-xs font-bold text-[#730042] mb-3">Notice period details</p>
+          <label className="block text-[11px] font-semibold text-[#993556] mb-1">Notice period (months)</label>
+          <input
+            type="number"
+            min="1"
+            value={noticePeriodMonths}
+            onChange={(e)=>setNoticePeriodMonths(e.target.value)}
+            placeholder="e.g. 3"
+            className={`${inputCls} mb-3`}
+          />
+          <label className="block text-[11px] font-semibold text-[#993556] mb-1">Last working day (notice period end date)</label>
+          <input
+            type="date"
+            value={lastWorkingDay}
+            onChange={(e)=>setLastWorkingDay(e.target.value)}
+            className={`${inputCls} mb-3`}
+          />
+          <p className="text-[10px] text-[#993556] mb-3 leading-relaxed">
+            Employee stays <strong>Working</strong> and gets normal payroll till this date. On this date the
+            system will automatically mark them <strong>{statusLabel}</strong> and generate their Full &amp; Final
+            settlement for that last month.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={()=>setStep("noticeAsk")} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">Back</button>
+            <button
+              onClick={handleNoticeDetailsContinue}
+              disabled={!noticePeriodMonths||!lastWorkingDay}
+              className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all"
+              style={{background:"#730042"}}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      ) : step==="confirm" ? (
         <div className="rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] p-3">
           <div className="flex items-start gap-2 mb-3">
             <FaExclamationTriangle size={14} className="text-[#DC2626] flex-shrink-0 mt-0.5"/>
             <div>
               <p className="text-xs font-bold text-[#991B1B]">This action cannot be undone</p>
               <p className="text-[11px] text-[#7F1D1D] mt-0.5 leading-relaxed">
-                Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
-                marked as inactive and cannot be set back to <strong>Working</strong>.
+                {noticePeriodAllowed ? (
+                  <>A <strong>{noticePeriodMonths}-month</strong> notice period will start now. On{" "}
+                  <strong>{new Date(lastWorkingDay).toDateString()}</strong> the employee will automatically be
+                  marked <strong>{statusLabel}</strong> and their F&amp;F will be generated.</>
+                ) : (
+                  <>Setting status to <strong>{statusLabel}</strong> is permanent. The employee will be
+                  marked as inactive and cannot be set back to <strong>Working</strong>.</>
+                )}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleCancel} className="flex-1 py-2 rounded-lg text-xs font-semibold border border-[#F4C0D1] text-[#730042] hover:bg-[#FBEAF0] transition-all">Cancel</button>
             <button onClick={handleConfirm} disabled={loading} className="flex-1 py-2 rounded-lg text-white text-xs font-bold disabled:opacity-50 transition-all" style={{background:"#DC2626"}}>
-              {loading?"Updating…":`Confirm ${statusLabel}`}
+              {loading?"Updating…":noticePeriodAllowed?"Start Notice Period":`Confirm ${statusLabel}`}
             </button>
           </div>
         </div>
@@ -1753,13 +1862,13 @@ function MobileCard({u,onView,onEdit,onDelete,onPromoteToManager,onPromoteToAdmi
     </div>
   );
 }
-
 function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChange}){
+  const { options: deptOptions } = useDepartmentOptions();
   if(step===0)return(
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. EMP-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Last Name" error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
       <PasswordField
         label="Password"
@@ -1785,7 +1894,17 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
         </select>
       </Field>
       <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field
+        label="Emergency Contact"
+        required
+        error={
+          form.e_contact && form.personal_contact && form.e_contact===form.personal_contact
+            ? "Emergency contact must be different from personal contact"
+            : errors.e_contact
+        }
+      >
+        <input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/>
+      </Field>
     </>
   );
   if(step===1)return(
@@ -1798,9 +1917,9 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
           className={inputCls}
         >
           <option value="">Select Department</option>
-          {DEPT_OPTIONS.map((dept) => (
-            <option key={dept} value={dept}>
-              {DEPT_FULL_FORMS[dept]}
+          {deptOptions.map((dept) => (
+            <option key={dept.value} value={dept.value}>
+              {dept.label}
             </option>
           ))}
         </select>
@@ -1868,11 +1987,12 @@ function EmpStepFields({step,form,onChange,errors,managersOnly,perms,onPermChang
 }
 
 function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin,perms,onPermChange}){
+  const { options: deptOptions } = useDepartmentOptions();
   if(step===0)return(
     <>
       <Field label="Employee ID" required error={errors.empid}><input name="empid" placeholder="e.g. MGR-1024" value={form.empid} onChange={onChange} className={inputCls}/></Field>
       <Field label="First Name" required error={errors.f_name}><input name="f_name" placeholder="First name" value={form.f_name} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Last Name" required error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
+      <Field label="Last Name" error={errors.l_name}><input name="l_name" placeholder="Last name" value={form.l_name} onChange={onChange} className={inputCls}/></Field>
       <Field label="Work Email" required error={errors.work_email}><input name="work_email" type="email" placeholder="name@company.com" value={form.work_email} onChange={onChange} className={inputCls}/></Field>
       <PasswordField
         label="Password"
@@ -1898,7 +2018,17 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
         </select>
       </Field>
       <Field label="Personal Contact" required error={errors.personal_contact}><input name="personal_contact" placeholder="10-digit mobile number" maxLength={10} value={form.personal_contact} onChange={onChange} className={inputCls}/></Field>
-      <Field label="Emergency Contact" required error={errors.e_contact}><input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/></Field>
+      <Field
+        label="Emergency Contact"
+        required
+        error={
+          form.e_contact && form.personal_contact && form.e_contact===form.personal_contact
+            ? "Emergency contact must be different from personal contact"
+            : errors.e_contact
+        }
+      >
+        <input name="e_contact" placeholder="10-digit mobile number" maxLength={10} value={form.e_contact} onChange={onChange} className={inputCls}/>
+      </Field>
     </>
   );
   if(step===1)return(
@@ -1906,9 +2036,9 @@ function MgrStepFields({step,form,onChange,errors,managersOnly,managersWithAdmin
       <Field label="Department" required error={errors.department}>
         <select name="department" value={form.department} onChange={onChange} className={inputCls}>
           <option value="">Select Department</option>
-          {DEPT_OPTIONS.map((dept) => (
-            <option key={dept} value={dept}>
-              {DEPT_FULL_FORMS[dept]}
+          {deptOptions.map((dept) => (
+            <option key={dept.value} value={dept.value}>
+              {dept.label}
             </option>
           ))}
         </select>
@@ -1987,8 +2117,10 @@ function validateContactInfo(form){
   if(!form.empid?.trim())err.empid="Required";
   if(!form.f_name)err.f_name="Required";
   else if(!NAME_REGEX.test(form.f_name))err.f_name="Enter a valid name";
-  if(!form.l_name)err.l_name="Required";
-  else if(!NAME_REGEX.test(form.l_name))err.l_name="Enter a valid name";
+
+  // last name ab required nahi — sirf format check hoga agar user kuch bhare
+  if(form.l_name && !NAME_REGEX.test(form.l_name))err.l_name="Enter a valid name";
+
   if(!form.work_email)err.work_email="Required";
   else if(!EMAIL_REGEX.test(form.work_email))err.work_email="Invalid email address";
   if(!form.password)err.password="Required";
@@ -2000,6 +2132,12 @@ function validateContactInfo(form){
   else if(!PHONE_REGEX.test(form.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
   if(!form.e_contact)err.e_contact="Required";
   else if(!PHONE_REGEX.test(form.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+
+  // personal aur emergency contact same nahi hone chahiye
+  else if(form.personal_contact && form.e_contact===form.personal_contact){
+    err.e_contact="Emergency contact must be different from personal contact";
+  }
+
   return err;
 }
 
@@ -2090,7 +2228,9 @@ function getErrorSummary(err){
 }
 
 export default function EmployeeTable(){
+  const { options: deptOptions } = useDepartmentOptions();
   const [open,setOpen]=useState(false);
+  const [openBulkOnboard,setOpenBulkOnboard]=useState(false);
   const [openManager,setOpenManager]=useState(false);
   const [showFilters,setShowFilters]=useState(false);
   const [popup,setPopup]=useState({show:false,type:"success",message:""});
@@ -2183,7 +2323,7 @@ export default function EmployeeTable(){
 
   const handleEditChange=(e)=>setEditForm({...editForm,[e.target.name]:e.target.value});
 
-  const validateEdit=()=>{
+   const validateEdit=()=>{
     const err={};
     if(!editForm.f_name?.trim())err.f_name="Required";
     if(!editForm.l_name?.trim())err.l_name="Required";
@@ -2193,6 +2333,9 @@ export default function EmployeeTable(){
     if(!editForm.department)err.department="Required";
     if(editForm.personal_contact&&!PHONE_REGEX.test(editForm.personal_contact))err.personal_contact="Must be a valid 10-digit Indian mobile number";
     if(editForm.e_contact&&!PHONE_REGEX.test(editForm.e_contact))err.e_contact="Must be a valid 10-digit Indian mobile number";
+    else if(editForm.personal_contact && editForm.e_contact && editForm.e_contact===editForm.personal_contact){
+      err.e_contact="Emergency contact must be different from personal contact";
+    }
     setEditErrors(err);
     return Object.keys(err).length===0;
   };
@@ -2511,6 +2654,13 @@ return(
                   onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#730042";}}>
                   <FaUserTie size={12}/><span>Add Manager</span>
                 </button>
+                <button onClick={()=>setOpenBulkOnboard(true)}
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
+                  style={{borderColor:"#085041",color:"#085041"}}
+                  onMouseEnter={(e)=>{e.currentTarget.style.background="#085041";e.currentTarget.style.color="#fff";}}
+                  onMouseLeave={(e)=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color="#085041";}}>
+                  <FaFileExcel size={12}/><span>Bulk Onboard</span>
+                </button>
                 <button onClick={()=>{setOpen(true);setEmpStep(0);}}
                   className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 w-full sm:w-auto"
                   style={{background:"#730042"}}>
@@ -2556,9 +2706,9 @@ return(
   </select>
   <select className={`${inputCls} flex-1 min-w-[140px]`} value={filters.department} onChange={(e)=>setFilters({...filters,department:e.target.value})}>
     <option value="">All Departments</option>
-    {DEPT_OPTIONS.map((dept)=>(
-      <option key={dept} value={dept}>
-        {DEPT_FULL_FORMS[dept]}
+    {deptOptions.map((dept)=>(
+      <option key={dept.value} value={dept.value}>
+        {dept.label}
       </option>
     ))}
   </select>
@@ -2723,6 +2873,8 @@ return(
         </StepModal>
       )}
 
+      <BulkOnboardingModal open={openBulkOnboard} onClose={()=>setOpenBulkOnboard(false)}/>
+
       {openEdit&&editTarget&&(
         <Modal
           title={`Edit ${editTarget.role==="manager"||editTarget.role==="senior_manager"?"Manager":"Employee"}`}
@@ -2737,8 +2889,8 @@ return(
           <Field label="Department" required error={editErrors.department}>
             <select name="department" value={editForm.department} onChange={handleEditChange} className={inputCls}>
               <option value="">Select Department</option>
-              {DEPT_OPTIONS.map((dept)=>(
-                <option key={dept} value={dept}>{DEPT_FULL_FORMS[dept]}</option>
+              {deptOptions.map((dept)=>(
+                <option key={dept.value} value={dept.value}>{dept.label}</option>
               ))}
             </select>
           </Field>
@@ -2762,9 +2914,17 @@ return(
               <option value="single">Single</option><option value="married">Married</option><option value="divorced">Divorced</option>
             </select>
           </Field>
-          <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          <Field label="Emergency Contact" error={editErrors.e_contact}><input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/></Field>
-          
+                    <Field label="Phone" error={editErrors.personal_contact}><input name="personal_contact" value={editForm.personal_contact} onChange={handleEditChange} className={inputCls}/></Field>
+          <Field
+            label="Emergency Contact"
+            error={
+              editForm.e_contact && editForm.personal_contact && editForm.e_contact===editForm.personal_contact
+                ? "Emergency contact must be different from personal contact"
+                : editErrors.e_contact
+            }
+          >
+            <input name="e_contact" value={editForm.e_contact} onChange={handleEditChange} className={inputCls}/>
+          </Field>
         </Modal>
       )}
 

@@ -19,7 +19,7 @@ api.interceptors.response.use(
   },
 );
 
-// ── Payroll Policy (org-wide) ───────────────────────────────────────────────
+
 
 export const getPayrollPolicy = async () => {
   const res = await api.get("admin/payroll/policy");
@@ -51,7 +51,7 @@ export const removePayrollAllowance = async (name) => {
   return res.data;
 };
 
-// ── Pay Schedule (fixed org-wide run schedule) ──────────────────────────────
+
 
 export const getPaySchedule = async () => {
   const res = await api.get("admin/payroll/pay-schedule");
@@ -63,7 +63,12 @@ export const setPaySchedule = async (data) => {
   return res.data;
 };
 
-// ── Salary Structure ────────────────────────────────────────────────────────
+
+
+export const getOrgOwner = async () => {
+  const res = await api.get("admin/payroll/org-owner");
+  return res.data;
+};
 
 export const setEmployeeCTC = async (data) => {
   const res = await api.post("admin/payroll/structure", data);
@@ -85,7 +90,7 @@ export const reapplyPolicy = async (employee) => {
   return res.data;
 };
 
-// ── Payroll generation ──────────────────────────────────────────────────────
+
 
 export const generatePayroll = async (data) => {
   const res = await api.post("admin/payroll/generate", data);
@@ -97,7 +102,7 @@ export const bulkGeneratePayroll = async (data) => {
   return res.data;
 };
 
-// ── Retrieval ────────────────────────────────────────────────────────────────
+
 
 export const listPayrolls = async (params) => {
   const res = await api.get("admin/payroll", { params });
@@ -116,5 +121,54 @@ export const updatePayrollStatus = async (id, status) => {
 
 export const deletePayroll = async (id) => {
   const res = await api.delete(`admin/payroll/${id}`);
+  return res.data;
+};
+
+export const bulkUpdatePayrollStatus = async (ids, status) => {
+  const res = await api.patch("admin/payroll/bulk/status", { ids, status });
+  return res.data;
+};
+
+export const bulkDeletePayroll = async (ids) => {
+  const res = await api.post("admin/payroll/bulk/delete", { ids });
+  return res.data;
+};
+
+
+
+// --- Full & Final (FnF) settlement — one-time, for resigned/fired/terminated people ---
+
+export const listEligibleForFnF = async () => {
+  const res = await api.get("admin/payroll/fnf/eligible");
+  return res.data;
+};
+
+export const generateFnF = async (data) => {
+  const res = await api.post("admin/payroll/fnf/generate", data);
+  return res.data;
+};
+
+export const listFnF = async (params) => {
+  const res = await api.get("admin/payroll/fnf", { params });
+  return res.data;
+};
+
+export const getFnFSlip = async (id) => {
+  const res = await api.get(`admin/payroll/fnf/${id}`);
+  return res.data;
+};
+
+export const updateFnF = async (id, data) => {
+  const res = await api.patch(`admin/payroll/fnf/${id}`, data);
+  return res.data;
+};
+
+export const updateFnFStatus = async (id, status) => {
+  const res = await api.patch(`admin/payroll/fnf/${id}/status`, { status });
+  return res.data;
+};
+
+export const deleteFnF = async (id) => {
+  const res = await api.delete(`admin/payroll/fnf/${id}`);
   return res.data;
 };

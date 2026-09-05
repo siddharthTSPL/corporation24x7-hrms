@@ -32,4 +32,28 @@ function isDateInLwpPortion(leave, date) {
   return d >= lwpStart;
 }
 
-module.exports = { isDateInLwpPortion };
+// Decides what an approved leave says a given date's attendance SHOULD be,
+// independent of whatever check-in/check-out/activeMinutes produced. This is
+// the single rule for "an approved leave always outranks the checkin-based
+// status": no matter how much someone actually worked that day (even a full
+// present-worthy session before auto-checkout), once a leave is approved for
+// that date, the leave's own type decides the day, not the clock.
+//
+//   - half_day_el / half_day_sl -> "half_day" (matches what the person
+//     actually applied for - a half day, not a full day off)
+//   - el / sl / ml / pl / lwp   -> "absent" (the attendance enum has no
+//     dedicated "leave" value; a full day covered by leave is not a worked
+//     day, so "absent" is the correct bucket - whether it's PAID or not is
+//     answered separately by isPaidForThisDate)
+//
+// isPaidForThisDate is false for leaveType "lwp", and also false for any
+// specific date that falls inside an otherwise-paid leave's lwpDays
+// shortfall portion (see isDateInLwpPortion above) - i.e. it answers "is
+// this exact calendar day excused/paid", not just "is this leave paid".
+function resolveLeaveDayOverride(leave, date) {
+  const isHalfDay = typeof leave.leaveType === "string" && leave.leaveType.startsWith("half_day");
+  const isPaidForThisDate = leave.leaveType !== "lwp" && !isDateInLwpPortion(leave, date);
+  return { status: isHalfDay ? "half_day" : "absent", isPaidForThisDate };
+}
+
+module.exports = { isDateInLwpPortion, resolveLeaveDayOverride };

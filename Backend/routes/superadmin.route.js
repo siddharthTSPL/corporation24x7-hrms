@@ -2,6 +2,14 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+
+// Performance Management (Review), Asset Management, and TorchX Voice are
+// plan-gated features: fully locked on the Basic plan, fully open on
+// Advance/enterprise (or during the free trial). The SuperAdmin document IS
+// the organisation record, so the SuperAdmin's own plan gates these too.
+const reviewPlanGate = restrictPlanFeature("review");
+const assetPlanGate = restrictPlanFeature("asset");
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
@@ -39,6 +47,9 @@ const {
   deleteAnnouncement,
   reviewtoadmin,
   getAllReviewsForSuperAdmin,
+  setAdminHRRole,
+  getHRAdmins,
+  superAdminAcknowledgeReview,
   getTodayCheckins,
   getAttendanceOverview,
   getAttendanceHistory,
@@ -202,14 +213,37 @@ superAdminRouter.delete(
 superAdminRouter.post(
   "/reviewtoadmin",
   superAdminAuth,
+  reviewPlanGate,
   asyncHandler(reviewtoadmin),
 );
 
 superAdminRouter.get(
   "/allreviews",
   superAdminAuth,
+  reviewPlanGate,
   asyncHandler(getAllReviewsForSuperAdmin),
 );
+
+// SuperAdmin grants/revokes HR approval rights on an Admin.
+superAdminRouter.post(
+  "/set-hr-role",
+  superAdminAuth,
+  asyncHandler(setAdminHRRole),
+);
+superAdminRouter.get(
+  "/hr-admins",
+  superAdminAuth,
+  asyncHandler(getHRAdmins),
+);
+
+// SuperAdmin can also give/override the final review acknowledgement directly.
+superAdminRouter.post(
+  "/review/acknowledge",
+  superAdminAuth,
+  reviewPlanGate,
+  asyncHandler(superAdminAcknowledgeReview),
+);
+
 superAdminRouter.get(
   "/gettodaycheckins",
   superAdminAuth,
@@ -285,22 +319,23 @@ superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(ge
 
 
 
-// assest route
-superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
-superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
+// asset route — plan-gated: locked on Basic
+superAdminRouter.post("/assets", superAdminAuth, assetPlanGate, asyncHandler(createAssetSuperAdmin));
+superAdminRouter.get("/assets", superAdminAuth, assetPlanGate, asyncHandler(getAllAssetsSuperAdmin));
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-superAdminRouter.get("/assets/employees", superAdminAuth, asyncHandler(getEmployeesWithAssets));
+superAdminRouter.get("/assets/employees", superAdminAuth, assetPlanGate, asyncHandler(getEmployeesWithAssets));
 superAdminRouter.get(
   "/assets/employees/:person_id/:person_model/history",
   superAdminAuth,
+  assetPlanGate,
   asyncHandler(getEmployeeAssetHistory)
 );
-superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
-superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
-superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
-superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, asyncHandler(assignAssetToAdminSuperAdmin));
-superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revokeAssetFromAdminSuperAdmin));
-superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
+superAdminRouter.get("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(getAssetByIdSuperAdmin));
+superAdminRouter.put("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(updateAssetSuperAdmin));
+superAdminRouter.delete("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(deleteAssetSuperAdmin));
+superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, assetPlanGate, asyncHandler(assignAssetToAdminSuperAdmin));
+superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, assetPlanGate, asyncHandler(revokeAssetFromAdminSuperAdmin));
+superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, assetPlanGate, asyncHandler(getAssetsOfPerson));
 
 // Help & Support form — no permission gate, super admin can reach support too.
 superAdminRouter.post("/contact-support", superAdminAuth, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));

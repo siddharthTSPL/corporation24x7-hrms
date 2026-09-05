@@ -263,6 +263,10 @@ const updateJob = async (req, res, next) => {
     return next(httpError("Only the assigner (or Admin/SuperAdmin) can edit this job", 403));
   }
 
+  if (job.status === "completed") {
+    return next(httpError("Completed jobs cannot be edited", 400));
+  }
+
   const allowedFields = [
     "title", "description", "priority", "billable", "hourly_rate",
     "currency", "estimated_hours", "due_date", "tags",
@@ -334,18 +338,42 @@ const archiveJob = async (req, res, next) => {
   res.status(200).json({ success: true, message: "Job archived", job });
 };
 
-// ─── ADMIN / SUPERADMIN: org-wide job visibility ─────────────────────────────
+// ─── ADMIN / SUPERADMIN / MANAGER: job visibility for reports ────────────────
+// Admin/SuperAdmin see every job in the org. Managers only see jobs assigned
+// to themselves or to their direct reports (mirrors getMyAssignedJobs' scope
+// but across a whole team, for the report-tab Job filter dropdown).
 
 const getAllJobsAdmin = async (req, res, next) => {
+  const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
   const { status, assigned_to, assigned_to_model, project, priority } = req.query;
 
   const filter = { organisation_id, archived_at: null };
   if (status) filter.status = status;
-  if (assigned_to) filter.assigned_to = assigned_to;
   if (assigned_to_model) filter.assigned_to_model = assigned_to_model;
   if (project) filter.project = project;
   if (priority) filter.priority = priority;
+
+  if (actor.model === "Manager") {
+    // Managers are scoped to their own team: themselves + their direct
+    // reports. If a specific assigned_to was requested, it must fall
+    // inside that team or we return an empty result rather than leaking
+    // another team's jobs.
+    const reports = await getDirectReportIds({
+      actorId: actor.id,
+      actorModel: actor.model,
+      organisationId: organisation_id,
+    });
+    const teamIds = [actor.id.toString(), ...reports.map((r) => r.id.toString())];
+
+    if (assigned_to) {
+      filter.assigned_to = teamIds.includes(assigned_to.toString()) ? assigned_to : null;
+    } else {
+      filter.assigned_to = { $in: teamIds };
+    }
+  } else if (assigned_to) {
+    filter.assigned_to = assigned_to;
+  }
 
   const jobs = await TSJob.find(filter)
     .populate("project", "name color_tag")
