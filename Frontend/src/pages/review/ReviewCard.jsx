@@ -22,18 +22,22 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Until HR has actually approved/rejected the review, the badge just reads
+// "Pending" — the in-between reviewer/reviewee states aren't a final
+// decision yet, so labelling them individually read as more final than
+// they were.
 const STATUS_LABEL = {
-  submitted: "Awaiting your response",
-  reviewee_accepted: "Accepted — awaiting HR approval",
-  reviewee_disputed: "Disputed — awaiting HR review",
+  submitted: "Pending",
+  reviewee_accepted: "Pending",
+  reviewee_disputed: "Pending",
   hr_approved: "HR Approved (Final)",
   hr_rejected: "HR Rejected",
 };
 
 const STATUS_COLOR = {
   submitted: "#B8860B",
-  reviewee_accepted: "#1E7A3D",
-  reviewee_disputed: "#B0233A",
+  reviewee_accepted: "#B8860B",
+  reviewee_disputed: "#B8860B",
   hr_approved: "#1E7A3D",
   hr_rejected: "#B0233A",
 };

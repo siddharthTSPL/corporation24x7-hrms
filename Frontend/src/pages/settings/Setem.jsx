@@ -986,7 +986,7 @@ function ReviewsTab({ reviews }) {
   };
 
   return (
-    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/10`} accent={C.brand}>
+    <SectionCard title="My Reviews" subtitle={`${reviews.length} review${reviews.length !== 1 ? "s" : ""} · avg ${avg}/5`} accent={C.brand}>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {reviews.map((r, i) => (
           <div key={r._id || i} style={{ padding: "14px 16px", borderRadius: 10, border: `0.5px solid ${C.border}`, background: C.surface, minWidth: 0 }}>
@@ -999,7 +999,7 @@ function ReviewsTab({ reviews }) {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: ratingBadgeColor(r.overallRating) }}>
-                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/10
+                  {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/5
                 </span>
                 {r.overallRating && (
                   <span style={{ fontSize: 11, color: C.muted }}>· {r.overallRating}</span>
@@ -1013,7 +1013,7 @@ function ReviewsTab({ reviews }) {
                   <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>
                 )}
                 {r.behaviourEthics && (
-                  <span>Behaviour: {r.behaviourEthics.score}/10 ({r.behaviourEthics.rating})</span>
+                  <span>Behaviour: {r.behaviourEthics.score}/5 ({r.behaviourEthics.rating})</span>
                 )}
                 {r.attendance && (
                   <span>Attendance: {r.attendance.percentage}% ({r.attendance.rating})</span>
