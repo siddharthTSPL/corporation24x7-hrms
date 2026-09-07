@@ -80,9 +80,9 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section className="flex flex-col-reverse md:flex-row items-center px-6 md:px-12 py-12 gap-10">
+      <section className="relative flex flex-col md:flex-row items-center px-6 md:px-12 py-12 gap-10 overflow-hidden">
         {/* LEFT */}
-        <div className="flex-1 text-center md:text-left">
+        <div className="flex-1 text-center md:text-left z-10">
           <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight">
             Streamline Workforce, Strengthen Performance.
           </h1>
@@ -109,9 +109,14 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* RIGHT IMAGE */}
-        <div className="flex-1 flex justify-center">
-          <img src="/Group 551.png" alt="hero" className="w-full max-w-md" />
+        {/* RIGHT IMAGE — floats to the top-right on desktop, stays centered under the text on mobile */}
+        <div className="relative flex-1 flex justify-center md:justify-end w-full md:self-start md:-mt-4">
+          <div className="absolute -inset-6 hidden md:block bg-[var(--secondary)]/30 blur-2xl rounded-[40%_60%_60%_40%/50%_40%_60%_50%]" />
+          <img
+            src="/Group 551.png"
+            alt="TorchX dashboard preview"
+            className="relative w-full max-w-md md:max-w-lg drop-shadow-2xl"
+          />
         </div>
       </section>
 
