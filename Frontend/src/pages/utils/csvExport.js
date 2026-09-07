@@ -23,19 +23,34 @@ export function downloadReportCSV(rows, columns, filename) {
 }
 
 export const TIMESHEET_REPORT_CSV_COLUMNS = [
-  { label: "Name", value: (r) => r.name },
-  { label: "Designation", value: (r) => r.designation },
-  { label: "Department", value: (r) => r.department },
-  { label: "Project", value: (r) => r.project?.name || "" },
-  { label: "Job", value: (r) => r.job?.title || "" },
-  { label: "Date", value: (r) => r.date },
-  { label: "Day Type", value: (r) => r.day_label },
+  { label: "Name", value: (r) => (r.__isTotal ? "TOTAL" : r.name) },
+  { label: "Designation", value: (r) => (r.__isTotal ? "" : r.designation) },
+  { label: "Department", value: (r) => (r.__isTotal ? "" : r.department) },
+  { label: "Project", value: (r) => (r.__isTotal ? "" : r.project?.name || "") },
+  { label: "Job", value: (r) => (r.__isTotal ? "" : r.job?.title || "") },
+  { label: "Date", value: (r) => (r.__isTotal ? "" : r.date) },
+  { label: "Day Type", value: (r) => (r.__isTotal ? `${r.count} row(s)` : r.day_label) },
   { label: "Required Hours", value: (r) => r.required_hours },
   { label: "Serving Hours", value: (r) => r.serving_hours },
   { label: "Overtime Hours", value: (r) => r.overtime_hours },
-  { label: "Billable", value: (r) => (r.billable ? "Yes" : "No") },
-  { label: "Timesheet Status", value: (r) => r.timesheet_status },
-  { label: "Approved By", value: (r) => r.approved_by || "" },
-  { label: "Rejected By", value: (r) => r.rejected_by || "" },
-  { label: "Remarks", value: (r) => r.remarks || "" },
+  { label: "Billable", value: (r) => (r.__isTotal ? "" : r.billable ? "Yes" : "No") },
+  { label: "Timesheet Status", value: (r) => (r.__isTotal ? "" : r.timesheet_status) },
+  { label: "Approved By", value: (r) => (r.__isTotal ? "" : r.approved_by || "") },
+  { label: "Rejected By", value: (r) => (r.__isTotal ? "" : r.rejected_by || "") },
+  { label: "Remarks", value: (r) => (r.__isTotal ? "" : r.remarks || "") },
 ];
+
+// Appended as the last row of a Timesheet Report CSV export so Required /
+// Serving (overall) / Overtime hours have at least a total, instead of the
+// export ending mid-list with nothing summed up.
+export function buildReportTotalsRow(rows) {
+  const sum = (key) =>
+    Math.round(rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0) * 100) / 100;
+  return {
+    __isTotal: true,
+    count: rows.length,
+    required_hours: sum("required_hours"),
+    serving_hours: sum("serving_hours"),
+    overtime_hours: sum("overtime_hours"),
+  };
+}

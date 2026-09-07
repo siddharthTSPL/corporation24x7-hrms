@@ -48,6 +48,7 @@ const Organisationma = lazy(() => import("./pages/organisation/organisationma"))
 
 const Reviewad = lazy(() => import("./pages/review/reviewad"));
 const Reviewma = lazy(() => import("./pages/review/reviewma"));
+const Reviewem = lazy(() => import("./pages/review/MyReviews"));
 
 const Attendancepage = lazy(() => import("./pages/attendance/attendancepage"));
 
@@ -229,6 +230,7 @@ function App() {
             <Route path="/organisation-manager"     element={<Organisationma />} />
             <Route path="/review-admin"             element={<ProtectedRoute planFeature="review"><Reviewad /></ProtectedRoute>} />
             <Route path="/review-manager"           element={<ProtectedRoute planFeature="review"><Reviewma /></ProtectedRoute>} />
+            <Route path="/review-employee"          element={<ProtectedRoute planFeature="review"><Reviewem /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
             <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
             <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />

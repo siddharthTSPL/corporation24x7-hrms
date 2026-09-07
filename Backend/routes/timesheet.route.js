@@ -292,8 +292,11 @@ timesheetRouter.get(
   asyncHandler(getMyProductivitySummary),
 );
 
-// ─── Admin / SuperAdmin: org-wide visibility ──────────────────────────────────
-timesheetRouter.get("/admin/jobs", saOrAdmin, asyncHandler(getAllJobsAdmin));
+// ─── Admin / SuperAdmin / Manager: job + timesheet visibility ────────────────
+// getAllJobsAdmin itself scopes Managers down to their own team (see
+// controller) so this is safe to open up beyond saOrAdmin — Managers use it
+// to populate the Job filter on their timesheet report tab.
+timesheetRouter.get("/admin/jobs", saAdminOrManager, asyncHandler(getAllJobsAdmin));
 timesheetRouter.get(
   "/admin/jobs/:id/timeline",
   saOrAdmin,

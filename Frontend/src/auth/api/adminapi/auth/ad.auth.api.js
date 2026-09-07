@@ -72,22 +72,25 @@ export const addEmployee = async (data) => {
 };
 
 // Triggers a browser download of the bulk-onboarding .xlsx template.
-export const downloadBulkEmployeeTemplate = async () => {
-  const res = await api.get('admin/employees/bulk-template', { responseType: 'blob' });
+// `type` is 'employee' or 'manager'.
+export const downloadBulkEmployeeTemplate = async (type = 'employee') => {
+  const res = await api.get(`admin/employees/bulk-template?type=${type}`, { responseType: 'blob' });
   const url = window.URL.createObjectURL(new Blob([res.data]));
   const link = document.createElement('a');
   link.href = url;
-  link.setAttribute('download', 'bulk_employee_onboarding_template.xlsx');
+  link.setAttribute('download', `bulk_${type}_onboarding_template.xlsx`);
   document.body.appendChild(link);
   link.click();
   link.remove();
   window.URL.revokeObjectURL(url);
 };
 
-// `file` is a raw File object from an <input type="file">.
-export const bulkUploadEmployees = async (file) => {
+// `file` is a raw File object from an <input type="file">. `type` is
+// 'employee' or 'manager'.
+export const bulkUploadEmployees = async ({ file, type = 'employee' }) => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('type', type);
   try {
     const res = await api.post('admin/employees/bulk-upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -102,9 +105,9 @@ export const bulkUploadEmployees = async (file) => {
   }
 };
 
-export const bulkImportEmployeesFromSheet = async (sheetUrl) => {
+export const bulkImportEmployeesFromSheet = async ({ sheetUrl, type = 'employee' }) => {
   try {
-    const res = await api.post('admin/employees/bulk-import-sheet', { sheetUrl });
+    const res = await api.post('admin/employees/bulk-import-sheet', { sheetUrl, type });
     return res.data;
   } catch (err) {
     if (err?.responseData) return err.responseData;
