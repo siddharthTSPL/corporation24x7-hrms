@@ -735,6 +735,7 @@ const getme = async (req, res, next) => {
       organisation_id,
     })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
       .lean(),
   ]);
 
