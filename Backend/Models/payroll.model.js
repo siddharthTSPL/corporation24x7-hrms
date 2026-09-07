@@ -32,6 +32,8 @@ const payrollSchema = new mongoose.Schema(
       employeeId: { type: String, default: "" }, // uid
       department: { type: String, default: "" },
       designation: { type: String, default: "" },
+      bankName: { type: String, default: "" },
+      accountNumber: { type: String, default: "" },
     },
 
     // Snapshot of the organisation's name at generation time, so the
