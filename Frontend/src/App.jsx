@@ -176,6 +176,8 @@ function App() {
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/platform-features" element={<PlatformFeaturesPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/coming-soon" element={<ComingSoon />} /> 
