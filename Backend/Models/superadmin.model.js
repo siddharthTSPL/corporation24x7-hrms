@@ -136,6 +136,22 @@ const superAdminSchema = new mongoose.Schema(
       enum: ["PAN", "GSTIN"],
     },
 
+    bank_name: {
+      type: String,
+    },
+
+    account_holder_name: {
+      type: String,
+    },
+
+    account_number: {
+      type: String,
+    },
+
+    ifsc_code: {
+      type: String,
+    },
+
     last_login: {
       type: Date,
       default: null,
