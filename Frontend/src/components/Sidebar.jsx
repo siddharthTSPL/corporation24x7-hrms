@@ -100,6 +100,7 @@ const employeeMenu = [
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
+  { name: "Review",       path: "/review-employee",       icon: <FaClipboardCheck />, blurb: "See the performance reviews your manager has given you.", planFeature: "review" },
   { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet.", planFeature: "timesheet" },
   { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
