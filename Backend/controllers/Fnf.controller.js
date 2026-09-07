@@ -26,7 +26,7 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   if (!Model) return { name: "", employeeId: "", department: "", designation: "", pan: "", bankAccountNumber: "", bankName: "", dateOfJoining: null };
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name").lean();
+    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
     if (!person) return { name: "", employeeId: "", department: "", designation: "", pan: "", bankAccountNumber: "", bankName: "", dateOfJoining: null };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
@@ -34,8 +34,8 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
       department: "Management",
       designation: "Super Admin",
       pan: "",
-      bankAccountNumber: "",
-      bankName: "",
+      bankAccountNumber: person.account_number || "",
+      bankName: person.bank_name || "",
       dateOfJoining: null,
     };
   }
