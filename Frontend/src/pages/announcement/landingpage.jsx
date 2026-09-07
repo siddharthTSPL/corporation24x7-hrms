@@ -29,17 +29,17 @@ const radarData = [
   { metric: 'Communication', value: 80 },
 ]
 
-const fadeUp = {
+export const fadeUp = {
   hidden: { opacity: 0, y: 36 },
   show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } }
 }
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
-const cardVariant = {
+export const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
+export const cardVariant = {
   hidden: { opacity: 0, y: 40 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
 }
 
-const fontStyles = `
+export const fontStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 
   .font-display { font-family: 'Sora', sans-serif; }
@@ -58,7 +58,7 @@ const fontStyles = `
   .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
 `
 
-const Wrap = ({ children, className = '' }) => (
+export const Wrap = ({ children, className = '' }) => (
   <div className={`max-w-[1500px] mx-auto w-full px-5 sm:px-10 lg:px-16 ${className}`}>
     {children}
   </div>
@@ -72,7 +72,8 @@ function Divider() {
   )
 }
 
-function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
+export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -107,7 +108,7 @@ function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
               onClick={(e) => {
                 if (l === 'About') {
                   e.preventDefault()
-                  scrollToTop()
+                  navigate('/about')
                 }
               }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
@@ -141,7 +142,7 @@ function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
               onClick={(e) => {
                 if (l === 'About') {
                   e.preventDefault()
-                  scrollToTop()
+                  navigate('/about')
                 }
                 setOpen(false)
               }}
@@ -1107,7 +1108,7 @@ function LegalModal({ docKey, onClose }) {
   )
 }
 
-function Footer() {
+export function Footer() {
   const cols = [
     { title: 'Product', links: [
       { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
