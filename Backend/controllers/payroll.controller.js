@@ -61,16 +61,15 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name").lean();
+    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
     if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
       employeeId: "OWNER",
       department: "Management",
       designation: "Super Admin",
-      // SuperAdmin has no bank_name/account_number fields on its own model.
-      bankName: "",
-      accountNumber: "",
+      bankName: person.bank_name || "",
+      accountNumber: person.account_number || "",
     };
   }
 
