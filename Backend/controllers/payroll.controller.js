@@ -57,27 +57,34 @@ const getOrganisationSnapshot = async (organisation_id) => {
 
 const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   const Model = EMPLOYEE_MODEL_MAP[employeeModel];
-  if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
+  if (!Model) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
 
 
   if (employeeModel === "SuperAdmin") {
     const person = await Model.findById(employeeId).select("f_name l_name organisation_name").lean();
-    if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+    if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
       employeeId: "OWNER",
       department: "Management",
       designation: "Super Admin",
+      // SuperAdmin has no bank_name/account_number fields on its own model.
+      bankName: "",
+      accountNumber: "",
     };
   }
 
-  const person = await Model.findById(employeeId).select("f_name l_name empid uid department designation").lean();
-  if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+  const person = await Model.findById(employeeId)
+    .select("f_name l_name empid uid department designation bank_name account_number")
+    .lean();
+  if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
   return {
     name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
     employeeId: person.empid || person.uid || "",
     department: person.department || "",
     designation: person.designation || "",
+    bankName: person.bank_name || "",
+    accountNumber: person.account_number || "",
   };
 };
 
@@ -551,6 +558,22 @@ const listPayrolls = async (req, res) => {
     }
   }
 
+  // Older payrolls (generated before bank details were added to the
+  // snapshot) won't have bankName/accountNumber saved — backfill from each
+  // employee's current bank details so existing payslips still show them.
+  const needsBankBackfill = payrolls.filter((p) => !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber);
+  if (needsBankBackfill.length) {
+    const cache = new Map();
+    for (const p of needsBankBackfill) {
+      const cacheKey = `${p.employeeModel}:${p.employee}`;
+      if (!cache.has(cacheKey)) {
+        cache.set(cacheKey, await getEmployeeSnapshot(p.employeeModel, p.employee));
+      }
+      const { bankName, accountNumber } = cache.get(cacheKey);
+      p.employeeSnapshot = { ...p.employeeSnapshot, bankName, accountNumber };
+    }
+  }
+
   res.status(200).json({ success: true, count: payrolls.length, payrolls });
 };
 
@@ -567,6 +590,14 @@ const getPayslip = async (req, res) => {
 
   if (!payslip.organisationSnapshot?.name) {
     payslip.organisationSnapshot = await getOrganisationSnapshot(organisation_id);
+  }
+
+  // Older payslips (generated before bank details were added to the
+  // snapshot) won't have bankName/accountNumber saved — backfill from the
+  // employee's current bank details so existing payslips still show them.
+  if (!payslip.employeeSnapshot?.bankName && !payslip.employeeSnapshot?.accountNumber) {
+    const { bankName, accountNumber } = await getEmployeeSnapshot(payslip.employeeModel, payslip.employee);
+    payslip.employeeSnapshot = { ...payslip.employeeSnapshot, bankName, accountNumber };
   }
 
   res.status(200).json({ success: true, payslip });
