@@ -98,7 +98,20 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
       }`}
     >
       <div className="max-w-[1500px] mx-auto px-5 sm:px-10 lg:px-16 h-[72px] flex items-center justify-between">
-        <img src={logo} alt="TorchX Talent logo" className="h-9 sm:h-11 w-auto object-contain block" />
+        <button
+  type="button"
+  onClick={() => {
+    window.location.href = '/'
+  }}
+  className="bg-transparent border-none p-0 m-0 cursor-pointer"
+  aria-label="Go to home"
+>
+  <img
+    src={logo}
+    alt="TorchX Talent logo"
+    className="h-9 sm:h-11 w-auto object-contain block"
+  />
+</button>
 
         <div className="hidden lg:flex items-center gap-9">
           {links.map(l => (
