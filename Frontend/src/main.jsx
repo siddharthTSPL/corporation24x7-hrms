@@ -6,8 +6,16 @@ import { Toaster } from "react-hot-toast";
 import './index.css'
 import App from './App.jsx'
 
-
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
@@ -25,12 +33,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
-<Toaster
-    position="top-right"
-    reverseOrder={false}
-    gutter={8}
-  />
-
+        <Toaster
+          position="top-right"
+          reverseOrder={false}
+          gutter={8}
+        />
         <App />
       </QueryClientProvider>
     </HelmetProvider>
