@@ -1,18 +1,20 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  AreaChart, Area, LineChart, Line, RadarChart, PolarGrid, PolarAngleAxis,
+  PolarRadiusAxis, Radar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import {
   FaCalendarAlt, FaFileInvoiceDollar, FaFolder, FaTicketAlt,
-  FaClock, FaPlus, FaArrowRight, FaCheckCircle,
+  FaClock, FaPlus, FaArrowRight, FaCheckCircle, FaPercentage,
+  FaChartLine,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
 
 const BRAND = "#730042";
-const PALETTE = ["#730042", "#CD166E", "#F5A623", "#2FB4A0", "#4A6FDC", "#9B59B6"];
+const PALETTE = ["#730042", "#CD166E", "#F5A623", "#2FB4A0", "#4A6FDC", "#9B59B6", "#EB5757", "#27AE60"];
 
 const ROLE_PATHS = {
   employee: { leave: "/leave-employee", reimbursement: "/reimbursement-employee", documents: "/file-employee", tickets: "/employee-complaints" },
@@ -56,17 +58,24 @@ function ActionCard({ icon, title, blurb, onClick }) {
   );
 }
 
-function SectionCard({ title, children, className = "" }) {
+function SectionCard({ title, action, children, className = "" }) {
   return (
     <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-4 ${className}`}>
-      <p className="text-sm font-semibold text-gray-700 mb-3">{title}</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-gray-700">{title}</p>
+        {action}
+      </div>
       {children}
     </div>
   );
 }
 
+function SectionHeading({ children }) {
+  return <h2 className="text-sm font-bold uppercase tracking-wide text-[#730042]/70 mt-2">{children}</h2>;
+}
+
 function EmptyState({ text }) {
-  return <p className="text-xs text-gray-400 py-6 text-center">{text}</p>;
+  return <p className="text-xs text-gray-400 py-10 text-center">{text}</p>;
 }
 
 function fmtDate(d) {
@@ -89,6 +98,19 @@ export default function SelfServicePortal() {
   const paths = ROLE_PATHS[role] || ROLE_PATHS.employee;
   const { data, isLoading, isError } = useSelfServiceSummary();
 
+  const radarData = useMemo(() => {
+    if (!data) return [];
+    const leaveDecided = (data.leave?.counts?.approved || 0) + (data.leave?.counts?.rejected || 0);
+    const leaveApprovalRate = leaveDecided > 0 ? Math.round(((data.leave?.counts?.approved || 0) / leaveDecided) * 100) : 0;
+    const ticketResolutionRate = data.tickets?.counts?.total ? Math.round((data.tickets.counts.resolved / data.tickets.counts.total) * 100) : 0;
+    return [
+      { metric: "Attendance", value: data.attendance?.attendanceRate ?? 0 },
+      { metric: "Leave Approval", value: leaveApprovalRate },
+      { metric: "Claim Approval", value: data.reimbursement?.approvalRate ?? 0 },
+      { metric: "Ticket Resolution", value: ticketResolutionRate },
+    ];
+  }, [data]);
+
   if (isLoading) {
     return <div className="p-6 text-sm text-gray-400">Loading Self Service Portal…</div>;
   }
@@ -98,6 +120,8 @@ export default function SelfServicePortal() {
   }
 
   const isOrgScope = data.scope === "organisation";
+  const attendance = data.attendance;
+  const currentAttendanceMonth = attendance?.monthlyTrend?.[attendance.monthlyTrend.length - 1];
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -105,8 +129,8 @@ export default function SelfServicePortal() {
         <h1 className="text-xl font-bold text-gray-800">Self Service Portal</h1>
         <p className="text-sm text-gray-400">
           {isOrgScope
-            ? "Organisation-wide leave, reimbursement, document, and ticket activity."
-            : `Everything you need to manage your own leave, claims, documents, and tickets — ${ROLE_LABEL[role]} view.`}
+            ? "Organisation-wide leave, reimbursement, document, attendance, and ticket activity."
+            : `Everything you need to manage your own leave, claims, documents, attendance, and tickets — ${ROLE_LABEL[role]} view.`}
         </p>
       </div>
 
@@ -120,47 +144,36 @@ export default function SelfServicePortal() {
       </div>
 
       {!isOrgScope ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard icon={<FaCalendarAlt />} label="Leave Balance (EL)" value={data.leave?.balance?.EL ?? "—"} sub={`${data.leave?.counts?.pending || 0} pending`} />
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <StatCard icon={<FaCalendarAlt />} label="EL Remaining" value={data.leave?.balance?.EL?.remaining ?? "—"} sub={`${data.leave?.counts?.pending || 0} pending`} />
+          <StatCard icon={<FaCalendarAlt />} label="SL Remaining" value={data.leave?.balance?.SL?.remaining ?? "—"} />
           <StatCard icon={<FaFileInvoiceDollar />} label="Claims Pending" value={data.reimbursement?.counts?.submitted || 0} sub={fmtCurrency(data.reimbursement?.totalClaimed)} />
-          <StatCard icon={<FaFolder />} label="My Documents" value={data.documents?.total || 0} />
-          <StatCard icon={data.attendance?.checkedIn ? <FaCheckCircle /> : <FaClock />} label="Today's Attendance" value={data.attendance?.checkedIn ? "Checked In" : "Not Checked In"} sub={data.attendance?.checkIn ? new Date(data.attendance.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : undefined} />
+          <StatCard icon={<FaPercentage />} label="Claim Approval Rate" value={data.reimbursement?.approvalRate != null ? `${data.reimbursement.approvalRate}%` : "—"} />
+          <StatCard icon={<FaFolder />} label="My Documents" value={data.documents?.total || 0} sub={`${data.documents?.totalSizeMb || 0} MB used`} />
+          <StatCard icon={<FaTicketAlt />} label="Open Tickets" value={data.tickets?.counts?.open || 0} sub={`${data.tickets?.counts?.total || 0} total`} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           <StatCard icon={<FaCalendarAlt />} label="Leave Requests" value={data.leave?.counts?.total || 0} sub={`${data.leave?.counts?.pending || 0} pending`} />
           <StatCard icon={<FaFileInvoiceDollar />} label="Reimbursements" value={data.reimbursement?.counts?.total || 0} sub={fmtCurrency(data.reimbursement?.totalClaimed)} />
-          <StatCard icon={<FaFolder />} label="Documents" value={data.documents?.total || 0} />
+          <StatCard icon={<FaPercentage />} label="Claim Approval Rate" value={data.reimbursement?.approvalRate != null ? `${data.reimbursement.approvalRate}%` : "—"} />
+          <StatCard icon={<FaFolder />} label="Documents" value={data.documents?.total || 0} sub={`${data.documents?.totalSizeMb || 0} MB used`} />
           <StatCard icon={<FaTicketAlt />} label="Open Tickets" value={data.tickets?.counts?.open || 0} sub={`${data.tickets?.counts?.total || 0} total`} />
+          <StatCard icon={<FaChartLine />} label="Org Attendance Rate" value={data.attendance?.attendanceRate != null ? `${data.attendance.attendanceRate}%` : "—"} sub="this month" />
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SectionCard title={isOrgScope ? "Leave requests by type" : "Reimbursement trend (last 6 months)"}>
+      <SectionHeading>Overview</SectionHeading>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <SectionCard title="Self service health">
           <ResponsiveContainer width="100%" height={220}>
-            {isOrgScope ? (
-              <BarChart data={data.leave?.byType || []}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="type" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill={BRAND} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            ) : (
-              <AreaChart data={data.reimbursement?.monthlyTrend || []}>
-                <defs>
-                  <linearGradient id="ssAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={BRAND} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => fmtCurrency(v)} />
-                <Area type="monotone" dataKey="amount" stroke={BRAND} fill="url(#ssAmount)" strokeWidth={2} />
-              </AreaChart>
-            )}
+            <RadarChart data={radarData} outerRadius={75}>
+              <PolarGrid />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10 }} />
+              <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9 }} />
+              <Radar dataKey="value" stroke={BRAND} fill={BRAND} fillOpacity={0.4} />
+              <Tooltip />
+            </RadarChart>
           </ResponsiveContainer>
         </SectionCard>
 
@@ -168,7 +181,26 @@ export default function SelfServicePortal() {
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
-                data={Object.entries(data.reimbursement?.counts || {}).filter(([k]) => k !== "total").map(([status, count]) => ({ name: fmtStatus(status), value: count }))}
+                data={Object.entries(data.reimbursement?.counts || {}).filter(([k]) => k !== "total" && k !== "draft").map(([status, count]) => ({ name: fmtStatus(status), value: count }))}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={2}
+              >
+                {PALETTE.map((color, i) => <Cell key={i} fill={color} />)}
+              </Pie>
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </SectionCard>
+
+        <SectionCard title="Tickets by type">
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie
+                data={(data.tickets?.byType || []).map((t) => ({ name: fmtStatus(t.type), value: t.count }))}
                 dataKey="value"
                 nameKey="name"
                 innerRadius={50}
@@ -184,6 +216,153 @@ export default function SelfServicePortal() {
         </SectionCard>
       </div>
 
+      <SectionHeading>Leave</SectionHeading>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {!isOrgScope && (
+          <SectionCard title="Leave balance (EL / SL)">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={[
+                  { name: "EL", Entitled: data.leave?.balance?.EL?.entitled || 0, Availed: data.leave?.balance?.EL?.availed || 0, Remaining: data.leave?.balance?.EL?.remaining || 0 },
+                  { name: "SL", Entitled: data.leave?.balance?.SL?.entitled || 0, Availed: data.leave?.balance?.SL?.availed || 0, Remaining: data.leave?.balance?.SL?.remaining || 0 },
+                ]}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="Entitled" fill={PALETTE[2]} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Availed" fill={PALETTE[1]} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Remaining" fill={BRAND} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </SectionCard>
+        )}
+
+        <SectionCard title="Leave days taken (last 6 months)" className={isOrgScope ? "lg:col-span-2" : ""}>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={data.leave?.monthlyTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Line type="monotone" dataKey="days" stroke={BRAND} strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </SectionCard>
+
+        <SectionCard title="Leave requests by type">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data.leave?.byType || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="type" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill={BRAND} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </SectionCard>
+      </div>
+
+      <SectionHeading>Reimbursement</SectionHeading>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SectionCard title="Claimed amount trend (last 6 months)">
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={data.reimbursement?.monthlyTrend || []}>
+              <defs>
+                <linearGradient id="ssAmount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={BRAND} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={BRAND} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v) => fmtCurrency(v)} />
+              <Area type="monotone" dataKey="amount" stroke={BRAND} fill="url(#ssAmount)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </SectionCard>
+
+        <SectionCard title="Claimed amount by type">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data.reimbursement?.byType || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="type" tick={{ fontSize: 10 }} interval={0} angle={-15} textAnchor="end" height={50} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v) => fmtCurrency(v)} />
+              <Bar dataKey="amount" fill={PALETTE[1]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </SectionCard>
+      </div>
+
+      <SectionHeading>Documents & Tickets</SectionHeading>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SectionCard title="Documents uploaded (last 6 months)">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data.documents?.monthlyTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count" fill={PALETTE[3]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </SectionCard>
+
+        <SectionCard title="Tickets raised (last 6 months)">
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={data.tickets?.monthlyTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="count" stroke={PALETTE[4]} strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </SectionCard>
+      </div>
+
+      <SectionHeading>Attendance</SectionHeading>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {!isOrgScope && (
+          <StatCard
+            icon={attendance?.today?.checkedIn ? <FaCheckCircle /> : <FaClock />}
+            label="Today's Attendance"
+            value={attendance?.today?.checkedIn ? "Checked In" : "Not Checked In"}
+            sub={attendance?.today?.checkIn ? new Date(attendance.today.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : undefined}
+          />
+        )}
+        <SectionCard title="Attendance this month">
+          <div className="flex items-center gap-4">
+            <p className="text-3xl font-bold" style={{ color: BRAND }}>{attendance?.attendanceRate != null ? `${attendance.attendanceRate}%` : "—"}</p>
+            <div className="text-xs text-gray-500">
+              <p>Present: {currentAttendanceMonth?.present ?? 0}</p>
+              <p>Half day: {currentAttendanceMonth?.half ?? 0}</p>
+              <p>Absent: {currentAttendanceMonth?.absent ?? 0}</p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Attendance trend (last 6 months)" className="lg:col-span-1">
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={attendance?.monthlyTrend || []}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 10 }} />
+              <Bar dataKey="present" stackId="a" fill={PALETTE[3]} />
+              <Bar dataKey="half" stackId="a" fill={PALETTE[2]} />
+              <Bar dataKey="absent" stackId="a" fill={PALETTE[6]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </SectionCard>
+      </div>
+
+      <SectionHeading>Recent Activity</SectionHeading>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {!isOrgScope && (
           <SectionCard title="Recent leave requests">
@@ -205,7 +384,7 @@ export default function SelfServicePortal() {
           </SectionCard>
         )}
 
-        <SectionCard title="Recent reimbursement claims" className={isOrgScope ? "lg:col-span-2" : ""}>
+        <SectionCard title="Recent reimbursement claims">
           {data.reimbursement?.recent?.length ? (
             <ul className="space-y-2">
               {data.reimbursement.recent.map((c) => (
@@ -224,9 +403,27 @@ export default function SelfServicePortal() {
           ) : <EmptyState text="No reimbursement claims yet" />}
         </SectionCard>
 
-        <SectionCard title={isOrgScope ? "Documents by type" : "Recent documents"}>
-          {isOrgScope ? (
-            data.documents?.byType?.length ? (
+        <SectionCard title="Recent tickets">
+          {data.tickets?.recent?.length ? (
+            <ul className="space-y-2">
+              {data.tickets.recent.map((t) => (
+                <li key={t._id} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                  <div>
+                    <p className="font-medium text-gray-700">{t.ticketNumber}</p>
+                    <p className="text-gray-400 capitalize">{t.type} · {fmtDate(t.createdAt)}</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ background: `${BRAND}1A`, color: BRAND }}>
+                    {fmtStatus(t.status)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState text="No tickets yet" />}
+        </SectionCard>
+
+        {isOrgScope && (
+          <SectionCard title="Documents by type">
+            {data.documents?.byType?.length ? (
               <ul className="space-y-2">
                 {data.documents.byType.map((d) => (
                   <li key={d.type} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
@@ -235,18 +432,24 @@ export default function SelfServicePortal() {
                   </li>
                 ))}
               </ul>
-            ) : <EmptyState text="No documents yet" />
-          ) : data.documents?.recent?.length ? (
-            <ul className="space-y-2">
-              {data.documents.recent.map((d) => (
-                <li key={d._id} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                  <span className="text-gray-600 truncate pr-2">{d.title}</span>
-                  <span className="text-gray-400">{fmtDate(d.uploadedAt)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : <EmptyState text="No documents yet" />}
-        </SectionCard>
+            ) : <EmptyState text="No documents yet" />}
+          </SectionCard>
+        )}
+
+        {!isOrgScope && (
+          <SectionCard title="Recent documents">
+            {data.documents?.recent?.length ? (
+              <ul className="space-y-2">
+                {data.documents.recent.map((d) => (
+                  <li key={d._id} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                    <span className="text-gray-600 truncate pr-2">{d.title}</span>
+                    <span className="text-gray-400">{fmtDate(d.uploadedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <EmptyState text="No documents yet" />}
+          </SectionCard>
+        )}
       </div>
     </div>
   );
