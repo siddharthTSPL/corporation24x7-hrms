@@ -8,10 +8,8 @@ const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const superadminmiddleware = require("../middleware/auth/superadmin.middleware");
 const supportUpload = require("../middleware/upload/Supportattachments.middleware");
 
-const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 // Reimbursements are part of the Self Service Portal bundle: locked on
 // Basic, fully open on Advance/enterprise (or during the free trial).
-const selfServicePlanGate = restrictPlanFeature("selfService");
 
 const {
   employeeApply,
@@ -47,95 +45,82 @@ const claimAttachments = supportUpload.fields([
 // ---- Employee ---------------------------------------------------------
 reimbursementRouter.post(
   "/employee/apply",
-  employeemiddleware, selfServicePlanGate,
-  claimAttachments,
+  employeemiddleware,  claimAttachments,
   asyncHandler(employeeApply),
 );
 reimbursementRouter.put(
   "/employee/update/:id",
-  employeemiddleware, selfServicePlanGate,
-  claimAttachments,
+  employeemiddleware,  claimAttachments,
   asyncHandler(employeeUpdate),
 );
 reimbursementRouter.delete(
   "/employee/delete/:id",
-  employeemiddleware, selfServicePlanGate,
-  asyncHandler(employeeDelete),
+  employeemiddleware,  asyncHandler(employeeDelete),
 );
-reimbursementRouter.get("/employee/my", employeemiddleware, selfServicePlanGate, asyncHandler(employeeGetMy));
+reimbursementRouter.get("/employee/my", employeemiddleware, asyncHandler(employeeGetMy));
 
 // ---- Manager ------------------------------------------------------------
 reimbursementRouter.post(
   "/manager/apply",
-  managermiddleware, selfServicePlanGate,
-  claimAttachments,
+  managermiddleware,  claimAttachments,
   asyncHandler(managerApply),
 );
 reimbursementRouter.put(
   "/manager/update/:id",
-  managermiddleware, selfServicePlanGate,
-  claimAttachments,
+  managermiddleware,  claimAttachments,
   asyncHandler(managerUpdate),
 );
 reimbursementRouter.delete(
   "/manager/delete/:id",
-  managermiddleware, selfServicePlanGate,
-  asyncHandler(managerDelete),
+  managermiddleware,  asyncHandler(managerDelete),
 );
-reimbursementRouter.get("/manager/my", managermiddleware, selfServicePlanGate, asyncHandler(managerGetMy));
+reimbursementRouter.get("/manager/my", managermiddleware, asyncHandler(managerGetMy));
 
 // ---- Admin ---------------------------------------------------------------
 // Own claims (escalate to SuperAdmin)
 reimbursementRouter.post(
   "/admin/apply",
-  adminauthmiddleware, selfServicePlanGate,
-  claimAttachments,
+  adminauthmiddleware,  claimAttachments,
   asyncHandler(adminApply),
 );
 reimbursementRouter.put(
   "/admin/update/:id",
-  adminauthmiddleware, selfServicePlanGate,
-  claimAttachments,
+  adminauthmiddleware,  claimAttachments,
   asyncHandler(adminUpdate),
 );
 reimbursementRouter.delete(
   "/admin/delete/:id",
-  adminauthmiddleware, selfServicePlanGate,
-  asyncHandler(adminDelete),
+  adminauthmiddleware,  asyncHandler(adminDelete),
 );
-reimbursementRouter.get("/admin/my", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminGetMy));
+reimbursementRouter.get("/admin/my", adminauthmiddleware, asyncHandler(adminGetMy));
 
 // Reviewing Employee + Manager claims
-reimbursementRouter.get("/admin/pending", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminGetPending));
-reimbursementRouter.get("/admin/all", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminGetAll));
-reimbursementRouter.post("/admin/approve", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminApprove));
-reimbursementRouter.post("/admin/reject", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminReject));
-reimbursementRouter.post("/admin/markPaid", adminauthmiddleware, selfServicePlanGate, asyncHandler(adminMarkPaid));
+reimbursementRouter.get("/admin/pending", adminauthmiddleware, asyncHandler(adminGetPending));
+reimbursementRouter.get("/admin/all", adminauthmiddleware, asyncHandler(adminGetAll));
+reimbursementRouter.post("/admin/approve", adminauthmiddleware, asyncHandler(adminApprove));
+reimbursementRouter.post("/admin/reject", adminauthmiddleware, asyncHandler(adminReject));
+reimbursementRouter.post("/admin/markPaid", adminauthmiddleware, asyncHandler(adminMarkPaid));
 
 // ---- SuperAdmin ----------------------------------------------------------
 // Reviewing Admin claims
 reimbursementRouter.get(
   "/superadmin/pending",
-  superadminmiddleware, selfServicePlanGate,
-  asyncHandler(superadminGetPending),
+  superadminmiddleware,  asyncHandler(superadminGetPending),
 );
 reimbursementRouter.post(
   "/superadmin/approve",
-  superadminmiddleware, selfServicePlanGate,
-  asyncHandler(superadminApprove),
+  superadminmiddleware,  asyncHandler(superadminApprove),
 );
 reimbursementRouter.post(
   "/superadmin/reject",
-  superadminmiddleware, selfServicePlanGate,
-  asyncHandler(superadminReject),
+  superadminmiddleware,  asyncHandler(superadminReject),
 );
 reimbursementRouter.post(
   "/superadmin/markPaid",
-  superadminmiddleware, selfServicePlanGate,
-  asyncHandler(superadminMarkPaid),
+  superadminmiddleware,  asyncHandler(superadminMarkPaid),
 );
 
 // Org-wide visibility: Employee + Manager + Admin claims, any status.
-reimbursementRouter.get("/superadmin/all", superadminmiddleware, selfServicePlanGate, asyncHandler(superadminGetAll));
+reimbursementRouter.get("/superadmin/all", superadminmiddleware, asyncHandler(superadminGetAll));
 
 module.exports = reimbursementRouter;
