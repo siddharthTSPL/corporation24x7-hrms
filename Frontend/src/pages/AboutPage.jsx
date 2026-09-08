@@ -11,6 +11,9 @@ import { FiStar, FiUsers } from 'react-icons/fi'
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
 
+// Compressed, web-sized copies (originals were multi-MB camera-resolution
+// files, which is why images could take a long time to appear on first
+// load and looked "broken" until the browser finished downloading them).
 import slideWhiteOffice from '../assets/Office-meeting.png'
 import slideTeam from '../assets/Team-work.jpg'
 
@@ -30,11 +33,17 @@ function HeroBadge({ children }) {
 }
 
 function AboutHero({ onExplore }) {
+  // This section is above the fold — it's visible the instant the page opens,
+  // so it animates immediately on mount (animate="show") instead of waiting
+  // for a scroll-triggered whileInView. Relying on whileInView here was the
+  // main reason the hero image could stay invisible (opacity: 0) until the
+  // user refreshed: the IntersectionObserver that reveals it doesn't always
+  // fire promptly for content that's already on screen at load time.
   return (
     <section className="bg-white pt-32 pb-16 overflow-hidden">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] items-center gap-12">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
+          <motion.div variants={fadeUp} initial="hidden" animate="show">
             <div className="mb-5"><HeroBadge>About TorchX Talent — People-First HRMS Architecture</HeroBadge></div>
             <h1 className="font-hero font-medium text-[#111] leading-[1.12] mb-6 text-[clamp(1.9rem,4.2vw,3.2rem)] tracking-[-1px]">
               Empowering Modern Workforces Through <span className="text-[#7A004B]">Intelligent HR</span> Solutions
@@ -60,11 +69,18 @@ function AboutHero({ onExplore }) {
           </motion.div>
 
           <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ delay: 0.15 }}
+            variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }}
             className="relative"
           >
             <div className="rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_24px_64px_rgba(115,0,66,0.16)] aspect-[4/3]">
-              <img src={slideWhiteOffice} alt="TorchX Talent workforce analytics" className="w-full h-full object-cover" />
+              <img
+                src={slideWhiteOffice}
+                alt="TorchX Talent workforce analytics"
+                className="w-full h-full object-cover"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
             </div>
 
             <div className="absolute -top-4 -left-4 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] border border-[#EAC7D7] px-4 py-2.5 hidden sm:block">
@@ -96,7 +112,7 @@ function AboutHero({ onExplore }) {
   )
 }
 
-function TrackRecord() {
+function TrackRecord({ scrollContainerRef }) {
   const stats = [
     { icon: <BsPeopleFill size={20} />, num: '100+', label: 'Happy customers of TorchX Talent' },
     { icon: <BsGraphUp size={20} />, num: '100+', label: 'No. of live executive demos' },
@@ -106,12 +122,17 @@ function TrackRecord() {
   return (
     <section className="bg-white py-14">
       <Wrap>
-        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-10">
+        <motion.div
+          variants={fadeUp} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
+          className="text-center mb-10"
+        >
           <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[12.5px] mb-2">Proven Track Record</p>
           <h2 className="font-hero font-medium text-[#111] text-[clamp(1.6rem,3vw,2.2rem)]">Trusted by Forward-Thinking HR Leaders</h2>
         </motion.div>
         <motion.div
-          variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.2 }}
+          variants={stagger} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
         >
           {stats.map(s => (
@@ -134,7 +155,7 @@ function TrackRecord() {
   )
 }
 
-function OriginStory() {
+function OriginStory({ scrollContainerRef }) {
   const points = [
     'Single pane of glass across the entire workforce journey—hiring, payroll, attendance & appraisal.',
     'Real-time attendance biometrics & cloud self-service for effortless employee autonomy.',
@@ -144,9 +165,19 @@ function OriginStory() {
     <section className="bg-[#F8F5F7] py-16">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-12 items-center">
-          <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="relative">
+          <motion.div
+            variants={fadeUp} initial="hidden" whileInView="show"
+            viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
+            className="relative"
+          >
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
-              <img src={slideTeam} alt="TorchX Talent engineering lab" className="w-full h-full object-cover" />
+              <img
+                src={slideTeam}
+                alt="TorchX Talent engineering lab"
+                className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
             <div className="flex items-center justify-between mt-3 px-1">
               <span className="inline-flex items-center gap-2 text-[12.5px] font-body text-[#555]">
@@ -158,7 +189,11 @@ function OriginStory() {
             </div>
           </motion.div>
 
-          <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ delay: 0.1 }}>
+          <motion.div
+            variants={fadeUp} initial="hidden" whileInView="show"
+            viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
+            transition={{ delay: 0.1 }}
+          >
             <div className="mb-4"><HeroBadge>Our Origin &amp; Purpose</HeroBadge></div>
             <h2 className="font-hero font-medium text-[#111] leading-[1.2] mb-5 text-[clamp(1.6rem,3vw,2.2rem)]">
               Born to Eliminate Legacy HR Friction and Unleash True Human Potential
@@ -189,7 +224,7 @@ function OriginStory() {
   )
 }
 
-function GuidingPhilosophy() {
+function GuidingPhilosophy({ scrollContainerRef }) {
   const cards = [
     {
       icon: <FiZap />, title: 'Our Mission', tag: 'Zero-Friction Administration',
@@ -207,7 +242,11 @@ function GuidingPhilosophy() {
   return (
     <section className="bg-white py-16">
       <Wrap>
-        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-14">
+        <motion.div
+          variants={fadeUp} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
+          className="text-center mb-14"
+        >
           <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[12.5px] mb-2">Our Guiding Philosophy</p>
           <h2 className="font-hero font-medium text-[#111] leading-[1.15] mb-4 text-[clamp(1.8rem,3.6vw,2.6rem)]">
             Architected for Scalability, Guided by Empathy
@@ -217,7 +256,8 @@ function GuidingPhilosophy() {
           </p>
         </motion.div>
         <motion.div
-          variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.15 }}
+          variants={stagger} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.15 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-7"
         >
           {cards.map(c => (
@@ -239,7 +279,7 @@ function GuidingPhilosophy() {
   )
 }
 
-function SecuritySection() {
+function SecuritySection({ scrollContainerRef }) {
   const items = [
     { icon: <FiLock />, title: 'AES-256 Cloud Encryption', desc: 'High-standard cryptographic security applied for both data at rest and in transit.' },
     { icon: <FiShield />, title: 'Granular RBAC Controls', desc: 'Role-based access ensures sensitive payroll & appraisals remain strictly confidential.' },
@@ -250,7 +290,8 @@ function SecuritySection() {
     <section className="bg-[#F8F5F7] py-16">
       <Wrap>
         <motion.div
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
+          variants={fadeUp} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.15 }}
           className="bg-white rounded-3xl border border-[#EAC7D7] shadow-[0_8px_32px_rgba(122,0,75,0.08)] p-8 md:p-10 grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] gap-10 items-center"
         >
           <div>
@@ -282,11 +323,15 @@ function SecuritySection() {
   )
 }
 
-function AboutCTA() {
+function AboutCTA({ scrollContainerRef }) {
   return (
     <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-16">
       <Wrap>
-        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center">
+        <motion.div
+          variants={fadeUp} initial="hidden" whileInView="show"
+          viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
+          className="text-center"
+        >
           <span className="inline-flex items-center gap-2 bg-white/10 border border-white/25 text-white text-[12px] font-ui font-semibold uppercase tracking-[1px] px-4 py-2 rounded-full mb-5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#ffd6ea]" /> Transform Your Workplace Operations Today
           </span>
@@ -339,11 +384,11 @@ export default function AboutPage() {
       <style>{fontStyles}</style>
       <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} scrollContainerRef={scrollContainerRef} />
       <AboutHero onExplore={handleExplore} />
-      <TrackRecord />
-      <OriginStory />
-      <GuidingPhilosophy />
-      <SecuritySection />
-      <AboutCTA />
+      <TrackRecord scrollContainerRef={scrollContainerRef} />
+      <OriginStory scrollContainerRef={scrollContainerRef} />
+      <GuidingPhilosophy scrollContainerRef={scrollContainerRef} />
+      <SecuritySection scrollContainerRef={scrollContainerRef} />
+      <AboutCTA scrollContainerRef={scrollContainerRef} />
       <Footer />
     </div>
   )
