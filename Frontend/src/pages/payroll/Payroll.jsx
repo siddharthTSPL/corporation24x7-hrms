@@ -1905,7 +1905,6 @@ function RecordsTab({ notify, directory }) {
   const { mutate: bulkUpdateStatus, isPending: bulkStatusPending } = useBulkUpdatePayrollStatus();
   const { mutate: bulkDelete, isPending: bulkDeletePending } = useBulkDeletePayroll();
   const [selected, setSelected] = useState(null);
-<<<<<<< Updated upstream
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -1970,21 +1969,6 @@ function RecordsTab({ notify, directory }) {
     );
   }, [payrolls]);
 
-=======
-  const [exporting, setExporting] = useState(false);
-
-  const payrolls = data?.payrolls || [];
-
-  const handleExport = () => {
-    setExporting(true);
-    try {
-      downloadPayrollWorkbook({ payrolls, directory, filters });
-    } finally {
-      setExporting(false);
-    }
-  };
-
->>>>>>> Stashed changes
   const handleStatus = (id, status) => {
     updateStatus(
       { id, status },

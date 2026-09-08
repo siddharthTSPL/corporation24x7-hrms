@@ -11,12 +11,10 @@ const { cacheRoute } = require("../middleware/cache/cache.middleware");
 // plan-gated features: fully locked on the Basic plan, fully open on
 // Advance/enterprise (or during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
-const assetPlanGate = restrictPlanFeature("asset");
 const ticketsPlanGate = restrictPlanFeature("tickets");
 // Self Service Portal — Leave, Reimbursements, and Document/File
 // self-management — is likewise fully locked on Basic and fully open on
 // Advance/enterprise (or during the free trial).
-const selfServicePlanGate = restrictPlanFeature("selfService");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -280,44 +278,37 @@ adminrouter.put(
 adminrouter.get(
   "/showallleaves",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(showallleaves),
 );
-adminrouter.post("/applyleave", adminauthmiddleware, selfServicePlanGate, asyncHandler(applyleave));
+adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
 adminrouter.put(
   "/editleave/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(editleaveadmin),
 );
 adminrouter.delete(
   "/deleteleave/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(deleteleaveadmin),
 );
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(getmyleavehistory),
 );
 adminrouter.put(
   "/acceptleave/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(acceptLeave),
 );
 adminrouter.put(
   "/rejectleave/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(rejectLeave),
 );
 adminrouter.post(
   "/actionleave",
   adminauthmiddleware,
-  selfServicePlanGate,
   asyncHandler(adminActionOnLeave),
 );
 
@@ -382,7 +373,6 @@ adminrouter.delete(
 adminrouter.post(
   "/upload",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   uploadDocument,
@@ -390,7 +380,6 @@ adminrouter.post(
 adminrouter.put(
   "/documents/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   editDocument,
@@ -398,28 +387,24 @@ adminrouter.put(
 adminrouter.delete(
   "/documents/:id",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   deleteDocument,
 );
 adminrouter.get(
   "/documents/personal",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllPersonalDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/expense",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllExpenseDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getDocumentDetailsAdmin),
 );
@@ -456,7 +441,6 @@ adminrouter.post(
 adminrouter.get(
   "/documents",
   adminauthmiddleware,
-  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
 );
@@ -484,23 +468,22 @@ adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactive
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
 
 // ── Asset Management (Admin) — plan-gated: locked on Basic ─────────────────────
-adminrouter.post("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(createAssetAdmin));
-adminrouter.get("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(getAllAssetsAdmin));
+adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
+adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-adminrouter.get("/assets/employees", adminauthmiddleware, assetPlanGate, asyncHandler(getEmployeesWithAssets));
+adminrouter.get("/assets/employees", adminauthmiddleware, asyncHandler(getEmployeesWithAssets));
 adminrouter.get(
   "/assets/employees/:person_id/:person_model/history",
   adminauthmiddleware,
-  assetPlanGate,
   asyncHandler(getEmployeeAssetHistory)
 );
-adminrouter.get("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetByIdAdmin));
-adminrouter.put("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(updateAssetAdmin));
-adminrouter.delete("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(deleteAssetAdmin));
-adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToEmployee));
-adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToManager));
-adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, assetPlanGate, asyncHandler(revokeAssetAdmin));
-adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetsOfPerson));
+adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
+adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
+adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
+adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandler(assignAssetToEmployee));
+adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
+adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
+adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
 
 // Assets assigned to the logged-in admin themself (e.g. by SuperAdmin) — Dashboard / Settings "My Assets" widget
 adminrouter.get("/my-assets", adminauthmiddleware, asyncHandler(getMyAssets));

@@ -10,11 +10,9 @@ const { cacheRoute } = require("../middleware/cache/cache.middleware");
 // Advance/enterprise (or during the free trial). The SuperAdmin document IS
 // the organisation record, so the SuperAdmin's own plan gates these too.
 const reviewPlanGate = restrictPlanFeature("review");
-const assetPlanGate = restrictPlanFeature("asset");
 // Self Service Portal — Leave, Reimbursements, and Document/File
 // self-management — is likewise fully locked on Basic and fully open on
 // Advance/enterprise (or during the free trial).
-const selfServicePlanGate = restrictPlanFeature("selfService");
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
@@ -180,19 +178,16 @@ superAdminRouter.delete(
 superAdminRouter.get(
   "/showallleaves",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(showallleaves),
 );
 superAdminRouter.put(
   "/accept-leave/:id",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(acceptleavebyadmin),
 );
 superAdminRouter.put(
   "/reject-leave/:id",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(rejectleavebyadmin),
 );
 
@@ -276,19 +271,16 @@ superAdminRouter.get(
 superAdminRouter.get(
   "/getallpersonaldocuments",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(getAllPersonalDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getallexpensedocuments",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(getAllExpenseDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getdocumentdetails/:id",
   superAdminAuth,
-  selfServicePlanGate,
   asyncHandler(getDocumentDetailsSuperAdmin),
 );
 
@@ -336,22 +328,21 @@ superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(ge
 
 
 // asset route — plan-gated: locked on Basic
-superAdminRouter.post("/assets", superAdminAuth, assetPlanGate, asyncHandler(createAssetSuperAdmin));
-superAdminRouter.get("/assets", superAdminAuth, assetPlanGate, asyncHandler(getAllAssetsSuperAdmin));
+superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
+superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-superAdminRouter.get("/assets/employees", superAdminAuth, assetPlanGate, asyncHandler(getEmployeesWithAssets));
+superAdminRouter.get("/assets/employees", superAdminAuth, asyncHandler(getEmployeesWithAssets));
 superAdminRouter.get(
   "/assets/employees/:person_id/:person_model/history",
   superAdminAuth,
-  assetPlanGate,
   asyncHandler(getEmployeeAssetHistory)
 );
-superAdminRouter.get("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(getAssetByIdSuperAdmin));
-superAdminRouter.put("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(updateAssetSuperAdmin));
-superAdminRouter.delete("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(deleteAssetSuperAdmin));
-superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, assetPlanGate, asyncHandler(assignAssetToAdminSuperAdmin));
-superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, assetPlanGate, asyncHandler(revokeAssetFromAdminSuperAdmin));
-superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, assetPlanGate, asyncHandler(getAssetsOfPerson));
+superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
+superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
+superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
+superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, asyncHandler(assignAssetToAdminSuperAdmin));
+superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revokeAssetFromAdminSuperAdmin));
+superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
 
 // Help & Support form — no permission gate, super admin can reach support too.
 superAdminRouter.post("/contact-support", superAdminAuth, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
