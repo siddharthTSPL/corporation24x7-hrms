@@ -83,4 +83,20 @@ const invalidateOrgCache = (orgId) => {
   }
 };
 
-module.exports = { cacheRoute, invalidateOrgCache };
+/**
+ * Same as invalidateOrgCache, but for entries keyed by an individual
+ * user/actor id rather than an organisation — use this for "my own data"
+ * endpoints (getme/profile) where two people in the same org must never
+ * share a cache entry.
+ *
+ * @param {string} userId
+ */
+const invalidateUserCache = (userId) => {
+  if (!userId) return;
+  const prefix = `user:${userId}:`;
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) cache.delete(key);
+  }
+};
+
+module.exports = { cacheRoute, invalidateOrgCache, invalidateUserCache };
