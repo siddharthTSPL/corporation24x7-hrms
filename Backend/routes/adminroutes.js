@@ -5,6 +5,7 @@ const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -120,7 +121,17 @@ adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
 adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
 
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
-adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+// getme is the "who am I / what's my dashboard" call — fired on nearly
+// every page load and hits Admin + LeaveBalance + Review in parallel.
+// Cached 30s per admin (never per-org — this is one person's own data,
+// so the key MUST be their own _id or two admins in the same org would
+// see each other's profile/reviews).
+adminrouter.get(
+  "/getme",
+  adminauthmiddleware,
+  cacheRoute(30_000, (req) => `user:${req.admin._id}:${req.originalUrl}`),
+  asyncHandler(getme)
+);
 adminrouter.get("/getattendance", adminauthmiddleware, asyncHandler(getMyAttendanceHistory));
 adminrouter.put(
   "/editadminprofile",
