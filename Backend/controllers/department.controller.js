@@ -1,4 +1,5 @@
 const Department = require("../Models/department.model");
+const { invalidateOrgCache } = require("../middleware/cache/cache.middleware");
 
 // The old hardcoded enum - seeded once per organisation so existing data
 // (Users/Managers/Admins already saved with these codes) keeps working
@@ -52,6 +53,7 @@ const createDepartment = async (req, res) => {
       code: (code || "").trim(),
     });
 
+    invalidateOrgCache(organisation_id);
     res.status(201).json({ message: "Department created", department });
   } catch (error) {
     if (error.code === 11000)
@@ -80,6 +82,7 @@ const updateDepartment = async (req, res) => {
     );
 
     if (!department) return res.status(404).json({ message: "Department not found" });
+    invalidateOrgCache(organisation_id);
     res.json({ message: "Department updated", department });
   } catch (error) {
     if (error.code === 11000)
@@ -101,6 +104,7 @@ const deleteDepartment = async (req, res) => {
     department.isActive = false;
     await department.save();
 
+    invalidateOrgCache(organisation_id);
     res.json({ message: "Department deactivated" });
   } catch (error) {
     res.status(500).json({ error: error.message });
