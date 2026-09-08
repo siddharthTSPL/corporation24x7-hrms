@@ -50,7 +50,7 @@ function PlatformHero() {
           </a>
         </motion.div>
 
-        <motion.div
+        <motion.div    
           variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ delay: 0.15 }}
           className="relative max-w-[980px] mx-auto px-4 sm:px-0"
         >

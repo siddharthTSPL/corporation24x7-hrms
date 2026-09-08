@@ -1147,7 +1147,7 @@ export function Footer() {
       { label: 'Pricing', href: '#pricing' },
     ] },
     { title: 'Resources', links: [
-      { label: 'Documentation', href: '' },
+      { label: 'Documentation', to: '/documentation' },
     ] },
   ]
   const socials = [
@@ -1198,7 +1198,7 @@ export function Footer() {
                         </a>
                       ) : (
                         <Link
-                          to={`/coming-soon?product=${encodeURIComponent(l.label)}`}
+                          to={l.to || `/coming-soon?product=${encodeURIComponent(l.label)}`}
                           className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
                         >
                           {l.label}
