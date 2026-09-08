@@ -29,18 +29,19 @@ function ratingColor(rating) {
   return "#B0233A";
 }
 
+// Same rule as ReviewCard: not a final HR decision yet -> just "Pending".
 const STATUS_LABEL = {
-  submitted: "Awaiting response",
-  reviewee_accepted: "Accepted",
-  reviewee_disputed: "Disputed",
+  submitted: "Pending",
+  reviewee_accepted: "Pending",
+  reviewee_disputed: "Pending",
   hr_approved: "HR Approved",
   hr_rejected: "HR Rejected",
 };
 
 const STATUS_COLOR = {
   submitted: "#B8860B",
-  reviewee_accepted: "#1E7A3D",
-  reviewee_disputed: "#B0233A",
+  reviewee_accepted: "#B8860B",
+  reviewee_disputed: "#B8860B",
   hr_approved: "#1E7A3D",
   hr_rejected: "#B0233A",
 };

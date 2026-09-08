@@ -1562,7 +1562,7 @@ function getPayslipLineItems(payroll) {
 
 
 
-function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
+function downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
   const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
@@ -1602,6 +1602,8 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
     <div><span class="lbl">Employee ID: </span>${employeeId}</div>
     <div><span class="lbl">Department: </span>${departmentLabel(department)}</div>
     <div><span class="lbl">Designation: </span>${designation}</div>
+    <div><span class="lbl">Bank Name: </span>${bankName || "—"}</div>
+    <div><span class="lbl">Account Number: </span>${accountNumber || "—"}</div>
     <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
     <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
   </div>
@@ -1659,6 +1661,8 @@ function PayslipModal({ payroll, directory, onClose }) {
   const employeeId = snap.employeeId || person?.empid || "—";
   const department = snap.department || "—";
   const designation = snap.designation || "—";
+  const bankName = snap.bankName || "—";
+  const accountNumber = snap.accountNumber || "—";
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
 
@@ -1676,7 +1680,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             {payroll.status === "paid" && (
-              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, orgName })}>
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
                 Download
               </GhostButton>
             )}
@@ -1689,6 +1693,8 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Employee ID" value={employeeId} />
           <PayslipRow label="Department" value={departmentLabel(department)} />
           <PayslipRow label="Designation" value={designation} />
+          <PayslipRow label="Bank Name" value={bankName} />
+          <PayslipRow label="Account Number" value={accountNumber} />
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
 
@@ -2180,6 +2186,8 @@ function RecordsTab({ notify, directory }) {
                             employeeId: snap.employeeId || person?.empid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
+                            bankName: snap.bankName || "—",
+                            accountNumber: snap.accountNumber || "—",
                             orgName: p.organisationSnapshot?.name || "",
                           });
                         }}

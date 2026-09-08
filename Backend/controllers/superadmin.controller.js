@@ -562,6 +562,10 @@ const getMe = async (req, res, next) => {
         company_address: superAdmin.company_address,
         company_size: superAdmin.company_size,
         industry: superAdmin.industry,
+        bank_name: superAdmin.bank_name,
+        account_holder_name: superAdmin.account_holder_name,
+        account_number: superAdmin.account_number,
+        ifsc_code: superAdmin.ifsc_code,
         plan: superAdmin.plan,
         role: superAdmin.role,
         status: superAdmin.status,
@@ -611,6 +615,10 @@ const updateSuperAdmin = async (req, res, next) => {
     "company_size",
     "industry",
     "organisation_name",
+    "bank_name",
+    "account_holder_name",
+    "account_number",
+    "ifsc_code",
   ].forEach((field) => {
     if (req.body[field] !== undefined) superAdmin[field] = req.body[field];
   });
@@ -629,6 +637,10 @@ const updateSuperAdmin = async (req, res, next) => {
       company_address: superAdmin.company_address,
       company_size: superAdmin.company_size,
       industry: superAdmin.industry,
+      bank_name: superAdmin.bank_name,
+      account_holder_name: superAdmin.account_holder_name,
+      account_number: superAdmin.account_number,
+      ifsc_code: superAdmin.ifsc_code,
     },
   });
 };
@@ -2944,4 +2956,4 @@ module.exports = {
   getLeavePolicy,
   setLeavePolicy,
   getperticularadmin
-};  
+};

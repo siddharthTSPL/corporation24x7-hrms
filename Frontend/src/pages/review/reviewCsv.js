@@ -14,10 +14,11 @@ export function formatDate(d) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Same rule as ReviewCard: not a final HR decision yet -> just "Pending".
 export const STATUS_LABEL = {
-  submitted: "Awaiting response",
-  reviewee_accepted: "Accepted",
-  reviewee_disputed: "Disputed",
+  submitted: "Pending",
+  reviewee_accepted: "Pending",
+  reviewee_disputed: "Pending",
   hr_approved: "HR Approved",
   hr_rejected: "HR Rejected",
 };

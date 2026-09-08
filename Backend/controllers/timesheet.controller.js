@@ -3,6 +3,7 @@ const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
+const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
@@ -422,6 +423,29 @@ const resolveActorName = async (id, cache) => {
   return null;
 };
 
+// "Off" placeholder rows (week-off/holiday days with no logged entry) have
+// no TimeLog to read a project off of, so they used to show a blank Project
+// column. Instead, resolve the employee's currently active job(s) (ongoing
+// status, not completed/cancelled) and show those project name(s) — cached
+// per employee per report run since the same employee repeats across their
+// off days.
+const resolveActiveProjectLabel = async (employeeId, employeeModel, cache) => {
+  const key = `${employeeModel}:${employeeId}`;
+  if (cache.has(key)) return cache.get(key);
+  const jobs = await TSJob.find({
+    assigned_to: employeeId,
+    assigned_to_model: employeeModel,
+    status: { $in: ["not_started", "in_progress", "on_hold"] },
+  })
+    .populate({ path: "project", select: "name code" })
+    .select("project")
+    .lean();
+  const names = [...new Set(jobs.map((j) => j.project?.name).filter(Boolean))];
+  const label = names.length ? { id: null, name: names.join(", "), code: null } : null;
+  cache.set(key, label);
+  return label;
+};
+
 const getTimesheetDetailedReport = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
@@ -573,9 +597,11 @@ const getTimesheetDetailedReport = async (req, res, next) => {
 
     const loggedDates = new Set(rows.map((r) => `${r.employee_model}:${r.employee_id}:${r.date}`));
     const rangeEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    const activeProjectCache = new Map();
 
     for (const emp of employeesSeen.values()) {
       const dayTypeMap = await getWeekOffMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
+      const activeProject = await resolveActiveProjectLabel(emp.id, emp.model, activeProjectCache);
       for (const [dateKey, info] of dayTypeMap.entries()) {
         if (!info.isOff) continue;
         const seenKey = `${emp.model}:${emp.id}:${dateKey}`;
@@ -588,7 +614,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
           work_email: null,
           designation: emp.designation,
           department: emp.department,
-          project: null,
+          project: activeProject,
           job: null,
           date: dateKey,
           day_type: "week_off",

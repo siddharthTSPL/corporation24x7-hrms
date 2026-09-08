@@ -758,14 +758,14 @@ function ReviewsTab({ uid, role }) {
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/10</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/5</span>
               {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}
             </div>
           </div>
           {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
             <div className="flex flex-wrap gap-2 mb-1.5 text-[11px] text-gray-500">
               {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
-              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/10</span>}
+              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/5</span>}
               {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
             </div>
           )}
