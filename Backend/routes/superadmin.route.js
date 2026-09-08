@@ -11,6 +11,10 @@ const { cacheRoute } = require("../middleware/cache/cache.middleware");
 // the organisation record, so the SuperAdmin's own plan gates these too.
 const reviewPlanGate = restrictPlanFeature("review");
 const assetPlanGate = restrictPlanFeature("asset");
+// Self Service Portal — Leave, Reimbursements, and Document/File
+// self-management — is likewise fully locked on Basic and fully open on
+// Advance/enterprise (or during the free trial).
+const selfServicePlanGate = restrictPlanFeature("selfService");
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
@@ -176,16 +180,19 @@ superAdminRouter.delete(
 superAdminRouter.get(
   "/showallleaves",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(showallleaves),
 );
 superAdminRouter.put(
   "/accept-leave/:id",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(acceptleavebyadmin),
 );
 superAdminRouter.put(
   "/reject-leave/:id",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(rejectleavebyadmin),
 );
 
@@ -269,16 +276,19 @@ superAdminRouter.get(
 superAdminRouter.get(
   "/getallpersonaldocuments",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(getAllPersonalDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getallexpensedocuments",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(getAllExpenseDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getdocumentdetails/:id",
   superAdminAuth,
+  selfServicePlanGate,
   asyncHandler(getDocumentDetailsSuperAdmin),
 );
 
