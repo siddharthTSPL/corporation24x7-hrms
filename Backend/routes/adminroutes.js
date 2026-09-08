@@ -5,6 +5,7 @@ const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -12,6 +13,10 @@ const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.midd
 const reviewPlanGate = restrictPlanFeature("review");
 const assetPlanGate = restrictPlanFeature("asset");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+// Self Service Portal — Leave, Reimbursements, and Document/File
+// self-management — is likewise fully locked on Basic and fully open on
+// Advance/enterprise (or during the free trial).
+const selfServicePlanGate = restrictPlanFeature("selfService");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -120,7 +125,17 @@ adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
 adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
 
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
-adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
+// getme is the "who am I / what's my dashboard" call — fired on nearly
+// every page load and hits Admin + LeaveBalance + Review in parallel.
+// Cached 30s per admin (never per-org — this is one person's own data,
+// so the key MUST be their own _id or two admins in the same org would
+// see each other's profile/reviews).
+adminrouter.get(
+  "/getme",
+  adminauthmiddleware,
+  cacheRoute(30_000, (req) => `user:${req.admin._id}:${req.originalUrl}`),
+  asyncHandler(getme)
+);
 adminrouter.get("/getattendance", adminauthmiddleware, asyncHandler(getMyAttendanceHistory));
 adminrouter.put(
   "/editadminprofile",
@@ -265,37 +280,44 @@ adminrouter.put(
 adminrouter.get(
   "/showallleaves",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(showallleaves),
 );
-adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.post("/applyleave", adminauthmiddleware, selfServicePlanGate, asyncHandler(applyleave));
 adminrouter.put(
   "/editleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(editleaveadmin),
 );
 adminrouter.delete(
   "/deleteleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(deleteleaveadmin),
 );
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(getmyleavehistory),
 );
 adminrouter.put(
   "/acceptleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(acceptLeave),
 );
 adminrouter.put(
   "/rejectleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(rejectLeave),
 );
 adminrouter.post(
   "/actionleave",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(adminActionOnLeave),
 );
 
@@ -360,6 +382,7 @@ adminrouter.delete(
 adminrouter.post(
   "/upload",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   uploadDocument,
@@ -367,6 +390,7 @@ adminrouter.post(
 adminrouter.put(
   "/documents/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   editDocument,
@@ -374,24 +398,28 @@ adminrouter.put(
 adminrouter.delete(
   "/documents/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   deleteDocument,
 );
 adminrouter.get(
   "/documents/personal",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllPersonalDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/expense",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllExpenseDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getDocumentDetailsAdmin),
 );
@@ -428,6 +456,7 @@ adminrouter.post(
 adminrouter.get(
   "/documents",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
 );
