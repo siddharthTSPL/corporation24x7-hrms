@@ -16,6 +16,9 @@ const AVATAR_STYLES = [
   "micah", "open-peeps", "big-ears", "croodles",
 ];
 
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
+
 const C = {
   brand: "#730042",
   brandLight: "rgba(115,0,66,0.08)",
@@ -263,6 +266,11 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     {
       key: "organisation", label: "Organisation", icon: (
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>
+      )
+    },
+    {
+      key: "banking", label: "Banking", icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M1.5 6L8 2l6.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /><rect x="2" y="6.5" width="12" height="6.5" rx="1" stroke="currentColor" strokeWidth="1.4" /><path d="M4.5 9v2M8 9v2M11.5 9v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /><path d="M1.5 13.5h13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
       )
     },
     {
@@ -545,6 +553,85 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
       <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
         Save organisation details
+      </PrimaryButton>
+    </SectionCard>
+  );
+}
+
+function BankingTab({ superAdmin, onSuccess, onError }) {
+  const queryClient = useQueryClient();
+  const updateProfile = useUpdateSuperAdminProfile();
+
+  const [form, setForm] = useState({
+    bank_name: "", account_holder_name: "", account_number: "", ifsc_code: "",
+  });
+
+  useEffect(() => {
+    if (superAdmin) {
+      setForm({
+        bank_name: superAdmin.bank_name || "",
+        account_holder_name: superAdmin.account_holder_name || "",
+        account_number: superAdmin.account_number || "",
+        ifsc_code: superAdmin.ifsc_code || "",
+      });
+    }
+  }, [superAdmin]);
+
+  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  const handleSave = () => {
+    if (form.bank_name && form.bank_name.length > 100) { onError("Bank name is too long"); return; }
+    if (!form.account_holder_name.trim()) { onError("Account holder name is required"); return; }
+    if (!ACCOUNT_REGEX.test(form.account_number)) { onError("Account number must be 9-18 digits"); return; }
+    if (!IFSC_REGEX.test(form.ifsc_code.toUpperCase())) { onError("Invalid IFSC code (e.g. HDFC0001234)"); return; }
+
+    updateProfile.mutate(
+      {
+        bank_name: form.bank_name,
+        account_holder_name: form.account_holder_name,
+        account_number: form.account_number,
+        ifsc_code: form.ifsc_code.toUpperCase(),
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
+          onSuccess("Banking details updated!");
+        },
+        onError: (err) => onError(getErrorMessage(err)),
+      }
+    );
+  };
+
+  return (
+    <SectionCard title="Banking details" subtitle="Used for your own salary/payslip disbursement" accent={C.green}>
+      <InputField
+        label="Bank name"
+        value={form.bank_name}
+        onChange={set("bank_name")}
+        placeholder="e.g. HDFC Bank"
+      />
+      <InputField
+        label="Account holder name *"
+        value={form.account_holder_name}
+        onChange={set("account_holder_name")}
+        placeholder="Name exactly as per passbook"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
+        <InputField
+          label="Account number *"
+          value={form.account_number}
+          onChange={(e) => setForm((p) => ({ ...p, account_number: e.target.value.replace(/\D/g, "") }))}
+          placeholder="9-18 digit account number"
+        />
+        <InputField
+          label="IFSC code *"
+          value={form.ifsc_code}
+          onChange={(e) => setForm((p) => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))}
+          placeholder="e.g. HDFC0001234"
+        />
+      </div>
+      <PrimaryButton onClick={handleSave} loading={updateProfile.isPending} color={C.green}>
+        Save banking details
       </PrimaryButton>
     </SectionCard>
   );
@@ -854,6 +941,7 @@ export default function SuperAdminSettingsPage() {
           {tab === "overview" && <OverviewTab superAdmin={superAdmin} />}
           {tab === "profile" && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "organisation" && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "banking" && <BankingTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
           {tab === "kiosk" && <KioskTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "avatar" && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}

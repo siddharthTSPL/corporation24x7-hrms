@@ -4,6 +4,9 @@ import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
 
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
+
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
@@ -49,6 +52,7 @@ const Organisationma = lazy(() => import("./pages/organisation/organisationma"))
 
 const Reviewad = lazy(() => import("./pages/review/reviewad"));
 const Reviewma = lazy(() => import("./pages/review/reviewma"));
+const Reviewem = lazy(() => import("./pages/review/MyReviews"));
 
 const Attendancepage = lazy(() => import("./pages/attendance/attendancepage"));
 
@@ -172,7 +176,8 @@ function App() {
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/platform-features" element={<PlatformFeaturesPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/coming-soon" element={<ComingSoon />} /> 
@@ -231,6 +236,7 @@ function App() {
             <Route path="/organisation-manager"     element={<Organisationma />} />
             <Route path="/review-admin"             element={<ProtectedRoute planFeature="review"><Reviewad /></ProtectedRoute>} />
             <Route path="/review-manager"           element={<ProtectedRoute planFeature="review"><Reviewma /></ProtectedRoute>} />
+            <Route path="/review-employee"          element={<ProtectedRoute planFeature="review"><Reviewem /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
             <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
             <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
