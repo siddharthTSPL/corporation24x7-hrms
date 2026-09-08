@@ -13,6 +13,10 @@ const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const reviewPlanGate = restrictPlanFeature("review");
 const assetPlanGate = restrictPlanFeature("asset");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+// Self Service Portal — Leave, Reimbursements, and Document/File
+// self-management — is likewise fully locked on Basic and fully open on
+// Advance/enterprise (or during the free trial).
+const selfServicePlanGate = restrictPlanFeature("selfService");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -276,37 +280,44 @@ adminrouter.put(
 adminrouter.get(
   "/showallleaves",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(showallleaves),
 );
-adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.post("/applyleave", adminauthmiddleware, selfServicePlanGate, asyncHandler(applyleave));
 adminrouter.put(
   "/editleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(editleaveadmin),
 );
 adminrouter.delete(
   "/deleteleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(deleteleaveadmin),
 );
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(getmyleavehistory),
 );
 adminrouter.put(
   "/acceptleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(acceptLeave),
 );
 adminrouter.put(
   "/rejectleave/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(rejectLeave),
 );
 adminrouter.post(
   "/actionleave",
   adminauthmiddleware,
+  selfServicePlanGate,
   asyncHandler(adminActionOnLeave),
 );
 
@@ -371,6 +382,7 @@ adminrouter.delete(
 adminrouter.post(
   "/upload",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   uploadDocument,
@@ -378,6 +390,7 @@ adminrouter.post(
 adminrouter.put(
   "/documents/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   upload.single("file"),
   editDocument,
@@ -385,24 +398,28 @@ adminrouter.put(
 adminrouter.delete(
   "/documents/:id",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   deleteDocument,
 );
 adminrouter.get(
   "/documents/personal",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllPersonalDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/expense",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getAllExpenseDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_view_all_documents"),
   asyncHandler(getDocumentDetailsAdmin),
 );
@@ -439,6 +456,7 @@ adminrouter.post(
 adminrouter.get(
   "/documents",
   adminauthmiddleware,
+  selfServicePlanGate,
   checkPermission("documents.can_upload_documents"),
   asyncHandler(getDocuments),
 );
