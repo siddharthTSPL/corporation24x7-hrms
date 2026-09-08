@@ -93,6 +93,7 @@ const SuperAdminManagement = lazy(() => import("./pages/torchx-management/supera
 
 const HelpCenter = lazy(() => import("./components/help/Helpcenter"));
 const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
+const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -468,6 +469,7 @@ function App() {
           >
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
+            <Route path="/self-service"   element={<ProtectedRoute planFeature="selfService"><SelfServicePortal /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />
