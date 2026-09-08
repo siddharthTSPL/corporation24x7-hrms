@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Adminmodel = require("../Models/Admin.model");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Managermodel = require("../Models/manager.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 
@@ -2858,6 +2859,7 @@ const editadminprofile = async (req, res, next) => {
 
   await admin.save();
 
+  invalidateUserCache(admin._id);
   res.status(200).json({
     success: true,
     message: "Admin profile updated successfully",
