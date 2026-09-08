@@ -1,4 +1,5 @@
 const managermodel = require("../Models/manager.model");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const usermodel = require("../Models/user.model");
 const Document = require("../Models/document.model");
 const leavemodel = require("../Models/leave.model");
@@ -1479,6 +1480,7 @@ const editprofilemanager = async (req, res, next) => {
         date_of_birth: manager.date_of_birth,
       },
     });
+    invalidateUserCache(manager._id);
   } catch (error) {
     return next(Object.assign(new Error(error.message), { statusCode: 500 }));
   }
