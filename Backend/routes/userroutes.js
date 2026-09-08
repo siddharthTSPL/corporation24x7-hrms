@@ -4,6 +4,7 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const multer = require("multer");
 
 // Performance Management (Review) and TorchX Voice are plan-gated features:
@@ -65,7 +66,12 @@ userrouter.get("/change-password", showPasswordPage);
 userrouter.post("/firstloginpasswordchange", asyncHandler(firstLoginPasswordChange));
 
 userrouter.post("/logout", employeemiddleware, asyncHandler(userlogout));
-userrouter.get("/getme", employeemiddleware, asyncHandler(getme));
+userrouter.get(
+  "/getme",
+  employeemiddleware,
+  cacheRoute(30_000, (req) => `user:${req.employee._id}:${req.originalUrl}`),
+  asyncHandler(getme)
+);
 // Step 2: Employee accepts/disputes the review their manager gave them.
 userrouter.post("/review/respond", employeemiddleware, reviewPlanGate, asyncHandler(respondToMyReview));
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));

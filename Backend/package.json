@@ -28,6 +28,7 @@
     "imagekit": "^6.0.0",
     "ip-range-check": "^0.2.0",
     "jsonwebtoken": "^9.0.3",
+    "lru-cache": "^11.5.2",
     "mongoose": "^9.3.3",
     "moongose": "^1.0.0",
     "morgan": "^1.10.1",
