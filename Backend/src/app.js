@@ -90,6 +90,7 @@ const notificationrouter = require('../routes/Notification.routes');
 const reviewrouter = require('../routes/review.route');
 const analyticsrouter = require('../routes/Analytics.route');
 const planFeatureRouter = require('../routes/planFeature.route');
+const selfServiceRouter = require('../routes/selfService.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -121,6 +122,7 @@ app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
 app.use('/review', reviewrouter);
 app.use('/plan-features', planFeatureRouter);
+app.use('/self-service', selfServiceRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
 

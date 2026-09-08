@@ -1,4 +1,5 @@
 const SuperAdminModel = require("../Models/superadmin.model");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
@@ -623,6 +624,7 @@ const updateSuperAdmin = async (req, res, next) => {
     if (req.body[field] !== undefined) superAdmin[field] = req.body[field];
   });
   await superAdmin.save();
+  invalidateUserCache(superAdmin._id);
   res.status(200).json({
     success: true,
     message: "Profile updated successfully",

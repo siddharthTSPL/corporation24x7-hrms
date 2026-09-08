@@ -4,6 +4,7 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const multer = require("multer");
 
 // Performance Management (Review) and TorchX Voice are plan-gated features:
@@ -11,6 +12,10 @@ const multer = require("multer");
 // during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+// Self Service Portal — Leave and Document/File self-management — is
+// likewise fully locked on Basic and fully open on Advance/enterprise (or
+// during the free trial).
+const selfServicePlanGate = restrictPlanFeature("selfService");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -65,7 +70,12 @@ userrouter.get("/change-password", showPasswordPage);
 userrouter.post("/firstloginpasswordchange", asyncHandler(firstLoginPasswordChange));
 
 userrouter.post("/logout", employeemiddleware, asyncHandler(userlogout));
-userrouter.get("/getme", employeemiddleware, asyncHandler(getme));
+userrouter.get(
+  "/getme",
+  employeemiddleware,
+  cacheRoute(30_000, (req) => `user:${req.employee._id}:${req.originalUrl}`),
+  asyncHandler(getme)
+);
 // Step 2: Employee accepts/disputes the review their manager gave them.
 userrouter.post("/review/respond", employeemiddleware, reviewPlanGate, asyncHandler(respondToMyReview));
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));
@@ -73,20 +83,20 @@ userrouter.put("/changepassword", employeemiddleware, asyncHandler(changepasswor
 userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));
 userrouter.post("/sendPasswordSetupLink", employeemiddleware, asyncHandler(sendPasswordSetupLink));
 
-userrouter.post("/applyleave", employeemiddleware, asyncHandler(applyleave));
-userrouter.put("/editleave/:id", employeemiddleware, asyncHandler(editleave));
-userrouter.delete("/deleteleave/:id", employeemiddleware, asyncHandler(deleteleave));
-userrouter.get("/getallleave", employeemiddleware, asyncHandler(getallleave));
-userrouter.get("/getallleavehistory", employeemiddleware, asyncHandler(getallleavehistory));
+userrouter.post("/applyleave", employeemiddleware, selfServicePlanGate, asyncHandler(applyleave));
+userrouter.put("/editleave/:id", employeemiddleware, selfServicePlanGate, asyncHandler(editleave));
+userrouter.delete("/deleteleave/:id", employeemiddleware, selfServicePlanGate, asyncHandler(deleteleave));
+userrouter.get("/getallleave", employeemiddleware, selfServicePlanGate, asyncHandler(getallleave));
+userrouter.get("/getallleavehistory", employeemiddleware, selfServicePlanGate, asyncHandler(getallleavehistory));
 userrouter.get("/getattendance", employeemiddleware, asyncHandler(getattendance));
 
 userrouter.get("/showannouncements", employeemiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(showannouncements));
 userrouter.get("/showannouncement/:id", employeemiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(showparticularannouncement));
 
-userrouter.post("/upload", employeemiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
-userrouter.get("/documents", employeemiddleware, checkPermission("documents.can_upload_documents"), getDocuments);
-userrouter.put("/documents/:id", employeemiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
-userrouter.delete("/documents/:id", employeemiddleware, checkPermission("documents.can_upload_documents"), deleteDocument);
+userrouter.post("/upload", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
+userrouter.get("/documents", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), getDocuments);
+userrouter.put("/documents/:id", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
+userrouter.delete("/documents/:id", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), deleteDocument);
 
 userrouter.post("/submitTicket", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeSubmitTicket));
 userrouter.get("/getMyTickets", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetMyTickets));
@@ -94,8 +104,8 @@ userrouter.post("/rateTicket", employeemiddleware, ticketsPlanGate, checkPermiss
 userrouter.get("/getTicketDetail/:ticketNumber", employeemiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(employeeGetTicketDetail));
 
 
-userrouter.get("/getExpenseDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getExpenseDocuments));
-userrouter.get("/getPersonalDocuments", employeemiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(getPersonalDocuments));
+userrouter.get("/getExpenseDocuments", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_view_all_documents"), asyncHandler(getExpenseDocuments));
+userrouter.get("/getPersonalDocuments", employeemiddleware, selfServicePlanGate, checkPermission("documents.can_view_all_documents"), asyncHandler(getPersonalDocuments));
 
 // Assets assigned to the logged-in employee (Dashboard / Settings "My Assets" widget)
 userrouter.get("/my-assets", employeemiddleware, asyncHandler(getMyAssets));
