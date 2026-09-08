@@ -13,6 +13,10 @@ const multer = require("multer");
 // during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+// Self Service Portal — Leave and Document/File self-management — is
+// likewise fully locked on Basic and fully open on Advance/enterprise (or
+// during the free trial).
+const selfServicePlanGate = restrictPlanFeature("selfService");
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { sendSupportRequest } = require("../controllers/support.controller");
@@ -50,18 +54,18 @@ managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontr
 managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
 managerrouter.get("/submanagers", managermiddleware, asyncHandler(managercontroller.getSubManagers));
 
-managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
-managerrouter.put("/editleavem/:id", managermiddleware, asyncHandler(managercontroller.editleavem));
-managerrouter.delete("/deleteleavem/:id", managermiddleware, asyncHandler(managercontroller.deleteleavem));
-managerrouter.get("/getmyleaves", managermiddleware, asyncHandler(managercontroller.getmyleaves));
-managerrouter.get("/myleavehistory", managermiddleware, asyncHandler(managercontroller.getmyleavehistory));
-managerrouter.post("/acceptleaverequest", managermiddleware, asyncHandler(managercontroller.acceptleaverequest));
-managerrouter.post("/rejectleaverequest", managermiddleware, asyncHandler(managercontroller.rejectleaverequest));
+managerrouter.post("/applyleavem", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.applyleavem));
+managerrouter.put("/editleavem/:id", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.editleavem));
+managerrouter.delete("/deleteleavem/:id", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.deleteleavem));
+managerrouter.get("/getmyleaves", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.getmyleaves));
+managerrouter.get("/myleavehistory", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.getmyleavehistory));
+managerrouter.post("/acceptleaverequest", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.acceptleaverequest));
+managerrouter.post("/rejectleaverequest", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.rejectleaverequest));
 managerrouter.post("/forwardtoreportingmanager", managermiddleware, asyncHandler(managercontroller.forwardedtoreportingmanager));
-managerrouter.get("/getforwardedleaves", managermiddleware, asyncHandler(managercontroller.getforwardedleaves));
-managerrouter.post("/acceptforwardedleave", managermiddleware, asyncHandler(managercontroller.acceptforwardedleave));
-managerrouter.post("/rejectforwardedleave", managermiddleware, asyncHandler(managercontroller.rejectforwardedleave));
-managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, asyncHandler(managercontroller.forwardLeaveUpChain));
+managerrouter.get("/getforwardedleaves", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.getforwardedleaves));
+managerrouter.post("/acceptforwardedleave", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.acceptforwardedleave));
+managerrouter.post("/rejectforwardedleave", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.rejectforwardedleave));
+managerrouter.post("/forwardforwardedleavetoadmin", managermiddleware, selfServicePlanGate, asyncHandler(managercontroller.forwardLeaveUpChain));
 
 managerrouter.post("/reviewtoemployee", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtoemployee));
 managerrouter.post("/reviewtosubmanager", managermiddleware, reviewPlanGate, asyncHandler(managercontroller.reviewtosubmanager));
@@ -72,13 +76,13 @@ managerrouter.post("/review/respond", managermiddleware, reviewPlanGate, asyncHa
 managerrouter.get("/showannouncements", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.showannouncements));
 managerrouter.get("/showannouncement/:id", managermiddleware, checkPermission("announcements.can_view_announcements"), asyncHandler(managercontroller.particularannouncement));
 
-managerrouter.post("/upload", managermiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
-managerrouter.get("/documents", managermiddleware, checkPermission("documents.can_upload_documents"), asyncHandler(getDocuments));
-managerrouter.put("/documents/:id", managermiddleware, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
-managerrouter.delete("/documents/:id", managermiddleware, checkPermission("documents.can_upload_documents"), deleteDocument);
-managerrouter.get("/getAllExpenseDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllExpenseDocuments));
-managerrouter.get("/getAllPersonalDocuments", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllPersonalDocuments));
-managerrouter.get("/getDocumentDetails/:documentId", managermiddleware, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getDocumentDetails));
+managerrouter.post("/upload", managermiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), upload.single("file"), uploadDocument);
+managerrouter.get("/documents", managermiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), asyncHandler(getDocuments));
+managerrouter.put("/documents/:id", managermiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), upload.single("file"), editDocument);
+managerrouter.delete("/documents/:id", managermiddleware, selfServicePlanGate, checkPermission("documents.can_upload_documents"), deleteDocument);
+managerrouter.get("/getAllExpenseDocuments", managermiddleware, selfServicePlanGate, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllExpenseDocuments));
+managerrouter.get("/getAllPersonalDocuments", managermiddleware, selfServicePlanGate, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getAllPersonalDocuments));
+managerrouter.get("/getDocumentDetails/:documentId", managermiddleware, selfServicePlanGate, checkPermission("documents.can_view_all_documents"), asyncHandler(managercontroller.getDocumentDetails));
 
 managerrouter.post("/submit-ticket", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerSubmitTicket));
 managerrouter.get("/my-tickets", managermiddleware, ticketsPlanGate, checkPermission("tickets.can_raise_ticket"), asyncHandler(managercontroller.managerGetMyTickets));
@@ -87,6 +91,7 @@ managerrouter.get("/getTicketDetail/:ticketNumber", managermiddleware, ticketsPl
 managerrouter.get(
   "/viewallleaves",
   managermiddleware,
+  selfServicePlanGate,
   asyncHandler(managercontroller.viewallleaves)
 );
 
