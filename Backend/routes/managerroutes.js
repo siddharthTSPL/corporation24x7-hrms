@@ -5,6 +5,7 @@ const managermiddleware = require("../middleware/auth/manager.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const multer = require("multer");
 
 // Performance Management (Review) and TorchX Voice are plan-gated features:
@@ -34,7 +35,12 @@ managerrouter.get("/showPasswordPageotp", managercontroller.showPasswordPageotp)
 managerrouter.post("/resetManagerPassword", asyncHandler(managercontroller.resetManagerPassword));
 
 managerrouter.post("/logout", managermiddleware, asyncHandler(managercontroller.managerlogout));
-managerrouter.get("/getme", managermiddleware, asyncHandler(managercontroller.getme));
+managerrouter.get(
+  "/getme",
+  managermiddleware,
+  cacheRoute(30_000, (req) => `user:${req.manager._id}:${req.originalUrl}`),
+  asyncHandler(managercontroller.getme)
+);
 managerrouter.put("/manager/edit-profile", managermiddleware, asyncHandler(managercontroller.editprofilemanager));
 managerrouter.put("/manager/change-password", managermiddleware, asyncHandler(managercontroller.changepassword));
 managerrouter.put("/updatepassword", managermiddleware, asyncHandler(managercontroller.managerUpdatePassword));
