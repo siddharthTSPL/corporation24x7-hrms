@@ -3,6 +3,7 @@ const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -89,7 +90,12 @@ superAdminRouter.post("/forgot-password", asyncHandler(forgotPassword));
 superAdminRouter.post("/verify-otp", asyncHandler(verifyOtp));
 superAdminRouter.post("/resetpassword", asyncHandler(resetPassword));
 
-superAdminRouter.get("/me", superAdminAuth, asyncHandler(getMe));
+superAdminRouter.get(
+  "/me",
+  superAdminAuth,
+  cacheRoute(30_000, (req) => `user:${req.superAdmin._id}:${req.originalUrl}`),
+  asyncHandler(getMe)
+);
 superAdminRouter.put("/update-profile", superAdminAuth, asyncHandler(updateSuperAdmin));
 superAdminRouter.put(
   "/changepassword",
