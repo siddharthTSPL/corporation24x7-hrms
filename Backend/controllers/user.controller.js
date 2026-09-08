@@ -1,4 +1,5 @@
 const usermodel = require("../Models/user.model");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Leave = require("../Models/leave.model");
 const LeaveBalance = require("../Models/leavebalance.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
@@ -894,6 +895,7 @@ const editprofile = async (req, res, next) => {
 
   employee.updatedAt = Date.now();
   await employee.save();
+  invalidateUserCache(employee._id);
 
   if (leaveUpdateRequired) {
     const leave = await LeaveBalance.findOne({
