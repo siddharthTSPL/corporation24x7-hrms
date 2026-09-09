@@ -44,7 +44,7 @@ const superAdminMenu = [
   { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn />, blurb: "Broadcast announcements across all organisations." },
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt />, blurb: "See and manage leave requests across every organisation." },
   { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations.", planFeature: "review" },
-  {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history." },
+  {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history.", planFeature: "asset" },
   { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt />, blurb: "Access documents uploaded by teams across organisations." },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide.", planFeature: "timesheet" },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
@@ -64,7 +64,7 @@ const adminMenu = [
   { name: "Leave",         path: "/leave-admin",         icon: <FaCalendarAlt />, blurb: "Approve or reject leave requests from managers and employees.",
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review pending requests, check your own leave balance, or apply for your own leave and WFH." } },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets." },
+  { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", planFeature: "asset" },
   { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt />, blurb: "Enroll employee faces for kiosk-based attendance." },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, blurb: "Post hiring requisitions and track candidates.",
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
@@ -162,13 +162,13 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     return item.permissionGroup.some((p) => can(p));
   };
 
-  // Review / Timesheet / Recruitment / TorchX Voice (tickets) / the combined
-  // Self Service Portal page are locked on the Basic plan and open on
-  // Advance/enterprise (or during the free trial). Asset Management and the
-  // individual Leave, Document, and Reimbursement pages are always open,
-  // regardless of plan. Until plan data has loaded we don't block on it —
-  // permission checks (isAllowed) already gate the item, and once
-  // planFeatures resolves this recomputes.
+  // Review / Timesheet / Recruitment / Asset Management / TorchX Voice (tickets)
+  // are locked on the Basic plan and open on Advance/enterprise (or during
+  // the free trial). The Self Service Portal and the individual Leave,
+  // Document, Reimbursement, and Payslip pages are always open, regardless
+  // of plan. Until plan data has loaded we don't block on it — permission
+  // checks (isAllowed) already gate the item, and once planFeatures
+  // resolves this recomputes.
   const isPlanLocked = (item) => {
     if (!item.planFeature) return false;
     if (!planFeatures) return false;
