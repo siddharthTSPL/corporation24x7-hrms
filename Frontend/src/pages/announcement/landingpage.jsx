@@ -49,7 +49,7 @@ export const fontStyles = `
 
   html { scroll-behavior: smooth; overflow-x: hidden; }
   body { -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-  .scroll-anchor { scroll-margin-top: 90px; }
+  .scroll-anchor { scroll-margin-top: 72px; }
 
   @keyframes menuDrop {
     from { opacity: 0; transform: translateY(-8px); max-height: 0; }
