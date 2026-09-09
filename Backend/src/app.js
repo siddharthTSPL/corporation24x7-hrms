@@ -9,6 +9,7 @@ require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
 require('../automatic/Birthdaynotify');
 require('../automatic/Noticeperiodautoexit');
+require('../automatic/fieldOperationsRetention');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -91,6 +92,7 @@ const reviewrouter = require('../routes/review.route');
 const analyticsrouter = require('../routes/Analytics.route');
 const planFeatureRouter = require('../routes/planFeature.route');
 const selfServiceRouter = require('../routes/selfService.route');
+const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -123,6 +125,7 @@ app.use('/notifications', notificationrouter);
 app.use('/review', reviewrouter);
 app.use('/plan-features', planFeatureRouter);
 app.use('/self-service', selfServiceRouter);
+app.use('/field-operations', fieldOperationsRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
 
