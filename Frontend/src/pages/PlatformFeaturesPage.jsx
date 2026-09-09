@@ -60,7 +60,10 @@ function PlatformHero() {
             <img
               src={slideNavyOffice}
               alt="TorchX Talent enterprise dashboard"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover bg-[#F3E4EC]"
+              loading="eager"
+              fetchpriority="high"
+              decoding="async"
             />
           </div>
 
@@ -212,7 +215,9 @@ function EnterpriseArchitectureBanner() {
               <img
                 src={slideWhiteOffice}
                 alt="Enterprise security architecture"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover bg-white/10"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div className="absolute -top-3 -right-2 sm:-top-4 sm:-right-3 bg-white rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.25)] px-3 sm:px-4 py-2 sm:py-2.5 max-w-[62%]">
@@ -324,7 +329,9 @@ function PlatformCTA() {
               <img
                 src={work}
                 alt="Executive briefing"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover bg-white/10"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div className="absolute -bottom-3 sm:-bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.25)] px-4 sm:px-5 py-2 sm:py-2.5 flex items-center gap-2 whitespace-nowrap max-w-[92%]">
