@@ -7,31 +7,20 @@ import {
   FaSitemap, FaBell, FaUserCog, FaSignInAlt, FaCalendarCheck,
 } from "react-icons/fa";
 
-// =====================================================================
-// COLOR TOKENS — "beetroot" palette (replaces the earlier pink tones).
-// Keeping these in one place makes future palette tweaks a one-line change.
-// =====================================================================
 const BEETROOT = {
-  900: "#5C1730", // deepest — headings/icons on light bg
-  700: "#730042", // primary accent (already beetroot-toned, kept as-is)
-  500: "#8C2F49", // mid accent — focus rings, active states
-  300: "#C98096", // borders, dividers
-  100: "#E9C7D0", // soft borders / pill outlines
-  50: "#F3E1E7",  // lightest tint — section backgrounds, chip fills
-  textMid: "#7A2A41", // subdued supporting text on tinted bg
+  900: "#5C1730", 
+  700: "#730042", 
+  500: "#8C2F49", 
+  300: "#C98096", 
+  100: "#E9C7D0", 
+  50: "#F3E1E7",  
+  textMid: "#7A2A41", 
 };
 
-// =====================================================================
-// CONTENT MODEL — same shape as the Documentation modal, so both stay
-// easy to keep in sync. Each article is an ordered list of "blocks":
-//   { type: "p",     text }                                 paragraph
-//   { type: "steps", title?, items: [string...] }            numbered walkthrough
-//   { type: "list",  title?, items: [string...] }             bullet list
-//   { type: "note",  tone: "info"|"warning"|"success", text } callout
-// =====================================================================
+
 
 const CATEGORIES = [
-  // --------------------------------------------------- Getting started --
+  
   {
     id: "getting-started",
     label: "Getting Started",
@@ -1137,6 +1126,94 @@ const CATEGORIES = [
 ];
 
 // =====================================================================
+// CARD SUMMARIES — one-line blurbs for the category cards on the
+// documentation landing page. Kept separate from CATEGORIES above so
+// the full article content is never touched by this UI change.
+// =====================================================================
+const CATEGORY_SUMMARIES = {
+  "getting-started": "Sign-up, organisation setup, role-based login, and Companion Login for continuing your session on another device.",
+  "face-attendance": "Kiosk face check-in/checkout, the 10-minute checkout cooldown, auto-checkout, and troubleshooting failed scans.",
+  "system-attendance": "Manual check-in and checkout from the app, and how your daily attendance status gets classified.",
+  "geolocation": "How location is verified during check-in, and what to do if check-in keeps getting rejected for location.",
+  "leave": "Applying for leave or WFH, how the approval chain works, tracking requests, and your leave balance.",
+  "timesheet": "Logging time against a project, using the live timer, and how submission, approval & escalation work.",
+  "payroll": "Setting CTC, building salary structures, generating payroll (single or bulk), and sharing payslips.",
+  "reimbursement": "Filing an expense claim, and how Manager / Admin / Super Admin approve reimbursement claims.",
+  "performance-review": "The 14 Plus / 14 Minus scoring system, submitting and approving reviews, and your review history.",
+  "tickets": "Raising a ticket or complaint and how it moves through status stages to resolution.",
+  "employees": "Adding employees one at a time or in bulk, and promoting, demoting, or managing profiles.",
+  "assets": "Viewing and requesting company assets, and how quantity-based asset tracking works for Admins.",
+  "recruitment": "Raising a hiring requisition and moving candidates through the recruitment pipeline.",
+  "company-setup": "Configuring shifts, assigning them to employees, week-offs & holidays, and attendance/leave policy.",
+  "permissions": "How role-based access control works across Super Admin, Admin, Manager, and Employee.",
+  "documents": "Uploading and finding employee documents.",
+  "announcements": "Publishing, editing, and removing organisation-wide announcements.",
+  "organisation": "Reading the organisation chart to see reporting lines across the company.",
+  "notifications": "Using your notification feed to stay on top of approvals, updates, and alerts.",
+  "settings": "Updating your profile and address, and adding your banking and ID details.",
+  "desktop-agent": "What the desktop agent does, installing it, and troubleshooting security warnings.",
+};
+
+function CategoryCard({ cat, onOpen }) {
+  const Icon = cat.icon;
+  const count = cat.articles.length;
+  return (
+    <button
+      onClick={onOpen}
+      className="relative text-left rounded-[22px] border border-gray-100 bg-white p-5 flex flex-col gap-4 overflow-hidden
+                 transition-all duration-300 ease-out group
+                 hover:-translate-y-[3px] hover:border-transparent hover:shadow-[0_14px_32px_-12px_rgba(115,0,66,0.28)]"
+    >
+      {/* soft gradient wash that fades in on hover — purely decorative, sits behind the content */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{ background: `linear-gradient(150deg, ${BEETROOT[50]} 0%, rgba(255,255,255,0) 55%)` }}
+      />
+
+      <div className="relative flex items-start justify-between gap-3">
+        <div
+          className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm
+                     transition-transform duration-300 group-hover:scale-105 group-hover:-rotate-3"
+          style={{ background: `linear-gradient(135deg, ${BEETROOT[700]} 0%, ${BEETROOT[500]} 100%)` }}
+        >
+          <Icon className="text-white" size={17} />
+        </div>
+        <span
+          className="text-[10.5px] font-semibold px-2 py-1 rounded-full flex-shrink-0"
+          style={{ background: BEETROOT[50], color: BEETROOT[700] }}
+        >
+          {count} {count === 1 ? "article" : "articles"}
+        </span>
+      </div>
+
+      <div className="relative min-w-0">
+        <h3 className="text-[15px] font-semibold text-gray-800 group-hover:text-[#5C1730] transition-colors">
+          {cat.label}
+        </h3>
+        <p className="text-[12.5px] text-gray-500 leading-relaxed mt-1.5 break-words">
+          {CATEGORY_SUMMARIES[cat.id]}
+        </p>
+      </div>
+
+      <div className="relative mt-auto flex items-center gap-1.5 pt-1">
+        <span
+          className="text-[12px] font-semibold flex items-center gap-1.5 group-hover:gap-2.5 transition-all"
+          style={{ color: BEETROOT[700] }}
+        >
+          Browse docs
+          <span
+            className="w-5 h-5 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: BEETROOT[50] }}
+          >
+            <FaChevronRight size={8} style={{ color: BEETROOT[700] }} />
+          </span>
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// =====================================================================
 // RENDERING
 // =====================================================================
 
@@ -1238,7 +1315,12 @@ function Article({ article, isOpen, onToggle }) {
 export default function DocumentationPage() {
   const [query, setQuery] = useState("");
   const [openArticle, setOpenArticle] = useState(null); // `${categoryId}:${index}`
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].id);
+  const [activeCategory, setActiveCategory] = useState(null); // null = landing grid ("Devdocs"-style hub)
+
+  const totalArticles = useMemo(
+    () => CATEGORIES.reduce((sum, c) => sum + c.articles.length, 0),
+    []
+  );
 
   // Search matches on article title + any text found inside its blocks —
   // covers steps/list items and note text too, not just paragraphs.
@@ -1258,10 +1340,22 @@ export default function DocumentationPage() {
   }, [query]);
 
   const isSearching = query.trim().length > 0;
+  const isLanding = !isSearching && activeCategory === null;
   const visibleCategories = isSearching ? filtered : CATEGORIES;
-  const currentCategory = isSearching
-    ? null
-    : visibleCategories.find((c) => c.id === activeCategory) || visibleCategories[0];
+  const currentCategory =
+    !isSearching && !isLanding
+      ? visibleCategories.find((c) => c.id === activeCategory) || visibleCategories[0]
+      : null;
+
+  const openCategory = (id) => {
+    setActiveCategory(id);
+    setOpenArticle(null);
+  };
+  const backToGrid = () => {
+    setActiveCategory(null);
+    setOpenArticle(null);
+    setQuery("");
+  };
 
   return (
     // h-screen + overflow-y-auto here (instead of relying on a parent) is what makes the
@@ -1274,17 +1368,28 @@ export default function DocumentationPage() {
       <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-5" style={{ background: BEETROOT[50] }}>
         <div className="max-w-5xl mx-auto flex items-start gap-3">
           <div
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center flex-shrink-0 bg-white"
+            className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center flex-shrink-0 bg-white shadow-sm mt-0.5"
             style={{ borderColor: BEETROOT[300] }}
           >
-            <FaBook style={{ color: BEETROOT[700] }} size={17} />
+            <FaBook style={{ color: BEETROOT[700] }} size={20} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-[17px] sm:text-[19px] font-semibold" style={{ color: BEETROOT[700] }}>
-              Documentation
+            {!isLanding && (
+              <button
+                onClick={backToGrid}
+                className="text-[11.5px] font-semibold mb-1 flex items-center gap-1 hover:underline"
+                style={{ color: BEETROOT[700] }}
+              >
+                <FaChevronRight size={8} className="rotate-180" /> All documentation
+              </button>
+            )}
+            <h1 className="text-[26px] sm:text-[34px] leading-tight font-bold tracking-tight" style={{ color: BEETROOT[700] }}>
+              {isLanding ? "Documentation" : currentCategory ? currentCategory.label : "Documentation"}
             </h1>
-            <p className="text-[12.5px] mt-0.5 break-words" style={{ color: BEETROOT.textMid }}>
-              Detailed, step-by-step guides for every feature in TorchX Talent.
+            <p className="text-[13px] sm:text-[14px] mt-1 break-words" style={{ color: BEETROOT.textMid }}>
+              {isLanding
+                ? `Detailed, step-by-step guides for every feature in TorchX Talent — ${CATEGORIES.length} categories, ${totalArticles} articles.`
+                : "Detailed, step-by-step guides for every feature in TorchX Talent."}
             </p>
           </div>
         </div>
@@ -1303,63 +1408,21 @@ export default function DocumentationPage() {
         </div>
       </div>
 
-      {/* Body */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6 flex flex-col sm:flex-row gap-4 sm:gap-6">
-        {!isSearching && (
-          <div className="w-full sm:w-48 lg:w-56 flex-shrink-0 hidden sm:block">
-            <div className="sticky top-6 flex flex-col gap-0.5">
-              {CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const active = cat.id === (currentCategory?.id ?? activeCategory);
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setActiveCategory(cat.id); setOpenArticle(null); }}
-                    className="w-full flex items-center justify-between gap-2 text-left px-3.5 py-2.5 rounded-lg text-[12.5px] font-medium transition-colors"
-                    style={active ? { color: BEETROOT[700], background: BEETROOT[50] } : { color: "#6B7280" }}
-                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "#F3F4F6"; }}
-                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <Icon size={12} className="flex-shrink-0" />
-                      <span className="truncate">{cat.label}</span>
-                    </span>
-                    {active && <FaChevronRight size={9} className="flex-shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
+      {/* Landing hub — grid of category cards, à la a "Devdocs"-style docs home. */}
+      {isLanding && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-8 py-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {CATEGORIES.map((cat) => (
+              <CategoryCard key={cat.id} cat={cat} onOpen={() => openCategory(cat.id)} />
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Mobile category picker — same rows, horizontal scroll, no separate sidebar.
-            This is the one place horizontal scrolling is intentional, so it's scoped
-            to just this strip via overflow-x-auto + flex-shrink-0 children. */}
-        {!isSearching && (
-          <div className="sm:hidden -mx-4 px-4 mb-1">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {CATEGORIES.map((cat) => {
-                const active = cat.id === (currentCategory?.id ?? activeCategory);
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setActiveCategory(cat.id); setOpenArticle(null); }}
-                    className="flex-shrink-0 text-[12px] font-semibold px-3 py-1.5 rounded-full border whitespace-nowrap"
-                    style={
-                      active
-                        ? { background: BEETROOT[700], color: "#fff", borderColor: BEETROOT[700] }
-                        : { background: "#fff", color: BEETROOT[700], borderColor: BEETROOT[100] }
-                    }
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0">
+      {/* Search results OR a single category's articles — no other-categories
+          sidebar here on purpose: opening a card shows ONLY that card's content. */}
+      {!isLanding && (
+        <div className="max-w-3xl mx-auto px-4 sm:px-8 py-6">
           {isSearching && visibleCategories.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-16 px-4">No articles match "{query}".</p>
           )}
@@ -1368,9 +1431,6 @@ export default function DocumentationPage() {
             <div key={cat.id} className="mb-8 last:mb-0">
               {isSearching && (
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2.5">{cat.label}</p>
-              )}
-              {!isSearching && (
-                <h2 className="text-[16px] font-semibold text-gray-800 mb-3 sm:hidden">{cat.label}</h2>
               )}
               <div className="flex flex-col gap-2.5">
                 {cat.articles.map((art, i) => {
@@ -1388,7 +1448,7 @@ export default function DocumentationPage() {
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }

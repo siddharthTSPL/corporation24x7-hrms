@@ -49,13 +49,38 @@ export const fontStyles = `
 
   html { scroll-behavior: smooth; overflow-x: hidden; }
   body { -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-  .scroll-anchor { scroll-margin-top: 90px; }
+  .scroll-anchor { scroll-margin-top: 72px; }
 
   @keyframes menuDrop {
     from { opacity: 0; transform: translateY(-8px); max-height: 0; }
     to   { opacity: 1; transform: translateY(0);    max-height: 360px; }
   }
   .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
+
+  @keyframes testimonialScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+   .testimonial-marquee {
+    overflow: hidden;
+    padding: 26px 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+  .testimonial-track {
+    display: flex;
+    width: max-content;
+    gap: 28px;
+    animation: testimonialScroll 40s linear infinite;
+  }
+  .testimonial-marquee:hover .testimonial-track,
+  .testimonial-marquee:active .testimonial-track {
+    animation-play-state: paused;
+  }
+  .testi-card-m { flex: 0 0 auto; }
+  @media (max-width: 640px) {
+    .testimonial-track { animation-duration: 24s; gap: 16px; }
+  }
 `
 
 export const Wrap = ({ children, className = '' }) => (
@@ -66,9 +91,7 @@ export const Wrap = ({ children, className = '' }) => (
 
 function Divider() {
   return (
-    <div className="bg-[#FDF4F8] py-3 flex items-center">
-      <div className="w-full h-px bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
-    </div>
+    <div className="h-px w-full bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
   )
 }
 
@@ -250,16 +273,16 @@ function DashboardMockup() {
   const P = '#7A004B'
   return (
     <div className="bg-white relative overflow-visible">
-      <div className="relative px-6 pt-12 pb-20 flex items-center justify-center">
+      <div className="relative px-3 pt-6 pb-6 sm:px-5 sm:pt-8 sm:pb-8 lg:px-6 lg:pt-10 lg:pb-14 flex items-center justify-center">
         <div
-          className="absolute top-[10%] right-[8%] w-[420px] h-[480px] z-0"
+          className="absolute top-[10%] right-[8%] w-[62vw] h-[70vw] max-w-[420px] max-h-[480px] z-0"
           style={{
             background: 'radial-gradient(ellipse at 60% 40%, #f5d6e8 0%, #fdf0f7 60%, transparent 100%)',
             borderRadius: '60% 40% 55% 45% / 50% 55% 45% 50%',
           }}
         />
         <div className="relative z-[2] w-full max-w-full">
-          <div className="absolute -bottom-7 -left-9 z-20">
+          <div className="absolute -bottom-2.5 -left-2.5 scale-[0.62] sm:-bottom-4 sm:-left-4 sm:scale-[0.8] lg:-bottom-7 lg:-left-9 lg:scale-100 origin-bottom-left z-20">
             <AnalyticsCard />
           </div>
           <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"
@@ -290,12 +313,13 @@ function DashboardMockup() {
             <path d="M21,213 L21,226 Q21,227.5 22.5,227.5 L32.5,227.5 Q34,227.5 34,226 L34,217.5 L30,213 Z" fill="none" stroke="#888" strokeWidth="1.5"/>
             <polyline points="30,213 30,217.5 34,217.5" fill="none" stroke="#888" strokeWidth="1.5"/>
             <text x="40" y="224" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">File</text>
-            <circle cx="27" cy="244" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <circle cx="27" cy="244" r="2" fill="#888"/>
+            <circle cx="27" cy="243" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
+            <circle cx="27" cy="243" r="2" fill="#888"/>
             <text x="40" y="248" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Settings</text>
-            <path d="M20,267 L20,277 Q20,279 22,279 L28,279" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
-            <polyline points="26,276 30,279 26,282" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <text x="40" y="272" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Logout</text>
+            <line x1="20"  y1="266"  x2="34" y2="266" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
+            <polyline points="30,262 34,266 30,270" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <text x="40" y="270" fontFamily="Instrument Sans,sans-serif"  fontSize="13" fontWeight="400" fill="#555" > Logout </text>
+
             <text x="16" y="648" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="#ccc">Powered by TechTorch | © 2026</text>
             <rect x="210" y="0" width="750" height="660" fill="#eef2f8"/>
             <rect x="210" y="0" width="750" height="68" fill="#ffffff"/>
@@ -442,7 +466,7 @@ function Hero({ onOpenCalculator }) {
   return (
     <section className="bg-white overflow-hidden pt-20 pb-[72px]">
       <Wrap>
-        <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] items-center gap-10 lg:gap-[60px] mt-5 lg:mt-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] items-center gap-10 lg:gap-[52px] mt-5 lg:mt-0">
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
             className="max-w-[520px]"
@@ -494,7 +518,7 @@ function Hero({ onOpenCalculator }) {
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            className="w-full pb-[clamp(15px,3vw,36px)] overflow-visible"
+            className="w-full pb-2 sm:pb-3 lg:pb-9 overflow-visible"
           >
             <DashboardMockup />
           </motion.div>
@@ -551,114 +575,75 @@ function MiniSidebar() {
   )
 }
 
-function AIRecruitmentCard() {
+function CandidateList() {
   const candidates = [
     { name: 'Baibhav Gangwar', role: 'UI/UX Designer', pct: 96 },
     { name: 'Ashish Gangwar', role: 'Full Stack Developer', pct: 92 },
     { name: 'Pawan Kumar', role: 'Frontend Developer', pct: 89 },
   ]
   return (
-    <motion.div
-      variants={cardVariant}
-      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
-    >
-      <div className="px-8 pt-8 pb-4">
-        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
-          <HiOutlineSparkles className="text-[#7A004B] text-[26px]" />
+    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 overflow-hidden flex">
+      <MiniSidebar />
+      <div className="flex-1 px-3 pt-3.5 pb-4">
+        <div className="text-[9px] font-ui font-bold text-[#b98ba3] uppercase tracking-[0.8px] mb-2.5">
+          Top Matched Candidates
         </div>
-        <h3 className="text-lg font-display font-bold text-[#111] mb-2">AI Recruitment</h3>
-        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
-          Find the right talent faster with AI-powered candidate screening, smart matching, and automated shortlisting.
-        </p>
-      </div>
-      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl overflow-hidden flex flex-1">
-        <MiniSidebar />
-        <div className="flex-1 px-3 pt-3.5 pb-4">
-          <div className="text-[9px] font-ui font-bold text-[#aaa] uppercase tracking-[0.8px] mb-2.5">Top Matched Candidates</div>
-          {candidates.map(c => (
-            <div key={c.name} className="flex items-center gap-2 mb-2 bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
-              <div className="w-7 h-7 rounded-full bg-[#7A004B]/[0.09] flex items-center justify-center shrink-0">
-                <FiUser className="text-[#7A004B] text-xs" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-ui font-bold text-[#111] whitespace-nowrap overflow-hidden text-ellipsis">{c.name}</div>
-                <div className="text-[8px] text-[#bbb] font-body">{c.role}</div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="w-[42px] h-1 bg-[#e8e0ec] rounded overflow-hidden">
-                  <div className="h-full bg-[#00b050] rounded" style={{ width: `${c.pct}%` }} />
-                </div>
-                <span className="text-[9px] font-bold text-[#00b050] font-ui">{c.pct}%</span>
-              </div>
+        {candidates.map(c => (
+          <div key={c.name} className="flex items-center gap-2 mb-2 bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
+            <div className="w-7 h-7 rounded-full bg-[#7A004B]/[0.09] flex items-center justify-center shrink-0">
+              <FiUser className="text-[#7A004B] text-xs" />
             </div>
-          ))}
-        </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-ui font-bold text-[#111] whitespace-nowrap overflow-hidden text-ellipsis">{c.name}</div>
+              <div className="text-[8px] text-[#bbb] font-body">{c.role}</div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="w-[42px] h-1 bg-[#e8e0ec] rounded overflow-hidden">
+                <div className="h-full bg-[#00b050] rounded" style={{ width: `${c.pct}%` }} />
+              </div>
+              <span className="text-[9px] font-bold text-[#00b050] font-ui">{c.pct}%</span>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="px-8 py-3.5 border-t border-[#EAC7D7] flex justify-between items-center">
-        <span className="text-xs font-ui font-bold text-[#7A004B]">Smart hiring. Better teams.</span>
-        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
-          <FiArrowRight className="text-[#7A004B] text-[13px]" />
-        </div>
-      </div>
-    </motion.div>
+    </div>
   )
 }
 
-function PerformanceCard() {
+function PerformancePanel() {
   const P = '#7A004B'
   return (
-    <motion.div
-      variants={cardVariant}
-      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
-    >
-      <div className="px-8 pt-8 pb-4">
-        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
-          <BsGraphUp className="text-[#7A004B] text-2xl" />
+    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 px-3.5 pt-3.5 pb-3">
+      <div className="flex items-center gap-1.5 mb-3">
+        <div className="min-w-[80px]">
+          <div className="text-[9px] text-[#b98ba3] font-body mb-0.5">Avg Rating</div>
+          <div className="text-[30px] font-display font-extrabold text-[#111] leading-none mb-0.5">4.6</div>
+          <div className="text-[#7A004B] text-[13px] tracking-widest">★★★★★</div>
         </div>
-        <h3 className="text-lg font-display font-bold text-[#111] mb-2">Performance Reviews</h3>
-        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
-          Simplify performance evaluations with customizable reviews, goal tracking, and actionable feedback.
-        </p>
-      </div>
-      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl px-3.5 pt-3.5 pb-2.5 flex-1">
-        <div className="text-[9px] font-ui font-bold text-[#aaa] uppercase tracking-[0.8px] mb-2.5">Performance Overview</div>
-        <div className="flex items-center gap-1.5 mb-3">
-          <div className="min-w-[80px]">
-            <div className="text-[9px] text-[#aaa] font-body mb-0.5">Avg Rating</div>
-            <div className="text-[30px] font-display font-extrabold text-[#111] leading-none mb-0.5">4.6</div>
-            <div className="text-[#7A004B] text-[13px] tracking-widest">★★★★★</div>
-          </div>
-          <div className="flex-1 h-[110px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsRadar data={radarData} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
-                <PolarGrid stroke="#e8d0de" strokeWidth={0.8} />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 7, fill: '#aaa', fontFamily: 'DM Sans, sans-serif' }} />
-                <Radar dataKey="value" name="Score" stroke={P} fill={P} fillOpacity={0.15} strokeWidth={1.8} dot={{ r: 3, fill: P, strokeWidth: 1.5, stroke: '#fff' }} />
-              </RechartsRadar>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <div className="bg-white rounded-[10px] px-2.5 py-2 border border-[#EAC7D7]">
-          <div className="flex justify-between mb-1.5">
-            <span className="text-[10px] font-body text-[#5C5C5C] font-semibold">Goals Achieved</span>
-            <span className="text-[10px] font-ui font-bold text-[#7A004B]">82%</span>
-          </div>
-          <div className="w-full h-1.5 bg-[#e8d8e8] rounded-md">
-            <div className="w-[82%] h-full bg-[#7A004B] rounded-md" />
-          </div>
+        <div className="flex-1 h-[110px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsRadar data={radarData} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
+              <PolarGrid stroke="#e8d0de" strokeWidth={0.8} />
+              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 7, fill: '#b98ba3', fontFamily: 'DM Sans, sans-serif' }} />
+              <Radar dataKey="value" name="Score" stroke={P} fill={P} fillOpacity={0.15} strokeWidth={1.8} dot={{ r: 3, fill: P, strokeWidth: 1.5, stroke: '#fff' }} />
+            </RechartsRadar>
+          </ResponsiveContainer>
         </div>
       </div>
-      <div className="px-8 py-3.5 border-t-2 border-[#7A004B] flex justify-between items-center">
-        <span className="text-xs font-ui font-bold text-[#7A004B]">Evaluate. Improve. Grow.</span>
-        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
-          <FiArrowRight className="text-[#7A004B] text-[13px]" />
+      <div className="bg-white rounded-[10px] px-2.5 py-2 border border-[#EAC7D7]">
+        <div className="flex justify-between mb-1.5">
+          <span className="text-[10px] font-body text-[#5C5C5C] font-semibold">Goals Achieved</span>
+          <span className="text-[10px] font-ui font-bold text-[#7A004B]">82%</span>
+        </div>
+        <div className="w-full h-1.5 bg-[#e8d8e8] rounded-md">
+          <div className="w-[82%] h-full bg-[#7A004B] rounded-md" />
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-function EmployeePortalCard() {
+function PortalPanel() {
   const quickActions = [
     { icon: <FiUser />, label: 'My\nProfile' },
     { icon: <FiBell />, label: 'Company\nNews' },
@@ -666,54 +651,110 @@ function EmployeePortalCard() {
     { icon: <FiUsers />, label: 'Leave\nReqs' },
   ]
   return (
-    <motion.div
-      variants={cardVariant}
-      className="feat-card bg-white border-2 border-[#7A004B] rounded-[18px] overflow-hidden shadow-[0_8px_24px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2.5 hover:shadow-[0_16px_48px_rgba(122,0,75,0.18)]"
-    >
-      <div className="px-8 pt-8 pb-4">
-        <div className="w-14 h-14 bg-[#FDF4F8] rounded-2xl flex items-center justify-center mb-3.5">
-          <BsPersonBadge className="text-[#7A004B] text-[26px]" />
+    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 overflow-hidden flex">
+      <MiniSidebar />
+      <div className="flex-1 px-2.5 pt-3 pb-3.5">
+        <div className="text-[11px] font-display font-bold text-[#111] mb-2.5">Welcome back, Baibhav!</div>
+        <div className="grid grid-cols-2 gap-1.5 mb-2">
+          {quickActions.map(item => (
+            <div key={item.label} className="bg-white rounded-[10px] py-1.5 px-1.5 text-center flex flex-col items-center gap-1 border border-[#EAC7D7]">
+              <div className="text-[#7A004B] text-[15px]">{item.icon}</div>
+              <div className="text-[8px] font-ui text-[#7A004B] leading-[1.3] font-semibold whitespace-pre-line">{item.label}</div>
+            </div>
+          ))}
         </div>
-        <h3 className="text-lg font-display font-bold text-[#111] mb-2">Employee Portal</h3>
-        <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">
-          Empower employees with a self-service portal for profiles, documents, requests, and company updates.
-        </p>
-      </div>
-      <div className="mx-4 bg-[#FDF4F8] rounded-t-xl overflow-hidden flex flex-1">
-        <MiniSidebar />
-        <div className="flex-1 px-2.5 pt-3 pb-3.5">
-          <div className="text-[11px] font-display font-bold text-[#111] mb-2.5">Welcome back, Baibhav!</div>
-          <div className="grid grid-cols-2 gap-1.5 mb-2">
-            {quickActions.map(item => (
-              <div key={item.label} className="bg-white rounded-[10px] py-1.5 px-1.5 text-center flex flex-col items-center gap-1 border border-[#EAC7D7]">
-                <div className="text-[#7A004B] text-[15px]">{item.icon}</div>
-                <div className="text-[8px] font-ui text-[#7A004B] leading-[1.3] font-semibold whitespace-pre-line">{item.label}</div>
-              </div>
-            ))}
-          </div>
-          <div className="bg-white rounded-[10px] px-2.5 py-1.5 mb-1.5 border border-[#EAC7D7]">
-            <div className="text-[8px] text-[#aaa] font-body font-semibold mb-0.5">Upcoming Leave</div>
-            <div className="text-[10px] font-display font-bold text-[#111]">15 – 18 May 2024</div>
-          </div>
-          <div className="bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
-            <div className="text-[8px] text-[#aaa] font-body font-semibold mb-1.5">Team Birthday 🎂</div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0">
-                <FiUser className="text-white text-[11px]" />
-              </div>
-              <div>
-                <div className="text-[9px] font-display font-bold text-[#111]">Baibhav Gangwar</div>
-                <div className="text-[7.5px] text-[#bbb] font-body">May 05</div>
-              </div>
+        <div className="bg-white rounded-[10px] px-2.5 py-1.5 mb-1.5 border border-[#EAC7D7]">
+          <div className="text-[8px] text-[#b98ba3] font-body font-semibold mb-0.5">Upcoming Leave</div>
+          <div className="text-[10px] font-display font-bold text-[#111]">15 – 18 May 2024</div>
+        </div>
+        <div className="bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
+          <div className="text-[8px] text-[#b98ba3] font-body font-semibold mb-1.5">Team Birthday 🎂</div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-6 h-6 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0">
+              <FiUser className="text-white text-[11px]" />
+            </div>
+            <div>
+              <div className="text-[9px] font-display font-bold text-[#111]">Baibhav Gangwar</div>
+              <div className="text-[7.5px] text-[#bbb] font-body">May 05</div>
             </div>
           </div>
         </div>
       </div>
-      <div className="px-8 py-3.5 border-t border-[#EAC7D7] flex justify-between items-center">
-        <span className="text-xs font-ui font-bold text-[#7A004B]">Everything you need, in one place.</span>
-        <div className="w-[30px] h-[30px] rounded-full border-[1.5px] border-[#EAC7D7] flex items-center justify-center">
-          <FiArrowRight className="text-[#7A004B] text-[13px]" />
-        </div>
+    </div>
+  )
+}
+
+const journeyStages = [
+  {
+    num: '01', stage: 'Hire',
+    icon: <HiOutlineSparkles className="text-[#7A004B] text-xl" />,
+    title: 'AI Recruitment',
+    copy: 'Find the right talent faster with AI-powered candidate screening, smart matching, and automated shortlisting.',
+    footer: 'Smart hiring, better teams',
+    body: <CandidateList />,
+  },
+  {
+    num: '02', stage: 'Grow',
+    icon: <BsGraphUp className="text-[#7A004B] text-lg" />,
+    title: 'Performance Reviews',
+    copy: 'Simplify performance evaluations with customizable reviews, goal tracking, and actionable feedback.',
+    footer: 'Evaluate, improve, grow',
+    body: <PerformancePanel />,
+  },
+  {
+    num: '03', stage: 'Belong',
+    icon: <BsPersonBadge className="text-[#7A004B] text-xl" />,
+    title: 'Employee Portal',
+    copy: 'Empower employees with a self-service portal for profiles, documents, requests, and company updates.',
+    footer: 'Everything in one place',
+    body: <PortalPanel />,
+  },
+]
+
+function FeatureJourney() {
+  return (
+    <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}>
+      {/* connecting path — desktop only */}
+      <div className="hidden md:flex items-center mb-3 px-2">
+        {journeyStages.map((s, i) => (
+          <div key={s.num} className="flex items-center flex-1 last:flex-none">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="font-display text-xs font-bold text-[#7A004B]/35 tabular-nums">{s.num}</span>
+              <span className="font-ui text-[13px] font-semibold text-[#7A004B]">{s.stage}</span>
+            </div>
+            {i < journeyStages.length - 1 && (
+              <div
+                className="flex-1 h-px mx-4"
+                style={{ background: 'repeating-linear-gradient(to right, #DDB7CB 0, #DDB7CB 5px, transparent 5px, transparent 10px)' }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#EAC7D7] bg-white rounded-[28px] border border-[#EAC7D7] shadow-[0_20px_60px_rgba(122,0,75,0.08)] overflow-hidden">
+        {journeyStages.map(s => (
+          <motion.div
+            key={s.num}
+            variants={cardVariant}
+            className="group px-7 py-8 flex flex-col gap-5 transition-colors duration-300 hover:bg-[#FDFAFC]"
+          >
+            <div className="flex items-center gap-2.5 md:hidden">
+              <span className="font-display text-xs font-bold text-[#7A004B]/35 tabular-nums">{s.num}</span>
+              <span className="font-ui text-[13px] font-semibold text-[#7A004B]">{s.stage}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              {s.icon}
+              <h3 className="text-lg font-display font-bold text-[#111]">{s.title}</h3>
+            </div>
+            <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">{s.copy}</p>
+            {s.body}
+            <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs font-ui font-bold text-[#7A004B]">
+              {s.footer}
+              <FiArrowRight className="text-[13px] transition-transform duration-300 group-hover:translate-x-1" />
+            </div>
+          </motion.div>
+        ))}
       </div>
     </motion.div>
   )
@@ -733,14 +774,7 @@ function Features() {
             </p>
           </div>
 
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"
-            variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}
-          >
-            <AIRecruitmentCard />
-            <PerformanceCard />
-            <EmployeePortalCard />
-          </motion.div>
+          <FeatureJourney />
         </motion.div>
       </Wrap>
     </section>
@@ -954,15 +988,16 @@ function Pricing() {
 
 
 function Testimonials() {
-  const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
-    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'AL' },
-    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director',  initials: 'AV' },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead' , initials: 'RS' },
-    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources',  initials: 'KM' },
-    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer',  initials: 'MP' },
+    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
+    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', initials: 'AV' },
+    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', initials: 'RS' },
+    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', initials: 'KM' },
+    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', initials: 'MP' },
   ]
-  const visibleTestimonials = testimonials.slice(startIndex, startIndex + 3)
+
+  // duplicated once so the CSS marquee loop is seamless
+  const loopTestimonials = [...testimonials, ...testimonials]
 
   return (
     <section id="testimonials" className="scroll-anchor bg-[#F6EDF2] font-body pt-8 pb-10">
@@ -976,60 +1011,33 @@ function Testimonials() {
               See how organizations like yours are using TorchX Talent to streamline HR and achieve more every day.
             </p>
           </div>
+        </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 mb-12">
-            {visibleTestimonials.map((t, i) => (
-              <motion.div
-  key={t.name}
-  initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
-  className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
->
-  <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
-  <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
-  <hr className="border-none border-t border-[#E6D6DF] mb-4" />
-  <div className="flex items-center gap-2.5">
-    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
-      <span className="text-white text-xs font-display font-bold">{t.initials}</span>
-    </div>
-    <div className="flex-1">
-      <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
-      <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
-    </div>
-    <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
+        <div className="testimonial-marquee mb-12 -mx-5 sm:-mx-10 lg:-mx-16 px-5 sm:px-10 lg:px-16">
+          <div className="testimonial-track">
+            {loopTestimonials.map((t, i) => (
+              <div
+                key={`${t.name}-${i}`}
+                className="testi-card-m w-[280px] sm:w-[320px] md:w-[340px] bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
+              >
+               <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
+<p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-4">{t.quote}</p>
+<div className="border-t border-dotted border-[#c88ba8] mb-4" />
+<div className="flex items-center gap-2.5">
+  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
   </div>
-</motion.div>
+  <div className="flex-1 min-w-0">
+    <div className="text-[13px] font-display font-bold text-[#7A004B] truncate">{t.name}</div>
+    <div className="text-[11px] text-[#777] mt-0.5 truncate">{t.role}</div>
+  </div>
+</div>
+              </div>
             ))}
           </div>
+        </div>
 
-          <div className="flex justify-center items-center gap-5 mb-12">
-            <button
-              onClick={() => setStartIndex(prev => Math.max(prev - 1, 0))}
-              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
-            >
-              ←
-            </button>
-
-            <div className="flex items-center gap-1.5">
-              {[0, 1, 2].map(i => (
-                <button
-                  key={i}
-                  onClick={() => setStartIndex(i)}
-                  className={`rounded-full border-none cursor-pointer p-0 transition-all duration-300 ${
-                    startIndex === i ? 'w-10 h-[15px] bg-[#730042]' : 'w-[25px] h-2 bg-[#DDB7CB]'
-                  }`}
-                />
-              ))}
-            </div>
-
-            <button
-              onClick={() => setStartIndex(prev => Math.min(prev + 1, testimonials.length - 3))}
-              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
-            >
-              →
-            </button>
-          </div>
-
+        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="testimonial-cta flex flex-col md:flex-row flex-wrap w-full bg-gradient-to-br from-[#FFF7FA] to-[#F9EAF2] border border-[#E7CCD9] rounded-[22px] px-8 py-12 justify-between items-start md:items-center gap-5 shadow-[0_10px_30px_rgba(122,0,75,0.08)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(122,0,75,0.15)]">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-[#7A004B] to-[#B00068] shadow-[0_8px_20px_rgba(122,0,75,0.25)] rounded-full flex items-center justify-center shrink-0">
