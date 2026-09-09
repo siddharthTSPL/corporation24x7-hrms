@@ -56,6 +56,31 @@ export const fontStyles = `
     to   { opacity: 1; transform: translateY(0);    max-height: 360px; }
   }
   .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
+
+  @keyframes testimonialScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+   .testimonial-marquee {
+    overflow: hidden;
+    padding: 26px 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+  }
+  .testimonial-track {
+    display: flex;
+    width: max-content;
+    gap: 28px;
+    animation: testimonialScroll 40s linear infinite;
+  }
+  .testimonial-marquee:hover .testimonial-track,
+  .testimonial-marquee:active .testimonial-track {
+    animation-play-state: paused;
+  }
+  .testi-card-m { flex: 0 0 auto; }
+  @media (max-width: 640px) {
+    .testimonial-track { animation-duration: 24s; gap: 16px; }
+  }
 `
 
 export const Wrap = ({ children, className = '' }) => (
@@ -952,15 +977,16 @@ function Pricing() {
 
 
 function Testimonials() {
-  const [startIndex, setStartIndex] = useState(0)
   const testimonials = [
-    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'AL' },
-    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director',  initials: 'AV' },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead' , initials: 'RS' },
-    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources',  initials: 'KM' },
-    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer',  initials: 'MP' },
+    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
+    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', initials: 'AV' },
+    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', initials: 'RS' },
+    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', initials: 'KM' },
+    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', initials: 'MP' },
   ]
-  const visibleTestimonials = testimonials.slice(startIndex, startIndex + 3)
+
+  // duplicated once so the CSS marquee loop is seamless
+  const loopTestimonials = [...testimonials, ...testimonials]
 
   return (
     <section id="testimonials" className="scroll-anchor bg-[#F6EDF2] font-body pt-8 pb-10">
@@ -974,60 +1000,33 @@ function Testimonials() {
               See how organizations like yours are using TorchX Talent to streamline HR and achieve more every day.
             </p>
           </div>
+        </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 mb-12">
-            {visibleTestimonials.map((t, i) => (
-              <motion.div
-  key={t.name}
-  initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.45, delay: i * 0.1 }} viewport={{ once: true }}
-  className="testi-card bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
->
-  <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
-  <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-5">{t.quote}</p>
-  <hr className="border-none border-t border-[#E6D6DF] mb-4" />
-  <div className="flex items-center gap-2.5">
-    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
-      <span className="text-white text-xs font-display font-bold">{t.initials}</span>
-    </div>
-    <div className="flex-1">
-      <div className="text-[13px] font-display font-bold text-[#7A004B]">{t.name}</div>
-      <div className="text-[11px] text-[#777] mt-0.5">{t.role}</div>
-    </div>
-    <div className="text-[9px] font-ui font-bold text-[#888] tracking-widest uppercase border-l border-[#E6D6DF] pl-2.5">{t.co}</div>
+        <div className="testimonial-marquee mb-12 -mx-5 sm:-mx-10 lg:-mx-16 px-5 sm:px-10 lg:px-16">
+          <div className="testimonial-track">
+            {loopTestimonials.map((t, i) => (
+              <div
+                key={`${t.name}-${i}`}
+                className="testi-card-m w-[280px] sm:w-[320px] md:w-[340px] bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
+              >
+               <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
+<p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-4">{t.quote}</p>
+<div className="border-t border-dotted border-[#c88ba8] mb-4" />
+<div className="flex items-center gap-2.5">
+  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
   </div>
-</motion.div>
+  <div className="flex-1 min-w-0">
+    <div className="text-[13px] font-display font-bold text-[#7A004B] truncate">{t.name}</div>
+    <div className="text-[11px] text-[#777] mt-0.5 truncate">{t.role}</div>
+  </div>
+</div>
+              </div>
             ))}
           </div>
+        </div>
 
-          <div className="flex justify-center items-center gap-5 mb-12">
-            <button
-              onClick={() => setStartIndex(prev => Math.max(prev - 1, 0))}
-              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
-            >
-              ←
-            </button>
-
-            <div className="flex items-center gap-1.5">
-              {[0, 1, 2].map(i => (
-                <button
-                  key={i}
-                  onClick={() => setStartIndex(i)}
-                  className={`rounded-full border-none cursor-pointer p-0 transition-all duration-300 ${
-                    startIndex === i ? 'w-10 h-[15px] bg-[#730042]' : 'w-[25px] h-2 bg-[#DDB7CB]'
-                  }`}
-                />
-              ))}
-            </div>
-
-            <button
-              onClick={() => setStartIndex(prev => Math.min(prev + 1, testimonials.length - 3))}
-              className="w-[42px] h-[42px] min-w-[42px] rounded-full border-[1.5px] border-[#DDB7CB] bg-white text-[#730042] cursor-pointer flex items-center justify-center text-lg transition-all shadow-[0_4px_12px_rgba(115,0,66,0.08)] hover:bg-[#730042] hover:text-white hover:-translate-y-0.5"
-            >
-              →
-            </button>
-          </div>
-
+        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="testimonial-cta flex flex-col md:flex-row flex-wrap w-full bg-gradient-to-br from-[#FFF7FA] to-[#F9EAF2] border border-[#E7CCD9] rounded-[22px] px-8 py-12 justify-between items-start md:items-center gap-5 shadow-[0_10px_30px_rgba(122,0,75,0.08)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_20px_40px_rgba(122,0,75,0.15)]">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-[#7A004B] to-[#B00068] shadow-[0_8px_20px_rgba(122,0,75,0.25)] rounded-full flex items-center justify-center shrink-0">
