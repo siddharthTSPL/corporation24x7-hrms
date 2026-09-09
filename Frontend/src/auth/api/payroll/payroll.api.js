@@ -114,6 +114,13 @@ export const getPayslip = async (params) => {
   return res.data;
 };
 
+// Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
+// Available on every plan (Basic included) — no plan-feature gate.
+export const getMyPayslips = async () => {
+  const res = await api.get("admin/payroll/my-payslips");
+  return res.data;
+};
+
 export const updatePayrollStatus = async (id, status) => {
   const res = await api.patch(`admin/payroll/${id}/status`, { status });
   return res.data;
