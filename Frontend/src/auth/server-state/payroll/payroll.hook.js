@@ -17,6 +17,7 @@ import {
   bulkGeneratePayroll,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,
@@ -203,6 +204,17 @@ export const useGetPayslip = (params, enabled) => {
     queryKey: ["payslip", params],
     queryFn: () => getPayslip(params),
     enabled: Boolean(enabled && params?.employee && params?.month && params?.year),
+    staleTime: 0,
+  });
+};
+
+// Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
+// Available on every plan (Basic included).
+export const useMyPayslips = (enabled = true) => {
+  return useQuery({
+    queryKey: ["my-payslips"],
+    queryFn: () => getMyPayslips(),
+    enabled,
     staleTime: 0,
   });
 };
