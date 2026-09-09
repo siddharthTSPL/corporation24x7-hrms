@@ -316,35 +316,9 @@ function DashboardMockup() {
             <circle cx="27" cy="244" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
             <circle cx="27" cy="244" r="2" fill="#888"/>
             <text x="40" y="248" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Settings</text>
- 
-<line
-  x1="20"
-  y1="266"
-  x2="34"
-  y2="266"
-  stroke="#888"
-  strokeWidth="1.5"
-  strokeLinecap="round"
-/>
-
-<polyline
-  points="30,262 34,266 30,270"
-  fill="none"
-  stroke="#888"
-  strokeWidth="1.5"
-  strokeLinecap="round"
-  strokeLinejoin="round"
-/>
-
-<text
-  x="40"
-  y="270"
-  fontFamily="Instrument Sans,sans-serif"
-  fontSize="13"
-  fontWeight="400"
-  fill="#555"
->
-  Logout </text>
+            <line x1="20"  y1="266"  x2="34" y2="266" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
+            <polyline points="30,262 34,266 30,270" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <text x="40" y="270" fontFamily="Instrument Sans,sans-serif"  fontSize="13" fontWeight="400" fill="#555" > Logout </text>
 
             <text x="16" y="648" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="#ccc">Powered by TechTorch | © 2026</text>
             <rect x="210" y="0" width="750" height="660" fill="#eef2f8"/>
