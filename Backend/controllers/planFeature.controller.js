@@ -6,7 +6,12 @@ const { UNLOCKED_PLANS } = require("../middleware/auth/planFeatureGate.middlewar
 // the actual enforcement; this endpoint just tells the frontend what to
 // show ahead of time so users see a clear "upgrade required" state instead
 // of a failed API call.
-const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets", "selfService"];
+//
+// NOTE: "selfService" (Self Service Portal — Leave/Reimbursement/Documents)
+// is intentionally NOT in this list. It is available on every plan,
+// including Basic. Only these 5 remain locked on Basic: Review, Timesheet,
+// Recruitment, Asset Management, TorchX Voice.
+const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets"];
 
 const getPlanFeatureAccess = async (req, res, next) => {
   try {

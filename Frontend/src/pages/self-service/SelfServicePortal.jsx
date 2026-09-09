@@ -8,10 +8,12 @@ import {
 import {
   FaCalendarAlt, FaFileInvoiceDollar, FaFolder, FaTicketAlt,
   FaClock, FaPlus, FaArrowRight, FaCheckCircle, FaPercentage,
-  FaChartLine,
+  FaChartLine, FaDownload,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
+import { useMyPayslips } from "../../auth/server-state/payroll/payroll.hook";
+import { downloadPayslip, MONTH_NAMES } from "../utils/Payslip";
 
 const BRAND = "#730042";
 const PALETTE = ["#730042", "#CD166E", "#F5A623", "#2FB4A0", "#4A6FDC", "#9B59B6", "#EB5757", "#27AE60"];
@@ -91,6 +93,56 @@ function fmtCurrency(n = 0) {
   return `₹${Number(n).toLocaleString("en-IN")}`;
 }
 
+// "My Payslip" — available on every plan, including Basic. Shows once
+// payroll has been marked "paid"; nothing to show before that.
+function MyPayslipsCard({ enabled }) {
+  const { data, isLoading, isError } = useMyPayslips(enabled);
+  const payslips = data?.payslips || [];
+
+  const handleDownload = (payroll) => {
+    const snap = payroll.employeeSnapshot || {};
+    downloadPayslip({
+      payroll,
+      name: snap.name || "—",
+      employeeId: snap.employeeId || "—",
+      department: snap.department || "—",
+      designation: snap.designation || "—",
+      bankName: snap.bankName,
+      accountNumber: snap.accountNumber,
+      orgName: payroll.organisationSnapshot?.name || "",
+    });
+  };
+
+  return (
+    <SectionCard title="My Payslip">
+      {isLoading ? (
+        <p className="text-xs text-gray-400 py-6 text-center">Loading your payslips…</p>
+      ) : isError ? (
+        <p className="text-xs text-gray-400 py-6 text-center">Couldn't load your payslips right now.</p>
+      ) : payslips.length === 0 ? (
+        <EmptyState text="No paid payslip yet. Once payroll marks a month as Paid, it will appear here for download." />
+      ) : (
+        <div className="space-y-2">
+          {payslips.slice(0, 6).map((p) => (
+            <div key={p._id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-700">{MONTH_NAMES[p.month - 1]} {p.year}</p>
+                <p className="text-[11px] text-gray-400">Net Pay: {fmtCurrency(p.netSalary)}</p>
+              </div>
+              <button
+                onClick={() => handleDownload(p)}
+                className="flex items-center gap-1.5 text-xs font-medium text-[#730042] hover:text-[#CD166E] flex-shrink-0"
+              >
+                <FaDownload size={11} /> Download
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 export default function SelfServicePortal() {
   const navigate = useNavigate();
   const { data: auth } = useAuth();
@@ -162,6 +214,8 @@ export default function SelfServicePortal() {
           <StatCard icon={<FaChartLine />} label="Org Attendance Rate" value={data.attendance?.attendanceRate != null ? `${data.attendance.attendanceRate}%` : "—"} sub="this month" />
         </div>
       )}
+
+      {!isOrgScope && <MyPayslipsCard enabled={!isOrgScope} />}
 
       <SectionHeading>Overview</SectionHeading>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

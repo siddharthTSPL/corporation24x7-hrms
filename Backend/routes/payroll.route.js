@@ -2,6 +2,7 @@ const express = require("express");
 const payrollrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
+const planFeatureAnyRole = require("../middleware/auth/Planfeatureanyrole.middleware");
 
 const {
   getOrgOwner,
@@ -13,6 +14,7 @@ const {
   bulkGeneratePayroll,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,
@@ -35,6 +37,11 @@ payrollrouter.post("/generate/bulk", adminauthmiddleware, asyncHandler(bulkGener
 
 payrollrouter.get("/", adminauthmiddleware, asyncHandler(listPayrolls));
 payrollrouter.get("/payslip", adminauthmiddleware, asyncHandler(getPayslip));
+
+// Self-service: logged-in Employee/Manager/Admin fetching their OWN paid
+// payslips. Plan-independent by design — available on every plan (Basic
+// included), unlike Review/Timesheet/Recruitment/Asset/TorchX Voice.
+payrollrouter.get("/my-payslips", planFeatureAnyRole, asyncHandler(getMyPayslips));
 
 
 

@@ -602,6 +602,56 @@ const getPayslip = async (req, res) => {
   res.status(200).json({ success: true, payslip });
 };
 
+// Self-service endpoint: lets the logged-in Employee/Manager/Admin see and
+// download their OWN payslips — but only once payroll has actually been
+// marked "paid". This is deliberately plan-independent (no restrictPlanFeature
+// gate on its route) so it works on every plan, including Basic.
+const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin" };
+
+const resolveSelfServiceActor = (req) => {
+  if (req.employee) return { actor: req.employee, employeeModel: SELF_SERVICE_ROLE_MODEL.employee, organisation_id: req.employee.organisation_id };
+  if (req.manager) return { actor: req.manager, employeeModel: SELF_SERVICE_ROLE_MODEL.manager, organisation_id: req.manager.organisation_id };
+  if (req.admin) return { actor: req.admin, employeeModel: SELF_SERVICE_ROLE_MODEL.admin, organisation_id: req.admin.organisation_id };
+  return null;
+};
+
+const getMyPayslips = async (req, res, next) => {
+  try {
+    const resolved = resolveSelfServiceActor(req);
+    if (!resolved) return next(Object.assign(new Error("Payslips are not available for this account type."), { statusCode: 403 }));
+
+    const { actor, employeeModel, organisation_id } = resolved;
+
+    const payslips = await Payroll.find({
+      organisation_id,
+      employee: actor._id,
+      employeeModel,
+      status: "paid",
+    })
+      .sort({ year: -1, month: -1 })
+      .lean();
+
+    if (payslips.length) {
+      const organisationSnapshot = payslips[0].organisationSnapshot?.name
+        ? null
+        : await getOrganisationSnapshot(organisation_id);
+      const needsEmployeeSnapshot = !payslips[0].employeeSnapshot?.bankName && !payslips[0].employeeSnapshot?.accountNumber;
+      const employeeSnapshot = needsEmployeeSnapshot ? await getEmployeeSnapshot(employeeModel, actor._id) : null;
+
+      for (const p of payslips) {
+        if (organisationSnapshot && !p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
+        if (employeeSnapshot && !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber) {
+          p.employeeSnapshot = { ...p.employeeSnapshot, ...employeeSnapshot };
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, count: payslips.length, payslips });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updatePayrollStatus = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const { id } = req.params;
@@ -728,6 +778,7 @@ module.exports = {
   bulkGeneratePayroll,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,
