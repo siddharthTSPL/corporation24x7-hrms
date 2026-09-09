@@ -7,31 +7,20 @@ import {
   FaSitemap, FaBell, FaUserCog, FaSignInAlt, FaCalendarCheck,
 } from "react-icons/fa";
 
-// =====================================================================
-// COLOR TOKENS — "beetroot" palette (replaces the earlier pink tones).
-// Keeping these in one place makes future palette tweaks a one-line change.
-// =====================================================================
 const BEETROOT = {
-  900: "#5C1730", // deepest — headings/icons on light bg
-  700: "#730042", // primary accent (already beetroot-toned, kept as-is)
-  500: "#8C2F49", // mid accent — focus rings, active states
-  300: "#C98096", // borders, dividers
-  100: "#E9C7D0", // soft borders / pill outlines
-  50: "#F3E1E7",  // lightest tint — section backgrounds, chip fills
-  textMid: "#7A2A41", // subdued supporting text on tinted bg
+  900: "#5C1730", 
+  700: "#730042", 
+  500: "#8C2F49", 
+  300: "#C98096", 
+  100: "#E9C7D0", 
+  50: "#F3E1E7",  
+  textMid: "#7A2A41", 
 };
 
-// =====================================================================
-// CONTENT MODEL — same shape as the Documentation modal, so both stay
-// easy to keep in sync. Each article is an ordered list of "blocks":
-//   { type: "p",     text }                                 paragraph
-//   { type: "steps", title?, items: [string...] }            numbered walkthrough
-//   { type: "list",  title?, items: [string...] }             bullet list
-//   { type: "note",  tone: "info"|"warning"|"success", text } callout
-// =====================================================================
+
 
 const CATEGORIES = [
-  // --------------------------------------------------- Getting started --
+  
   {
     id: "getting-started",
     label: "Getting Started",
