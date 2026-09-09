@@ -313,8 +313,8 @@ function DashboardMockup() {
             <path d="M21,213 L21,226 Q21,227.5 22.5,227.5 L32.5,227.5 Q34,227.5 34,226 L34,217.5 L30,213 Z" fill="none" stroke="#888" strokeWidth="1.5"/>
             <polyline points="30,213 30,217.5 34,217.5" fill="none" stroke="#888" strokeWidth="1.5"/>
             <text x="40" y="224" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">File</text>
-            <circle cx="27" cy="244" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <circle cx="27" cy="244" r="2" fill="#888"/>
+            <circle cx="27" cy="243" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
+            <circle cx="27" cy="243" r="2" fill="#888"/>
             <text x="40" y="248" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Settings</text>
             <line x1="20"  y1="266"  x2="34" y2="266" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
             <polyline points="30,262 34,266 30,270" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
