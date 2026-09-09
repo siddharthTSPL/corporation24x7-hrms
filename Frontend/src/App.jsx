@@ -225,13 +225,13 @@ function App() {
             <Route path="/employee-dashboard"       element={<EmployeeDashboard />} />
             <Route path="/manager-dashboard"        element={<Managerdashboard />} />
             <Route path="/employee"                 element={<EmployeeTable />} />
-            <Route path="/leave-manager"            element={<ProtectedRoute planFeature="selfService"><LeaveTablema /></ProtectedRoute>} />
-            <Route path="/leave-employee"           element={<ProtectedRoute planFeature="selfService"><LeaveTableem /></ProtectedRoute>} />
-            <Route path="/leave-admin"              element={<ProtectedRoute planFeature="selfService"><LeaveTablead /></ProtectedRoute>} />
+            <Route path="/leave-manager"            element={<ProtectedRoute><LeaveTablema /></ProtectedRoute>} />
+            <Route path="/leave-employee"           element={<ProtectedRoute><LeaveTableem /></ProtectedRoute>} />
+            <Route path="/leave-admin"              element={<ProtectedRoute><LeaveTablead /></ProtectedRoute>} />
             <Route path="/leave"                    element={<LeaveTable />} />
             <Route path="/file"                     element={<File />} />
-            <Route path="/file-employee"            element={<ProtectedRoute planFeature="selfService"><Fileem /></ProtectedRoute>} />
-            <Route path="/file-manager"             element={<ProtectedRoute planFeature="selfService"><Filema /></ProtectedRoute>} />
+            <Route path="/file-employee"            element={<ProtectedRoute><Fileem /></ProtectedRoute>} />
+            <Route path="/file-manager"             element={<ProtectedRoute><Filema /></ProtectedRoute>} />
             <Route path="/settings"                 element={<Set />} />
             <Route path="/settings-employee"        element={<Setem />} />
             <Route path="/settings-manager"         element={<Setma />} />
@@ -249,15 +249,15 @@ function App() {
 
             <Route
               path="/reimbursement-admin"
-              element={<ProtectedRoute planFeature="selfService"><ReimbursementAdmin /></ProtectedRoute>}
+              element={<ProtectedRoute><ReimbursementAdmin /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-manager"
-              element={<ProtectedRoute planFeature="selfService"><ReimbursementManager /></ProtectedRoute>}
+              element={<ProtectedRoute><ReimbursementManager /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-employee"
-              element={<ProtectedRoute planFeature="selfService"><ReimbursementEmployee /></ProtectedRoute>}
+              element={<ProtectedRoute><ReimbursementEmployee /></ProtectedRoute>}
             />
 
             {/* Restricted to admins only — payroll policy, CTC and payslips
@@ -321,7 +321,7 @@ function App() {
             <Route
               path="/document"
               element={
-                <ProtectedRoute permission="documents.can_view_all_documents" planFeature="selfService">
+                <ProtectedRoute permission="documents.can_view_all_documents">
                   <Doc />
                 </ProtectedRoute>
               }
@@ -334,7 +334,6 @@ function App() {
                     "documents.can_view_all_documents",
                     "documents.can_upload_documents",
                   ]}
-                  planFeature="selfService"
                 >
                   <Managerdocument />
                 </ProtectedRoute>
@@ -343,7 +342,7 @@ function App() {
             <Route
               path="/document-admin"
               element={
-                <ProtectedRoute permission="documents.can_upload_documents" planFeature="selfService">
+                <ProtectedRoute permission="documents.can_upload_documents">
                   <Admindocument />
                 </ProtectedRoute>
               }
@@ -351,7 +350,7 @@ function App() {
             <Route
               path="/document-admin-team"
               element={
-                <ProtectedRoute permission="documents.can_view_all_documents" planFeature="selfService">
+                <ProtectedRoute permission="documents.can_view_all_documents">
                   <Adminteamdocument />
                 </ProtectedRoute>
               }
@@ -442,16 +441,16 @@ function App() {
             <Route path="/superadmin-dashboard"          element={<SuperAdminDashboard />} />
             <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
             <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves"              element={<ProtectedRoute planFeature="selfService"><SuperAdminLeaves /></ProtectedRoute>} />
+            <Route path="/superadmin-leaves"              element={<ProtectedRoute><SuperAdminLeaves /></ProtectedRoute>} />
             <Route path="/superadmin-reviews"             element={<ProtectedRoute planFeature="review"><SuperAdminReviews /></ProtectedRoute>} />
             <Route path="/superadmin-settings"            element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents"           element={<ProtectedRoute planFeature="selfService"><SuperAdminDocuments /></ProtectedRoute>} />
+            <Route path="/superadmin-documents"           element={<ProtectedRoute><SuperAdminDocuments /></ProtectedRoute>} />
             <Route path="/superadmin-complaints"          element={<ProtectedRoute planFeature="tickets"><SuperAdminComplaints /></ProtectedRoute>} />
             <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
             <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
-            <Route path="/superadmin-reimbursement"        element={<ProtectedRoute planFeature="selfService"><ReimbursementSuperadmin /></ProtectedRoute>} />
+            <Route path="/superadmin-reimbursement"        element={<ProtectedRoute><ReimbursementSuperadmin /></ProtectedRoute>} />
           </Route>
 
           {/* Shared across every logged-in role. These previously lived duplicated
@@ -471,7 +470,7 @@ function App() {
           >
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
-            <Route path="/self-service"   element={<ProtectedRoute planFeature="selfService"><SelfServicePortal /></ProtectedRoute>} />
+            <Route path="/self-service"   element={<ProtectedRoute><SelfServicePortal /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />
