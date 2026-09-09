@@ -23,6 +23,7 @@ import {
   FaFileSignature,       
   FaClipboardCheck,
   FaConciergeBell,
+  FaMapMarkedAlt,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -38,6 +39,7 @@ import TechnicalSupportModal from "./help/TechnicalSupportModal";
 import DocumentationModal from "./help/DocumentationModal";
 
 const superAdminMenu = [
+
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Org-wide leave, reimbursement, document, and ticket activity in one place." },
@@ -52,9 +54,11 @@ const superAdminMenu = [
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
+    { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits." }
 ];
 
 const adminMenu = [
+  
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers />, blurb: "Add and manage employees and managers." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
@@ -77,9 +81,11 @@ const adminMenu = [
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits." }
 ];
 
 const managerMenu = [
+ 
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt />, blurb: "Approve or forward leave requests from your team.",
@@ -95,9 +101,11 @@ const managerMenu = [
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
+   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams." }
 ];
 
 const employeeMenu = [
+  { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits." },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
