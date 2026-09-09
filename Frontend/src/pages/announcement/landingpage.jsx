@@ -66,9 +66,7 @@ export const Wrap = ({ children, className = '' }) => (
 
 function Divider() {
   return (
-    <div className="bg-[#FDF4F8] py-3 flex items-center">
-      <div className="w-full h-px bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
-    </div>
+    <div className="h-px w-full bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
   )
 }
 
