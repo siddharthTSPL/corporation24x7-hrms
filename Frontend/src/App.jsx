@@ -12,6 +12,7 @@ const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/Signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
 const TalentPricingCalculator = lazy(() => import("./components/marketing/TalentPricingCalculator"));
+const FieldOperations = lazy(() => import("./pages/field-operations/FieldOperations"));
 
 const ComingSoon = lazy(() => import("./components/ComingSoon"));
 
@@ -468,6 +469,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="/field-operations" element={<FieldOperations />} />
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
             <Route path="/self-service"   element={<ProtectedRoute><SelfServicePortal /></ProtectedRoute>} />
