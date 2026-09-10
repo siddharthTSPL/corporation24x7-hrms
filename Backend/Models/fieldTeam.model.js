@@ -8,6 +8,11 @@ const fieldTeamSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     code: { type: String, trim: true, uppercase: true, maxlength: 32 },
     territory: { type: String, trim: true, maxlength: 160, default: "" },
+    geofence: {
+      latitude: { type: Number, default: null, min: -90, max: 90 },
+      longitude: { type: Number, default: null, min: -180, max: 180 },
+      radiusMeters: { type: Number, default: null, min: 25, max: 50000 },
+    },
     managers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Manager" }],
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     active: { type: Boolean, default: true },
