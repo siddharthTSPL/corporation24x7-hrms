@@ -9,7 +9,8 @@ import {
   FiUser, FiFileText, FiBell, FiHardDrive,
   FiUsers, FiStar, FiBarChart2,
   FiLogOut, FiSettings, FiMessageSquare,
-  FiMapPin, FiCamera, FiNavigation, FiCalendar, FiDollarSign
+  FiMapPin, FiCamera, FiNavigation, FiCalendar, FiDollarSign,
+  FiClipboard, FiCreditCard
 } from 'react-icons/fi'
 import { FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
@@ -753,33 +754,38 @@ const featureItems = [
     desc: 'A real-time command center with the workforce metrics that matter most to your business.',
     highlights: ['Live KPI widgets', 'Exportable reports'],
   },
+  {
+    tag: 'Lifecycle',
+    icon: <FiClipboard className="text-lg" />,
+    title: 'Onboarding & Offboarding',
+    desc: 'Guided checklists and automated workflows make every employee\u2019s first day — and last day — smooth and paperwork-free.',
+    highlights: ['Automated onboarding checklists', 'Digital document collection'],
+  },
+  {
+    tag: 'Finance',
+    icon: <FiCreditCard className="text-lg" />,
+    title: 'Expense Management',
+    desc: 'Employees submit expenses and managers approve them in a few taps, synced straight to payroll.',
+    highlights: ['Mobile expense submission', 'Approval workflows'],
+  },
 ]
 
 function FeatureJourney() {
   return (
     <motion.div
       variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+      className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
     >
       {featureItems.map((f, i) => (
         <motion.div
           key={f.title}
           variants={cardVariant}
-          className={`group relative overflow-hidden rounded-[24px] p-7 flex flex-col gap-4 transition-all duration-300 hover:-translate-y-1.5 ${
+          className={`group relative overflow-hidden rounded-[20px] sm:rounded-[24px] p-5 sm:p-6 lg:p-7 flex flex-col gap-3 sm:gap-4 transition-all duration-300 hover:-translate-y-1.5 ${
             f.featured
-              ? 'sm:col-span-2 lg:col-span-2 bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] text-white shadow-[0_20px_50px_rgba(122,0,75,0.30)] hover:shadow-[0_28px_64px_rgba(122,0,75,0.42)]'
+              ? 'col-span-2 bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] text-white shadow-[0_20px_50px_rgba(122,0,75,0.30)] hover:shadow-[0_28px_64px_rgba(122,0,75,0.42)]'
               : 'bg-white border border-[#EAC7D7] shadow-[0_4px_16px_rgba(122,0,75,0.06)] hover:shadow-[0_18px_44px_rgba(122,0,75,0.16)] hover:border-[#c88ba8]'
           }`}
         >
-          {/* decorative index number */}
-          <span
-            className={`absolute -top-3 right-3 font-display font-black text-[76px] leading-none select-none pointer-events-none transition-transform duration-300 group-hover:scale-110 ${
-              f.featured ? 'text-white/10' : 'text-[#7A004B]/[0.06]'
-            }`}
-          >
-            {String(i + 1).padStart(2, '0')}
-          </span>
-
           {/* decorative glow blob on hover */}
           <div
             className={`absolute -right-8 -bottom-8 w-32 h-32 rounded-full blur-2xl transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none ${
@@ -787,9 +793,9 @@ function FeatureJourney() {
             }`}
           />
 
-          <div className="relative z-[1] flex items-center gap-3">
+          <div className="relative z-[1] flex items-center gap-2.5 sm:gap-3">
             <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-300 ${
+              className={`w-9 h-9 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-300 ${
                 f.featured
                   ? 'bg-white/15 text-white'
                   : 'bg-[#7A004B]/[0.09] text-[#7A004B] group-hover:bg-[#7A004B] group-hover:text-white'
@@ -798,7 +804,7 @@ function FeatureJourney() {
               {f.icon}
             </div>
             <span
-              className={`text-[10px] font-ui font-bold uppercase tracking-[1px] px-2.5 py-1 rounded-full ${
+              className={`text-[9px] sm:text-[10px] font-ui font-bold uppercase tracking-[1px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full ${
                 f.featured ? 'bg-white/15 text-white' : 'bg-[#7A004B]/[0.08] text-[#7A004B]'
               }`}
             >
@@ -806,17 +812,17 @@ function FeatureJourney() {
             </span>
           </div>
 
-          <div className="relative z-[1] flex-1 flex flex-col gap-2.5">
+          <div className="relative z-[1] flex-1 flex flex-col gap-2 sm:gap-2.5">
             <h3
-              className={`font-display font-bold leading-snug ${
-                f.featured ? 'text-xl text-white' : 'text-[16px] text-[#111]'
+              className={`font-display font-extrabold leading-snug tracking-tight ${
+                f.featured ? 'text-xl sm:text-2xl lg:text-[28px] text-white' : 'text-[17px] sm:text-[19px] lg:text-[21px] text-[#111]'
               }`}
             >
               {f.title}
             </h3>
             <p
-              className={`font-body leading-[1.65] ${
-                f.featured ? 'text-[14px] text-white/80' : 'text-[13px] text-[#5C5C5C]'
+              className={`font-body leading-[1.6] ${
+                f.featured ? 'text-[13px] sm:text-[14px] text-white/80' : 'text-[12px] sm:text-[13px] text-[#5C5C5C]'
               }`}
             >
               {f.desc}
@@ -825,7 +831,7 @@ function FeatureJourney() {
               {f.highlights.map(h => (
                 <li
                   key={h}
-                  className={`flex items-start gap-2 text-[12.5px] font-body ${
+                  className={`flex items-start gap-2 text-[11.5px] sm:text-[12.5px] font-body ${
                     f.featured ? 'text-white/85' : 'text-[#5C5C5C]'
                   }`}
                 >
