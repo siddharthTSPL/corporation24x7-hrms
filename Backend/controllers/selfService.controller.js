@@ -7,6 +7,7 @@ const Document = require("../Models/document.model");
 const Ticket = require("../Models/ticket.model");
 const Attendance = require("../Models/attendance.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const AssetModel = require("../Models/asset.model");
 
 const statusBucket = (status = "") => {
   if (status.startsWith("pending") || status.startsWith("forwarded")) return "pending";
@@ -238,6 +239,85 @@ const buildTicketSummary = async ({ organisation_id, submittedBy, submitterModel
   };
 };
 
+// Full asset assignment history (currently held + returned) for the
+// logged-in person, used by their own Self Service Portal.
+const buildAssetSummary = async ({ organisation_id, personId, personModel }) => {
+  const assets = await AssetModel.find({
+    organisation_id,
+    assignments: { $elemMatch: { assigned_to: personId, assigned_to_model: personModel } },
+  })
+    .select("asset_id asset_name asset_type serial_number brand model_number status assignments")
+    .lean();
+
+  const history = [];
+  assets.forEach((a) => {
+    (a.assignments || [])
+      .filter((x) => String(x.assigned_to) === String(personId) && x.assigned_to_model === personModel)
+      .forEach((x) => {
+        history.push({
+          assignment_id: x._id,
+          asset_id: a._id,
+          asset_code: a.asset_id,
+          asset_name: a.asset_name,
+          asset_type: a.asset_type,
+          serial_number: a.serial_number,
+          brand: a.brand,
+          model_number: a.model_number,
+          quantity: x.quantity,
+          assigned_date: x.assigned_date,
+          returned_date: x.returned_date,
+          is_returned: x.is_returned,
+          return_condition: x.return_condition,
+          return_notes: x.return_notes,
+        });
+      });
+  });
+
+  history.sort((a, b) => new Date(b.assigned_date) - new Date(a.assigned_date));
+
+  const currentlyAssigned = history.filter((h) => !h.is_returned);
+  const returned = history.filter((h) => h.is_returned);
+
+  const byType = {};
+  currentlyAssigned.forEach((h) => { byType[h.asset_type] = (byType[h.asset_type] || 0) + 1; });
+
+  return {
+    counts: { currently_assigned: currentlyAssigned.length, returned: returned.length, total: history.length },
+    byType: Object.entries(byType).map(([type, count]) => ({ type, count })),
+    recent: history.slice(0, 8),
+  };
+};
+
+// Org-wide asset snapshot (status breakdown + most recent assignment activity).
+const buildOrgAssetSummary = async ({ organisation_id }) => {
+  const assets = await AssetModel.find({ organisation_id })
+    .select("asset_id asset_name asset_type status assignments")
+    .lean();
+
+  const counts = { available: 0, assigned: 0, under_maintenance: 0, retired: 0, total: assets.length };
+  const activity = [];
+
+  assets.forEach((a) => {
+    if (counts[a.status] !== undefined) counts[a.status] += 1;
+    (a.assignments || []).forEach((x) => {
+      activity.push({
+        asset_code: a.asset_id,
+        asset_name: a.asset_name,
+        asset_type: a.asset_type,
+        assigned_to_model: x.assigned_to_model,
+        quantity: x.quantity,
+        assigned_date: x.assigned_date,
+        returned_date: x.returned_date,
+        is_returned: x.is_returned,
+      });
+    });
+  });
+
+  activity.sort((a, b) => new Date(b.assigned_date) - new Date(a.assigned_date));
+
+  return { counts, recent: activity.slice(0, 8) };
+};
+
 const buildAttendanceToday = async ({ organisation_id, employee }) => {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -316,12 +396,13 @@ const getSelfServiceSummary = async (req, res, next) => {
     if (req.superAdmin) {
       const organisation_id = req.superAdmin._id;
 
-      const [leave, reimbursement, documents, tickets, attendance] = await Promise.all([
+      const [leave, reimbursement, documents, tickets, attendance, assets] = await Promise.all([
         buildOrgLeaveSummary({ organisation_id }),
         buildReimbursementSummary({ organisation_id }),
         buildDocumentSummary({ organisation_id }),
         buildTicketSummary({ organisation_id }),
         buildOrgAttendanceSummary({ organisation_id }),
+        buildOrgAssetSummary({ organisation_id }),
       ]);
 
       return res.status(200).json({
@@ -333,6 +414,7 @@ const getSelfServiceSummary = async (req, res, next) => {
         documents,
         tickets,
         attendance,
+        assets,
       });
     }
 
@@ -368,13 +450,14 @@ const getSelfServiceSummary = async (req, res, next) => {
       return next(Object.assign(new Error("Unrecognised role."), { statusCode: 403 }));
     }
 
-    const [leave, reimbursement, documents, tickets, attendanceToday, attendanceSummary] = await Promise.all([
+    const [leave, reimbursement, documents, tickets, attendanceToday, attendanceSummary, assets] = await Promise.all([
       buildLeaveSummary({ Model: leaveModel, filterField: leaveField, actorId: actor._id, organisation_id }),
       buildReimbursementSummary({ organisation_id, submittedBy: actor._id, submitterModel }),
       buildDocumentSummary({ organisation_id, uploader: actor._id, uploaderModel: submitterModel }),
       buildTicketSummary({ organisation_id, submittedBy: actor._id, submitterModel }),
       buildAttendanceToday({ organisation_id, employee: actor._id }),
       buildAttendanceSummary({ organisation_id, employee: actor._id, role }),
+      buildAssetSummary({ organisation_id, personId: actor._id, personModel: submitterModel }),
     ]);
 
     res.status(200).json({
@@ -386,6 +469,7 @@ const getSelfServiceSummary = async (req, res, next) => {
       documents,
       tickets,
       attendance: { today: attendanceToday, ...attendanceSummary },
+      assets,
     });
   } catch (err) {
     next(err);
