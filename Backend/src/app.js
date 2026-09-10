@@ -93,6 +93,7 @@ const analyticsrouter = require('../routes/Analytics.route');
 const planFeatureRouter = require('../routes/planFeature.route');
 const selfServiceRouter = require('../routes/selfService.route');
 const fieldOperationsRouter = require('../routes/fieldOperations.route');
+const singleSignInRouter = require('../routes/SingleSignIn.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -126,6 +127,7 @@ app.use('/review', reviewrouter);
 app.use('/plan-features', planFeatureRouter);
 app.use('/self-service', selfServiceRouter);
 app.use('/field-operations', fieldOperationsRouter);
+app.use('/single-sign-in', singleSignInRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
 
