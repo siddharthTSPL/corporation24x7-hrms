@@ -18,6 +18,11 @@ const fieldLocationSchema = new mongoose.Schema(
     deviceTimestamp: { type: Date, required: true },
     batteryLevel: { type: Number, default: null },
     networkStatus: { type: String, enum: ["online", "offline", "unknown"], default: "unknown" },
+    speedKph: { type: Number, default: null },
+    heading: { type: Number, default: null },
+    distanceFromPreviousMeters: { type: Number, default: null },
+    movementStatus: { type: String, enum: ["moving", "slow_moving", "stationary", "unknown"], default: "unknown" },
+    withinTeamGeofence: { type: Boolean, default: null },
   },
   { timestamps: true }
 );

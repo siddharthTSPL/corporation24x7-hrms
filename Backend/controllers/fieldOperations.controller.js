@@ -5,10 +5,14 @@ const FieldVisit = require("../Models/fieldVisit.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const SuperAdmin = require("../Models/superadmin.model");
+const FaceProfile = require("../Models/faceprofile.model");
+const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
+const { getDistance } = require("geolib");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 
 const OPEN_STATUSES = ["active", "paused", "offline"];
 const STAFF_ROLES = ["SuperAdmin", "Admin", "Manager"];
+const FACE_MATCH_THRESHOLD = 0.62;
 
 const asPoint = (input, required = true) => {
   const latitude = Number(input?.latitude);
@@ -30,11 +34,51 @@ const asPoint = (input, required = true) => {
 const actorContext = (req) => ({ actor: resolveActor(req), organisation_id: resolveOrgId(req) });
 const isStaff = (actor) => STAFF_ROLES.includes(actor.model);
 
+const getMovement = ({ previous, point, speedMps }) => {
+  if (!previous) return { distanceFromPreviousMeters: null, speedKph: null, movementStatus: "unknown" };
+  const distanceFromPreviousMeters = getDistance(
+    { latitude: previous.latitude, longitude: previous.longitude },
+    { latitude: point.latitude, longitude: point.longitude }
+  );
+  const elapsedSeconds = Math.max(1, (point.capturedAt - previous.capturedAt) / 1000);
+  const derivedKph = (distanceFromPreviousMeters / elapsedSeconds) * 3.6;
+  const browserKph = Number.isFinite(Number(speedMps)) && Number(speedMps) >= 0 ? Number(speedMps) * 3.6 : null;
+  const speedKph = browserKph ?? derivedKph;
+  const movementStatus = speedKph < 1 ? "stationary" : speedKph < 8 ? "slow_moving" : "moving";
+  return { distanceFromPreviousMeters, speedKph: Number(speedKph.toFixed(1)), movementStatus };
+};
+
+const isInsideGeofence = (point, geofence) => {
+  if (!geofence || !Number.isFinite(geofence.latitude) || !Number.isFinite(geofence.longitude) || !Number.isFinite(geofence.radiusMeters)) return null;
+  return getDistance({ latitude: point.latitude, longitude: point.longitude }, { latitude: geofence.latitude, longitude: geofence.longitude }) <= geofence.radiusMeters;
+};
+
+const parseGeofence = (input) => {
+  if (!input || input.latitude === "" || input.longitude === "" || input.radiusMeters === "") return undefined;
+  const latitude = Number(input.latitude), longitude = Number(input.longitude), radiusMeters = Number(input.radiusMeters);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || !Number.isFinite(radiusMeters) || radiusMeters < 25 || radiusMeters > 50000) {
+    throw httpError("Geofence requires valid latitude, longitude, and a radius from 25 to 50,000 metres", 400);
+  }
+  return { latitude, longitude, radiusMeters };
+};
+
 async function assertFieldOperationsEnabled(organisation_id) {
   const organisation = await SuperAdmin.findById(organisation_id).select("field_operations").lean();
   if (!organisation) throw httpError("Organisation not found", 404);
   if (organisation.field_operations?.enabled === false) throw httpError("Field Operations is disabled for this organisation", 403);
-  return organisation.field_operations || { max_field_employees: 50, max_managers: 10, data_retention_days: 180 };
+  return organisation.field_operations || { max_field_employees: 50, max_managers: 10, data_retention_days: 180, require_face_verification: false };
+}
+
+async function verifyDutySelfie({ organisation_id, employeeId, selfieBase64, required }) {
+  if (!selfieBase64 && !required) return null;
+  if (!selfieBase64) throw httpError("Face verification is required before starting field duty", 403);
+  if (typeof selfieBase64 !== "string" || selfieBase64.length > 8 * 1024 * 1024) throw httpError("Invalid face verification image", 400);
+  const profile = await FaceProfile.findOne({ organisation_id, employee: employeeId, onModel: "User" }).select("embedding").lean();
+  if (!profile) throw httpError("Your face is not enrolled. Ask your administrator to register it before field duty.", 403);
+  const embedding = await getEmbedding(selfieBase64.replace(/^data:image\/[a-zA-Z+]+;base64,/, ""));
+  const score = cosineSimilarity(embedding, profile.embedding);
+  if (score < FACE_MATCH_THRESHOLD) throw httpError("Face could not be verified. Use good lighting and look directly at the camera.", 403);
+  return { verifiedAt: new Date(), score: Number(score.toFixed(3)) };
 }
 
 async function assertEmployeeCanUseFieldOperations(req) {
@@ -76,6 +120,7 @@ async function getOwnedSession(req, sessionId, { employeeOnly = false } = {}) {
 
 exports.startDuty = async (req, res) => {
   const { actor, organisation_id, teamId } = await assertEmployeeCanUseFieldOperations(req);
+  const settings = await assertFieldOperationsEnabled(organisation_id);
   const startLocation = asPoint(req.body.location || req.body);
   const clientEventId = String(req.body.eventId || "").trim() || null;
 
@@ -87,9 +132,12 @@ exports.startDuty = async (req, res) => {
   const open = await FieldDutySession.findOne({ organisation_id, employee: actor.id, status: { $in: OPEN_STATUSES } }).sort({ startedAt: -1 });
   if (open) return res.status(409).json({ success: false, message: "You already have an open field-duty session", session: open });
 
+  const face = await verifyDutySelfie({ organisation_id, employeeId: actor.id, selfieBase64: req.body.selfieBase64, required: settings.require_face_verification });
+  const team = await FieldTeam.findById(teamId).select("geofence").lean();
   const session = await FieldDutySession.create({
     organisation_id, employee: actor.id, team: teamId, startLocation, lastLocation: startLocation,
     lastSeenAt: startLocation.capturedAt, clientEventId,
+    activity: { withinTeamGeofence: isInsideGeofence(startLocation, team?.geofence), faceVerifiedAt: face?.verifiedAt || null, faceMatchScore: face?.score || null },
   });
   return res.status(201).json({ success: true, session });
 };
@@ -97,8 +145,9 @@ exports.startDuty = async (req, res) => {
 exports.myDuty = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
   if (actor.model !== "User") return res.json({ success: true, session: null });
+  const settings = await assertFieldOperationsEnabled(organisation_id);
   const session = await FieldDutySession.findOne({ organisation_id, employee: actor.id, status: { $in: OPEN_STATUSES } }).sort({ startedAt: -1 });
-  return res.json({ success: true, session });
+  return res.json({ success: true, session, faceVerificationRequired: Boolean(settings.require_face_verification) });
 };
 
 exports.updateDutyStatus = async (req, res) => {
@@ -120,6 +169,9 @@ exports.addLocation = async (req, res) => {
   const eventId = String(req.body.eventId || "").trim();
   if (!eventId) throw httpError("eventId is required for safe offline sync", 400);
 
+  const team = await FieldTeam.findById(session.team).select("geofence").lean();
+  const movement = getMovement({ previous: session.lastLocation, point, speedMps: req.body.speedMps });
+  const withinTeamGeofence = isInsideGeofence(point, team?.geofence);
   let location;
   try {
     location = await FieldLocation.create({
@@ -128,6 +180,8 @@ exports.addLocation = async (req, res) => {
       accuracy: point.accuracy, deviceTimestamp: point.capturedAt,
       batteryLevel: Number.isFinite(Number(req.body.batteryLevel)) ? Number(req.body.batteryLevel) : null,
       networkStatus: ["online", "offline"].includes(req.body.networkStatus) ? req.body.networkStatus : "unknown",
+      speedKph: movement.speedKph, heading: Number.isFinite(Number(req.body.heading)) ? Number(req.body.heading) : null,
+      distanceFromPreviousMeters: movement.distanceFromPreviousMeters, movementStatus: movement.movementStatus, withinTeamGeofence,
     });
   } catch (error) {
     if (error?.code !== 11000) throw error;
@@ -138,6 +192,11 @@ exports.addLocation = async (req, res) => {
   if (!session.lastSeenAt || point.capturedAt >= session.lastSeenAt) {
     session.lastLocation = point;
     session.lastSeenAt = point.capturedAt;
+    session.activity = session.activity || {};
+    session.activity.movementStatus = movement.movementStatus;
+    session.activity.speedKph = movement.speedKph;
+    session.activity.distanceFromPreviousMeters = movement.distanceFromPreviousMeters;
+    session.activity.withinTeamGeofence = withinTeamGeofence;
     if (session.status === "offline") session.status = "active";
     await session.save();
   }
@@ -261,7 +320,7 @@ exports.createTeam = async (req, res) => {
   managers.forEach((id) => existingManagerIds.add(String(id)));
   if (existingMemberIds.size > settings.max_field_employees) throw httpError(`Your Field Operations plan allows up to ${settings.max_field_employees} field employees`, 403);
   if (existingManagerIds.size > settings.max_managers) throw httpError(`Your Field Operations plan allows up to ${settings.max_managers} field managers`, 403);
-  const team = await FieldTeam.create({ organisation_id, name, code: req.body.code, territory: req.body.territory, members, managers, createdBy: actor.id });
+  const team = await FieldTeam.create({ organisation_id, name, code: req.body.code, territory: req.body.territory, geofence: parseGeofence(req.body.geofence), members, managers, createdBy: actor.id });
   return res.status(201).json({ success: true, team });
 };
 

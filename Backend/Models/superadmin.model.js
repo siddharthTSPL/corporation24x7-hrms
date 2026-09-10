@@ -176,6 +176,7 @@ const superAdminSchema = new mongoose.Schema(
       max_field_employees: { type: Number, default: 50, min: 0 },
       max_managers: { type: Number, default: 10, min: 0 },
       data_retention_days: { type: Number, default: 180, min: 1 },
+      require_face_verification: { type: Boolean, default: false },
     },
 
     licenses: [licenseSchema],

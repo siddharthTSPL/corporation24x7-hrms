@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FiActivity, FiCheckCircle, FiClock, FiMapPin, FiNavigation, FiPause, FiPlay, FiRefreshCw, FiUserPlus, FiUsers, FiWifiOff, FiXCircle } from "react-icons/fi";
+import { FiActivity, FiCamera, FiCheckCircle, FiClock, FiMapPin, FiNavigation, FiPause, FiPlay, FiRefreshCw, FiUserPlus, FiUsers, FiWifiOff, FiXCircle } from "react-icons/fi";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import {
   checkoutFieldDuty, createFieldTeam, endFieldVisit, getFieldOverview, getFieldTeams,
@@ -10,7 +10,7 @@ import { pendingFieldEvents, queueFieldEvent, removeFieldEvent } from "./fieldOf
 
 const newId = () => window.crypto?.randomUUID?.() || `field_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 const formatTime = (value) => value ? new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(new Date(value)) : "—";
-const pointFromPosition = (position) => ({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, capturedAt: new Date(position.timestamp).toISOString(), networkStatus: navigator.onLine ? "online" : "offline" });
+const pointFromPosition = (position) => ({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy, speedMps: position.coords.speed, heading: position.coords.heading, capturedAt: new Date(position.timestamp).toISOString(), networkStatus: navigator.onLine ? "online" : "offline" });
 
 function currentPosition() {
   return new Promise((resolve, reject) => {
@@ -20,7 +20,7 @@ function currentPosition() {
 }
 
 function StatusPill({ status }) {
-  const styles = { active: "bg-emerald-100 text-emerald-700", paused: "bg-amber-100 text-amber-700", offline: "bg-slate-200 text-slate-600", checked_out: "bg-slate-100 text-slate-600", in_progress: "bg-blue-100 text-blue-700", completed: "bg-emerald-100 text-emerald-700", follow_up_required: "bg-violet-100 text-violet-700", skipped: "bg-rose-100 text-rose-700" };
+  const styles = { active: "bg-emerald-100 text-emerald-700", paused: "bg-amber-100 text-amber-700", offline: "bg-slate-200 text-slate-600", checked_out: "bg-slate-100 text-slate-600", moving: "bg-emerald-100 text-emerald-700", slow_moving: "bg-amber-100 text-amber-700", stationary: "bg-slate-200 text-slate-700", in_progress: "bg-blue-100 text-blue-700", completed: "bg-emerald-100 text-emerald-700", follow_up_required: "bg-violet-100 text-violet-700", skipped: "bg-rose-100 text-rose-700" };
   return <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ${styles[status] || styles.offline}`}>{String(status || "unknown").replaceAll("_", " ")}</span>;
 }
 
@@ -32,13 +32,33 @@ function LiveMap({ session }) {
   return <iframe title="Live field location" className="h-72 w-full rounded-2xl border border-slate-200" src={src} loading="lazy" />;
 }
 
-function EmployeeDuty({ session, setSession, refresh, pendingCount, setPendingCount }) {
+function FaceCheckModal({ onCaptured, onClose }) {
+  const videoRef = useRef(null); const streamRef = useRef(null); const [error, setError] = useState(""); const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    navigator.mediaDevices?.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } }, audio: false })
+      .then(async (stream) => { if (!active) { stream.getTracks().forEach((track) => track.stop()); return; } streamRef.current = stream; videoRef.current.srcObject = stream; await videoRef.current.play(); setReady(true); })
+      .catch(() => setError("Camera permission is needed to verify your face."));
+    return () => { active = false; streamRef.current?.getTracks().forEach((track) => track.stop()); };
+  }, []);
+  const capture = () => {
+    const video = videoRef.current; if (!video?.videoWidth) return;
+    const canvas = document.createElement("canvas"); const size = Math.min(video.videoWidth, video.videoHeight);
+    canvas.width = 480; canvas.height = 480;
+    canvas.getContext("2d").drawImage(video, (video.videoWidth - size) / 2, (video.videoHeight - size) / 2, size, size, 0, 0, 480, 480);
+    streamRef.current?.getTracks().forEach((track) => track.stop()); onCaptured(canvas.toDataURL("image/jpeg", 0.85));
+  };
+  return <div className="fixed inset-0 z-[80] grid place-items-center bg-black/60 p-4"><div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="rounded-full bg-[#fdf0f6] p-2 text-[#7A004B]"><FiCamera /></span><div><h2 className="font-extrabold text-slate-900">Verify before field duty</h2><p className="mt-1 text-xs text-slate-500">Keep your face centred and use good lighting. The photo is checked against your enrolled face profile.</p></div></div><div className="mt-4 aspect-square overflow-hidden rounded-xl bg-slate-900"><video ref={videoRef} playsInline muted className="h-full w-full object-cover -scale-x-100" /></div>{error && <p className="mt-3 text-sm text-rose-600">{error}</p>}<div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={onClose} className="rounded-lg border px-3 py-2.5 text-sm font-bold">Cancel</button><button type="button" disabled={!ready} onClick={capture} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50"><FiCamera /> Verify & start</button></div></div></div>;
+}
+
+function EmployeeDuty({ session, setSession, refresh, pendingCount, setPendingCount, faceVerificationRequired }) {
   const watchId = useRef(null);
   const lastSent = useRef(0);
   const [busy, setBusy] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [visitForm, setVisitForm] = useState({ customerName: "", organisationName: "", contactNumber: "", purpose: "" });
   const [openVisit, setOpenVisit] = useState(null);
+  const [showFaceCheck, setShowFaceCheck] = useState(false);
 
   const syncQueue = useCallback(async () => {
     const queued = await pendingFieldEvents();
@@ -77,12 +97,13 @@ function EmployeeDuty({ session, setSession, refresh, pendingCount, setPendingCo
     return () => window.removeEventListener("online", onOnline);
   }, [syncQueue]);
 
-  const beginDuty = async () => {
+  const beginDuty = async (selfieBase64 = null) => {
+    if (faceVerificationRequired && !selfieBase64) { setShowFaceCheck(true); return; }
     setBusy(true);
     try {
       if (!navigator.onLine) throw new Error("Connect to the internet once to start field duty. GPS updates are safely queued after duty starts.");
       const position = await currentPosition();
-      const result = await startFieldDuty({ location: pointFromPosition(position), eventId: newId() });
+      const result = await startFieldDuty({ location: pointFromPosition(position), selfieBase64, eventId: newId() });
       setSession(result.session); toast.success("Field duty started. Live location sharing is on.");
     } catch (error) { toast.error(error?.response?.data?.message || error.message || "Could not start duty"); }
     finally { setBusy(false); }
@@ -129,21 +150,22 @@ function EmployeeDuty({ session, setSession, refresh, pendingCount, setPendingCo
     <div className="rounded-2xl bg-gradient-to-br from-[#7A004B] to-[#31001d] p-5 text-white shadow-lg">
       <div className="flex items-start justify-between gap-3"><div><p className="text-sm text-white/70">Duty status</p><p className="mt-1 text-2xl font-extrabold">{session ? (session.status === "checked_out" ? "Duty completed" : "Field duty active") : "Ready to start"}</p></div>{session && <StatusPill status={session.status} />}</div>
       {session ? <div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div className="rounded-xl bg-white/10 p-3"><FiClock className="mb-1" />Started {formatTime(session.startedAt)}</div><div className="rounded-xl bg-white/10 p-3"><FiMapPin className="mb-1" />Last seen {formatTime(session.lastSeenAt)}</div></div> : <p className="mt-4 text-sm text-white/80">Allow precise location when prompted. We stop tracking automatically after checkout.</p>}
-      {!session || session.status === "checked_out" ? <button disabled={busy} onClick={beginDuty} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-bold text-[#7A004B] disabled:opacity-60"><FiPlay /> Start field duty</button> : <div className="mt-5 grid grid-cols-2 gap-3"><button disabled={busy || session.status !== "active"} onClick={() => changeStatus("paused")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-4 py-3 font-bold disabled:opacity-40"><FiPause /> Pause</button><button disabled={busy} onClick={endDuty} className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-3 font-bold"><FiXCircle /> Check out</button></div>}
+      {!session || session.status === "checked_out" ? <button disabled={busy} onClick={() => beginDuty()} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-bold text-[#7A004B] disabled:opacity-60">{faceVerificationRequired ? <FiCamera /> : <FiPlay />}{faceVerificationRequired ? " Verify face & start duty" : " Start field duty"}</button> : <div className="mt-5 grid grid-cols-2 gap-3"><button disabled={busy || session.status !== "active"} onClick={() => changeStatus("paused")} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-4 py-3 font-bold disabled:opacity-40"><FiPause /> Pause</button><button disabled={busy} onClick={endDuty} className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-3 font-bold"><FiXCircle /> Check out</button></div>}
       {session?.status === "paused" && <button disabled={busy} onClick={() => changeStatus("active")} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-bold text-[#7A004B]"><FiPlay /> Resume location sharing</button>}
     </div>
     <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex gap-3"><FiWifiOff className={navigator.onLine ? "text-emerald-600" : "text-amber-600"} size={20} /><div><p className="font-bold text-slate-800">{navigator.onLine ? "Online" : "Offline"} · {pendingCount} update{pendingCount === 1 ? "" : "s"} pending</p><p className="text-xs text-slate-500">GPS points are stored securely on this device and sync when you reconnect.</p></div></div>{pendingCount > 0 && <button onClick={syncQueue} className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[#7A004B]"><FiRefreshCw /> Sync now</button>}</div>
     {session && session.status !== "checked_out" && <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Customer visit</h2><p className="text-xs text-slate-500">Log time and outcome at each customer location.</p></div>{openVisit ? <StatusPill status="in_progress" /> : null}</div>{openVisit ? <div className="mt-4 rounded-xl bg-blue-50 p-3"><p className="font-bold text-blue-900">{openVisit.customerName}</p><p className="text-xs text-blue-700">Started {formatTime(openVisit.startedAt)}</p><button disabled={busy} onClick={finishVisit} className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white">End visit</button></div> : <button disabled={busy || session.status !== "active"} onClick={() => setVisitOpen(true)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#7A004B] px-4 py-3 font-bold text-[#7A004B] disabled:opacity-40"><FiUserPlus /> Start customer visit</button>}</div>}
     {visitOpen && <form onSubmit={beginVisit} className="rounded-2xl border border-[#d7a6c0] bg-[#fff8fb] p-4 space-y-3"><h2 className="font-bold">Start a customer visit</h2>{[["customerName", "Customer / contact name *"], ["organisationName", "Organisation / place"], ["contactNumber", "Contact number"], ["purpose", "Visit purpose"]].map(([name, label]) => <input key={name} required={name === "customerName"} value={visitForm[name]} onChange={(e) => setVisitForm({ ...visitForm, [name]: e.target.value })} placeholder={label} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#7A004B]" />)}<div className="flex gap-2"><button disabled={busy} className="flex-1 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white">Start visit</button><button type="button" onClick={() => setVisitOpen(false)} className="rounded-lg border px-3 py-2 text-sm">Cancel</button></div></form>}
+    {showFaceCheck && <FaceCheckModal onClose={() => setShowFaceCheck(false)} onCaptured={(selfie) => { setShowFaceCheck(false); beginDuty(selfie); }} />}
   </div>;
 }
 
 function ManagerDashboard({ overview, reload, teams, setTeams, canManageTeams }) {
-  const [selected, setSelected] = useState(null); const [showSetup, setShowSetup] = useState(false); const [options, setOptions] = useState(null); const [form, setForm] = useState({ name: "", territory: "", managers: [], members: [] }); const [saving, setSaving] = useState(false);
+  const [selected, setSelected] = useState(null); const [showSetup, setShowSetup] = useState(false); const [options, setOptions] = useState(null); const [form, setForm] = useState({ name: "", territory: "", geofence: { latitude: "", longitude: "", radiusMeters: "" }, managers: [], members: [] }); const [saving, setSaving] = useState(false);
   const live = overview?.live || []; const active = selected || live[0] || null;
   const openSetup = async () => { try { setOptions(await getFieldTeamOptions()); setShowSetup(true); } catch (e) { toast.error(e?.response?.data?.message || "Could not load team members"); } };
   const toggle = (key, id) => setForm((current) => ({ ...current, [key]: current[key].includes(id) ? current[key].filter((item) => item !== id) : [...current[key], id] }));
-  const createTeam = async (event) => { event.preventDefault(); setSaving(true); try { await createFieldTeam(form); toast.success("Field team created"); setShowSetup(false); setForm({ name: "", territory: "", managers: [], members: [] }); const data = await getFieldTeams(); setTeams(data.teams); } catch (e) { toast.error(e?.response?.data?.message || "Could not create team"); } finally { setSaving(false); } };
+  const createTeam = async (event) => { event.preventDefault(); setSaving(true); try { await createFieldTeam(form); toast.success("Field team created"); setShowSetup(false); setForm({ name: "", territory: "", geofence: { latitude: "", longitude: "", radiusMeters: "" }, managers: [], members: [] }); const data = await getFieldTeams(); setTeams(data.teams); } catch (e) { toast.error(e?.response?.data?.message || "Could not create team"); } finally { setSaving(false); } };
   return <div className="space-y-5 p-4 sm:p-6"><header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-[#7A004B]">Field Operations</p><h1 className="mt-1 text-2xl font-extrabold text-slate-900">Live field map</h1><p className="mt-1 text-sm text-slate-500">Updates refresh every 45 seconds while a duty session is open.</p></div><div className="flex gap-2"><button onClick={reload} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"><FiRefreshCw /> Refresh</button>{canManageTeams && <button onClick={openSetup} className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"><FiUsers /> Create field team</button>}</div></header>
     <div className="grid gap-3 sm:grid-cols-3"><Stat icon={<FiActivity />} label="Active now" value={overview?.summary?.active || 0} /><Stat icon={<FiWifiOff />} label="Offline" value={overview?.summary?.offline || 0} /><Stat icon={<FiCheckCircle />} label="Visits completed today" value={overview?.summary?.completedVisits || 0} /></div>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_360px]"><section className="rounded-2xl border border-slate-200 bg-white p-3"><LiveMap session={active} />{active && <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3"><div><p className="font-bold text-slate-900">{active.employee?.f_name} {active.employee?.l_name}</p><p className="text-xs text-slate-500">{active.team?.name || "Field team"} · Last seen {formatTime(active.lastSeenAt)}</p></div><StatusPill status={active.status} /></div>}</section><section className="rounded-2xl border border-slate-200 bg-white p-3"><h2 className="px-1 pb-3 font-bold text-slate-900">Field employees ({live.length})</h2><div className="max-h-[380px] space-y-2 overflow-y-auto">{live.length ? live.map((item) => <button key={item._id} onClick={() => setSelected(item)} className={`w-full rounded-xl p-3 text-left ${active?._id === item._id ? "bg-[#fdf0f6] ring-1 ring-[#d7a6c0]" : "bg-slate-50"}`}><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-sm text-slate-900">{item.employee?.f_name} {item.employee?.l_name}</p><p className="mt-0.5 text-xs text-slate-500">{item.team?.territory || item.employee?.office_location || "No territory"}</p><p className="mt-1 text-xs text-slate-500">Last seen {formatTime(item.lastSeenAt)}</p></div><StatusPill status={item.status} /></div></button>) : <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">No field employee is on duty right now.</p>}</div></section></div>
