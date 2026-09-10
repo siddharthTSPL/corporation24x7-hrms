@@ -71,7 +71,7 @@ export const fontStyles = `
     display: flex;
     width: max-content;
     gap: 28px;
-    animation: testimonialScroll 40s linear infinite;
+    animation: testimonialScroll 50s linear infinite;
   }
   .testimonial-marquee:hover .testimonial-track,
   .testimonial-marquee:active .testimonial-track {
@@ -872,9 +872,7 @@ function Pricing() {
             </div>
           </div>
 
-          {/* items-stretch (not items-center) so every card fills the row's full height —
-              combined with h-full below, this keeps Basic / Advance / Enterprise
-              all exactly the same size regardless of how many features each lists. */}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
