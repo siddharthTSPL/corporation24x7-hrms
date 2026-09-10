@@ -11,7 +11,7 @@ const { UNLOCKED_PLANS } = require("../middleware/auth/planFeatureGate.middlewar
 // is intentionally NOT in this list. It is available on every plan,
 // including Basic. Only these 5 remain locked on Basic: Review, Timesheet,
 // Recruitment, Asset Management, TorchX Voice.
-const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets"];
+const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets", "single_sign_in"];
 
 const getPlanFeatureAccess = async (req, res, next) => {
   try {
