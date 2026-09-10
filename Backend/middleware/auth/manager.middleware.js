@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const managermodel = require("../../Models/manager.model");
+const { isSessionStillActive } = require("../../utils/singleSignIn.utils");
 
 const authmanager = async (req, res, next) => {
   try {
@@ -14,6 +15,10 @@ const authmanager = async (req, res, next) => {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
       return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    if (decoded.sid && !(await isSessionStillActive(decoded.sid))) {
+      return res.status(401).json({ message: "Logged out — signed in from another device.", code: "SESSION_REVOKED" });
     }
 
     const manager = await managermodel.findById(decoded.managerid).select("-password -isVerified -status");

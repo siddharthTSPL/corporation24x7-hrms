@@ -7,6 +7,7 @@ const FEATURE_LABELS = {
   recruitment: "Recruitment Management",
   asset: "Asset Management",
   tickets: "TorchX Voice",
+  single_sign_in: "Single Sign-In",
 };
 
 // Plans that unlock the gated features below (Review, Timesheet, Recruitment,
