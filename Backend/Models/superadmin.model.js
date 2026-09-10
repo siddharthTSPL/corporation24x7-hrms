@@ -181,6 +181,18 @@ const superAdminSchema = new mongoose.Schema(
 
     licenses: [licenseSchema],
 
+    // Single Sign-In (one active device/browser per account). Gated to
+    // Advance/enterprise plans at the route/UI level — the toggle itself
+    // stays harmless to store even on Basic, it just won't be reachable.
+    singleSignIn: {
+      enabled: { type: Boolean, default: false },
+      mode: {
+        type: String,
+        enum: ["strict", "approval"],
+        default: "approval",
+      },
+    },
+
     plan: {
       type: String,
       default: null,

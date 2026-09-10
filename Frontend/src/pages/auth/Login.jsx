@@ -21,6 +21,7 @@ import { getMeSuperAdmin } from "../../auth/api/superadmin/auth/su.auth";
 import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { setAgentToken } from "../../pages/utils/Desktopagent";
+import { pollChallengeStatus, finalizeApprovedLogin } from "../../auth/api/singleSignIn/singleSignIn.api";
 
 // Prefer the backend's explicit account-type bucket (superadmin/admin/manager/employee).
 // Falls back to normalizing the raw role string for older responses that don't send accountType.
@@ -59,6 +60,8 @@ function Login() {
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt }
+  const [approvalError, setApprovalError] = useState("");
 
   const images = [slide1, slide2, slide3];
 
@@ -123,17 +126,74 @@ function Login() {
   const handleLogin = () => {
     if (!validate()) return;
     setShowLoader(true);
+    setApprovalError("");
 
     loginFn(
       { email: form.email, password: form.password },
       {
-        onSuccess: (data) => finishPostAuth(data),
+        onSuccess: (data) => {
+          if (data?.challenge) {
+            // Single Sign-In (approval mode): another device is already
+            // signed in. Wait here instead of logging in — the person
+            // approves/denies from that other device.
+            setShowLoader(false);
+            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setStep("waiting-approval");
+            return;
+          }
+          finishPostAuth(data);
+        },
         onError: (err) => {
           setShowLoader(false);
           setErrors({ general: getErrorMessage(err) });
         },
       }
     );
+  };
+
+  // Polls every 3s while waiting for the other device to approve/deny the
+  // new sign-in. Stops on approve, deny, or expiry.
+  useEffect(() => {
+    if (step !== "waiting-approval" || !approvalChallenge?.sessionId) return;
+
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const result = await pollChallengeStatus(approvalChallenge.sessionId);
+        if (cancelled) return;
+
+        if (result.status === "approved") {
+          clearInterval(interval);
+          const finalized = await finalizeApprovedLogin(approvalChallenge.sessionId);
+          if (cancelled) return;
+          setApprovalChallenge(null);
+          setStep("login");
+          await finishPostAuth(finalized);
+        } else if (result.status === "denied") {
+          clearInterval(interval);
+          setApprovalChallenge(null);
+          setStep("login");
+          setApprovalError(
+            result.reason === "expired"
+              ? "The approval request timed out. Please try signing in again."
+              : "Sign-in was denied from your other device."
+          );
+        }
+      } catch (err) {
+        // transient network hiccup — keep polling, don't drop the person
+        // out of the waiting screen for one failed request
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [step, approvalChallenge]);
+
+  const cancelApprovalWait = () => {
+    setApprovalChallenge(null);
+    setStep("login");
   };
 
   const handleSendOtp = () => {
@@ -167,6 +227,14 @@ function Login() {
       { email: form.email, otp: form.otp },
       {
         onSuccess: (data) => {
+          if (data?.challenge) {
+            // Same Single Sign-In approval gate as password login — the OTP
+            // is verified, but another device holds the active session.
+            setErrors({});
+            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setStep("waiting-approval");
+            return;
+          }
           // OTP is verified and the server already logged the account in
           // (token cookie set) — it also issued a resetToken cookie so the
           // person can optionally set a brand new password here.
@@ -234,9 +302,9 @@ function Login() {
                 <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
                 <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
 
-                {errors.general && (
+                {(errors.general || approvalError) && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{errors.general}</p>
+                    <p className="text-red-600 text-sm">{errors.general || approvalError}</p>
                   </div>
                 )}
 
@@ -306,6 +374,22 @@ function Login() {
                   For office kiosk/tablet devices — employees check in/out with their face, no password needed.
                 </p>
               </>
+            )}
+
+            {step === "waiting-approval" && (
+              <div className="flex flex-col items-center text-center py-8">
+                <div className="w-12 h-12 border-4 border-[#730042]/20 border-t-[#730042] rounded-full animate-spin mb-5" />
+                <h2 className="text-xl font-bold text-[#730042] mb-1">Waiting for approval</h2>
+                <p className="text-gray-500 text-sm mb-6 max-w-xs">
+                  We've sent a sign-in request to your other device. Approve it there to continue — this page checks automatically.
+                </p>
+                <button
+                  onClick={cancelApprovalWait}
+                  className="text-sm text-[#730042] font-medium hover:underline"
+                >
+                  Cancel and go back
+                </button>
+              </div>
             )}
 
             {step === "email" && (

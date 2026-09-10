@@ -10,6 +10,7 @@ import {
   useSetKioskPassword,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
@@ -281,6 +282,11 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     {
       key: "kiosk", label: "Kiosk", icon: (
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M6 14h4M8 11v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+      )
+    },
+    {
+      key: "security", label: "Security", icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
       )
     },
     {
@@ -944,6 +950,7 @@ export default function SuperAdminSettingsPage() {
           {tab === "banking" && <BankingTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
           {tab === "kiosk" && <KioskTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "security" && <SingleSignInSecurityTab onSuccess={showSuccess} onError={showError} />}
           {tab === "avatar" && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
 
           <div className="text-center text-xs text-[#c9bab5] mt-2">

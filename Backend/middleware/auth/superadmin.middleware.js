@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const SuperAdminModel = require("../../Models/superadmin.model");
+const { isSessionStillActive } = require("../../utils/singleSignIn.utils");
 
 const superAdminAuth = async (req, res, next) => {
   try {
@@ -13,6 +14,13 @@ const superAdminAuth = async (req, res, next) => {
 
     if (!decoded.role || decoded.role !== "super_admin") {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Single Sign-In: a token minted while the feature was on carries a
+    // `sid`. If that session got revoked (signed in elsewhere), this device
+    // is logged out immediately instead of waiting for token expiry.
+    if (decoded.sid && !(await isSessionStillActive(decoded.sid))) {
+      return res.status(401).json({ message: "Logged out — signed in from another device.", code: "SESSION_REVOKED" });
     }
 
     const superAdmin = await SuperAdminModel.findById(decoded.superadminid).select("-password");

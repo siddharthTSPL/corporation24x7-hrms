@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const AdminModel = require("../../Models/Admin.model");
+const { isSessionStillActive } = require("../../utils/singleSignIn.utils");
 
 const adminAuth = async (req, res, next) => {
   try {
@@ -15,6 +16,10 @@ const adminAuth = async (req, res, next) => {
 if (!decoded.role || !adminRoles.includes(decoded.role)) {
   return res.status(403).json({ message: "Access denied" });
 }
+
+    if (decoded.sid && !(await isSessionStillActive(decoded.sid))) {
+      return res.status(401).json({ message: "Logged out — signed in from another device.", code: "SESSION_REVOKED" });
+    }
 
     const admin = await AdminModel.findById(decoded.adminid).select("-password");
 
