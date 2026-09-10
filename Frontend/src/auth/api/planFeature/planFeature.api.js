@@ -20,7 +20,7 @@ api.interceptors.response.use(
 const LOCKED_FALLBACK = {
   plan: null,
   isTrialActive: false,
-  features: { review: false, timesheet: false, recruitment: false, asset: false, tickets: false },
+  features: { review: false, timesheet: false, recruitment: false, asset: false, tickets: false, single_sign_in: false },
 };
 
 export const fetchPlanFeatures = async () => {
