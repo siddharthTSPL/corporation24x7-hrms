@@ -853,7 +853,7 @@ function Features() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-16">
-            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(42px,5vw,52px)]">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
             <p className="text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
@@ -920,7 +920,7 @@ function Pricing() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-10">
-            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(28px,3.2vw,42px)]">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
             <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed mb-8">
@@ -960,7 +960,7 @@ function Pricing() {
           </div>
 
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
@@ -1089,7 +1089,7 @@ function Testimonials() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-16">
-            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(26px,3.2vw,40px)] leading-tight">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Loved by <span className="text-[#7A004B]">Teams</span>, Trusted by <span className="text-[#7A004B]">Leaders</span>
             </h2>
             <p className="text-lg text-[#555] max-w-[440px] mx-auto leading-relaxed">
