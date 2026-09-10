@@ -40,7 +40,7 @@ function AboutHero({ onExplore }) {
   // user refreshed: the IntersectionObserver that reveals it doesn't always
   // fire promptly for content that's already on screen at load time.
   return (
-    <section className="bg-white pt-32 pb-16 overflow-hidden">
+    <section className="bg-white pt-24 pb-12 overflow-hidden">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] items-center gap-12">
           <motion.div variants={fadeUp} initial="hidden" animate="show">
@@ -120,12 +120,12 @@ function TrackRecord({ scrollContainerRef }) {
     { icon: <FiStar size={20} />, num: '97.36%', label: 'Customer satisfaction & retention' },
   ]
   return (
-    <section className="bg-white py-14">
+    <section className="bg-white py-10">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show"
           viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
-          className="text-center mb-10"
+          className="text-center mb-8"
         >
           <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[12.5px] mb-2">Proven Track Record</p>
           <h2 className="font-hero font-medium text-[#111] text-[clamp(1.6rem,3vw,2.2rem)]">Trusted by Forward-Thinking HR Leaders</h2>
@@ -162,20 +162,20 @@ function OriginStory({ scrollContainerRef }) {
     'Built-in statutory compliance keeping your company audit-ready 365 days a year.',
   ]
   return (
-    <section className="bg-[#F8F5F7] py-16">
+    <section className="bg-[#F8F5F7] py-12">
       <Wrap>
-        <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-12 items-center">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show"
-            viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
-            className="relative"
-          >
+        <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
+          {/* Static, non-animated wrapper: this image previously faded in only once
+              an IntersectionObserver fired (whileInView), which could leave it
+              invisible for a noticeable stretch on slower connections. It now
+              renders immediately and loads eagerly, just like the hero image. */}
+          <div className="relative">
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
               <img
                 src={slideTeam}
                 alt="TorchX Talent engineering lab"
                 className="w-full h-full object-cover"
-                loading="lazy"
+                loading="eager"
                 decoding="async"
               />
             </div>
@@ -187,7 +187,7 @@ function OriginStory({ scrollContainerRef }) {
                 Est. Enterprise Hub
               </span>
             </div>
-          </motion.div>
+          </div>
 
           <motion.div
             variants={fadeUp} initial="hidden" whileInView="show"
@@ -240,12 +240,12 @@ function GuidingPhilosophy({ scrollContainerRef }) {
     },
   ]
   return (
-    <section className="bg-white py-16">
+    <section className="bg-white py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show"
           viewport={{ once: true, root: scrollContainerRef, amount: 0.2 }}
-          className="text-center mb-14"
+          className="text-center mb-10"
         >
           <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[12.5px] mb-2">Our Guiding Philosophy</p>
           <h2 className="font-hero font-medium text-[#111] leading-[1.15] mb-4 text-[clamp(1.8rem,3.6vw,2.6rem)]">
@@ -287,7 +287,7 @@ function SecuritySection({ scrollContainerRef }) {
     { icon: <FiFileText />, title: 'GDPR & DPDP Ready', desc: 'Strict adherence to data privacy acts, right-to-be-forgotten, and full audit logs.' },
   ]
   return (
-    <section className="bg-[#F8F5F7] py-16">
+    <section className="bg-[#F8F5F7] py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show"
@@ -325,7 +325,7 @@ function SecuritySection({ scrollContainerRef }) {
 
 function AboutCTA({ scrollContainerRef }) {
   return (
-    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-16">
+    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show"
