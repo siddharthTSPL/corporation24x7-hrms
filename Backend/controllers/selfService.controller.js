@@ -246,7 +246,7 @@ const buildAssetSummary = async ({ organisation_id, personId, personModel }) => 
     organisation_id,
     assignments: { $elemMatch: { assigned_to: personId, assigned_to_model: personModel } },
   })
-    .select("asset_id asset_name asset_type serial_number brand model_number status assignments")
+    .select("asset_id asset_name asset_type serial_number brand model_number status purchase_date purchase_price condition notes assignments")
     .lean();
 
   const history = [];
@@ -263,6 +263,11 @@ const buildAssetSummary = async ({ organisation_id, personId, personModel }) => 
           serial_number: a.serial_number,
           brand: a.brand,
           model_number: a.model_number,
+          asset_status: a.status,
+          purchase_date: a.purchase_date,
+          purchase_price: a.purchase_price,
+          condition: a.condition,
+          notes: a.notes,
           quantity: x.quantity,
           assigned_date: x.assigned_date,
           returned_date: x.returned_date,
@@ -291,7 +296,7 @@ const buildAssetSummary = async ({ organisation_id, personId, personModel }) => 
 // Org-wide asset snapshot (status breakdown + most recent assignment activity).
 const buildOrgAssetSummary = async ({ organisation_id }) => {
   const assets = await AssetModel.find({ organisation_id })
-    .select("asset_id asset_name asset_type status assignments")
+    .select("asset_id asset_name asset_type serial_number brand model_number status purchase_date purchase_price condition notes assignments")
     .lean();
 
   const counts = { available: 0, assigned: 0, under_maintenance: 0, retired: 0, total: assets.length };
@@ -301,14 +306,26 @@ const buildOrgAssetSummary = async ({ organisation_id }) => {
     if (counts[a.status] !== undefined) counts[a.status] += 1;
     (a.assignments || []).forEach((x) => {
       activity.push({
+        assignment_id: x._id,
+        asset_id: a._id,
         asset_code: a.asset_id,
         asset_name: a.asset_name,
         asset_type: a.asset_type,
+        serial_number: a.serial_number,
+        brand: a.brand,
+        model_number: a.model_number,
+        asset_status: a.status,
+        purchase_date: a.purchase_date,
+        purchase_price: a.purchase_price,
+        condition: a.condition,
+        notes: a.notes,
         assigned_to_model: x.assigned_to_model,
         quantity: x.quantity,
         assigned_date: x.assigned_date,
         returned_date: x.returned_date,
         is_returned: x.is_returned,
+        return_condition: x.return_condition,
+        return_notes: x.return_notes,
       });
     });
   });
