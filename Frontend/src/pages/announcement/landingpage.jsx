@@ -8,7 +8,8 @@ import {
   FiShield, FiLink, FiActivity, FiBookOpen,
   FiUser, FiFileText, FiBell, FiHardDrive,
   FiUsers, FiStar, FiBarChart2,
-  FiLogOut, FiSettings, FiMessageSquare
+  FiLogOut, FiSettings, FiMessageSquare,
+  FiMapPin, FiCamera, FiNavigation, FiCalendar, FiDollarSign
 } from 'react-icons/fi'
 import { FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
@@ -684,78 +685,158 @@ function PortalPanel() {
   )
 }
 
-const journeyStages = [
+// Detailed bento-style grid of TorchX Talent features — pulled from the
+// actual product (dashboard mockup + pricing plans) so nothing is invented.
+// index 0 is marked `featured` and renders as a larger highlighted card.
+const featureItems = [
   {
-    num: '01', stage: 'Hire',
-    icon: <HiOutlineSparkles className="text-[#7A004B] text-xl" />,
+    tag: 'Hiring',
+    icon: <HiOutlineSparkles className="text-2xl" />,
     title: 'AI Recruitment',
-    copy: 'Find the right talent faster with AI-powered candidate screening, smart matching, and automated shortlisting.',
-    footer: 'Smart hiring, better teams',
-    body: <CandidateList />,
+    desc: 'Screen, match, and shortlist candidates automatically — so your hiring team spends less time filtering resumes and more time talking to the right people.',
+    highlights: ['AI-powered candidate screening', 'Smart skill-based matching', 'Automated shortlisting workflow'],
+    featured: true,
   },
   {
-    num: '02', stage: 'Grow',
-    icon: <BsGraphUp className="text-[#7A004B] text-lg" />,
+    tag: 'Growth',
+    icon: <BsGraphUp className="text-xl" />,
     title: 'Performance Reviews',
-    copy: 'Simplify performance evaluations with customizable reviews, goal tracking, and actionable feedback.',
-    footer: 'Evaluate, improve, grow',
-    body: <PerformancePanel />,
+    desc: 'Run structured, transparent reviews with clear goals and a continuous feedback loop.',
+    highlights: ['Customizable review cycles', 'Goal & KPI tracking'],
   },
   {
-    num: '03', stage: 'Belong',
-    icon: <BsPersonBadge className="text-[#7A004B] text-xl" />,
+    tag: 'Self-Service',
+    icon: <BsPersonBadge className="text-xl" />,
     title: 'Employee Portal',
-    copy: 'Empower employees with a self-service portal for profiles, documents, requests, and company updates.',
-    footer: 'Everything in one place',
-    body: <PortalPanel />,
+    desc: 'One place for every employee to manage profiles, documents, requests, and company updates.',
+    highlights: ['Centralized document access', 'Request & approval workflows'],
+  },
+  {
+    tag: 'Attendance',
+    icon: <FiMapPin className="text-lg" />,
+    title: 'Geo Tag Attendance',
+    desc: 'Location-verified check-ins keep attendance data accurate across every site and shift.',
+    highlights: ['GPS-based check-in / check-out', 'Site-wise attendance logs'],
+  },
+  {
+    tag: 'Attendance',
+    icon: <FiCamera className="text-lg" />,
+    title: 'Face Attendance',
+    desc: 'Contactless facial recognition makes clocking in fast, hygienic, and tamper-proof.',
+    highlights: ['Biometric-grade accuracy', 'No buddy punching'],
+  },
+  {
+    tag: 'Field Ops',
+    icon: <FiNavigation className="text-lg" />,
+    title: 'Live Map Tracking',
+    desc: 'Track field employees and site visits on a live map for full visibility into on-ground work.',
+    highlights: ['Real-time location tracking', 'Visit history & routes'],
+  },
+  {
+    tag: 'Leave',
+    icon: <FiCalendar className="text-lg" />,
+    title: 'Leave Management',
+    desc: 'Apply, approve, and track leave balances without spreadsheets or back-and-forth emails.',
+    highlights: ['Automated leave accrual', 'One-click approvals'],
+  },
+  {
+    tag: 'Payroll',
+    icon: <FiDollarSign className="text-lg" />,
+    title: 'Integrated Payroll',
+    desc: 'Payroll that runs directly off attendance and leave data, cutting manual reconciliation.',
+    highlights: ['Auto-synced with attendance', 'Payslip generation'],
+  },
+  {
+    tag: 'Insights',
+    icon: <FiBarChart2 className="text-lg" />,
+    title: 'Analytical Dashboard',
+    desc: 'A real-time command center with the workforce metrics that matter most to your business.',
+    highlights: ['Live KPI widgets', 'Exportable reports'],
   },
 ]
 
 function FeatureJourney() {
   return (
-    <motion.div variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}>
-      {/* connecting path — desktop only */}
-      <div className="hidden md:flex items-center mb-3 px-2">
-        {journeyStages.map((s, i) => (
-          <div key={s.num} className="flex items-center flex-1 last:flex-none">
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="font-display text-xs font-bold text-[#7A004B]/35 tabular-nums">{s.num}</span>
-              <span className="font-ui text-[13px] font-semibold text-[#7A004B]">{s.stage}</span>
-            </div>
-            {i < journeyStages.length - 1 && (
-              <div
-                className="flex-1 h-px mx-4"
-                style={{ background: 'repeating-linear-gradient(to right, #DDB7CB 0, #DDB7CB 5px, transparent 5px, transparent 10px)' }}
-              />
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#EAC7D7] bg-white rounded-[28px] border border-[#EAC7D7] shadow-[0_20px_60px_rgba(122,0,75,0.08)] overflow-hidden">
-        {journeyStages.map(s => (
-          <motion.div
-            key={s.num}
-            variants={cardVariant}
-            className="group px-7 py-8 flex flex-col gap-5 transition-colors duration-300 hover:bg-[#FDFAFC]"
+    <motion.div
+      variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+    >
+      {featureItems.map((f, i) => (
+        <motion.div
+          key={f.title}
+          variants={cardVariant}
+          className={`group relative overflow-hidden rounded-[24px] p-7 flex flex-col gap-4 transition-all duration-300 hover:-translate-y-1.5 ${
+            f.featured
+              ? 'sm:col-span-2 lg:col-span-2 bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] text-white shadow-[0_20px_50px_rgba(122,0,75,0.30)] hover:shadow-[0_28px_64px_rgba(122,0,75,0.42)]'
+              : 'bg-white border border-[#EAC7D7] shadow-[0_4px_16px_rgba(122,0,75,0.06)] hover:shadow-[0_18px_44px_rgba(122,0,75,0.16)] hover:border-[#c88ba8]'
+          }`}
+        >
+          {/* decorative index number */}
+          <span
+            className={`absolute -top-3 right-3 font-display font-black text-[76px] leading-none select-none pointer-events-none transition-transform duration-300 group-hover:scale-110 ${
+              f.featured ? 'text-white/10' : 'text-[#7A004B]/[0.06]'
+            }`}
           >
-            <div className="flex items-center gap-2.5 md:hidden">
-              <span className="font-display text-xs font-bold text-[#7A004B]/35 tabular-nums">{s.num}</span>
-              <span className="font-ui text-[13px] font-semibold text-[#7A004B]">{s.stage}</span>
+            {String(i + 1).padStart(2, '0')}
+          </span>
+
+          {/* decorative glow blob on hover */}
+          <div
+            className={`absolute -right-8 -bottom-8 w-32 h-32 rounded-full blur-2xl transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none ${
+              f.featured ? 'bg-white/10' : 'bg-[#7A004B]/[0.08]'
+            }`}
+          />
+
+          <div className="relative z-[1] flex items-center gap-3">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-300 ${
+                f.featured
+                  ? 'bg-white/15 text-white'
+                  : 'bg-[#7A004B]/[0.09] text-[#7A004B] group-hover:bg-[#7A004B] group-hover:text-white'
+              }`}
+            >
+              {f.icon}
             </div>
-            <div className="flex items-center gap-3">
-              {s.icon}
-              <h3 className="text-lg font-display font-bold text-[#111]">{s.title}</h3>
-            </div>
-            <p className="text-[13px] text-[#5C5C5C] leading-[1.65] font-body">{s.copy}</p>
-            {s.body}
-            <div className="mt-auto pt-2 flex items-center gap-1.5 text-xs font-ui font-bold text-[#7A004B]">
-              {s.footer}
-              <FiArrowRight className="text-[13px] transition-transform duration-300 group-hover:translate-x-1" />
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            <span
+              className={`text-[10px] font-ui font-bold uppercase tracking-[1px] px-2.5 py-1 rounded-full ${
+                f.featured ? 'bg-white/15 text-white' : 'bg-[#7A004B]/[0.08] text-[#7A004B]'
+              }`}
+            >
+              {f.tag}
+            </span>
+          </div>
+
+          <div className="relative z-[1] flex-1 flex flex-col gap-2.5">
+            <h3
+              className={`font-display font-bold leading-snug ${
+                f.featured ? 'text-xl text-white' : 'text-[16px] text-[#111]'
+              }`}
+            >
+              {f.title}
+            </h3>
+            <p
+              className={`font-body leading-[1.65] ${
+                f.featured ? 'text-[14px] text-white/80' : 'text-[13px] text-[#5C5C5C]'
+              }`}
+            >
+              {f.desc}
+            </p>
+            <ul className="flex flex-col gap-1.5 mt-1">
+              {f.highlights.map(h => (
+                <li
+                  key={h}
+                  className={`flex items-start gap-2 text-[12.5px] font-body ${
+                    f.featured ? 'text-white/85' : 'text-[#5C5C5C]'
+                  }`}
+                >
+                  <FiCheck className={`shrink-0 mt-0.5 text-[13px] ${f.featured ? 'text-white' : 'text-[#7A004B]'}`} />
+                  {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </motion.div>
+      ))}
     </motion.div>
   )
 }
