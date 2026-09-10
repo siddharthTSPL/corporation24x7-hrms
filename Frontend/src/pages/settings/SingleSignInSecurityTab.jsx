@@ -95,53 +95,18 @@ export default function SingleSignInSecurityTab({ onSuccess, onError }) {
 
   return (
     <div className="bg-white rounded-xl border border-[#e8dcd6] p-6">
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <h3 className="text-base font-semibold text-[#2a1a16] mb-1">Single Sign-In</h3>
-          <p className="text-sm text-[#8a7a75] max-w-md">
-            When on, every account in your organisation can only be signed in on one device at a time.
-          </p>
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
+      <div className="flex items-start justify-between gap-4 mb-1">
+        <h3 className="text-base font-semibold text-[#2a1a16]">Single Sign-In</h3>
+        <span className="text-xs font-medium text-[#730042] bg-[#730042]/10 rounded-full px-2.5 py-1 shrink-0">
+          Coming soon
+        </span>
       </div>
-
-      {enabled && (
-        <div className="pt-4 border-t border-[#f0e8e4]">
-          <p className="text-sm font-medium text-[#2a1a16] mb-2">When someone signs in on a new device</p>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="sso-mode"
-                checked={mode === "approval"}
-                onChange={() => handleModeChange("approval")}
-                disabled={isSaving}
-                className="mt-1"
-              />
-              <span className="text-sm text-[#2a1a16]">
-                <span className="font-medium">Ask for approval</span>
-                <span className="block text-[#8a7a75] text-xs">The existing device gets an approve/deny prompt before the new sign-in goes through.</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="sso-mode"
-                checked={mode === "strict"}
-                onChange={() => handleModeChange("strict")}
-                disabled={isSaving}
-                className="mt-1"
-              />
-              <span className="text-sm text-[#2a1a16]">
-                <span className="font-medium">Block outright</span>
-                <span className="block text-[#8a7a75] text-xs">The new sign-in is rejected — they must sign out of the other device first.</span>
-              </span>
-            </label>
-          </div>
-        </div>
-      )}
-
-      {enabled && <ActiveSessionsPanel onSuccess={onSuccess} onError={onError} />}
+      <p className="text-sm text-[#8a7a75] max-w-md mb-4">
+        Restrict every account to one active device at a time, with an approve/deny prompt when someone tries to sign in elsewhere.
+      </p>
+      <div className="p-3 bg-[#fdf6f2] border border-[#f0dcd0] rounded-lg text-sm text-[#8a5a3a]">
+        This feature is being finalised and will be available on your plan soon.
+      </div>
     </div>
   );
 }
