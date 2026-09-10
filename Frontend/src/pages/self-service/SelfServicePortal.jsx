@@ -8,7 +8,7 @@ import {
 import {
   FaCalendarAlt, FaFileInvoiceDollar, FaFolder, FaTicketAlt,
   FaClock, FaPlus, FaArrowRight, FaCheckCircle, FaPercentage,
-  FaChartLine, FaDownload,
+  FaChartLine, FaDownload, FaLaptop,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
@@ -203,6 +203,7 @@ export default function SelfServicePortal() {
           <StatCard icon={<FaPercentage />} label="Claim Approval Rate" value={data.reimbursement?.approvalRate != null ? `${data.reimbursement.approvalRate}%` : "—"} />
           <StatCard icon={<FaFolder />} label="My Documents" value={data.documents?.total || 0} sub={`${data.documents?.totalSizeMb || 0} MB used`} />
           <StatCard icon={<FaTicketAlt />} label="Open Tickets" value={data.tickets?.counts?.open || 0} sub={`${data.tickets?.counts?.total || 0} total`} />
+          <StatCard icon={<FaLaptop />} label="Assets Held" value={data.assets?.counts?.currently_assigned || 0} sub={`${data.assets?.counts?.returned || 0} returned`} />
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -212,6 +213,7 @@ export default function SelfServicePortal() {
           <StatCard icon={<FaFolder />} label="Documents" value={data.documents?.total || 0} sub={`${data.documents?.totalSizeMb || 0} MB used`} />
           <StatCard icon={<FaTicketAlt />} label="Open Tickets" value={data.tickets?.counts?.open || 0} sub={`${data.tickets?.counts?.total || 0} total`} />
           <StatCard icon={<FaChartLine />} label="Org Attendance Rate" value={data.attendance?.attendanceRate != null ? `${data.attendance.attendanceRate}%` : "—"} sub="this month" />
+          <StatCard icon={<FaLaptop />} label="Assets" value={data.assets?.counts?.assigned || 0} sub={`${data.assets?.counts?.total || 0} total`} />
         </div>
       )}
 
@@ -376,6 +378,36 @@ export default function SelfServicePortal() {
               <Line type="monotone" dataKey="count" stroke={PALETTE[4]} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
+        </SectionCard>
+      </div>
+
+      <SectionHeading>Assets</SectionHeading>
+      <div className="grid grid-cols-1 gap-4">
+        <SectionCard title={isOrgScope ? "Recent asset activity" : "Asset history"}>
+          {data.assets?.recent?.length ? (
+            <ul className="space-y-2">
+              {data.assets.recent.map((a, i) => (
+                <li key={a.assignment_id || i} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-700 truncate">
+                      {a.asset_name} <span className="text-gray-400 font-normal">({a.asset_code})</span>
+                      {isOrgScope && <span className="text-gray-400 font-normal"> · {a.assigned_to_model}</span>}
+                    </p>
+                    <p className="text-gray-400">
+                      Assigned {fmtDate(a.assigned_date)}
+                      {a.is_returned ? ` · Returned ${fmtDate(a.returned_date)}` : ""}
+                    </p>
+                  </div>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+                    style={a.is_returned ? { background: "#F3F4F6", color: "#6B7280" } : { background: `${BRAND}1A`, color: BRAND }}
+                  >
+                    {a.is_returned ? "Returned" : "Assigned"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : <EmptyState text="No asset assignment history yet" />}
         </SectionCard>
       </div>
 
