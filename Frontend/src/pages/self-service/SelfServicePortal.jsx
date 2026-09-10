@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
@@ -8,7 +8,7 @@ import {
 import {
   FaCalendarAlt, FaFileInvoiceDollar, FaFolder, FaTicketAlt,
   FaClock, FaPlus, FaArrowRight, FaCheckCircle, FaPercentage,
-  FaChartLine, FaDownload, FaLaptop,
+  FaChartLine, FaDownload, FaLaptop, FaTimes, FaChevronRight,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
@@ -93,6 +93,76 @@ function fmtCurrency(n = 0) {
   return `₹${Number(n).toLocaleString("en-IN")}`;
 }
 
+function DetailRow({ label, value }) {
+  if (value === undefined || value === null || value === "") return null;
+  return (
+    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-gray-50 last:border-0">
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs font-medium text-gray-700 text-right">{value}</span>
+    </div>
+  );
+}
+
+// Detail modal for a single asset assignment record — shown when the user
+// clicks an entry in the Asset history / activity list.
+function AssetDetailModal({ asset, isOrgScope, onClose }) {
+  if (!asset) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white rounded-t-xl">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">{asset.asset_name}</p>
+            <p className="text-[11px] text-gray-400">{asset.asset_code}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+              style={asset.is_returned ? { background: "#F3F4F6", color: "#6B7280" } : { background: `${BRAND}1A`, color: BRAND }}
+            >
+              {asset.is_returned ? "Returned" : "Assigned"}
+            </span>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <FaTimes size={14} />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-4 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-1">Asset Details</p>
+          <DetailRow label="Type" value={asset.asset_type ? fmtStatus(asset.asset_type) : undefined} />
+          <DetailRow label="Brand" value={asset.brand} />
+          <DetailRow label="Model" value={asset.model_number} />
+          <DetailRow label="Serial Number" value={asset.serial_number} />
+          <DetailRow label="Condition" value={asset.condition ? fmtStatus(asset.condition) : undefined} />
+          <DetailRow label="Current Status" value={asset.asset_status ? fmtStatus(asset.asset_status) : undefined} />
+          <DetailRow label="Purchase Date" value={asset.purchase_date ? fmtDate(asset.purchase_date) : undefined} />
+          <DetailRow label="Purchase Price" value={asset.purchase_price != null ? fmtCurrency(asset.purchase_price) : undefined} />
+          <DetailRow label="Notes" value={asset.notes} />
+
+          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mt-4 mb-1">Assignment</p>
+          {isOrgScope && <DetailRow label="Held By" value={asset.assigned_to_model} />}
+          <DetailRow label="Quantity" value={asset.quantity} />
+          <DetailRow label="Assigned Date" value={fmtDate(asset.assigned_date)} />
+          {asset.is_returned && (
+            <>
+              <DetailRow label="Returned Date" value={fmtDate(asset.returned_date)} />
+              <DetailRow label="Return Condition" value={asset.return_condition ? fmtStatus(asset.return_condition) : undefined} />
+              <DetailRow label="Return Notes" value={asset.return_notes} />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // "My Payslip" — available on every plan, including Basic. Shows once
 // payroll has been marked "paid"; nothing to show before that.
 function MyPayslipsCard({ enabled }) {
@@ -149,6 +219,7 @@ export default function SelfServicePortal() {
   const role = auth?.role || "employee";
   const paths = ROLE_PATHS[role] || ROLE_PATHS.employee;
   const { data, isLoading, isError } = useSelfServiceSummary();
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const radarData = useMemo(() => {
     if (!data) return [];
@@ -387,7 +458,11 @@ export default function SelfServicePortal() {
           {data.assets?.recent?.length ? (
             <ul className="space-y-2">
               {data.assets.recent.map((a, i) => (
-                <li key={a.assignment_id || i} className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                <li
+                  key={a.assignment_id || i}
+                  onClick={() => setSelectedAsset(a)}
+                  className="flex items-center justify-between text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0 cursor-pointer hover:bg-gray-50 -mx-1 px-1 rounded"
+                >
                   <div className="min-w-0">
                     <p className="font-medium text-gray-700 truncate">
                       {a.asset_name} <span className="text-gray-400 font-normal">({a.asset_code})</span>
@@ -398,12 +473,15 @@ export default function SelfServicePortal() {
                       {a.is_returned ? ` · Returned ${fmtDate(a.returned_date)}` : ""}
                     </p>
                   </div>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
-                    style={a.is_returned ? { background: "#F3F4F6", color: "#6B7280" } : { background: `${BRAND}1A`, color: BRAND }}
-                  >
-                    {a.is_returned ? "Returned" : "Assigned"}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                      style={a.is_returned ? { background: "#F3F4F6", color: "#6B7280" } : { background: `${BRAND}1A`, color: BRAND }}
+                    >
+                      {a.is_returned ? "Returned" : "Assigned"}
+                    </span>
+                    <FaChevronRight className="text-gray-300" size={10} />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -537,6 +615,8 @@ export default function SelfServicePortal() {
           </SectionCard>
         )}
       </div>
+
+      <AssetDetailModal asset={selectedAsset} isOrgScope={isOrgScope} onClose={() => setSelectedAsset(null)} />
     </div>
   );
 }
