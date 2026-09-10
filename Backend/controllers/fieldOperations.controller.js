@@ -324,6 +324,44 @@ exports.createTeam = async (req, res) => {
   return res.status(201).json({ success: true, team });
 };
 
+exports.getSettings = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (!["SuperAdmin", "Admin"].includes(actor.model)) throw httpError("Only an administrator can view Field Operations settings", 403);
+  const organisation = await SuperAdmin.findById(organisation_id).select("field_operations").lean();
+  if (!organisation) throw httpError("Organisation not found", 404);
+  return res.json({
+    success: true,
+    settings: {
+      enabled: false, max_field_employees: 50, max_managers: 10, data_retention_days: 180, require_face_verification: false,
+      ...organisation.field_operations,
+    },
+  });
+};
+
+exports.updateSettings = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (!["SuperAdmin", "Admin"].includes(actor.model)) throw httpError("Only an administrator can change Field Operations settings", 403);
+  const organisation = await SuperAdmin.findById(organisation_id).select("field_operations");
+  if (!organisation) throw httpError("Organisation not found", 404);
+
+  const current = organisation.field_operations || {};
+  const next = { ...current.toObject?.() ?? current };
+
+  if (req.body.enabled !== undefined) next.enabled = Boolean(req.body.enabled);
+  if (req.body.require_face_verification !== undefined) next.require_face_verification = Boolean(req.body.require_face_verification);
+
+  for (const [key, min, max] of [["max_field_employees", 0, 100000], ["max_managers", 0, 10000], ["data_retention_days", 1, 3650]]) {
+    if (req.body[key] === undefined) continue;
+    const value = Number(req.body[key]);
+    if (!Number.isFinite(value) || value < min || value > max) throw httpError(`${key.replaceAll("_", " ")} must be a number between ${min} and ${max}`, 400);
+    next[key] = value;
+  }
+
+  organisation.field_operations = next;
+  await organisation.save();
+  return res.json({ success: true, settings: organisation.field_operations });
+};
+
 exports.teamOptions = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
   if (!["SuperAdmin", "Admin"].includes(actor.model)) throw httpError("Only an administrator can manage field teams", 403);

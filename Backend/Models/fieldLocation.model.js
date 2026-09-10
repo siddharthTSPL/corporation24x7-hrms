@@ -23,6 +23,8 @@ const fieldLocationSchema = new mongoose.Schema(
     distanceFromPreviousMeters: { type: Number, default: null },
     movementStatus: { type: String, enum: ["moving", "slow_moving", "stationary", "unknown"], default: "unknown" },
     withinTeamGeofence: { type: Boolean, default: null },
+    provider: { type: String, enum: ["gps", "network", "fused", "unknown"], default: "unknown" },
+    isMocked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -31,5 +33,6 @@ fieldLocationSchema.index({ location: "2dsphere" });
 fieldLocationSchema.index({ organisation_id: 1, session: 1, deviceTimestamp: 1 });
 // Retries from IndexedDB are safe: an already-synced event becomes a no-op.
 fieldLocationSchema.index({ organisation_id: 1, eventId: 1 }, { unique: true });
+fieldLocationSchema.index({ organisation_id: 1, isMocked: 1, deviceTimestamp: -1 });
 
 module.exports = mongoose.model("FieldLocation", fieldLocationSchema);

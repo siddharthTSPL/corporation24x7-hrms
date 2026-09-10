@@ -54,7 +54,7 @@ const superAdminMenu = [
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
-    // { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits." }
+    { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
 ];
 
 const adminMenu = [
@@ -81,7 +81,7 @@ const adminMenu = [
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
-  // { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits." }
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
 ];
 
 const managerMenu = [
@@ -101,11 +101,11 @@ const managerMenu = [
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
-  //  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams." }
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager" },
 ];
 
 const employeeMenu = [
-  // { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits." },
+  { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee" },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
@@ -158,7 +158,22 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [upgradeFeatureName, setUpgradeFeatureName] = useState(null);
 
-  const menu = menuByRole[role] ?? employeeMenu;
+  // Field Operations isn't a plan upsell — it's an org-type toggle. Orgs
+  // that don't do field work should never see it, and within a field org
+  // only the admins who manage it and the employees/managers actually
+  // assigned to a field team should see it. So it's filtered out of the
+  // menu entirely here, rather than shown locked with an "Upgrade" badge
+  // the way review/timesheet/recruitment are.
+  const passesFieldGate = (item) => {
+    if (!item.fieldGate) return true;
+    if (!planFeatures?.features?.fieldOperations) return false;
+    if (item.fieldGate === "admin") return true;
+    if (item.fieldGate === "manager") return Boolean(planFeatures?.fieldAssignment?.isManager);
+    if (item.fieldGate === "employee") return Boolean(planFeatures?.fieldAssignment?.isMember);
+    return true;
+  };
+
+  const menu = (menuByRole[role] ?? employeeMenu).filter(passesFieldGate);
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
