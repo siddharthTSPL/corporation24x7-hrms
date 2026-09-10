@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 
-// Field Operations deliberately keeps its hierarchy separate from attendance.
-// A team only contains employees who are allowed to start field-duty sessions.
+
 const fieldTeamSchema = new mongoose.Schema(
   {
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
@@ -16,6 +15,8 @@ const fieldTeamSchema = new mongoose.Schema(
     managers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Manager" }],
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     active: { type: Boolean, default: true },
+    color: { type: String, trim: true, maxlength: 16, default: "" },
+    notifyOnGeofenceExit: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, required: true },
   },
   { timestamps: true }

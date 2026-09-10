@@ -15,6 +15,8 @@ const fieldVisitSchema = new mongoose.Schema(
     organisationName: { type: String, trim: true, maxlength: 160, default: "" },
     contactNumber: { type: String, trim: true, maxlength: 30, default: "" },
     purpose: { type: String, trim: true, maxlength: 300, default: "" },
+    visitType: { type: String, trim: true, maxlength: 60, default: "" },
+    attachments: [{ type: String, trim: true }],
     status: { type: String, enum: ["in_progress", "completed", "skipped", "follow_up_required"], default: "in_progress", index: true },
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date, default: null },

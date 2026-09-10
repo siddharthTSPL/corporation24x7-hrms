@@ -172,7 +172,7 @@ const superAdminSchema = new mongoose.Schema(
     // its limits on the tenant document prevents one organisation's setup
     // from affecting another organisation's field users or GPS records.
     field_operations: {
-      enabled: { type: Boolean, default: true },
+      enabled: { type: Boolean, default: false },
       max_field_employees: { type: Number, default: 50, min: 0 },
       max_managers: { type: Number, default: 10, min: 0 },
       data_retention_days: { type: Number, default: 180, min: 1 },

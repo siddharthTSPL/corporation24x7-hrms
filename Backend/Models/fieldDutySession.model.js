@@ -31,6 +31,14 @@ const fieldDutySessionSchema = new mongoose.Schema(
       faceMatchScore: { type: Number, default: null },
     },
     totalDurationSeconds: { type: Number, default: 0 },
+    totalDistanceMeters: { type: Number, default: 0 },
+    geofenceExitCount: { type: Number, default: 0 },
+    device: {
+      platform: { type: String, trim: true, maxlength: 40, default: "" },
+      appVersion: { type: String, trim: true, maxlength: 20, default: "" },
+      batteryAtStart: { type: Number, default: null },
+      batteryAtEnd: { type: Number, default: null },
+    },
     clientEventId: { type: String, trim: true, default: null },
   },
   { timestamps: true }
