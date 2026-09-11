@@ -104,7 +104,7 @@ const getMyPendingChallenge = async (req, res, next) => {
       account_id: accountId,
       account_model: accountModel,
       status: "active",
-    });
+    }).sort({ last_seen_at: -1 });
 
     if (!session || session.challenge?.status !== "pending" || session.isChallengeExpired()) {
       if (session?.isChallengeExpired()) {
@@ -141,7 +141,7 @@ const respondToChallenge = async (req, res, next) => {
       account_id: accountId,
       account_model: accountModel,
       status: "active",
-    });
+    }).sort({ last_seen_at: -1 });
     if (!session || session.challenge?.status !== "pending") {
       return res.status(404).json({ success: false, message: "No pending sign-in request." });
     }

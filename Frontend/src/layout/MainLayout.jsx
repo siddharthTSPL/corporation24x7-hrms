@@ -8,6 +8,7 @@ import { useAuth, usePermissionsSync } from "../auth/store/getmeauth/getmeauth";
 import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/unifiedauth/Unifiedauth.hook";
 import WelcomeModal from "../components/WelcomeModal";
 import BirthdayModal from "../components/BirthdayModal";
+import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner";
 
 // True when `dob` (any year) falls on today's month/day.
 function isBirthdayToday(dob) {
@@ -182,6 +183,7 @@ export default function MainLayout() {
 
   return (
     <div className="flex h-screen bg-(--background)">
+      <SingleSignInApprovalBanner />
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <div className="flex-1 flex flex-col">

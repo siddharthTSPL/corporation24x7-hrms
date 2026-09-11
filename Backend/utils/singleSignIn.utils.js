@@ -60,11 +60,29 @@ const isSingleSignInActive = (orgSuperAdmin) => {
  */
 const evaluateSingleSignIn = async ({ organisation, role, accountId, req }) => {
   const accountModel = ROLE_TO_ACCOUNT_MODEL[role];
+
+  // .sort(): there should only ever be one "active" row per account, but if
+  // stray duplicates ever exist (e.g. leftover rows from before logout
+  // started revoking sessions), always deterministically treat the most
+  // recently-seen one as "the" active session, and quietly retire the rest
+  // — instead of leaving it up to whatever order Mongo happens to return.
   const existing = await SessionModel.findOne({
     account_id: accountId,
     account_model: accountModel,
     status: "active",
-  });
+  }).sort({ last_seen_at: -1 });
+
+  if (existing) {
+    await SessionModel.updateMany(
+      {
+        account_id: accountId,
+        account_model: accountModel,
+        status: "active",
+        _id: { $ne: existing._id },
+      },
+      { $set: { status: "revoked" } }
+    );
+  }
 
   const deviceInfo = buildDeviceInfo(req);
 
