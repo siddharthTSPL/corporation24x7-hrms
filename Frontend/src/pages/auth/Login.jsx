@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
@@ -44,8 +44,10 @@ async function fetchFullProfile(role) {
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
+  const [notice, setNotice] = useState(location.state?.notice || "");
 
   const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
   const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
@@ -75,6 +77,14 @@ function Login() {
   useEffect(() => {
     if (!authLoading && authData) navigateByRole(authData.role);
   }, [authData, authLoading]);
+
+  // Clear the router state right after reading it so the notice doesn't
+  // reappear on a refresh or when navigating back to this page later.
+  useEffect(() => {
+    if (location.state?.notice) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}loader.json`)
@@ -301,6 +311,20 @@ function Login() {
               <>
                 <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
                 <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
+
+                {notice && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between gap-2">
+                    <p className="text-blue-700 text-sm">{notice}</p>
+                    <button
+                      type="button"
+                      onClick={() => setNotice("")}
+                      className="text-blue-400 hover:text-blue-600 text-sm leading-none"
+                      aria-label="Dismiss"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
 
                 {(errors.general || approvalError) && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
