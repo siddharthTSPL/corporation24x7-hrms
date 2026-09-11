@@ -379,6 +379,9 @@ function OverviewTab({ superAdmin }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <ReadonlyField label="Full name" value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()} />
           <ReadonlyField label="Email address" value={superAdmin?.email} />
+          <ReadonlyField label="Employee ID" value={superAdmin?.empid} />
+          <ReadonlyField label="Designation" value={superAdmin?.designation} />
+          <ReadonlyField label="Department" value={superAdmin?.department} />
           <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
           <div className="mb-4">
             <FieldLabel>Account status</FieldLabel>
@@ -466,6 +469,9 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   const [form, setForm] = useState({
     f_name: superAdmin?.f_name || "",
     l_name: superAdmin?.l_name || "",
+    empid: superAdmin?.empid || "",
+    designation: superAdmin?.designation || "",
+    department: superAdmin?.department || "",
   });
 
   useEffect(() => {
@@ -473,6 +479,9 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
       setForm({
         f_name: superAdmin.f_name || "",
         l_name: superAdmin.l_name || "",
+        empid: superAdmin.empid || "",
+        designation: superAdmin.designation || "",
+        department: superAdmin.department || "",
       });
     }
   }, [superAdmin]);
@@ -509,6 +518,26 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         value={superAdmin?.email || ""}
         disabled
         hint="Email cannot be changed. Contact support if needed."
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
+        <InputField
+          label="Employee ID"
+          value={form.empid}
+          onChange={e => setForm(p => ({ ...p, empid: e.target.value }))}
+          placeholder="e.g. EMP001"
+        />
+        <InputField
+          label="Designation"
+          value={form.designation}
+          onChange={e => setForm(p => ({ ...p, designation: e.target.value }))}
+          placeholder="e.g. Founder & CEO"
+        />
+      </div>
+      <InputField
+        label="Department"
+        value={form.department}
+        onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
+        placeholder="e.g. Management"
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
