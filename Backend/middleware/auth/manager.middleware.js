@@ -37,6 +37,9 @@ const authmanager = async (req, res, next) => {
 
     req.manager = manager;
     req.user = manager;
+    // Raw decoded claims (sid included) — needed by logout to revoke this
+    // device's Single Sign-In session row.
+    req.tokenPayload = decoded;
     next();
 
   } catch (error) {
