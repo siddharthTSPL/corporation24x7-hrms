@@ -445,6 +445,76 @@ function buildSupportAckEmail({ name, subject }) {
   });
 }
 
+// ---------------------------------------------------------------
+// Subscription expiry reminder (sent to the org's SuperAdmin)
+// ---------------------------------------------------------------
+
+const PRODUCT_LABELS = {
+  torchx_talent: "TorchX Talent (HRMS)",
+  torchx_engage: "TorchX Engage",
+  torchx_finance: "TorchX Finance",
+  torchx_inventory: "TorchX Inventory",
+  torchx_pay: "TorchX Pay",
+};
+
+function productLabel(code) {
+  return PRODUCT_LABELS[code] || code;
+}
+
+function planLabel(plan, planType) {
+  const parts = [];
+  if (plan) parts.push(plan.charAt(0).toUpperCase() + plan.slice(1));
+  if (planType) parts.push(`(${planType.charAt(0).toUpperCase() + planType.slice(1)})`);
+  return parts.join(" ");
+}
+
+// `licenses` — [{ product, plan, planType, expiresAt, daysLeft }], all
+// already filtered down to the ones due to be reminded about today.
+function buildSubscriptionExpiringEmail({ recipientName, orgName, licenses = [], portalLink }) {
+  if (licenses.length === 0) return "";
+
+  const soonest = Math.min(...licenses.map((l) => l.daysLeft));
+  const multiple = licenses.length > 1;
+
+  const rows = licenses
+    .map((l) =>
+      detailRow(
+        productLabel(l.product),
+        `Expires ${formatDate(l.expiresAt)} — ${l.daysLeft} day${l.daysLeft === 1 ? "" : "s"} left${
+          planLabel(l.plan, l.planType) ? ` · ${planLabel(l.plan, l.planType)}` : ""
+        }`
+      )
+    )
+    .join("");
+
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      This is a reminder that ${multiple ? "the following subscriptions" : "the subscription"} for
+      <strong>${escapeHtml(orgName)}</strong> ${multiple ? "are" : "is"} due to expire soon. To avoid
+      any interruption to your organisation's access, please renew before the expiry date.
+    </p>
+    <div style="margin-bottom:20px;">
+      <span style="display:inline-block;padding:6px 18px;border-radius:3px;background:${BRAND.approvedBg};color:${BRAND.approvedText};font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+        Expiring in ${soonest} day${soonest === 1 ? "" : "s"}
+      </span>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table>
+    <p style="margin:20px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      Once a subscription expires, access to the related product for your organisation's admins, managers,
+      and employees may be restricted until it is renewed. You will continue to receive this reminder once
+      a day until the subscription is renewed or it expires.
+    </p>
+    ${plainLink(portalLink, "Renew your subscription")}
+  `;
+
+  return emailShell({
+    preheader: `Your ${PRODUCT_NAME} subscription${multiple ? "s expire" : " expires"} in ${soonest} day${soonest === 1 ? "" : "s"}`,
+    headerTitle: "Subscription Expiring Soon",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
   buildManagerEmail,
   buildEmployeeEmail,
@@ -454,6 +524,7 @@ module.exports = {
   buildForgotPasswordOtpEmail,
   buildSupportRequestEmail,
   buildSupportAckEmail,
+  buildSubscriptionExpiringEmail,
   leaveTypeLabel,
   formatDate,
 };
