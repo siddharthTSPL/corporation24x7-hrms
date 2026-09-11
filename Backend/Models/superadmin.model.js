@@ -93,6 +93,24 @@ const superAdminSchema = new mongoose.Schema(
 
     l_name: String,
 
+    empid: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    designation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    department: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     email: {
       type: String,
       unique: true,
