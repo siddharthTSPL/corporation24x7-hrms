@@ -31,6 +31,7 @@ const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = r
 const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
+const { revokeSession } = require("../utils/singleSignIn.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -595,6 +596,11 @@ const logoutSuperAdmin = async (req, res, next) => {
   // `status` = account state, checked on every request by the auth
   // middleware (and gates every admin/manager/employee under this org).
   // Do not set it to "inactive" here — see adminlogout note.
+
+  // Single Sign-In: release this device's session slot (no-op if the
+  // feature was never active for this login, i.e. no `sid` on the token).
+  await revokeSession(req.tokenPayload?.sid);
+
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
