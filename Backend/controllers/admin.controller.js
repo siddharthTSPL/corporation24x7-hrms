@@ -11,6 +11,7 @@ const generateUID = require("../automatic/uidgeneration");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
+const { revokeSession } = require("../utils/singleSignIn.utils");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const PermissionModel = require("../Models/permission.model");
@@ -293,6 +294,12 @@ const adminlogout = async (req, res, next) => {
   // inactive") until their next successful login, and can 403 any other
   // still-valid session/tab/device in the meantime. Logout should only
   // clear this session's cookie, not mutate account status.
+
+  // Single Sign-In: release this device's session slot (no-op if the
+  // feature was never active for this login, i.e. no `sid` on the token).
+  // See revokeSession() for why this is required.
+  await revokeSession(req.tokenPayload?.sid);
+
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
