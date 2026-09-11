@@ -30,15 +30,7 @@ function Badge({ children }) {
 }
 
 function PlatformHero() {
-  // Same fix as the About page hero: this section is above the fold, so both
-  // the heading block and the image now animate in immediately on mount
-  // (animate="show") instead of waiting on a scroll-triggered whileInView.
-  // whileInView relies on an IntersectionObserver that doesn't always fire
-  // right away for content that's already visible when the page loads, which
-  // is why the hero image in particular could sit invisible/half-loaded for
-  // a noticeable stretch. fetchpriority was also mis-cased for JSX (React
-  // expects fetchPriority, camelCase) so the browser likely wasn't honoring
-  // the high-priority load hint at all — fixed below.
+
   return (
     <section className="bg-white pt-20 sm:pt-24 lg:pt-28 pb-10 sm:pb-12">
       <Wrap>
@@ -63,10 +55,7 @@ function PlatformHero() {
           variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }}
           className="relative max-w-[980px] mx-auto px-4 sm:px-0"
         >
-          {/* Frame: fixed, responsive aspect-ratio box. object-cover + h-full makes the image
-              fill the frame completely at every breakpoint — no empty background peeking through.
-              Loads eagerly and at high fetch priority since it's the first thing visitors see,
-              which keeps it sharp and immediately visible instead of decoding in gradually. */}
+          
           <div className="relative w-full aspect-[4/3] xs:aspect-[16/11] sm:aspect-[16/10] lg:aspect-[16/9] rounded-2xl sm:rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_12px_32px_rgba(115,0,66,0.14)] sm:shadow-[0_24px_64px_rgba(115,0,66,0.16)]">
             <img
               src={slideNavyOffice}
@@ -220,8 +209,7 @@ function EnterpriseArchitectureBanner() {
           </div>
 
           <div className="relative">
-            {/* Frame: fixed aspect-ratio box that scales with the grid column. object-cover fills
-                it edge-to-edge (cropping as needed) so no empty background shows around the photo. */}
+
             <div className="relative w-full aspect-[4/3] sm:aspect-[5/4] rounded-2xl overflow-hidden border border-white/20 shadow-[0_12px_32px_rgba(0,0,0,0.25)] sm:shadow-[0_24px_64px_rgba(0,0,0,0.3)]">
               <img
                 src={slideWhiteOffice}

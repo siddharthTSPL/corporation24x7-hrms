@@ -11,9 +11,7 @@ import { FiStar, FiUsers } from 'react-icons/fi'
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
 
-// Compressed, web-sized copies (originals were multi-MB camera-resolution
-// files, which is why images could take a long time to appear on first
-// load and looked "broken" until the browser finished downloading them).
+
 import slideWhiteOffice from '../assets/Office-meeting.png'
 import slideTeam from '../assets/Team-work.jpg'
 
@@ -33,12 +31,7 @@ function HeroBadge({ children }) {
 }
 
 function AboutHero({ onExplore }) {
-  // This section is above the fold — it's visible the instant the page opens,
-  // so it animates immediately on mount (animate="show") instead of waiting
-  // for a scroll-triggered whileInView. Relying on whileInView here was the
-  // main reason the hero image could stay invisible (opacity: 0) until the
-  // user refreshed: the IntersectionObserver that reveals it doesn't always
-  // fire promptly for content that's already on screen at load time.
+ 
   return (
     <section className="bg-white pt-24 pb-12 overflow-hidden">
       <Wrap>
@@ -165,10 +158,7 @@ function OriginStory({ scrollContainerRef }) {
     <section className="bg-[#F8F5F7] py-12">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
-          {/* Static, non-animated wrapper: this image previously faded in only once
-              an IntersectionObserver fired (whileInView), which could leave it
-              invisible for a noticeable stretch on slower connections. It now
-              renders immediately and loads eagerly, just like the hero image. */}
+         
           <div className="relative">
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
               <img

@@ -1343,16 +1343,12 @@ export default function LandingPage() {
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
 
-  // "Access Your Talent Account" when a live session is found; falls back to
-  // "Sign in to your Talent Account" while auth is still resolving/expired
-  // so the button never flashes the wrong label once it's checked.
   const accountLabel = isAuthenticated
     ? 'Access Your Talent Account'
     : 'Sign in to your Talent Account'
 
   const handleAccountClick = () => {
-    // /redirect resolves the logged-in person's role and sends them to the
-    // right dashboard; if the session token expired it bounces to /login.
+    
     navigate(isAuthenticated ? '/redirect' : '/login')
   }
 
