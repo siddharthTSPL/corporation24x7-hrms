@@ -868,6 +868,7 @@ function Features() {
   )
 }
 
+
 function Pricing() {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
 
@@ -878,8 +879,8 @@ function Pricing() {
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave Management', 'Basic Payroll', 'Analytical and Digital Dashboard'],
-      crossFeatures: []
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
@@ -888,7 +889,7 @@ function Pricing() {
       monthlyPrice: 99,
       yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Live Map Tracking', 'Recruitment / Applicant Tracking', 'Face Attendance', 'Performance Management', 'Integrated Advanced Payroll'],
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
       crossFeatures: []
     },
     {
@@ -898,11 +899,13 @@ function Pricing() {
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
-        'Free Smartphone gift/offer',
-        'Face Attendance',
+        'Free Smartphone gifthamper',
+        'Face Attendence',
         'Custom Integrations',
         'Single Sign-On',
-        'API Access',
+        'API access',
+        'On-premises/ Private cloud hosting',
+        'Dedicated account manager',
       ],
       crossFeatures: []
     }
@@ -920,7 +923,7 @@ function Pricing() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-10">
-            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
+            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(28px,3.2vw,42px)]">
               Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
             <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed mb-8">
@@ -959,8 +962,10 @@ function Pricing() {
             </div>
           </div>
 
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6">
+          {/* items-stretch (not items-center) so every card fills the row's full height —
+              combined with h-full below, this keeps Basic / Advance / Enterprise
+              all exactly the same size regardless of how many features each lists. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
@@ -1069,6 +1074,7 @@ function Pricing() {
     </section>
   )
 } 
+
 
 
 
