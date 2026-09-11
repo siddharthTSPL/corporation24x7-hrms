@@ -67,6 +67,14 @@ const licenseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // Tracks the last calendar day (Asia/Kolkata) this license's
+    // "expiring soon" reminder email was sent to the org's SuperAdmin —
+    // keeps the daily cron from sending more than one email per day.
+    last_expiry_reminder_sent_at: {
+      type: Date,
+      default: null,
+    },
   },
   { _id: false }
 );
