@@ -118,6 +118,35 @@ const isSessionStillActive = async (sessionId) => {
   return !!session && session.status === "active";
 };
 
+// Called on logout, for every role, to release THIS device's session slot.
+//
+// Why this matters: evaluateSingleSignIn()'s whole "is another device
+// already signed in" check is based on whether a Session row for this
+// account still has status:"active". Logout only ever cleared the cookie —
+// it never touched this row. So after logging out, the row was still
+// "active" in the DB, and the very next login attempt (even from the same
+// device/browser) was treated as a second, concurrent sign-in:
+//   - strict mode  -> wrongly rejected ("already signed in elsewhere")
+//   - approval mode -> wrongly raised a pending challenge and parked the
+//     user on the "waiting for approval" screen — with no other logged-in
+//     device left anywhere to show the Approve/Deny banner, since this
+//     device's cookie was just cleared. It could only ever time out.
+//
+// Revoking the session here (not touching the account's own status/
+// working_status field — that's a separate, unrelated concept) closes that
+// gap: logout actually frees up the slot, so the next login on this device
+// is recognized as "no existing active session" and proceeds normally.
+//
+// `sessionId` is undefined/null for tokens minted while the feature was
+// off (no `sid` claim) — a harmless no-op in that case.
+const revokeSession = async (sessionId) => {
+  if (!sessionId) return;
+  await SessionModel.updateOne(
+    { _id: sessionId, status: "active" },
+    { $set: { status: "revoked" } }
+  );
+};
+
 module.exports = {
   CHALLENGE_TTL_MS,
   ROLE_TO_ACCOUNT_MODEL,
@@ -125,4 +154,5 @@ module.exports = {
   isSingleSignInActive,
   evaluateSingleSignIn,
   isSessionStillActive,
+  revokeSession,
 };
