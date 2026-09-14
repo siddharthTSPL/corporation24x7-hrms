@@ -1,6 +1,5 @@
 import axios from "axios";
 
-<<<<<<< HEAD
 const resolveApiBaseUrl = () => {
   const configured =
     import.meta.env.VITE_API_BASE_URL ||
@@ -12,26 +11,17 @@ const resolveApiBaseUrl = () => {
 
 const api = axios.create({
   baseURL: `${resolveApiBaseUrl()}/`,
-=======
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   withCredentials: true,
 });
 
 export const getMyFieldDuty = () =>
   api.get("field-operations/my-duty").then((r) => r.data);
-<<<<<<< HEAD
 export const getFieldOverview = (filters = {}) => {
   const params = Object.fromEntries(
     Object.entries(filters).filter(([, v]) => v !== "" && v != null),
   );
   return api.get("field-operations/overview", { params }).then((r) => r.data);
 };
-=======
-export const getFieldOverview = () =>
-  api.get("field-operations/overview").then((r) => r.data);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 export const startFieldDuty = (body) =>
   api.post("field-operations/duty/start", body).then((r) => r.data);
 export const updateFieldDutyStatus = (sessionId, status) =>
@@ -54,7 +44,6 @@ export const endFieldVisit = (visitId, body) =>
   api.patch(`field-operations/visits/${visitId}/end`, body).then((r) => r.data);
 export const getFieldTeams = () =>
   api.get("field-operations/teams").then((r) => r.data);
-<<<<<<< HEAD
 export const getFieldTeamOptions = (excludeTeamId) =>
   api
     .get("field-operations/team-options", {
@@ -62,10 +51,6 @@ export const getFieldTeamOptions = (excludeTeamId) =>
     })
     .then((r) => r.data);
 
-=======
-export const getFieldTeamOptions = () =>
-  api.get("field-operations/team-options").then((r) => r.data);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 export const createFieldTeam = (body) =>
   api.post("field-operations/teams", body).then((r) => r.data);
 export const getFieldSettings = () =>
@@ -88,7 +73,6 @@ export const uploadVisitPhoto = (visitId, file) => {
     .then((r) => r.data);
 };
 
-<<<<<<< HEAD
 export const exportFieldActivitiesCsvUrl = (filters = {}) => {
   const params = new URLSearchParams(
     Object.entries(filters)
@@ -127,7 +111,9 @@ export const getFieldAssignments = () =>
 export const createIndividualFieldAssignment = (body) =>
   api.post("field-operations/assignments", body).then((r) => r.data);
 export const removeIndividualFieldAssignment = (assignmentId) =>
-  api.delete(`field-operations/assignments/${assignmentId}`).then((r) => r.data);
+  api
+    .delete(`field-operations/assignments/${assignmentId}`)
+    .then((r) => r.data);
 
 export const getMyAssignedActivities = () =>
   api.get("field-operations/activities/mine").then((r) => r.data);
@@ -145,13 +131,13 @@ export const getMyFieldVisits = (filters = {}) => {
   const params = Object.fromEntries(
     Object.entries(filters).filter(([, v]) => v !== "" && v != null),
   );
-  return api.get("field-operations/visits/mine", { params }).then((r) => r.data);
+  return api
+    .get("field-operations/visits/mine", { params })
+    .then((r) => r.data);
 };
 export const getFieldAuditLog = ({ page = 1, limit = 50, action } = {}) =>
   api
     .get("field-operations/audit-log", { params: { page, limit, action } })
     .then((r) => r.data);
 
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 export const fieldOperationsApi = api;

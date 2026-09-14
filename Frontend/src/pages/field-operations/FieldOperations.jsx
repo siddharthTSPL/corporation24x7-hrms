@@ -1,15 +1,8 @@
-<<<<<<< HEAD
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   FiActivity,
   FiAlertTriangle,
-=======
-import { useCallback, useEffect, useRef, useState } from "react";
-import toast from "react-hot-toast";
-import {
-  FiActivity,
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   FiCamera,
   FiCheckCircle,
   FiClock,
@@ -18,7 +11,6 @@ import {
   FiPause,
   FiPlay,
   FiRefreshCw,
-<<<<<<< HEAD
   FiSettings,
   FiShare2,
   FiUpload,
@@ -58,50 +50,23 @@ import {
   useCreateIndividualFieldAssignment,
   useRemoveIndividualFieldAssignment,
   useMyAssignedActivities,
+  useMyFieldVisits,
   useAssignFieldActivity,
   useReassignFieldActivity,
   useCancelFieldActivity,
   useFieldAuditLog,
 } from "../../auth/server-state/fieldOperations/fieldOperations.hook";
 import {
-=======
-  FiUserPlus,
-  FiUsers,
-  FiWifiOff,
-  FiXCircle,
-} from "react-icons/fi";
-import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import {
-  checkoutFieldDuty,
-  createFieldTeam,
-  endFieldVisit,
-  getFieldOverview,
-  getFieldTeams,
-  getFieldTeamOptions,
-  getMyFieldDuty,
-  sendFieldLocation,
-  startFieldDuty,
-  startFieldVisit,
-  updateFieldDutyStatus,
-} from "../../auth/api/fieldOperations/fieldOperations.api";
-import {
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   pendingFieldEvents,
   queueFieldEvent,
   removeFieldEvent,
 } from "./fieldOfflineQueue";
-<<<<<<< HEAD
 import FieldMap from "./FieldMap";
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
 const newId = () =>
   window.crypto?.randomUUID?.() ||
   `field_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-<<<<<<< HEAD
 const MIN_VISIT_MINUTES = 20;
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const formatTime = (value) =>
   value
     ? new Intl.DateTimeFormat("en-IN", {
@@ -109,7 +74,6 @@ const formatTime = (value) =>
         minute: "2-digit",
       }).format(new Date(value))
     : "—";
-<<<<<<< HEAD
 const formatDuration = (totalSeconds) => {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "—";
   const h = Math.floor(totalSeconds / 3600);
@@ -137,14 +101,17 @@ const titleize = (value) => String(value || "").replaceAll("_", " ");
 function GeofenceResult({ result, label }) {
   if (!result || typeof result.withinFence !== "boolean") return null;
   return (
-    <p className={`mt-2 text-xs font-bold ${result.withinFence ? "text-emerald-700" : "text-rose-700"}`}>
-      {label}: {result.withinFence ? "within allowed area" : "outside allowed area"}
-      {Number.isFinite(result.distanceMeters) ? ` (${formatDistance(result.distanceMeters)} from expected location)` : ""}
+    <p
+      className={`mt-2 text-xs font-bold ${result.withinFence ? "text-emerald-700" : "text-rose-700"}`}
+    >
+      {label}:{" "}
+      {result.withinFence ? "within allowed area" : "outside allowed area"}
+      {Number.isFinite(result.distanceMeters)
+        ? ` (${formatDistance(result.distanceMeters)} from expected location)`
+        : ""}
     </p>
   );
 }
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const pointFromPosition = (position) => ({
   latitude: position.coords.latitude,
   longitude: position.coords.longitude,
@@ -190,7 +157,6 @@ function StatusPill({ status }) {
   );
 }
 
-<<<<<<< HEAD
 // Free, dependency-free "share on WhatsApp": opens wa.me with the
 // employee's last known REAL device GPS point as a Google Maps link. No
 // WhatsApp Business API, no recurring cost, no auto-push — the person
@@ -200,7 +166,8 @@ function ShareOnWhatsAppButton({ session }) {
   if (!location) return null;
   const lat = Number(location.latitude);
   const lon = Number(location.longitude);
-  const name = `${session.employee?.f_name || ""} ${session.employee?.l_name || ""}`.trim();
+  const name =
+    `${session.employee?.f_name || ""} ${session.employee?.l_name || ""}`.trim();
   const mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
   const text = encodeURIComponent(
     `${name || "Field employee"}'s current location (as of ${formatTime(location.capturedAt)}): ${mapsUrl}`,
@@ -219,9 +186,6 @@ function ShareOnWhatsAppButton({ session }) {
 }
 
 function LiveMap({ session, big = false }) {
-=======
-function LiveMap({ session }) {
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const location = session?.lastLocation || session?.startLocation;
   if (!location)
     return (
@@ -231,7 +195,6 @@ function LiveMap({ session }) {
     );
   const lat = Number(location.latitude);
   const lon = Number(location.longitude);
-<<<<<<< HEAD
   const accuracy = Number(location.accuracy);
   return (
     <div>
@@ -273,7 +236,9 @@ function AccuracyBadge({ accuracy }) {
         ? `Location accuracy is low: ${Math.round(accuracy)}m`
         : `Location accuracy is unreliable: ${Math.round(accuracy)}m. Please enable device GPS and retry.`;
   return (
-    <p className={`mt-2 flex items-center gap-1.5 text-xs font-semibold ${tone}`}>
+    <p
+      className={`mt-2 flex items-center gap-1.5 text-xs font-semibold ${tone}`}
+    >
       {accuracy > 200 && <FiAlertTriangle className="shrink-0" />}
       {message}
     </p>
@@ -292,7 +257,16 @@ function LiveDuration({ startedAt }) {
   );
 }
 
-function RouteTrail({ employeeId, date, showPicker, employees, selectedEmployeeId, onEmployeeChange, onDateChange, big = false }) {
+function RouteTrail({
+  employeeId,
+  date,
+  showPicker,
+  employees,
+  selectedEmployeeId,
+  onEmployeeChange,
+  onDateChange,
+  big = false,
+}) {
   const { data, isLoading } = useFieldRoute(employeeId, date);
   const gpsPoints = data?.points || [];
   // routePoints includes both automatic GPS samples and manual face
@@ -325,8 +299,7 @@ function RouteTrail({ employeeId, date, showPicker, employees, selectedEmployeeI
       const a = prev;
       const b = raw[i];
       const dLat = (b[0] - a[0]) * 111320;
-      const dLon =
-        ((b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180));
+      const dLon = (b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
       if (Math.hypot(dLat, dLon) >= MIN_MOVE_METERS) simplified.push(b);
     }
     return simplified;
@@ -421,7 +394,13 @@ function RouteTrail({ employeeId, date, showPicker, employees, selectedEmployeeI
       ) : (
         <>
           <div className="mt-3">
-            <FieldMap markers={markers} path={path} height={288} fitAll big={big} />
+            <FieldMap
+              markers={markers}
+              path={path}
+              height={288}
+              fitAll
+              big={big}
+            />
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-lg bg-slate-50 p-2">
@@ -469,21 +448,6 @@ function FaceCheckModal({
   heading = "Verify before field duty",
   subtext = "The live camera preview must be visible. Keep your face centred, look at the camera, and use good lighting before verifying.",
 }) {
-=======
-  const pad = 0.012;
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - pad}%2C${lat - pad}%2C${lon + pad}%2C${lat + pad}&layer=mapnik&marker=${lat}%2C${lon}`;
-  return (
-    <iframe
-      title="Live field location"
-      className="h-72 w-full rounded-2xl border border-slate-200"
-      src={src}
-      loading="lazy"
-    />
-  );
-}
-
-function FaceCheckModal({ onCaptured, onClose }) {
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [error, setError] = useState("");
@@ -548,18 +512,8 @@ function FaceCheckModal({ onCaptured, onClose }) {
             <FiCamera />
           </span>
           <div>
-<<<<<<< HEAD
             <h2 className="font-extrabold text-slate-900">{heading}</h2>
             <p className="mt-1 text-xs text-slate-500">{subtext}</p>
-=======
-            <h2 className="font-extrabold text-slate-900">
-              Verify before field duty
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Keep your face centred and use good lighting. The photo is checked
-              against your enrolled face profile.
-            </p>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </div>
         </div>
         <div className="mt-4 aspect-square overflow-hidden rounded-xl bg-slate-900">
@@ -570,12 +524,9 @@ function FaceCheckModal({ onCaptured, onClose }) {
             className="h-full w-full object-cover -scale-x-100"
           />
         </div>
-<<<<<<< HEAD
         <p className="mt-2 text-center text-xs font-semibold text-slate-600">
           Good lighting · face inside frame · look at the camera
         </p>
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
@@ -591,11 +542,7 @@ function FaceCheckModal({ onCaptured, onClose }) {
             onClick={capture}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
-<<<<<<< HEAD
             <FiCamera /> Verify
-=======
-            <FiCamera /> Verify & start
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </button>
         </div>
       </div>
@@ -603,7 +550,6 @@ function FaceCheckModal({ onCaptured, onClose }) {
   );
 }
 
-<<<<<<< HEAD
 function dataUrlToFile(dataUrl, filename) {
   const [header, base64] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)[1];
@@ -786,26 +732,11 @@ function EmployeeDuty({ auth }) {
   const promptedForRef = useRef(null);
   const [visitOpen, setVisitOpen] = useState(false);
   const [routeDate, setRouteDate] = useState("");
-=======
-function EmployeeDuty({
-  session,
-  setSession,
-  refresh,
-  pendingCount,
-  setPendingCount,
-  faceVerificationRequired,
-}) {
-  const watchId = useRef(null);
-  const lastSent = useRef(0);
-  const [busy, setBusy] = useState(false);
-  const [visitOpen, setVisitOpen] = useState(false);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const [visitForm, setVisitForm] = useState({
     customerName: "",
     organisationName: "",
     contactNumber: "",
     purpose: "",
-<<<<<<< HEAD
     visitType: "",
   });
   const [openVisit, setOpenVisit] = useState(null);
@@ -854,11 +785,6 @@ function EmployeeDuty({
   useEffect(() => {
     refreshPendingCount();
   }, [refreshPendingCount]);
-=======
-  });
-  const [openVisit, setOpenVisit] = useState(null);
-  const [showFaceCheck, setShowFaceCheck] = useState(false);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
   const syncQueue = useCallback(async () => {
     const queued = await pendingFieldEvents();
@@ -870,13 +796,8 @@ function EmployeeDuty({
         break;
       }
     }
-<<<<<<< HEAD
     refreshPendingCount();
   }, [refreshPendingCount]);
-=======
-    setPendingCount((await pendingFieldEvents()).length);
-  }, [setPendingCount]);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
   const sendLocation = useCallback(
     async (position) => {
@@ -895,17 +816,10 @@ function EmployeeDuty({
           payload,
           createdAt: Date.now(),
         });
-<<<<<<< HEAD
         refreshPendingCount();
       }
     },
     [session, refreshPendingCount],
-=======
-        setPendingCount((await pendingFieldEvents()).length);
-      }
-    },
-    [session, setPendingCount],
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   );
 
   useEffect(() => {
@@ -930,7 +844,6 @@ function EmployeeDuty({
   }, [syncQueue]);
 
   const beginDuty = async (selfieBase64 = null) => {
-<<<<<<< HEAD
     // A fresh live selfie is always captured at the start of a field duty.
     // The backend performs the enrolled-face match and returns a clear retry
     // message if lighting/face alignment is not sufficient.
@@ -938,20 +851,12 @@ function EmployeeDuty({
       setCheckInMode("start");
       return;
     }
-=======
-    if (faceVerificationRequired && !selfieBase64) {
-      setShowFaceCheck(true);
-      return;
-    }
-    setBusy(true);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       if (!navigator.onLine)
         throw new Error(
           "Connect to the internet once to start field duty. GPS updates are safely queued after duty starts.",
         );
       const position = await currentPosition();
-<<<<<<< HEAD
       await startDuty.mutateAsync({
         location: pointFromPosition(position),
         selfieBase64,
@@ -962,14 +867,6 @@ function EmployeeDuty({
           batteryLevel: null,
         },
       });
-=======
-      const result = await startFieldDuty({
-        location: pointFromPosition(position),
-        selfieBase64,
-        eventId: newId(),
-      });
-      setSession(result.session);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       toast.success("Field duty started. Live location sharing is on.");
     } catch (error) {
       toast.error(
@@ -977,7 +874,6 @@ function EmployeeDuty({
           error.message ||
           "Could not start duty",
       );
-<<<<<<< HEAD
     }
   };
 
@@ -1008,18 +904,6 @@ function EmployeeDuty({
   const changeStatus = async (status) => {
     try {
       await updateStatus.mutateAsync({ sessionId: session._id, status });
-=======
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const changeStatus = async (status) => {
-    setBusy(true);
-    try {
-      const result = await updateFieldDutyStatus(session._id, status);
-      setSession(result.session);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       toast.success(
         status === "paused"
           ? "Location sharing paused"
@@ -1027,19 +911,10 @@ function EmployeeDuty({
       );
     } catch (error) {
       toast.error(error?.response?.data?.message || "Could not update duty");
-<<<<<<< HEAD
-=======
-    } finally {
-      setBusy(false);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     }
   };
 
   const endDuty = async () => {
-<<<<<<< HEAD
-=======
-    setBusy(true);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       let body = {};
       try {
@@ -1047,17 +922,11 @@ function EmployeeDuty({
       } catch {
         body = {};
       }
-<<<<<<< HEAD
       await checkoutDuty.mutateAsync({ sessionId: session._id, body });
-=======
-      const result = await checkoutFieldDuty(session._id, body);
-      setSession(result.session);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       setOpenVisit(null);
       toast.success("Field duty checked out. Location sharing stopped.");
     } catch (error) {
       toast.error(error?.response?.data?.message || "Could not check out");
-<<<<<<< HEAD
     }
   };
 
@@ -1073,22 +942,6 @@ function EmployeeDuty({
           location: pointFromPosition(position),
           eventId: newId(),
         },
-=======
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const beginVisit = async (event) => {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const position = await currentPosition();
-      const result = await startFieldVisit(session._id, {
-        ...visitForm,
-        location: pointFromPosition(position),
-        eventId: newId(),
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       });
       setOpenVisit(result.visit);
       setVisitOpen(false);
@@ -1097,10 +950,7 @@ function EmployeeDuty({
         organisationName: "",
         contactNumber: "",
         purpose: "",
-<<<<<<< HEAD
         visitType: "",
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       });
       toast.success("Visit started");
     } catch (error) {
@@ -1109,13 +959,14 @@ function EmployeeDuty({
           error.message ||
           "Could not start visit",
       );
-<<<<<<< HEAD
     }
   };
 
   const startAssignedActivity = async (activity) => {
     if (!session || session.status !== "active") {
-      toast.error("Start and activate field duty before starting assigned work.");
+      toast.error(
+        "Start and activate field duty before starting assigned work.",
+      );
       return;
     }
     await beginVisit(null, activity);
@@ -1129,16 +980,6 @@ function EmployeeDuty({
 
   const finishVisit = async (status = "completed") => {
     if (!openVisit) return;
-=======
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const finishVisit = async () => {
-    if (!openVisit) return;
-    setBusy(true);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       let location = {};
       try {
@@ -1146,7 +987,6 @@ function EmployeeDuty({
       } catch {
         location = {};
       }
-<<<<<<< HEAD
       const result = await endVisitMut.mutateAsync({
         visitId: openVisit._id,
         body: { ...location, status },
@@ -1209,19 +1049,6 @@ function EmployeeDuty({
       <div className="p-8 text-sm text-slate-500">Loading your field duty…</div>
     );
 
-=======
-      await endFieldVisit(openVisit._id, { ...location, status: "completed" });
-      setOpenVisit(null);
-      toast.success("Visit completed");
-      refresh();
-    } catch (error) {
-      toast.error(error?.response?.data?.message || "Could not complete visit");
-    } finally {
-      setBusy(false);
-    }
-  };
-
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
       <header>
@@ -1256,7 +1083,6 @@ function EmployeeDuty({
               Started {formatTime(session.startedAt)}
             </div>
             <div className="rounded-xl bg-white/10 p-3">
-<<<<<<< HEAD
               <FiActivity className="mb-1" />
               {session.status === "checked_out" ? (
                 formatDuration(session.totalDurationSeconds)
@@ -1273,11 +1099,6 @@ function EmployeeDuty({
               <FiNavigation className="mb-1" />
               {formatDistance(session.totalDistanceMeters)} travelled
             </div>
-=======
-              <FiMapPin className="mb-1" />
-              Last seen {formatTime(session.lastSeenAt)}
-            </div>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </div>
         ) : (
           <p className="mt-4 text-sm text-white/80">
@@ -1291,14 +1112,7 @@ function EmployeeDuty({
             onClick={() => beginDuty()}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-bold text-[#7A004B] disabled:opacity-60"
           >
-<<<<<<< HEAD
             <FiCamera /> Verify face & start duty
-=======
-            {faceVerificationRequired ? <FiCamera /> : <FiPlay />}
-            {faceVerificationRequired
-              ? " Verify face & start duty"
-              : " Start field duty"}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </button>
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3">
@@ -1354,7 +1168,6 @@ function EmployeeDuty({
           </button>
         )}
       </div>
-<<<<<<< HEAD
       {session?.status === "active" && nextCheckInDueAt && (
         <div
           className={`rounded-2xl border p-4 ${checkInOverdue ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white"}`}
@@ -1389,19 +1202,13 @@ function EmployeeDuty({
           big
         />
       )}
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       {session && session.status !== "checked_out" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-bold text-slate-900">Customer visit</h2>
               <p className="text-xs text-slate-500">
-<<<<<<< HEAD
                 Log time, outcome, and a proof photo at each customer location.
-=======
-                Log time and outcome at each customer location.
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
               </p>
             </div>
             {openVisit ? <StatusPill status="in_progress" /> : null}
@@ -1414,7 +1221,6 @@ function EmployeeDuty({
               <p className="text-xs text-blue-700">
                 Started {formatTime(openVisit.startedAt)}
               </p>
-<<<<<<< HEAD
               <VisitPhotoUploader visit={openVisit} onUploaded={setOpenVisit} />
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
@@ -1439,17 +1245,14 @@ function EmployeeDuty({
                 be marked complete, and a live camera photo to close it out. Use
                 Skip if the customer wasn't available.
               </p>
-              <GeofenceResult result={openVisit.geofenceStatus?.atStart} label="Start location" />
-              <GeofenceResult result={openVisit.geofenceStatus?.atEnd} label="End location" />
-=======
-              <button
-                disabled={busy}
-                onClick={finishVisit}
-                className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white"
-              >
-                End visit
-              </button>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
+              <GeofenceResult
+                result={openVisit.geofenceStatus?.atStart}
+                label="Start location"
+              />
+              <GeofenceResult
+                result={openVisit.geofenceStatus?.atEnd}
+                label="End location"
+              />
             </div>
           ) : (
             <button
@@ -1462,12 +1265,19 @@ function EmployeeDuty({
           )}
         </div>
       )}
-<<<<<<< HEAD
-{lastFinishedVisit && (
+      {lastFinishedVisit && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="font-bold text-slate-900">Activity result: {lastFinishedVisit.customerName}</p>
-          <GeofenceResult result={lastFinishedVisit.geofenceStatus?.atStart} label="Start location" />
-          <GeofenceResult result={lastFinishedVisit.geofenceStatus?.atEnd} label="End location" />
+          <p className="font-bold text-slate-900">
+            Activity result: {lastFinishedVisit.customerName}
+          </p>
+          <GeofenceResult
+            result={lastFinishedVisit.geofenceStatus?.atStart}
+            label="Start location"
+          />
+          <GeofenceResult
+            result={lastFinishedVisit.geofenceStatus?.atEnd}
+            label="End location"
+          />
         </div>
       )}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1477,19 +1287,25 @@ function EmployeeDuty({
             <input
               type="date"
               value={visitFilter.from || ""}
-              onChange={(e) => setVisitFilter((f) => ({ ...f, from: e.target.value }))}
+              onChange={(e) =>
+                setVisitFilter((f) => ({ ...f, from: e.target.value }))
+              }
               className="rounded-lg border px-2 py-1 text-xs"
             />
             <span className="text-xs text-slate-400">to</span>
             <input
               type="date"
               value={visitFilter.to || ""}
-              onChange={(e) => setVisitFilter((f) => ({ ...f, to: e.target.value }))}
+              onChange={(e) =>
+                setVisitFilter((f) => ({ ...f, to: e.target.value }))
+              }
               className="rounded-lg border px-2 py-1 text-xs"
             />
             <select
               value={visitFilter.status}
-              onChange={(e) => setVisitFilter((f) => ({ ...f, status: e.target.value }))}
+              onChange={(e) =>
+                setVisitFilter((f) => ({ ...f, status: e.target.value }))
+              }
               className="rounded-lg border px-2 py-1 text-xs"
             >
               <option value="">All statuses</option>
@@ -1500,7 +1316,9 @@ function EmployeeDuty({
             </select>
             <select
               value={visitFilter.type}
-              onChange={(e) => setVisitFilter((f) => ({ ...f, type: e.target.value }))}
+              onChange={(e) =>
+                setVisitFilter((f) => ({ ...f, type: e.target.value }))
+              }
               className="rounded-lg border px-2 py-1 text-xs"
             >
               <option value="">All types</option>
@@ -1522,22 +1340,42 @@ function EmployeeDuty({
               <div key={visit._id} className="rounded-xl bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-bold text-slate-900">{visit.customerName}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {titleize(visit.activityType || "open")} · {visit.assignmentType}
-                      {visit.startedAt ? ` · started ${formatTime(visit.startedAt)}` : ""}
+                    <p className="font-bold text-slate-900">
+                      {visit.customerName}
                     </p>
-                    {visit.purpose && <p className="mt-1 text-xs text-slate-600">{visit.purpose}</p>}
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {titleize(visit.activityType || "open")} ·{" "}
+                      {visit.assignmentType}
+                      {visit.startedAt
+                        ? ` · started ${formatTime(visit.startedAt)}`
+                        : ""}
+                    </p>
+                    {visit.purpose && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {visit.purpose}
+                      </p>
+                    )}
                   </div>
                   <StatusPill status={visit.status} />
                 </div>
                 <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
                   {visit.attachments?.length ? (
-                    <span>{visit.attachments.length} photo{visit.attachments.length === 1 ? "" : "s"}</span>
+                    <span>
+                      {visit.attachments.length} photo
+                      {visit.attachments.length === 1 ? "" : "s"}
+                    </span>
                   ) : null}
                   {visit.geofenceStatus?.atEnd ? (
-                    <span className={visit.geofenceStatus.atEnd.withinFence ? "text-emerald-700" : "font-bold text-rose-700"}>
-                      {visit.geofenceStatus.atEnd.withinFence ? "Within" : "Outside"}
+                    <span
+                      className={
+                        visit.geofenceStatus.atEnd.withinFence
+                          ? "text-emerald-700"
+                          : "font-bold text-rose-700"
+                      }
+                    >
+                      {visit.geofenceStatus.atEnd.withinFence
+                        ? "Within"
+                        : "Outside"}
                     </span>
                   ) : null}
                 </div>
@@ -1554,17 +1392,30 @@ function EmployeeDuty({
               <div key={activity._id} className="rounded-xl bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-bold text-slate-900">{activity.customerName}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {titleize(activity.activityType)} · {titleize(activity.priority)} priority
-                      {activity.scheduledTime ? ` · ${activity.scheduledTime}` : ""}
+                    <p className="font-bold text-slate-900">
+                      {activity.customerName}
                     </p>
-                    {activity.purpose && <p className="mt-1 text-xs text-slate-600">{activity.purpose}</p>}
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {titleize(activity.activityType)} ·{" "}
+                      {titleize(activity.priority)} priority
+                      {activity.scheduledTime
+                        ? ` · ${activity.scheduledTime}`
+                        : ""}
+                    </p>
+                    {activity.purpose && (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {activity.purpose}
+                      </p>
+                    )}
                   </div>
                   {activity.status === "pending" ? (
                     <button
                       type="button"
-                      disabled={busy || Boolean(openVisit) || session?.status !== "active"}
+                      disabled={
+                        busy ||
+                        Boolean(openVisit) ||
+                        session?.status !== "active"
+                      }
                       onClick={() => startAssignedActivity(activity)}
                       className="rounded-lg bg-[#7A004B] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
                     >
@@ -1587,8 +1438,6 @@ function EmployeeDuty({
           onCaptured={handleCompletionPhoto}
         />
       )}
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       {visitOpen && (
         <form
           onSubmit={beginVisit}
@@ -1599,10 +1448,7 @@ function EmployeeDuty({
             ["customerName", "Customer / contact name *"],
             ["organisationName", "Organisation / place"],
             ["contactNumber", "Contact number"],
-<<<<<<< HEAD
             ["visitType", "Visit type (e.g. Sales call, Delivery, Service)"],
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             ["purpose", "Visit purpose"],
           ].map(([name, label]) => (
             <input
@@ -1633,7 +1479,6 @@ function EmployeeDuty({
           </div>
         </form>
       )}
-<<<<<<< HEAD
       {checkInMode && (
         <FaceCheckModal
           onClose={() => setCheckInMode(null)}
@@ -1646,22 +1491,11 @@ function EmployeeDuty({
               ? "A quick selfie + location every couple of hours confirms you're on the field and safe."
               : undefined
           }
-=======
-      {showFaceCheck && (
-        <FaceCheckModal
-          onClose={() => setShowFaceCheck(false)}
-          onCaptured={(selfie) => {
-            setShowFaceCheck(false);
-            beginDuty(selfie);
-          }}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
       )}
     </div>
   );
 }
-
-<<<<<<< HEAD
 function TeamSetupForm({ team, onClose, onSaved }) {
   const isEdit = Boolean(team);
   const teamOptions = useFieldTeamOptions();
@@ -1683,12 +1517,8 @@ function TeamSetupForm({ team, onClose, onSaved }) {
             longitude: team.geofence?.longitude ?? "",
             radiusMeters: team.geofence?.radiusMeters ?? "",
           },
-          managers: (team.managers || []).map((m) =>
-            String((m && m._id) || m),
-          ),
-          members: (team.members || []).map((m) =>
-            String((m && m._id) || m),
-          ),
+          managers: (team.managers || []).map((m) => String((m && m._id) || m)),
+          members: (team.members || []).map((m) => String((m && m._id) || m)),
         }
       : {
           name: "",
@@ -1714,36 +1544,6 @@ function TeamSetupForm({ team, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-=======
-function ManagerDashboard({
-  overview,
-  reload,
-  teams,
-  setTeams,
-  canManageTeams,
-}) {
-  const [selected, setSelected] = useState(null);
-  const [showSetup, setShowSetup] = useState(false);
-  const [options, setOptions] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    territory: "",
-    geofence: { latitude: "", longitude: "", radiusMeters: "" },
-    managers: [],
-    members: [],
-  });
-  const [saving, setSaving] = useState(false);
-  const live = overview?.live || [];
-  const active = selected || live[0] || null;
-  const openSetup = async () => {
-    try {
-      setOptions(await getFieldTeamOptions());
-      setShowSetup(true);
-    } catch (e) {
-      toast.error(e?.response?.data?.message || "Could not load team members");
-    }
-  };
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const toggle = (key, id) =>
     setForm((current) => ({
       ...current,
@@ -1751,7 +1551,6 @@ function ManagerDashboard({
         ? current[key].filter((item) => item !== id)
         : [...current[key], id],
     }));
-<<<<<<< HEAD
 
   const matchesSearch = (person, query) =>
     !query ||
@@ -2030,25 +1829,27 @@ function SettingsPanel({ onClose }) {
           <p className="mt-6 text-sm text-slate-500">Loading settings…</p>
         ) : (
           <form onSubmit={submit} className="mt-4 space-y-4">
-            {false && <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-              <span>
-                <span className="block font-bold text-slate-900">
-                  Field Operations enabled
+            {false && (
+              <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
+                <span>
+                  <span className="block font-bold text-slate-900">
+                    Field Operations enabled
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Off by default — turn on only for organisations that do
+                    field work.
+                  </span>
                 </span>
-                <span className="text-xs text-slate-500">
-                  Off by default — turn on only for organisations that do field
-                  work.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                onChange={(e) =>
-                  setForm({ ...form, enabled: e.target.checked })
-                }
-                className="h-5 w-5 accent-[#7A004B]"
-              />
-            </label>}
+                <input
+                  type="checkbox"
+                  checked={form.enabled}
+                  onChange={(e) =>
+                    setForm({ ...form, enabled: e.target.checked })
+                  }
+                  className="h-5 w-5 accent-[#7A004B]"
+                />
+              </label>
+            )}
             <label className="hidden flex items-center justify-between rounded-xl border border-slate-200 p-3">
               <span>
                 <span className="block font-bold text-slate-900">
@@ -2074,29 +1875,49 @@ function SettingsPanel({ onClose }) {
               Activity geofence mode
               <select
                 value={form.geofence_mode || "off"}
-                onChange={(e) => setForm({ ...form, geofence_mode: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, geofence_mode: e.target.value })
+                }
                 className="mt-1 w-full rounded-lg border px-2 py-2 text-sm font-normal"
               >
                 <option value="off">Off — record location only</option>
-                <option value="warning">Warning — record outside-fence result</option>
-                <option value="strict">Strict — block completion outside the fence</option>
+                <option value="warning">
+                  Warning — record outside-fence result
+                </option>
+                <option value="strict">
+                  Strict — block completion outside the fence
+                </option>
               </select>
             </label>
             <div>
-              <p className="text-xs font-bold text-slate-600">Minimum activity duration (minutes)</p>
-              <p className="mt-1 text-xs text-slate-500">Defaults are 20 minutes for customer visits and meetings; set 0 to allow immediate completion.</p>
+              <p className="text-xs font-bold text-slate-600">
+                Minimum activity duration (minutes)
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Defaults are 20 minutes for customer visits and meetings; set 0
+                to allow immediate completion.
+              </p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {ACTIVITY_TYPES.map((type) => (
-                  <label key={type} className="text-[11px] font-bold capitalize text-slate-600">
+                  <label
+                    key={type}
+                    className="text-[11px] font-bold capitalize text-slate-600"
+                  >
                     {titleize(type)}
                     <input
                       type="number"
                       min="0"
                       max="1440"
                       value={form.min_duration_overrides?.[type] ?? ""}
-                      placeholder={type === "meeting" || type === "customer_visit" ? "20" : "0"}
+                      placeholder={
+                        type === "meeting" || type === "customer_visit"
+                          ? "20"
+                          : "0"
+                      }
                       onChange={(e) => {
-                        const overrides = { ...(form.min_duration_overrides || {}) };
+                        const overrides = {
+                          ...(form.min_duration_overrides || {}),
+                        };
                         if (e.target.value === "") delete overrides[type];
                         else overrides[type] = Number(e.target.value);
                         setForm({ ...form, min_duration_overrides: overrides });
@@ -2178,7 +1999,13 @@ const CHECKPOINT_STATUS_OPTIONS = [
   { value: "overdue", label: "Overdue" },
 ];
 
-function OverviewFilters({ filters, onChange, teamOptions, canManageTeams, onExport }) {
+function OverviewFilters({
+  filters,
+  onChange,
+  teamOptions,
+  canManageTeams,
+  onExport,
+}) {
   const set = (key) => (e) => onChange({ ...filters, [key]: e.target.value });
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
@@ -2224,10 +2051,18 @@ function OverviewFilters({ filters, onChange, teamOptions, canManageTeams, onExp
           </option>
         ))}
       </select>
-      {(filters.date || filters.teamId || filters.dutyStatus || filters.checkpointStatus) && (
+      {(filters.date ||
+        filters.teamId ||
+        filters.dutyStatus ||
+        filters.checkpointStatus) && (
         <button
           onClick={() =>
-            onChange({ date: "", teamId: "", dutyStatus: "", checkpointStatus: "" })
+            onChange({
+              date: "",
+              teamId: "",
+              dutyStatus: "",
+              checkpointStatus: "",
+            })
           }
           className="text-xs font-bold text-slate-500 underline"
         >
@@ -2290,8 +2125,8 @@ function BulkAssignExcelModal({ onClose, onDone }) {
         </div>
         <p className="mt-1 text-sm text-slate-500">
           For assigning many employees at once — e.g. 60 employees across
-          several teams. Prefer ticking checkboxes instead? Close this and
-          use "Bulk assign" on a team's card.
+          several teams. Prefer ticking checkboxes instead? Close this and use
+          "Bulk assign" on a team's card.
         </p>
         <a
           href={downloadBulkAssignTemplateUrl()}
@@ -2356,10 +2191,17 @@ function IndividualAssignmentsPanel() {
   const createAssignment = useCreateIndividualFieldAssignment();
   const removeAssignment = useRemoveIndividualFieldAssignment();
   const [options, setOptions] = useState(null);
-  const [form, setForm] = useState({ employeeId: "", managerId: "", territory: "" });
+  const [form, setForm] = useState({
+    employeeId: "",
+    managerId: "",
+    territory: "",
+  });
 
   useEffect(() => {
-    teamOptions.mutateAsync().then(setOptions).catch(() => {});
+    teamOptions
+      .mutateAsync()
+      .then(setOptions)
+      .catch(() => {});
     // Load this picker only while the individual-assignment panel is mounted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2367,47 +2209,112 @@ function IndividualAssignmentsPanel() {
   const submit = async (event) => {
     event.preventDefault();
     try {
-      await createAssignment.mutateAsync({ ...form, managerId: form.managerId || undefined });
+      await createAssignment.mutateAsync({
+        ...form,
+        managerId: form.managerId || undefined,
+      });
       setForm({ employeeId: "", managerId: "", territory: "" });
       toast.success("Individual field assignment created");
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Could not create assignment");
+      toast.error(
+        error?.response?.data?.message || "Could not create assignment",
+      );
     }
   };
   const remove = async (assignment) => {
-    if (!window.confirm(`Remove ${assignment.employee?.f_name || "this employee"} from Field Work?`)) return;
+    if (
+      !window.confirm(
+        `Remove ${assignment.employee?.f_name || "this employee"} from Field Work?`,
+      )
+    )
+      return;
     try {
       await removeAssignment.mutateAsync(assignment._id);
       toast.success("Individual field assignment removed");
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Could not remove assignment");
+      toast.error(
+        error?.response?.data?.message || "Could not remove assignment",
+      );
     }
   };
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <h2 className="font-bold text-slate-900">Individual field assignments</h2>
-      <p className="mt-1 text-xs text-slate-500">For field employees who do not belong to a team.</p>
+      <p className="mt-1 text-xs text-slate-500">
+        For field employees who do not belong to a team.
+      </p>
       <form onSubmit={submit} className="mt-3 grid gap-2 md:grid-cols-4">
-        <select required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="rounded-lg border px-2 py-2 text-sm">
+        <select
+          required
+          value={form.employeeId}
+          onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        >
           <option value="">Choose employee</option>
-          {(options?.employees || []).map((employee) => <option key={employee._id} value={employee._id}>{employee.f_name} {employee.l_name} {employee.empid ? `(${employee.empid})` : ""}</option>)}
+          {(options?.employees || []).map((employee) => (
+            <option key={employee._id} value={employee._id}>
+              {employee.f_name} {employee.l_name}{" "}
+              {employee.empid ? `(${employee.empid})` : ""}
+            </option>
+          ))}
         </select>
-        <select value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })} className="rounded-lg border px-2 py-2 text-sm">
+        <select
+          value={form.managerId}
+          onChange={(e) => setForm({ ...form, managerId: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        >
           <option value="">No manager</option>
-          {(options?.managers || []).map((manager) => <option key={manager._id} value={manager._id}>{manager.f_name} {manager.l_name}</option>)}
+          {(options?.managers || []).map((manager) => (
+            <option key={manager._id} value={manager._id}>
+              {manager.f_name} {manager.l_name}
+            </option>
+          ))}
         </select>
-        <input value={form.territory} onChange={(e) => setForm({ ...form, territory: e.target.value })} placeholder="Territory (optional)" className="rounded-lg border px-2 py-2 text-sm" />
-        <button disabled={createAssignment.isPending} className="rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Assign</button>
+        <input
+          value={form.territory}
+          onChange={(e) => setForm({ ...form, territory: e.target.value })}
+          placeholder="Territory (optional)"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <button
+          disabled={createAssignment.isPending}
+          className="rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+        >
+          Assign
+        </button>
       </form>
       <div className="mt-3 space-y-2">
         {(assignments.data?.assignments || []).map((assignment) => (
-          <div key={assignment._id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-sm">
-            <div><b>{assignment.employee?.f_name} {assignment.employee?.l_name}</b><span className="text-slate-500"> · {assignment.territory || "No territory"} · Manager: {assignment.manager ? `${assignment.manager.f_name} ${assignment.manager.l_name}` : "None"}</span></div>
-            <button onClick={() => remove(assignment)} className="text-rose-600" title="Remove assignment"><FiTrash2 /></button>
+          <div
+            key={assignment._id}
+            className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-sm"
+          >
+            <div>
+              <b>
+                {assignment.employee?.f_name} {assignment.employee?.l_name}
+              </b>
+              <span className="text-slate-500">
+                {" "}
+                · {assignment.territory || "No territory"} · Manager:{" "}
+                {assignment.manager
+                  ? `${assignment.manager.f_name} ${assignment.manager.l_name}`
+                  : "None"}
+              </span>
+            </div>
+            <button
+              onClick={() => remove(assignment)}
+              className="text-rose-600"
+              title="Remove assignment"
+            >
+              <FiTrash2 />
+            </button>
           </div>
         ))}
-        {!assignments.isLoading && !(assignments.data?.assignments || []).length && <p className="text-sm text-slate-500">No individual assignments.</p>}
+        {!assignments.isLoading &&
+          !(assignments.data?.assignments || []).length && (
+            <p className="text-sm text-slate-500">No individual assignments.</p>
+          )}
       </div>
     </section>
   );
@@ -2417,11 +2324,25 @@ function AssignedActivitiesPanel({ employees, visits }) {
   const assignActivity = useAssignFieldActivity();
   const reassignActivity = useReassignFieldActivity();
   const cancelActivity = useCancelFieldActivity();
-  const [form, setForm] = useState({ employeeId: "", customerName: "", activityType: "customer_visit", priority: "medium", scheduledDate: "", scheduledTime: "", purpose: "", expectedLatitude: "", expectedLongitude: "", expectedRadius: "" });
+  const [form, setForm] = useState({
+    employeeId: "",
+    customerName: "",
+    activityType: "customer_visit",
+    priority: "medium",
+    scheduledDate: "",
+    scheduledTime: "",
+    purpose: "",
+    expectedLatitude: "",
+    expectedLongitude: "",
+    expectedRadius: "",
+  });
   const [reassignTo, setReassignTo] = useState({});
   const submit = async (event) => {
     event.preventDefault();
-    const hasExpectedLocation = form.expectedLatitude !== "" || form.expectedLongitude !== "" || form.expectedRadius !== "";
+    const hasExpectedLocation =
+      form.expectedLatitude !== "" ||
+      form.expectedLongitude !== "" ||
+      form.expectedRadius !== "";
     try {
       await assignActivity.mutateAsync({
         employeeId: form.employeeId,
@@ -2431,35 +2352,210 @@ function AssignedActivitiesPanel({ employees, visits }) {
         scheduledDate: form.scheduledDate || undefined,
         scheduledTime: form.scheduledTime,
         purpose: form.purpose,
-        expectedLocation: hasExpectedLocation ? { latitude: Number(form.expectedLatitude), longitude: Number(form.expectedLongitude), radiusMeters: Number(form.expectedRadius) } : undefined,
+        expectedLocation: hasExpectedLocation
+          ? {
+              latitude: Number(form.expectedLatitude),
+              longitude: Number(form.expectedLongitude),
+              radiusMeters: Number(form.expectedRadius),
+            }
+          : undefined,
       });
-      setForm({ employeeId: "", customerName: "", activityType: "customer_visit", priority: "medium", scheduledDate: "", scheduledTime: "", purpose: "", expectedLatitude: "", expectedLongitude: "", expectedRadius: "" });
+      setForm({
+        employeeId: "",
+        customerName: "",
+        activityType: "customer_visit",
+        priority: "medium",
+        scheduledDate: "",
+        scheduledTime: "",
+        purpose: "",
+        expectedLatitude: "",
+        expectedLongitude: "",
+        expectedRadius: "",
+      });
       toast.success("Field activity assigned");
-    } catch (error) { toast.error(error?.response?.data?.message || "Could not assign activity"); }
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Could not assign activity",
+      );
+    }
   };
-  const pending = visits.filter((visit) => visit.assignmentType === "assigned" && visit.status === "pending");
+  const pending = visits.filter(
+    (visit) =>
+      visit.assignmentType === "assigned" && visit.status === "pending",
+  );
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
       <h2 className="font-bold text-slate-900">Assigned field work</h2>
       <form onSubmit={submit} className="mt-3 grid gap-2 md:grid-cols-3">
-        <select required value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="">Assign to employee</option>{employees.map((employee) => <option key={employee._id} value={employee._id}>{employee.f_name} {employee.l_name}</option>)}</select>
-        <input required value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} placeholder="Customer / contact" className="rounded-lg border px-2 py-2 text-sm" />
-        <select value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })} className="rounded-lg border px-2 py-2 text-sm">{ACTIVITY_TYPES.map((type) => <option key={type} value={type}>{titleize(type)}</option>)}</select>
-        <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="rounded-lg border px-2 py-2 text-sm"><option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option></select>
-        <input type="date" value={form.scheduledDate} onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })} className="rounded-lg border px-2 py-2 text-sm" />
-        <input type="time" value={form.scheduledTime} onChange={(e) => setForm({ ...form, scheduledTime: e.target.value })} className="rounded-lg border px-2 py-2 text-sm" />
-        <input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="Purpose (optional)" className="rounded-lg border px-2 py-2 text-sm" />
-        <input type="number" step="any" value={form.expectedLatitude} onChange={(e) => setForm({ ...form, expectedLatitude: e.target.value })} placeholder="Expected latitude" className="rounded-lg border px-2 py-2 text-sm" />
-        <input type="number" step="any" value={form.expectedLongitude} onChange={(e) => setForm({ ...form, expectedLongitude: e.target.value })} placeholder="Expected longitude" className="rounded-lg border px-2 py-2 text-sm" />
-        <input type="number" min="1" value={form.expectedRadius} onChange={(e) => setForm({ ...form, expectedRadius: e.target.value })} placeholder="Allowed radius (m)" className="rounded-lg border px-2 py-2 text-sm" />
-        <button disabled={assignActivity.isPending} className="rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white disabled:opacity-50">Create assigned work</button>
+        <select
+          required
+          value={form.employeeId}
+          onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        >
+          <option value="">Assign to employee</option>
+          {employees.map((employee) => (
+            <option key={employee._id} value={employee._id}>
+              {employee.f_name} {employee.l_name}
+            </option>
+          ))}
+        </select>
+        <input
+          required
+          value={form.customerName}
+          onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+          placeholder="Customer / contact"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <select
+          value={form.activityType}
+          onChange={(e) => setForm({ ...form, activityType: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        >
+          {ACTIVITY_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {titleize(type)}
+            </option>
+          ))}
+        </select>
+        <select
+          value={form.priority}
+          onChange={(e) => setForm({ ...form, priority: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        >
+          <option value="low">Low priority</option>
+          <option value="medium">Medium priority</option>
+          <option value="high">High priority</option>
+        </select>
+        <input
+          type="date"
+          value={form.scheduledDate}
+          onChange={(e) => setForm({ ...form, scheduledDate: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <input
+          type="time"
+          value={form.scheduledTime}
+          onChange={(e) => setForm({ ...form, scheduledTime: e.target.value })}
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <input
+          value={form.purpose}
+          onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+          placeholder="Purpose (optional)"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <input
+          type="number"
+          step="any"
+          value={form.expectedLatitude}
+          onChange={(e) =>
+            setForm({ ...form, expectedLatitude: e.target.value })
+          }
+          placeholder="Expected latitude"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <input
+          type="number"
+          step="any"
+          value={form.expectedLongitude}
+          onChange={(e) =>
+            setForm({ ...form, expectedLongitude: e.target.value })
+          }
+          placeholder="Expected longitude"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <input
+          type="number"
+          min="1"
+          value={form.expectedRadius}
+          onChange={(e) => setForm({ ...form, expectedRadius: e.target.value })}
+          placeholder="Allowed radius (m)"
+          className="rounded-lg border px-2 py-2 text-sm"
+        />
+        <button
+          disabled={assignActivity.isPending}
+          className="rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+        >
+          Create assigned work
+        </button>
       </form>
       <div className="mt-4 space-y-2">
-        {pending.map((activity) => <div key={activity._id} className="rounded-xl bg-slate-50 p-3 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span><b>{activity.customerName}</b> · {activity.employee?.f_name} {activity.employee?.l_name} · {titleize(activity.activityType)}{activity.scheduledTime ? ` · ${activity.scheduledTime}` : ""}</span><StatusPill status="pending" /></div>
-          <div className="mt-2 flex flex-wrap gap-2"><select value={reassignTo[activity._id] || ""} onChange={(e) => setReassignTo({ ...reassignTo, [activity._id]: e.target.value })} className="rounded border px-2 py-1 text-xs"><option value="">Reassign to…</option>{employees.map((employee) => <option key={employee._id} value={employee._id}>{employee.f_name} {employee.l_name}</option>)}</select><button disabled={!reassignTo[activity._id] || reassignActivity.isPending} onClick={() => reassignActivity.mutateAsync({ activityId: activity._id, body: { employeeId: reassignTo[activity._id] } }).then(() => toast.success("Activity reassigned")).catch((e) => toast.error(e?.response?.data?.message || "Could not reassign"))} className="rounded border px-2 py-1 text-xs font-bold text-[#7A004B]">Reassign</button><button onClick={() => cancelActivity.mutateAsync({ activityId: activity._id }).then(() => toast.success("Activity cancelled")).catch((e) => toast.error(e?.response?.data?.message || "Could not cancel"))} className="rounded border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600">Cancel</button></div>
-        </div>)}
-        {!pending.length && <p className="text-sm text-slate-500">No pending assigned work for this date.</p>}
+        {pending.map((activity) => (
+          <div
+            key={activity._id}
+            className="rounded-xl bg-slate-50 p-3 text-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <b>{activity.customerName}</b> · {activity.employee?.f_name}{" "}
+                {activity.employee?.l_name} · {titleize(activity.activityType)}
+                {activity.scheduledTime ? ` · ${activity.scheduledTime}` : ""}
+              </span>
+              <StatusPill status="pending" />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <select
+                value={reassignTo[activity._id] || ""}
+                onChange={(e) =>
+                  setReassignTo({
+                    ...reassignTo,
+                    [activity._id]: e.target.value,
+                  })
+                }
+                className="rounded border px-2 py-1 text-xs"
+              >
+                <option value="">Reassign to…</option>
+                {employees.map((employee) => (
+                  <option key={employee._id} value={employee._id}>
+                    {employee.f_name} {employee.l_name}
+                  </option>
+                ))}
+              </select>
+              <button
+                disabled={
+                  !reassignTo[activity._id] || reassignActivity.isPending
+                }
+                onClick={() =>
+                  reassignActivity
+                    .mutateAsync({
+                      activityId: activity._id,
+                      body: { employeeId: reassignTo[activity._id] },
+                    })
+                    .then(() => toast.success("Activity reassigned"))
+                    .catch((e) =>
+                      toast.error(
+                        e?.response?.data?.message || "Could not reassign",
+                      ),
+                    )
+                }
+                className="rounded border px-2 py-1 text-xs font-bold text-[#7A004B]"
+              >
+                Reassign
+              </button>
+              <button
+                onClick={() =>
+                  cancelActivity
+                    .mutateAsync({ activityId: activity._id })
+                    .then(() => toast.success("Activity cancelled"))
+                    .catch((e) =>
+                      toast.error(
+                        e?.response?.data?.message || "Could not cancel",
+                      ),
+                    )
+                }
+                className="rounded border border-rose-200 px-2 py-1 text-xs font-bold text-rose-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ))}
+        {!pending.length && (
+          <p className="text-sm text-slate-500">
+            No pending assigned work for this date.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -2564,13 +2660,17 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   const activityEmployees = useMemo(() => {
     const people = new Map();
     (teams.data?.teams || []).forEach((team) =>
-      (team.members || []).forEach((employee) => people.set(employee._id, employee)),
+      (team.members || []).forEach((employee) =>
+        people.set(employee._id, employee),
+      ),
     );
     (overview.data?.visits || []).forEach((visit) => {
       if (visit.employee?._id) people.set(visit.employee._id, visit.employee);
     });
     return [...people.values()].sort((a, b) =>
-      `${a.f_name || ""} ${a.l_name || ""}`.localeCompare(`${b.f_name || ""} ${b.l_name || ""}`),
+      `${a.f_name || ""} ${a.l_name || ""}`.localeCompare(
+        `${b.f_name || ""} ${b.l_name || ""}`,
+      ),
     );
   }, [teams.data?.teams, overview.data?.visits]);
 
@@ -2591,30 +2691,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
     }
   };
 
-=======
-  const createTeam = async (event) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await createFieldTeam(form);
-      toast.success("Field team created");
-      setShowSetup(false);
-      setForm({
-        name: "",
-        territory: "",
-        geofence: { latitude: "", longitude: "", radiusMeters: "" },
-        managers: [],
-        members: [],
-      });
-      const data = await getFieldTeams();
-      setTeams(data.teams);
-    } catch (e) {
-      toast.error(e?.response?.data?.message || "Could not create team");
-    } finally {
-      setSaving(false);
-    }
-  };
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   return (
     <div className="space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -2626,7 +2702,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             Live field map
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-<<<<<<< HEAD
             {isRefreshing
               ? "Refreshing live field data…"
               : lastUpdated
@@ -2662,21 +2737,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           {canManageTeams && (
             <button
               onClick={() => setTeamFormTarget(null)}
-=======
-            Updates refresh every 45 seconds while a duty session is open.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={reload}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
-          >
-            <FiRefreshCw /> Refresh
-          </button>
-          {canManageTeams && (
-            <button
-              onClick={openSetup}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
               className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"
             >
               <FiUsers /> Create field team
@@ -2684,7 +2744,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           )}
         </div>
       </header>
-<<<<<<< HEAD
       <OverviewFilters
         filters={filters}
         onChange={setFilters}
@@ -2697,27 +2756,15 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           icon={<FiActivity />}
           label="Active now"
           value={overview.data?.summary?.active || 0}
-=======
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat
-          icon={<FiActivity />}
-          label="Active now"
-          value={overview?.summary?.active || 0}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
         <Stat
           icon={<FiWifiOff />}
           label="Offline"
-<<<<<<< HEAD
           value={overview.data?.summary?.offline || 0}
-=======
-          value={overview?.summary?.offline || 0}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
         <Stat
           icon={<FiCheckCircle />}
           label="Visits completed today"
-<<<<<<< HEAD
           value={overview.data?.summary?.completedVisits || 0}
         />
         <Stat
@@ -2760,38 +2807,13 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               onDateChange={setRouteDate}
               big
             />
-=======
-          value={overview?.summary?.completedVisits || 0}
-        />
-      </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_360px]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-3">
-          <LiveMap session={active} />
-          {active && (
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3">
-              <div>
-                <p className="font-bold text-slate-900">
-                  {active.employee?.f_name} {active.employee?.l_name}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {active.team?.name || "Field team"} · Last seen{" "}
-                  {formatTime(active.lastSeenAt)}
-                </p>
-              </div>
-              <StatusPill status={active.status} />
-            </div>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           )}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-3">
           <h2 className="px-1 pb-3 font-bold text-slate-900">
             Field employees ({live.length})
           </h2>
-<<<<<<< HEAD
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
-=======
-          <div className="max-h-[380px] space-y-2 overflow-y-auto">
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             {live.length ? (
               live.map((item) => (
                 <button
@@ -2815,7 +2837,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                     </div>
                     <StatusPill status={item.status} />
                   </div>
-<<<<<<< HEAD
                   <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-500">
                     <span>
                       {formatDistance(item.totalDistanceMeters)} travelled
@@ -2837,8 +2858,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                       </span>
                     )}
                   </div>
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 </button>
               ))
             ) : (
@@ -2850,44 +2869,28 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
         </section>
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
-<<<<<<< HEAD
         <h2 className="font-bold text-slate-900">Today's visits</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-sm">
-=======
-        <h2 className="font-bold text-slate-900">Today’s visits</h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             <thead className="border-b text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="pb-2">Employee</th>
                 <th className="pb-2">Customer</th>
-<<<<<<< HEAD
                 <th className="pb-2">Type</th>
                 <th className="pb-2">Started</th>
                 <th className="pb-2">Photos</th>
                 <th className="pb-2">Geofence</th>
-=======
-                <th className="pb-2">Purpose</th>
-                <th className="pb-2">Started</th>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 <th className="pb-2">Status</th>
               </tr>
             </thead>
             <tbody>
-<<<<<<< HEAD
               {(overview.data?.visits || []).map((visit) => (
-=======
-              {(overview?.visits || []).map((visit) => (
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 <tr key={visit._id} className="border-b last:border-0">
                   <td className="py-3 font-medium">
                     {visit.employee?.f_name} {visit.employee?.l_name}
                   </td>
                   <td className="py-3">{visit.customerName}</td>
                   <td className="py-3 text-slate-500">
-<<<<<<< HEAD
                     {visit.visitType || visit.purpose || "—"}
                   </td>
                   <td className="py-3">{formatTime(visit.startedAt)}</td>
@@ -2898,32 +2901,34 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                   </td>
                   <td className="py-3 text-xs">
                     {visit.geofenceStatus?.atEnd ? (
-                      <span className={visit.geofenceStatus.atEnd.withinFence ? "text-emerald-700" : "font-bold text-rose-700"}>
-                        {visit.geofenceStatus.atEnd.withinFence ? "Within" : "Outside"}
-                        {Number.isFinite(visit.geofenceStatus.atEnd.distanceMeters) ? ` (${formatDistance(visit.geofenceStatus.atEnd.distanceMeters)})` : ""}
+                      <span
+                        className={
+                          visit.geofenceStatus.atEnd.withinFence
+                            ? "text-emerald-700"
+                            : "font-bold text-rose-700"
+                        }
+                      >
+                        {visit.geofenceStatus.atEnd.withinFence
+                          ? "Within"
+                          : "Outside"}
+                        {Number.isFinite(
+                          visit.geofenceStatus.atEnd.distanceMeters,
+                        )
+                          ? ` (${formatDistance(visit.geofenceStatus.atEnd.distanceMeters)})`
+                          : ""}
                       </span>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="py-3">
-=======
-                    {visit.purpose || "—"}
-                  </td>
-                  <td className="py-3">{formatTime(visit.startedAt)}</td>
-                  <td className="py-3">
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     <StatusPill status={visit.status} />
                   </td>
                 </tr>
               ))}
-<<<<<<< HEAD
               {!overview.data?.visits?.length && (
                 <tr>
                   <td className="py-5 text-center text-slate-500" colSpan="7">
-=======
-              {!overview?.visits?.length && (
-                <tr>
-                  <td className="py-5 text-center text-slate-500" colSpan="5">
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     No visits recorded today.
                   </td>
                 </tr>
@@ -2932,8 +2937,12 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           </table>
         </div>
       </section>
-<<<<<<< HEAD
-      {!isSuperAdmin && <AssignedActivitiesPanel employees={activityEmployees} visits={overview.data?.visits || []} />}
+      {!isSuperAdmin && (
+        <AssignedActivitiesPanel
+          employees={activityEmployees}
+          visits={overview.data?.visits || []}
+        />
+      )}
       {canManageTeams && <IndividualAssignmentsPanel />}
       {(canManageTeams || isSuperAdmin) && <AuditLogPanel />}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -2974,28 +2983,12 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             </div>
           ))}
           {!teams.data?.teams?.length && (
-=======
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold text-slate-900">Your field teams</h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {teams.map((team) => (
-            <div key={team._id} className="rounded-xl bg-slate-50 p-3">
-              <p className="font-bold">{team.name}</p>
-              <p className="text-xs text-slate-500">
-                {team.territory || "No territory"} · {team.members?.length || 0}{" "}
-                field employee(s)
-              </p>
-            </div>
-          ))}
-          {!teams.length && (
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             <p className="text-sm text-slate-500">
               Create a team and assign a manager and field employees to begin.
             </p>
           )}
         </div>
       </section>
-<<<<<<< HEAD
       {teamFormTarget !== undefined && (
         <TeamSetupForm
           team={teamFormTarget}
@@ -3022,73 +3015,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             overview.refetch();
           }}
         />
-=======
-      {showSetup && (
-        <form
-          onSubmit={createTeam}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"
-        >
-          <div className="mx-auto my-6 max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
-            <div className="flex justify-between">
-              <h2 className="text-lg font-extrabold">Create field team</h2>
-              <button type="button" onClick={() => setShowSetup(false)}>
-                ×
-              </button>
-            </div>
-            <input
-              required
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Team name *"
-              className="mt-4 w-full rounded-lg border px-3 py-2"
-            />
-            <input
-              value={form.territory}
-              onChange={(e) => setForm({ ...form, territory: e.target.value })}
-              placeholder="Territory / area"
-              className="mt-2 w-full rounded-lg border px-3 py-2"
-            />
-            <p className="mt-4 text-sm font-bold">Managers</p>
-            <div className="mt-2 grid max-h-32 grid-cols-2 gap-2 overflow-y-auto">
-              {options?.managers?.map((person) => (
-                <label
-                  key={person._id}
-                  className="flex gap-2 rounded bg-slate-50 p-2 text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.managers.includes(person._id)}
-                    onChange={() => toggle("managers", person._id)}
-                  />
-                  {person.f_name} {person.l_name}
-                </label>
-              ))}
-            </div>
-            <p className="mt-4 text-sm font-bold">Field employees</p>
-            <div className="mt-2 grid max-h-40 grid-cols-2 gap-2 overflow-y-auto">
-              {options?.employees?.map((person) => (
-                <label
-                  key={person._id}
-                  className="flex gap-2 rounded bg-slate-50 p-2 text-xs"
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.members.includes(person._id)}
-                    onChange={() => toggle("members", person._id)}
-                  />
-                  {person.f_name} {person.l_name}
-                </label>
-              ))}
-            </div>
-            <button
-              disabled={saving}
-              className="mt-5 w-full rounded-lg bg-[#7A004B] py-2.5 font-bold text-white disabled:opacity-50"
-            >
-              Create team
-            </button>
-          </div>
-        </form>
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       )}
     </div>
   );
@@ -3111,7 +3037,6 @@ function Stat({ icon, label, value }) {
 export default function FieldOperations() {
   const { data: auth } = useAuth();
   const role = auth?.role;
-<<<<<<< HEAD
   const isEmployee = role === "employee";
 
   return isEmployee ? (
@@ -3120,68 +3045,6 @@ export default function FieldOperations() {
     <ManagerDashboard
       canManageTeams={role === "admin"}
       isSuperAdmin={role === "superadmin"}
-=======
-  const [session, setSession] = useState(null);
-  const [overview, setOverview] = useState(null);
-  const [teams, setTeams] = useState([]);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [faceVerificationRequired, setFaceVerificationRequired] =
-    useState(false);
-  const load = useCallback(async () => {
-    try {
-      if (role === "employee") {
-        const data = await getMyFieldDuty();
-        setSession(data.session);
-        setFaceVerificationRequired(Boolean(data.faceVerificationRequired));
-      } else {
-        const [data, teamData] = await Promise.all([
-          getFieldOverview(),
-          getFieldTeams(),
-        ]);
-        setOverview(data);
-        setTeams(teamData.teams);
-      }
-      setPendingCount((await pendingFieldEvents()).length);
-    } catch (error) {
-      toast.error(
-        error?.response?.data?.message || "Could not load Field Operations",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [role]);
-  useEffect(() => {
-    if (role) load();
-  }, [role, load]);
-  useEffect(() => {
-    if (role === "employee" || !role) return undefined;
-    const timer = window.setInterval(load, 45000);
-    return () => window.clearInterval(timer);
-  }, [role, load]);
-  if (loading)
-    return (
-      <div className="p-8 text-sm text-slate-500">
-        Loading Field Operations…
-      </div>
-    );
-  return role === "employee" ? (
-    <EmployeeDuty
-      session={session}
-      setSession={setSession}
-      refresh={load}
-      pendingCount={pendingCount}
-      setPendingCount={setPendingCount}
-      faceVerificationRequired={faceVerificationRequired}
-    />
-  ) : (
-    <ManagerDashboard
-      overview={overview}
-      reload={load}
-      teams={teams}
-      setTeams={setTeams}
-      canManageTeams={["admin", "superadmin"].includes(role)}
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     />
   );
 }
