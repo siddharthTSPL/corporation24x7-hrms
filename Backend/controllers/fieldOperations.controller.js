@@ -2615,7 +2615,7 @@ exports.myAssignedActivities = async (req, res) => {
   return res.json({ success: true, activities });
 };
 
-// Every visit the employee has ever started, newest first. Used by the
+// Every visit the employee has ever started, newest first. Used by 
 // employee's own "my visits" list so they can review past work without
 // opening the manager dashboard.
 exports.myVisits = async (req, res) => {
