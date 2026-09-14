@@ -968,7 +968,7 @@ function Pricing() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
-              const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
+              const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
               return (
                 <div
                   key={p.name}
