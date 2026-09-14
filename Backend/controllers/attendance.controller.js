@@ -1,8 +1,11 @@
 const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
+<<<<<<< HEAD
 const FieldTeam = require("../Models/fieldTeam.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
@@ -46,6 +49,7 @@ const resolveOrganisationId = async (user) => {
   return null;
 };
 
+<<<<<<< HEAD
 // Spec §10 — a field employee's presence is recorded through Field Duty, not
 // normal attendance. If this person is on an active Field Team or has an
 // active individual assignment, block the normal check-in channel at the
@@ -63,6 +67,8 @@ const assertNotFieldEmployee = async (organisation_id, userId) => {
   return !(onTeam || onIndividual);
 };
 
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const displayMinutes = (mins) => Math.round(mins || 0);
 
 // A channel's last-known status stays "valid" for this long after its own
@@ -100,6 +106,7 @@ const checkin = async (req, res) => {
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
+<<<<<<< HEAD
 
     // Field employees record presence via Field Duty, not normal attendance.
     const isAllowedAttendance = await assertNotFieldEmployee(
@@ -112,6 +119,8 @@ const checkin = async (req, res) => {
           "This employee is assigned to field work. Open the Field Duty app to record presence — normal attendance is disabled for field employees.",
         reason: "field_work_assigned",
       });
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });

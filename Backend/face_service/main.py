@@ -65,4 +65,8 @@ def embed(req: ImageRequest):
 
 @app.get("/health")
 def health():
+<<<<<<< HEAD
     return {"status": "ok"}
+=======
+    return {"status": "ok"}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7

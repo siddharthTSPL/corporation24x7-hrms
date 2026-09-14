@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   FiActivity,
   FiAlertTriangle,
+=======
+import { useCallback, useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import {
+  FiActivity,
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   FiCamera,
   FiCheckCircle,
   FiClock,
@@ -11,6 +18,7 @@ import {
   FiPause,
   FiPlay,
   FiRefreshCw,
+<<<<<<< HEAD
   FiSettings,
   FiShare2,
   FiUpload,
@@ -56,16 +64,44 @@ import {
   useFieldAuditLog,
 } from "../../auth/server-state/fieldOperations/fieldOperations.hook";
 import {
+=======
+  FiUserPlus,
+  FiUsers,
+  FiWifiOff,
+  FiXCircle,
+} from "react-icons/fi";
+import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import {
+  checkoutFieldDuty,
+  createFieldTeam,
+  endFieldVisit,
+  getFieldOverview,
+  getFieldTeams,
+  getFieldTeamOptions,
+  getMyFieldDuty,
+  sendFieldLocation,
+  startFieldDuty,
+  startFieldVisit,
+  updateFieldDutyStatus,
+} from "../../auth/api/fieldOperations/fieldOperations.api";
+import {
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   pendingFieldEvents,
   queueFieldEvent,
   removeFieldEvent,
 } from "./fieldOfflineQueue";
+<<<<<<< HEAD
 import FieldMap from "./FieldMap";
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
 const newId = () =>
   window.crypto?.randomUUID?.() ||
   `field_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+<<<<<<< HEAD
 const MIN_VISIT_MINUTES = 20;
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const formatTime = (value) =>
   value
     ? new Intl.DateTimeFormat("en-IN", {
@@ -73,6 +109,7 @@ const formatTime = (value) =>
         minute: "2-digit",
       }).format(new Date(value))
     : "—";
+<<<<<<< HEAD
 const formatDuration = (totalSeconds) => {
   if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "—";
   const h = Math.floor(totalSeconds / 3600);
@@ -106,6 +143,8 @@ function GeofenceResult({ result, label }) {
     </p>
   );
 }
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const pointFromPosition = (position) => ({
   latitude: position.coords.latitude,
   longitude: position.coords.longitude,
@@ -151,6 +190,7 @@ function StatusPill({ status }) {
   );
 }
 
+<<<<<<< HEAD
 // Free, dependency-free "share on WhatsApp": opens wa.me with the
 // employee's last known REAL device GPS point as a Google Maps link. No
 // WhatsApp Business API, no recurring cost, no auto-push — the person
@@ -179,6 +219,9 @@ function ShareOnWhatsAppButton({ session }) {
 }
 
 function LiveMap({ session, big = false }) {
+=======
+function LiveMap({ session }) {
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const location = session?.lastLocation || session?.startLocation;
   if (!location)
     return (
@@ -188,6 +231,7 @@ function LiveMap({ session, big = false }) {
     );
   const lat = Number(location.latitude);
   const lon = Number(location.longitude);
+<<<<<<< HEAD
   const accuracy = Number(location.accuracy);
   return (
     <div>
@@ -425,6 +469,21 @@ function FaceCheckModal({
   heading = "Verify before field duty",
   subtext = "The live camera preview must be visible. Keep your face centred, look at the camera, and use good lighting before verifying.",
 }) {
+=======
+  const pad = 0.012;
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon - pad}%2C${lat - pad}%2C${lon + pad}%2C${lat + pad}&layer=mapnik&marker=${lat}%2C${lon}`;
+  return (
+    <iframe
+      title="Live field location"
+      className="h-72 w-full rounded-2xl border border-slate-200"
+      src={src}
+      loading="lazy"
+    />
+  );
+}
+
+function FaceCheckModal({ onCaptured, onClose }) {
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [error, setError] = useState("");
@@ -489,8 +548,18 @@ function FaceCheckModal({
             <FiCamera />
           </span>
           <div>
+<<<<<<< HEAD
             <h2 className="font-extrabold text-slate-900">{heading}</h2>
             <p className="mt-1 text-xs text-slate-500">{subtext}</p>
+=======
+            <h2 className="font-extrabold text-slate-900">
+              Verify before field duty
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Keep your face centred and use good lighting. The photo is checked
+              against your enrolled face profile.
+            </p>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </div>
         </div>
         <div className="mt-4 aspect-square overflow-hidden rounded-xl bg-slate-900">
@@ -501,9 +570,12 @@ function FaceCheckModal({
             className="h-full w-full object-cover -scale-x-100"
           />
         </div>
+<<<<<<< HEAD
         <p className="mt-2 text-center text-xs font-semibold text-slate-600">
           Good lighting · face inside frame · look at the camera
         </p>
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
@@ -519,7 +591,11 @@ function FaceCheckModal({
             onClick={capture}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
+<<<<<<< HEAD
             <FiCamera /> Verify
+=======
+            <FiCamera /> Verify & start
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </button>
         </div>
       </div>
@@ -527,6 +603,7 @@ function FaceCheckModal({
   );
 }
 
+<<<<<<< HEAD
 function dataUrlToFile(dataUrl, filename) {
   const [header, base64] = dataUrl.split(",");
   const mime = header.match(/:(.*?);/)[1];
@@ -709,11 +786,26 @@ function EmployeeDuty({ auth }) {
   const promptedForRef = useRef(null);
   const [visitOpen, setVisitOpen] = useState(false);
   const [routeDate, setRouteDate] = useState("");
+=======
+function EmployeeDuty({
+  session,
+  setSession,
+  refresh,
+  pendingCount,
+  setPendingCount,
+  faceVerificationRequired,
+}) {
+  const watchId = useRef(null);
+  const lastSent = useRef(0);
+  const [busy, setBusy] = useState(false);
+  const [visitOpen, setVisitOpen] = useState(false);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const [visitForm, setVisitForm] = useState({
     customerName: "",
     organisationName: "",
     contactNumber: "",
     purpose: "",
+<<<<<<< HEAD
     visitType: "",
   });
   const [openVisit, setOpenVisit] = useState(null);
@@ -762,6 +854,11 @@ function EmployeeDuty({ auth }) {
   useEffect(() => {
     refreshPendingCount();
   }, [refreshPendingCount]);
+=======
+  });
+  const [openVisit, setOpenVisit] = useState(null);
+  const [showFaceCheck, setShowFaceCheck] = useState(false);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
   const syncQueue = useCallback(async () => {
     const queued = await pendingFieldEvents();
@@ -773,8 +870,13 @@ function EmployeeDuty({ auth }) {
         break;
       }
     }
+<<<<<<< HEAD
     refreshPendingCount();
   }, [refreshPendingCount]);
+=======
+    setPendingCount((await pendingFieldEvents()).length);
+  }, [setPendingCount]);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
   const sendLocation = useCallback(
     async (position) => {
@@ -793,10 +895,17 @@ function EmployeeDuty({ auth }) {
           payload,
           createdAt: Date.now(),
         });
+<<<<<<< HEAD
         refreshPendingCount();
       }
     },
     [session, refreshPendingCount],
+=======
+        setPendingCount((await pendingFieldEvents()).length);
+      }
+    },
+    [session, setPendingCount],
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   );
 
   useEffect(() => {
@@ -821,6 +930,7 @@ function EmployeeDuty({ auth }) {
   }, [syncQueue]);
 
   const beginDuty = async (selfieBase64 = null) => {
+<<<<<<< HEAD
     // A fresh live selfie is always captured at the start of a field duty.
     // The backend performs the enrolled-face match and returns a clear retry
     // message if lighting/face alignment is not sufficient.
@@ -828,12 +938,20 @@ function EmployeeDuty({ auth }) {
       setCheckInMode("start");
       return;
     }
+=======
+    if (faceVerificationRequired && !selfieBase64) {
+      setShowFaceCheck(true);
+      return;
+    }
+    setBusy(true);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       if (!navigator.onLine)
         throw new Error(
           "Connect to the internet once to start field duty. GPS updates are safely queued after duty starts.",
         );
       const position = await currentPosition();
+<<<<<<< HEAD
       await startDuty.mutateAsync({
         location: pointFromPosition(position),
         selfieBase64,
@@ -844,6 +962,14 @@ function EmployeeDuty({ auth }) {
           batteryLevel: null,
         },
       });
+=======
+      const result = await startFieldDuty({
+        location: pointFromPosition(position),
+        selfieBase64,
+        eventId: newId(),
+      });
+      setSession(result.session);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       toast.success("Field duty started. Live location sharing is on.");
     } catch (error) {
       toast.error(
@@ -851,6 +977,7 @@ function EmployeeDuty({ auth }) {
           error.message ||
           "Could not start duty",
       );
+<<<<<<< HEAD
     }
   };
 
@@ -881,6 +1008,18 @@ function EmployeeDuty({ auth }) {
   const changeStatus = async (status) => {
     try {
       await updateStatus.mutateAsync({ sessionId: session._id, status });
+=======
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changeStatus = async (status) => {
+    setBusy(true);
+    try {
+      const result = await updateFieldDutyStatus(session._id, status);
+      setSession(result.session);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       toast.success(
         status === "paused"
           ? "Location sharing paused"
@@ -888,10 +1027,19 @@ function EmployeeDuty({ auth }) {
       );
     } catch (error) {
       toast.error(error?.response?.data?.message || "Could not update duty");
+<<<<<<< HEAD
+=======
+    } finally {
+      setBusy(false);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     }
   };
 
   const endDuty = async () => {
+<<<<<<< HEAD
+=======
+    setBusy(true);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       let body = {};
       try {
@@ -899,11 +1047,17 @@ function EmployeeDuty({ auth }) {
       } catch {
         body = {};
       }
+<<<<<<< HEAD
       await checkoutDuty.mutateAsync({ sessionId: session._id, body });
+=======
+      const result = await checkoutFieldDuty(session._id, body);
+      setSession(result.session);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       setOpenVisit(null);
       toast.success("Field duty checked out. Location sharing stopped.");
     } catch (error) {
       toast.error(error?.response?.data?.message || "Could not check out");
+<<<<<<< HEAD
     }
   };
 
@@ -919,6 +1073,22 @@ function EmployeeDuty({ auth }) {
           location: pointFromPosition(position),
           eventId: newId(),
         },
+=======
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const beginVisit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const position = await currentPosition();
+      const result = await startFieldVisit(session._id, {
+        ...visitForm,
+        location: pointFromPosition(position),
+        eventId: newId(),
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       });
       setOpenVisit(result.visit);
       setVisitOpen(false);
@@ -927,7 +1097,10 @@ function EmployeeDuty({ auth }) {
         organisationName: "",
         contactNumber: "",
         purpose: "",
+<<<<<<< HEAD
         visitType: "",
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       });
       toast.success("Visit started");
     } catch (error) {
@@ -936,6 +1109,7 @@ function EmployeeDuty({ auth }) {
           error.message ||
           "Could not start visit",
       );
+<<<<<<< HEAD
     }
   };
 
@@ -955,6 +1129,16 @@ function EmployeeDuty({ auth }) {
 
   const finishVisit = async (status = "completed") => {
     if (!openVisit) return;
+=======
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finishVisit = async () => {
+    if (!openVisit) return;
+    setBusy(true);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     try {
       let location = {};
       try {
@@ -962,6 +1146,7 @@ function EmployeeDuty({ auth }) {
       } catch {
         location = {};
       }
+<<<<<<< HEAD
       const result = await endVisitMut.mutateAsync({
         visitId: openVisit._id,
         body: { ...location, status },
@@ -1024,6 +1209,19 @@ function EmployeeDuty({ auth }) {
       <div className="p-8 text-sm text-slate-500">Loading your field duty…</div>
     );
 
+=======
+      await endFieldVisit(openVisit._id, { ...location, status: "completed" });
+      setOpenVisit(null);
+      toast.success("Visit completed");
+      refresh();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Could not complete visit");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
       <header>
@@ -1058,6 +1256,7 @@ function EmployeeDuty({ auth }) {
               Started {formatTime(session.startedAt)}
             </div>
             <div className="rounded-xl bg-white/10 p-3">
+<<<<<<< HEAD
               <FiActivity className="mb-1" />
               {session.status === "checked_out" ? (
                 formatDuration(session.totalDurationSeconds)
@@ -1074,6 +1273,11 @@ function EmployeeDuty({ auth }) {
               <FiNavigation className="mb-1" />
               {formatDistance(session.totalDistanceMeters)} travelled
             </div>
+=======
+              <FiMapPin className="mb-1" />
+              Last seen {formatTime(session.lastSeenAt)}
+            </div>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </div>
         ) : (
           <p className="mt-4 text-sm text-white/80">
@@ -1087,7 +1291,14 @@ function EmployeeDuty({ auth }) {
             onClick={() => beginDuty()}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 font-bold text-[#7A004B] disabled:opacity-60"
           >
+<<<<<<< HEAD
             <FiCamera /> Verify face & start duty
+=======
+            {faceVerificationRequired ? <FiCamera /> : <FiPlay />}
+            {faceVerificationRequired
+              ? " Verify face & start duty"
+              : " Start field duty"}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           </button>
         ) : (
           <div className="mt-5 grid grid-cols-2 gap-3">
@@ -1143,6 +1354,7 @@ function EmployeeDuty({ auth }) {
           </button>
         )}
       </div>
+<<<<<<< HEAD
       {session?.status === "active" && nextCheckInDueAt && (
         <div
           className={`rounded-2xl border p-4 ${checkInOverdue ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white"}`}
@@ -1177,13 +1389,19 @@ function EmployeeDuty({ auth }) {
           big
         />
       )}
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       {session && session.status !== "checked_out" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-bold text-slate-900">Customer visit</h2>
               <p className="text-xs text-slate-500">
+<<<<<<< HEAD
                 Log time, outcome, and a proof photo at each customer location.
+=======
+                Log time and outcome at each customer location.
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
               </p>
             </div>
             {openVisit ? <StatusPill status="in_progress" /> : null}
@@ -1196,6 +1414,7 @@ function EmployeeDuty({ auth }) {
               <p className="text-xs text-blue-700">
                 Started {formatTime(openVisit.startedAt)}
               </p>
+<<<<<<< HEAD
               <VisitPhotoUploader visit={openVisit} onUploaded={setOpenVisit} />
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
@@ -1222,6 +1441,15 @@ function EmployeeDuty({ auth }) {
               </p>
               <GeofenceResult result={openVisit.geofenceStatus?.atStart} label="Start location" />
               <GeofenceResult result={openVisit.geofenceStatus?.atEnd} label="End location" />
+=======
+              <button
+                disabled={busy}
+                onClick={finishVisit}
+                className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white"
+              >
+                End visit
+              </button>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             </div>
           ) : (
             <button
@@ -1234,6 +1462,7 @@ function EmployeeDuty({ auth }) {
           )}
         </div>
       )}
+<<<<<<< HEAD
 {lastFinishedVisit && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <p className="font-bold text-slate-900">Activity result: {lastFinishedVisit.customerName}</p>
@@ -1358,6 +1587,8 @@ function EmployeeDuty({ auth }) {
           onCaptured={handleCompletionPhoto}
         />
       )}
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       {visitOpen && (
         <form
           onSubmit={beginVisit}
@@ -1368,7 +1599,10 @@ function EmployeeDuty({ auth }) {
             ["customerName", "Customer / contact name *"],
             ["organisationName", "Organisation / place"],
             ["contactNumber", "Contact number"],
+<<<<<<< HEAD
             ["visitType", "Visit type (e.g. Sales call, Delivery, Service)"],
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             ["purpose", "Visit purpose"],
           ].map(([name, label]) => (
             <input
@@ -1399,6 +1633,7 @@ function EmployeeDuty({ auth }) {
           </div>
         </form>
       )}
+<<<<<<< HEAD
       {checkInMode && (
         <FaceCheckModal
           onClose={() => setCheckInMode(null)}
@@ -1411,12 +1646,22 @@ function EmployeeDuty({ auth }) {
               ? "A quick selfie + location every couple of hours confirms you're on the field and safe."
               : undefined
           }
+=======
+      {showFaceCheck && (
+        <FaceCheckModal
+          onClose={() => setShowFaceCheck(false)}
+          onCaptured={(selfie) => {
+            setShowFaceCheck(false);
+            beginDuty(selfie);
+          }}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
       )}
     </div>
   );
 }
 
+<<<<<<< HEAD
 function TeamSetupForm({ team, onClose, onSaved }) {
   const isEdit = Boolean(team);
   const teamOptions = useFieldTeamOptions();
@@ -1469,6 +1714,36 @@ function TeamSetupForm({ team, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+=======
+function ManagerDashboard({
+  overview,
+  reload,
+  teams,
+  setTeams,
+  canManageTeams,
+}) {
+  const [selected, setSelected] = useState(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [options, setOptions] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    territory: "",
+    geofence: { latitude: "", longitude: "", radiusMeters: "" },
+    managers: [],
+    members: [],
+  });
+  const [saving, setSaving] = useState(false);
+  const live = overview?.live || [];
+  const active = selected || live[0] || null;
+  const openSetup = async () => {
+    try {
+      setOptions(await getFieldTeamOptions());
+      setShowSetup(true);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Could not load team members");
+    }
+  };
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   const toggle = (key, id) =>
     setForm((current) => ({
       ...current,
@@ -1476,6 +1751,7 @@ function TeamSetupForm({ team, onClose, onSaved }) {
         ? current[key].filter((item) => item !== id)
         : [...current[key], id],
     }));
+<<<<<<< HEAD
 
   const matchesSearch = (person, query) =>
     !query ||
@@ -2315,6 +2591,30 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
     }
   };
 
+=======
+  const createTeam = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await createFieldTeam(form);
+      toast.success("Field team created");
+      setShowSetup(false);
+      setForm({
+        name: "",
+        territory: "",
+        geofence: { latitude: "", longitude: "", radiusMeters: "" },
+        managers: [],
+        members: [],
+      });
+      const data = await getFieldTeams();
+      setTeams(data.teams);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Could not create team");
+    } finally {
+      setSaving(false);
+    }
+  };
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   return (
     <div className="space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -2326,6 +2626,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             Live field map
           </h1>
           <p className="mt-1 text-sm text-slate-500">
+<<<<<<< HEAD
             {isRefreshing
               ? "Refreshing live field data…"
               : lastUpdated
@@ -2361,6 +2662,21 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           {canManageTeams && (
             <button
               onClick={() => setTeamFormTarget(null)}
+=======
+            Updates refresh every 45 seconds while a duty session is open.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={reload}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
+          >
+            <FiRefreshCw /> Refresh
+          </button>
+          {canManageTeams && (
+            <button
+              onClick={openSetup}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
               className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"
             >
               <FiUsers /> Create field team
@@ -2368,6 +2684,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           )}
         </div>
       </header>
+<<<<<<< HEAD
       <OverviewFilters
         filters={filters}
         onChange={setFilters}
@@ -2380,15 +2697,27 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           icon={<FiActivity />}
           label="Active now"
           value={overview.data?.summary?.active || 0}
+=======
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Stat
+          icon={<FiActivity />}
+          label="Active now"
+          value={overview?.summary?.active || 0}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
         <Stat
           icon={<FiWifiOff />}
           label="Offline"
+<<<<<<< HEAD
           value={overview.data?.summary?.offline || 0}
+=======
+          value={overview?.summary?.offline || 0}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         />
         <Stat
           icon={<FiCheckCircle />}
           label="Visits completed today"
+<<<<<<< HEAD
           value={overview.data?.summary?.completedVisits || 0}
         />
         <Stat
@@ -2431,13 +2760,38 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               onDateChange={setRouteDate}
               big
             />
+=======
+          value={overview?.summary?.completedVisits || 0}
+        />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_360px]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-3">
+          <LiveMap session={active} />
+          {active && (
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+              <div>
+                <p className="font-bold text-slate-900">
+                  {active.employee?.f_name} {active.employee?.l_name}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {active.team?.name || "Field team"} · Last seen{" "}
+                  {formatTime(active.lastSeenAt)}
+                </p>
+              </div>
+              <StatusPill status={active.status} />
+            </div>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           )}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-3">
           <h2 className="px-1 pb-3 font-bold text-slate-900">
             Field employees ({live.length})
           </h2>
+<<<<<<< HEAD
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
+=======
+          <div className="max-h-[380px] space-y-2 overflow-y-auto">
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             {live.length ? (
               live.map((item) => (
                 <button
@@ -2461,6 +2815,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                     </div>
                     <StatusPill status={item.status} />
                   </div>
+<<<<<<< HEAD
                   <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-500">
                     <span>
                       {formatDistance(item.totalDistanceMeters)} travelled
@@ -2482,6 +2837,8 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                       </span>
                     )}
                   </div>
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 </button>
               ))
             ) : (
@@ -2493,28 +2850,44 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
         </section>
       </div>
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
+<<<<<<< HEAD
         <h2 className="font-bold text-slate-900">Today's visits</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[680px] text-left text-sm">
+=======
+        <h2 className="font-bold text-slate-900">Today’s visits</h2>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             <thead className="border-b text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="pb-2">Employee</th>
                 <th className="pb-2">Customer</th>
+<<<<<<< HEAD
                 <th className="pb-2">Type</th>
                 <th className="pb-2">Started</th>
                 <th className="pb-2">Photos</th>
                 <th className="pb-2">Geofence</th>
+=======
+                <th className="pb-2">Purpose</th>
+                <th className="pb-2">Started</th>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 <th className="pb-2">Status</th>
               </tr>
             </thead>
             <tbody>
+<<<<<<< HEAD
               {(overview.data?.visits || []).map((visit) => (
+=======
+              {(overview?.visits || []).map((visit) => (
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                 <tr key={visit._id} className="border-b last:border-0">
                   <td className="py-3 font-medium">
                     {visit.employee?.f_name} {visit.employee?.l_name}
                   </td>
                   <td className="py-3">{visit.customerName}</td>
                   <td className="py-3 text-slate-500">
+<<<<<<< HEAD
                     {visit.visitType || visit.purpose || "—"}
                   </td>
                   <td className="py-3">{formatTime(visit.startedAt)}</td>
@@ -2532,13 +2905,25 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                     ) : "—"}
                   </td>
                   <td className="py-3">
+=======
+                    {visit.purpose || "—"}
+                  </td>
+                  <td className="py-3">{formatTime(visit.startedAt)}</td>
+                  <td className="py-3">
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     <StatusPill status={visit.status} />
                   </td>
                 </tr>
               ))}
+<<<<<<< HEAD
               {!overview.data?.visits?.length && (
                 <tr>
                   <td className="py-5 text-center text-slate-500" colSpan="7">
+=======
+              {!overview?.visits?.length && (
+                <tr>
+                  <td className="py-5 text-center text-slate-500" colSpan="5">
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     No visits recorded today.
                   </td>
                 </tr>
@@ -2547,6 +2932,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           </table>
         </div>
       </section>
+<<<<<<< HEAD
       {!isSuperAdmin && <AssignedActivitiesPanel employees={activityEmployees} visits={overview.data?.visits || []} />}
       {canManageTeams && <IndividualAssignmentsPanel />}
       {(canManageTeams || isSuperAdmin) && <AuditLogPanel />}
@@ -2588,12 +2974,28 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             </div>
           ))}
           {!teams.data?.teams?.length && (
+=======
+      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="font-bold text-slate-900">Your field teams</h2>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {teams.map((team) => (
+            <div key={team._id} className="rounded-xl bg-slate-50 p-3">
+              <p className="font-bold">{team.name}</p>
+              <p className="text-xs text-slate-500">
+                {team.territory || "No territory"} · {team.members?.length || 0}{" "}
+                field employee(s)
+              </p>
+            </div>
+          ))}
+          {!teams.length && (
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
             <p className="text-sm text-slate-500">
               Create a team and assign a manager and field employees to begin.
             </p>
           )}
         </div>
       </section>
+<<<<<<< HEAD
       {teamFormTarget !== undefined && (
         <TeamSetupForm
           team={teamFormTarget}
@@ -2620,6 +3022,73 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             overview.refetch();
           }}
         />
+=======
+      {showSetup && (
+        <form
+          onSubmit={createTeam}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"
+        >
+          <div className="mx-auto my-6 max-w-xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex justify-between">
+              <h2 className="text-lg font-extrabold">Create field team</h2>
+              <button type="button" onClick={() => setShowSetup(false)}>
+                ×
+              </button>
+            </div>
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Team name *"
+              className="mt-4 w-full rounded-lg border px-3 py-2"
+            />
+            <input
+              value={form.territory}
+              onChange={(e) => setForm({ ...form, territory: e.target.value })}
+              placeholder="Territory / area"
+              className="mt-2 w-full rounded-lg border px-3 py-2"
+            />
+            <p className="mt-4 text-sm font-bold">Managers</p>
+            <div className="mt-2 grid max-h-32 grid-cols-2 gap-2 overflow-y-auto">
+              {options?.managers?.map((person) => (
+                <label
+                  key={person._id}
+                  className="flex gap-2 rounded bg-slate-50 p-2 text-xs"
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.managers.includes(person._id)}
+                    onChange={() => toggle("managers", person._id)}
+                  />
+                  {person.f_name} {person.l_name}
+                </label>
+              ))}
+            </div>
+            <p className="mt-4 text-sm font-bold">Field employees</p>
+            <div className="mt-2 grid max-h-40 grid-cols-2 gap-2 overflow-y-auto">
+              {options?.employees?.map((person) => (
+                <label
+                  key={person._id}
+                  className="flex gap-2 rounded bg-slate-50 p-2 text-xs"
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.members.includes(person._id)}
+                    onChange={() => toggle("members", person._id)}
+                  />
+                  {person.f_name} {person.l_name}
+                </label>
+              ))}
+            </div>
+            <button
+              disabled={saving}
+              className="mt-5 w-full rounded-lg bg-[#7A004B] py-2.5 font-bold text-white disabled:opacity-50"
+            >
+              Create team
+            </button>
+          </div>
+        </form>
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       )}
     </div>
   );
@@ -2642,6 +3111,7 @@ function Stat({ icon, label, value }) {
 export default function FieldOperations() {
   const { data: auth } = useAuth();
   const role = auth?.role;
+<<<<<<< HEAD
   const isEmployee = role === "employee";
 
   return isEmployee ? (
@@ -2650,6 +3120,68 @@ export default function FieldOperations() {
     <ManagerDashboard
       canManageTeams={role === "admin"}
       isSuperAdmin={role === "superadmin"}
+=======
+  const [session, setSession] = useState(null);
+  const [overview, setOverview] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [faceVerificationRequired, setFaceVerificationRequired] =
+    useState(false);
+  const load = useCallback(async () => {
+    try {
+      if (role === "employee") {
+        const data = await getMyFieldDuty();
+        setSession(data.session);
+        setFaceVerificationRequired(Boolean(data.faceVerificationRequired));
+      } else {
+        const [data, teamData] = await Promise.all([
+          getFieldOverview(),
+          getFieldTeams(),
+        ]);
+        setOverview(data);
+        setTeams(teamData.teams);
+      }
+      setPendingCount((await pendingFieldEvents()).length);
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Could not load Field Operations",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+  useEffect(() => {
+    if (role) load();
+  }, [role, load]);
+  useEffect(() => {
+    if (role === "employee" || !role) return undefined;
+    const timer = window.setInterval(load, 45000);
+    return () => window.clearInterval(timer);
+  }, [role, load]);
+  if (loading)
+    return (
+      <div className="p-8 text-sm text-slate-500">
+        Loading Field Operations…
+      </div>
+    );
+  return role === "employee" ? (
+    <EmployeeDuty
+      session={session}
+      setSession={setSession}
+      refresh={load}
+      pendingCount={pendingCount}
+      setPendingCount={setPendingCount}
+      faceVerificationRequired={faceVerificationRequired}
+    />
+  ) : (
+    <ManagerDashboard
+      overview={overview}
+      reload={load}
+      teams={teams}
+      setTeams={setTeams}
+      canManageTeams={["admin", "superadmin"].includes(role)}
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     />
   );
 }

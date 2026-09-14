@@ -11,7 +11,10 @@ import {
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
+<<<<<<< HEAD
 import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
 const AVATAR_STYLES = [
   "avataaars", "bottts", "personas", "lorelei",
@@ -288,11 +291,14 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
     {
       key: "security", label: "Security", icon: (
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+<<<<<<< HEAD
       )
     },
     {
       key: "field_work", label: "Field Work", icon: (
         <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /><circle cx="8" cy="6.5" r="1.8" stroke="currentColor" strokeWidth="1.4" /></svg>
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       )
     },
     {
@@ -950,7 +956,10 @@ export default function SuperAdminSettingsPage() {
         <Sidebar tab={tab} setTab={setTab} superAdmin={superAdmin} initials={initials} />
 
         <div className="flex-1 w-full min-w-0">
+<<<<<<< HEAD
           {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
           {tab === "overview" && <OverviewTab superAdmin={superAdmin} />}
           {tab === "profile" && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
           {tab === "organisation" && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}

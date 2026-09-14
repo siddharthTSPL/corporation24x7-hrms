@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 
+<<<<<<< HEAD
 // Field Operations deliberately keeps its hierarchy separate from attendance.
 // A team only contains employees who are allowed to start field-duty sessions.
 const fieldTeamSchema = new mongoose.Schema(
@@ -21,6 +22,14 @@ const fieldTeamSchema = new mongoose.Schema(
       ref: "Department",
       default: null,
     },
+=======
+
+const fieldTeamSchema = new mongoose.Schema(
+  {
+    organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    code: { type: String, trim: true, uppercase: true, maxlength: 32 },
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     territory: { type: String, trim: true, maxlength: 160, default: "" },
     geofence: {
       latitude: { type: Number, default: null, min: -90, max: 90 },
@@ -34,12 +43,21 @@ const fieldTeamSchema = new mongoose.Schema(
     notifyOnGeofenceExit: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, required: true },
   },
+<<<<<<< HEAD
   { timestamps: true },
+=======
+  { timestamps: true }
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 );
 
 fieldTeamSchema.index({ organisation_id: 1, name: 1 }, { unique: true });
 fieldTeamSchema.index({ organisation_id: 1, managers: 1 });
 fieldTeamSchema.index({ organisation_id: 1, members: 1 });
+<<<<<<< HEAD
 fieldTeamSchema.index({ organisation_id: 1, department: 1 });
 
 module.exports = mongoose.model("FieldTeam", fieldTeamSchema);
+=======
+
+module.exports = mongoose.model("FieldTeam", fieldTeamSchema);
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7

@@ -177,6 +177,7 @@ const superAdminSchema = new mongoose.Schema(
       max_managers: { type: Number, default: 10, min: 0 },
       data_retention_days: { type: Number, default: 180, min: 1 },
       require_face_verification: { type: Boolean, default: false },
+<<<<<<< HEAD
       // OFF: no geofence enforcement. WARNING: distance shown to the user
       // but never blocks. STRICT: an activity with a known expectedLocation
       // (radiusMeters set) cannot be started/ended outside the fence.
@@ -194,10 +195,27 @@ const superAdminSchema = new mongoose.Schema(
         of: Number,
         default: {},
       },
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
 
     licenses: [licenseSchema],
 
+<<<<<<< HEAD
+=======
+    // Single Sign-In (one active device/browser per account). Gated to
+    // Advance/enterprise plans at the route/UI level — the toggle itself
+    // stays harmless to store even on Basic, it just won't be reachable.
+    singleSignIn: {
+      enabled: { type: Boolean, default: false },
+      mode: {
+        type: String,
+        enum: ["strict", "approval"],
+        default: "approval",
+      },
+    },
+
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     plan: {
       type: String,
       default: null,
@@ -307,11 +325,19 @@ superAdminSchema.methods.generateLicense = function (
   plan = "basic",
   users = 0,
   plan_type = "monthly",
+<<<<<<< HEAD
   startDate = new Date(),
 ) {
   const activatedAt = new Date(startDate);
   const expiresAt = new Date(
     activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000,
+=======
+  startDate = new Date()
+) {
+  const activatedAt = new Date(startDate);
+  const expiresAt = new Date(
+    activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   );
 
   const existing = this.licenses.find((l) => l.product === product);
@@ -391,11 +417,15 @@ superAdminSchema.statics.forceExpireStaleLicenses = async function () {
   const result = await this.updateMany(
     { "licenses.isActive": true, "licenses.expiresAt": { $lte: now } },
     { $set: { "licenses.$[elem].isActive": false } },
+<<<<<<< HEAD
     {
       arrayFilters: [
         { "elem.isActive": true, "elem.expiresAt": { $lte: now } },
       ],
     },
+=======
+    { arrayFilters: [{ "elem.isActive": true, "elem.expiresAt": { $lte: now } }] }
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   );
   return {
     matchedDocuments: result.matchedCount,

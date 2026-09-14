@@ -20,6 +20,10 @@ api.interceptors.response.use(
 const LOCKED_FALLBACK = {
   plan: null,
   isTrialActive: false,
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
   features: {
     review: false,
     timesheet: false,
@@ -29,7 +33,13 @@ const LOCKED_FALLBACK = {
     fieldOperations: false,
   },
   fieldAssignment: { isMember: false, isManager: false },
+<<<<<<< HEAD
 
+=======
+=======
+  features: { review: false, timesheet: false, recruitment: false, asset: false, tickets: false, single_sign_in: false },
+>>>>>>> origin/Ashish
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 };
 
 export const fetchPlanFeatures = async () => {

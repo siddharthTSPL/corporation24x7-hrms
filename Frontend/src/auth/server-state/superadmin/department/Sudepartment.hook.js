@@ -6,6 +6,7 @@ import {
   deleteDepartmentSuperAdmin,
 } from "../../../api/superadmin/department/Sudepartment.api";
 
+<<<<<<< HEAD
 const SUPERADMIN_DEPARTMENT_QUERY_KEY = ["superadmin-departments"];
 
 const updateSuperAdminDepartmentsCache = (queryClient, updater) => {
@@ -19,6 +20,11 @@ const updateSuperAdminDepartmentsCache = (queryClient, updater) => {
 export const useGetAllDepartmentsSuperAdmin = () => {
   return useQuery({
     queryKey: SUPERADMIN_DEPARTMENT_QUERY_KEY,
+=======
+export const useGetAllDepartmentsSuperAdmin = () => {
+  return useQuery({
+    queryKey: ["superadmin-departments"],
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     queryFn: getAllDepartmentsSuperAdmin,
     staleTime: 0,
     refetchOnMount: true,
@@ -30,12 +36,17 @@ export const useCreateDepartmentSuperAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createDepartmentSuperAdmin,
+<<<<<<< HEAD
     onSuccess: (response, _variables, _context) => {
       const department = response?.data?.department;
       if (department) {
         updateSuperAdminDepartmentsCache(queryClient, (departments) => [...departments, department]);
       }
       queryClient.invalidateQueries({ queryKey: SUPERADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
+=======
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin-departments"] });
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };
@@ -44,6 +55,7 @@ export const useUpdateDepartmentSuperAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }) => updateDepartmentSuperAdmin(id, data),
+<<<<<<< HEAD
     onSuccess: (response, _variables) => {
       const department = response?.data?.department;
       if (department) {
@@ -52,6 +64,10 @@ export const useUpdateDepartmentSuperAdmin = () => {
         );
       }
       queryClient.invalidateQueries({ queryKey: SUPERADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
+=======
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin-departments"] });
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };
@@ -60,6 +76,7 @@ export const useDeleteDepartmentSuperAdmin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteDepartmentSuperAdmin,
+<<<<<<< HEAD
     onSuccess: (_response, departmentId) => {
       if (departmentId) {
         updateSuperAdminDepartmentsCache(queryClient, (departments) =>
@@ -67,6 +84,10 @@ export const useDeleteDepartmentSuperAdmin = () => {
         );
       }
       queryClient.invalidateQueries({ queryKey: SUPERADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
+=======
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin-departments"] });
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };

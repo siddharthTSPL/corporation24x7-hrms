@@ -1553,7 +1553,10 @@ function DepartmentsPanel({ notify }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const saving = createMutation.isPending || updateMutation.isPending;
+<<<<<<< HEAD
   const refreshing = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
   const openCreate = () => {
     setEditing(null);
@@ -1619,11 +1622,14 @@ function DepartmentsPanel({ notify }) {
           </Button>
         }
       >
+<<<<<<< HEAD
         {refreshing && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#F3D9E7] bg-[#F9F0F5] px-3 py-2 text-xs font-medium text-[#730042]">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> Refreshing department list...
           </div>
         )}
+=======
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         {loading ? (
           <div className="flex items-center justify-center py-10 text-slate-400">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -1644,16 +1650,24 @@ function DepartmentsPanel({ notify }) {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => openEdit(dept)}
+<<<<<<< HEAD
                     disabled={refreshing}
                     className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#730042] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+=======
+                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#730042] transition-colors"
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDelete(dept)}
+<<<<<<< HEAD
                     disabled={refreshing}
                     className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+=======
+                    className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+>>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
                     title="Remove"
                   >
                     <Trash2 className="w-4 h-4" />
