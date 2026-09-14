@@ -7,15 +7,34 @@ const pointSchema = new mongoose.Schema(
     accuracy: { type: Number, default: null },
     capturedAt: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const fieldDutySessionSchema = new mongoose.Schema(
   {
-    organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
-    employee: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    team: { type: mongoose.Schema.Types.ObjectId, ref: "FieldTeam", default: null },
-    status: { type: String, enum: ["active", "paused", "offline", "checked_out"], default: "active", index: true },
+    organisation_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SuperAdmin",
+      required: true,
+      index: true,
+    },
+    employee: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    team: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FieldTeam",
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["active", "paused", "offline", "checked_out"],
+      default: "active",
+      index: true,
+    },
     startedAt: { type: Date, default: Date.now, required: true },
     endedAt: { type: Date, default: null },
     startLocation: { type: pointSchema, required: true },
@@ -23,7 +42,11 @@ const fieldDutySessionSchema = new mongoose.Schema(
     lastLocation: { type: pointSchema, default: null },
     lastSeenAt: { type: Date, default: Date.now },
     activity: {
-      movementStatus: { type: String, enum: ["moving", "slow_moving", "stationary", "unknown"], default: "unknown" },
+      movementStatus: {
+        type: String,
+        enum: ["moving", "slow_moving", "stationary", "unknown"],
+        default: "unknown",
+      },
       speedKph: { type: Number, default: null },
       distanceFromPreviousMeters: { type: Number, default: null },
       withinTeamGeofence: { type: Boolean, default: null },
@@ -33,6 +56,17 @@ const fieldDutySessionSchema = new mongoose.Schema(
     totalDurationSeconds: { type: Number, default: 0 },
     totalDistanceMeters: { type: Number, default: 0 },
     geofenceExitCount: { type: Number, default: 0 },
+    lastCheckInAt: { type: Date, default: null },
+    checkIns: [
+      {
+        _id: false,
+        capturedAt: { type: Date, required: true },
+        latitude: Number,
+        longitude: Number,
+        accuracy: Number,
+        faceMatchScore: { type: Number, default: null },
+      },
+    ],
     device: {
       platform: { type: String, trim: true, maxlength: 40, default: "" },
       appVersion: { type: String, trim: true, maxlength: 20, default: "" },
@@ -41,12 +75,20 @@ const fieldDutySessionSchema = new mongoose.Schema(
     },
     clientEventId: { type: String, trim: true, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Exactly one open session is enforced in the controller; this index makes
 // live-map and employee history queries fast without a fragile global unique index.
-fieldDutySessionSchema.index({ organisation_id: 1, employee: 1, status: 1, startedAt: -1 });
-fieldDutySessionSchema.index({ organisation_id: 1, employee: 1, clientEventId: 1 }, { unique: true, sparse: true });
+fieldDutySessionSchema.index({
+  organisation_id: 1,
+  employee: 1,
+  status: 1,
+  startedAt: -1,
+});
+fieldDutySessionSchema.index(
+  { organisation_id: 1, employee: 1, clientEventId: 1 },
+  { unique: true, sparse: true },
+);
 
 module.exports = mongoose.model("FieldDutySession", fieldDutySessionSchema);

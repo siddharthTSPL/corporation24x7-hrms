@@ -1553,6 +1553,7 @@ function DepartmentsPanel({ notify }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const saving = createMutation.isPending || updateMutation.isPending;
+  const refreshing = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   const openCreate = () => {
     setEditing(null);
@@ -1618,6 +1619,11 @@ function DepartmentsPanel({ notify }) {
           </Button>
         }
       >
+        {refreshing && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#F3D9E7] bg-[#F9F0F5] px-3 py-2 text-xs font-medium text-[#730042]">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Refreshing department list...
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-10 text-slate-400">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -1638,14 +1644,16 @@ function DepartmentsPanel({ notify }) {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => openEdit(dept)}
-                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#730042] transition-colors"
+                    disabled={refreshing}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#730042] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Edit"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setConfirmDelete(dept)}
-                    className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                    disabled={refreshing}
+                    className="p-2 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Remove"
                   >
                     <Trash2 className="w-4 h-4" />

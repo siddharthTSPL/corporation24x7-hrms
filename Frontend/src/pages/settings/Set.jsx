@@ -6,6 +6,7 @@ import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/MyAssetsWidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
+import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
@@ -80,6 +81,7 @@ const TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
+  { key: "field_work", label: "Field Work" },
   { key: "avatar", label: "Avatar" },
 ];
 
@@ -1208,6 +1210,7 @@ export default function AdminSettingsPage() {
             </div>
 
             <div className="flex-1 min-w-0">
+              {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled={false} />}
               {tab === "profile" && <ProfileTab adminData={adminData} />}
               {tab === "contact" && <ContactTab adminData={adminData} onSuccess={showSuccess} onError={showError} />}
               {tab === "address" && <AddressTab adminData={adminData} />}

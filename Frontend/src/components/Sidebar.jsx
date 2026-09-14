@@ -164,6 +164,10 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // assigned to a field team should see it. So it's filtered out of the
   // menu entirely here, rather than shown locked with an "Upgrade" badge
   // the way review/timesheet/recruitment are.
+  //
+  // The master on/off switch lives in the Settings page (Settings nav has
+  // no fieldGate, so it stays visible even when Field Operations is off),
+  // so hiding this menu item when disabled does not cause a lockout.
   const passesFieldGate = (item) => {
     if (!item.fieldGate) return true;
     if (!planFeatures?.features?.fieldOperations) return false;
