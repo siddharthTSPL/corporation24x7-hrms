@@ -2379,7 +2379,6 @@ exports.exportFieldActivitiesCsv = async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10000)
     .lean();
-
   const teamManagerCache = new Map();
   const header = [
     "Date",
