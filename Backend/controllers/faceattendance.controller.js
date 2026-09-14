@@ -4,10 +4,7 @@ const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
-<<<<<<< HEAD
 const FieldTeam = require("../Models/fieldTeam.model");
-=======
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 const { updateSummary } = require("../automatic/monthattendanceupdate");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
 const { startOfISTDay } = require("../utils/istDate.utils");
@@ -45,7 +42,6 @@ const enrollFace = async (req, res) => {
         .json({ message: "employeeId, onModel and role are required" });
 
     if (!["User", "Manager", "Admin"].includes(onModel))
-<<<<<<< HEAD
       return res
         .status(400)
         .json({ message: "onModel must be User, Manager or Admin" });
@@ -54,12 +50,6 @@ const enrollFace = async (req, res) => {
       return res
         .status(400)
         .json({ message: "A photo file is required (field name: photo)" });
-=======
-      return res.status(400).json({ message: "onModel must be User, Manager or Admin" });
-
-    if (!req.file)
-      return res.status(400).json({ message: "A photo file is required (field name: photo)" });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     const organisation_id = req.admin.organisation_id;
     const imageBase64 = req.file.buffer.toString("base64");
@@ -76,11 +66,7 @@ const enrollFace = async (req, res) => {
         embedding,
         enrolledBy: req.admin._id,
       },
-<<<<<<< HEAD
       { upsert: true, new: true },
-=======
-      { upsert: true, new: true }
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     );
 
     res.status(200).json({
@@ -107,14 +93,10 @@ const listEnrolled = async (req, res) => {
 const removeFace = async (req, res) => {
   try {
     const organisation_id = req.admin.organisation_id;
-<<<<<<< HEAD
     await FaceProfile.findOneAndDelete({
       organisation_id,
       employee: req.params.employeeId,
     });
-=======
-    await FaceProfile.findOneAndDelete({ organisation_id, employee: req.params.employeeId });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     res.json({ message: "Face profile removed" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -124,22 +106,14 @@ const removeFace = async (req, res) => {
 const scanFace = async (req, res) => {
   try {
     const { image, gate } = req.body;
-<<<<<<< HEAD
     if (!image)
       return res.status(400).json({ message: "image (base64) is required" });
-=======
-    if (!image) return res.status(400).json({ message: "image (base64) is required" });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
     // value. Just cap length/sanitize - this is a location label, not a
     // permission gate, so we don't hard-reject unrecognised values.
-<<<<<<< HEAD
     const gateName =
       typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
-=======
-    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     const { organisation_id } = req.kiosk;
 
@@ -148,12 +122,8 @@ const scanFace = async (req, res) => {
     const profiles = await FaceProfile.find({ organisation_id }).lean();
     if (!profiles.length)
       return res.status(404).json({
-<<<<<<< HEAD
         message:
           "No employees are registered for face attendance yet. Please register first.",
-=======
-        message: "No employees are registered for face attendance yet. Please register first.",
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         reason: "not_registered",
       });
 
@@ -169,12 +139,8 @@ const scanFace = async (req, res) => {
 
     if (!best || bestScore < SIMILARITY_THRESHOLD)
       return res.status(404).json({
-<<<<<<< HEAD
         message:
           "Face not recognized. If you're new here, please register first.",
-=======
-        message: "Face not recognized. If you're new here, please register first.",
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         reason: "not_registered",
       });
 
@@ -184,7 +150,6 @@ const scanFace = async (req, res) => {
       .lean();
 
     if (!employeeDoc)
-<<<<<<< HEAD
       return res
         .status(404)
         .json({ message: "Matched employee record no longer exists" });
@@ -211,13 +176,6 @@ const scanFace = async (req, res) => {
       startTime: shift.startTime,
       endTime: shift.endTime,
     };
-=======
-      return res.status(404).json({ message: "Matched employee record no longer exists" });
-
-    const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
-    const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
-    const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     const now = new Date();
     const today = startOfISTDay(now); // IST-based day boundary, not server-local
@@ -251,14 +209,10 @@ const scanFace = async (req, res) => {
     }
 
     if (needsRealCheckin) {
-<<<<<<< HEAD
       const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(
         shift,
         now,
       );
-=======
-      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
       if (!allowed) {
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
@@ -306,15 +260,11 @@ const scanFace = async (req, res) => {
       // Exact instant checkout unlocks, so the kiosk can show a live
       // countdown chip right after check-in instead of only surfacing it
       // reactively after a blocked second scan.
-<<<<<<< HEAD
       const { checkoutOpensAt } = evaluateCheckoutWindow(
         shift,
         attendance.checkIn,
         attendance.checkIn,
       );
-=======
-      const { checkoutOpensAt } = evaluateCheckoutWindow(shift, attendance.checkIn, attendance.checkIn);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
       return res.json({
         message: checkinMessage,
@@ -340,15 +290,11 @@ const scanFace = async (req, res) => {
         checkOut: attendance.checkOut,
       });
 
-<<<<<<< HEAD
     const checkoutWindow = evaluateCheckoutWindow(
       shift,
       now,
       attendance.checkIn,
     );
-=======
-    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     if (!checkoutWindow.allowed) {
       const who = employeeName || "You";
@@ -368,13 +314,9 @@ const scanFace = async (req, res) => {
 
     attendance.checkOut = now;
     attendance.checkOutGate = gateName;
-<<<<<<< HEAD
     const durationMinutes = Math.round(
       (attendance.checkOut - attendance.checkIn) / 60000,
     );
-=======
-    const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     attendance.activeMinutes = durationMinutes;
 
     // Face-only rule: judged as a PERCENTAGE of this shift's own total
@@ -394,20 +336,12 @@ const scanFace = async (req, res) => {
       auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
     }[remark];
 
-<<<<<<< HEAD
     const finalMessage =
       attendance.status === "absent"
         ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
         : attendance.status === "half_day"
           ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
           : remarkMessage;
-=======
-    const finalMessage = attendance.status === "absent"
-      ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
-      : attendance.status === "half_day"
-        ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
-        : remarkMessage;
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
     return res.json({
       message: finalMessage,
@@ -427,8 +361,4 @@ const scanFace = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 module.exports = { enrollFace, listEnrolled, removeFace, scanFace, upload };
-=======
-module.exports = { enrollFace, listEnrolled, removeFace, scanFace, upload };
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7

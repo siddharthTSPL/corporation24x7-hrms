@@ -18,8 +18,7 @@ const fieldVisitPhotoUpload = multer({
   },
 });
 
-<<<<<<< HEAD
+
 module.exports = fieldVisitPhotoUpload;
-=======
-module.exports = fieldVisitPhotoUpload;
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
+
+

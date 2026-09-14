@@ -1,12 +1,8 @@
 const SuperAdminModel = require("../Models/superadmin.model");
 const FieldTeam = require("../Models/fieldTeam.model");
-<<<<<<< HEAD
 const {
   UNLOCKED_PLANS,
 } = require("../middleware/auth/planFeatureGate.middleware");
-=======
-const { UNLOCKED_PLANS } = require("../middleware/auth/planFeatureGate.middleware");
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
 // Features gated by the org's torchx_talent plan tier. Keep this in sync
 // with middleware/auth/planFeatureGate.middleware.js — that middleware is
@@ -18,17 +14,14 @@ const { UNLOCKED_PLANS } = require("../middleware/auth/planFeatureGate.middlewar
 // is intentionally NOT in this list. It is available on every plan,
 // including Basic. Only these 5 remain locked on Basic: Review, Timesheet,
 // Recruitment, Asset Management, TorchX Voice.
-<<<<<<< HEAD
 const GATED_FEATURES = [
   "review",
   "timesheet",
   "recruitment",
   "asset",
   "tickets",
+  "single_sign_in",
 ];
-=======
-const GATED_FEATURES = ["review", "timesheet", "recruitment", "asset", "tickets", "single_sign_in"];
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
 
 // Field Operations is NOT plan-tier gated like the list above — it's an
 // org-type toggle. Most organisations on the platform don't do field work,
@@ -48,34 +41,22 @@ const getPlanFeatureAccess = async (req, res, next) => {
 
     if (!organisationId)
       return next(
-<<<<<<< HEAD
         Object.assign(new Error("Organisation not found."), {
           statusCode: 404,
         }),
-=======
-        Object.assign(new Error("Organisation not found."), { statusCode: 404 })
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       );
 
     const organisation = req.superAdmin
       ? req.superAdmin
       : await SuperAdminModel.findById(organisationId).select(
-<<<<<<< HEAD
           "licenses is_trial_active trial_expires_at field_operations",
-=======
-          "licenses is_trial_active trial_expires_at field_operations"
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         );
 
     if (!organisation)
       return next(
-<<<<<<< HEAD
         Object.assign(new Error("Organisation not found."), {
           statusCode: 404,
         }),
-=======
-        Object.assign(new Error("Organisation not found."), { statusCode: 404 })
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
       );
 
     const trialActive = organisation.isTrialValid();
@@ -84,11 +65,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
       (l) =>
         l.product === "torchx_talent" &&
         l.isActive &&
-<<<<<<< HEAD
         new Date(l.expiresAt) > new Date(),
-=======
-        new Date(l.expiresAt) > new Date()
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     );
 
     const plan = license?.plan || null;
@@ -112,26 +89,18 @@ const getPlanFeatureAccess = async (req, res, next) => {
           organisation_id: organisationId,
           members: req.employee._id,
           active: true,
-<<<<<<< HEAD
         })
           .select("_id")
           .lean();
-=======
-        }).select("_id").lean();
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         fieldAssignment.isMember = Boolean(team);
       } else if (req.manager) {
         const team = await FieldTeam.findOne({
           organisation_id: organisationId,
           managers: req.manager._id,
           active: true,
-<<<<<<< HEAD
         })
           .select("_id")
           .lean();
-=======
-        }).select("_id").lean();
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
         fieldAssignment.isManager = Boolean(team);
       }
     }
@@ -148,8 +117,4 @@ const getPlanFeatureAccess = async (req, res, next) => {
   }
 };
 
-<<<<<<< HEAD
 module.exports = { getPlanFeatureAccess };
-=======
-module.exports = { getPlanFeatureAccess };
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
