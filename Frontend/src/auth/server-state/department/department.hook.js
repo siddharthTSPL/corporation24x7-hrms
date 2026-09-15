@@ -6,7 +6,6 @@ import {
   deleteDepartment,
 } from "../../api/department/department.api";
 
-<<<<<<< HEAD
 const ADMIN_DEPARTMENT_QUERY_KEY = ["admin-departments"];
 
 const updateAdminDepartmentsCache = (queryClient, updater) => {
@@ -20,11 +19,6 @@ const updateAdminDepartmentsCache = (queryClient, updater) => {
 export const useGetAllDepartments = () => {
   return useQuery({
     queryKey: ADMIN_DEPARTMENT_QUERY_KEY,
-=======
-export const useGetAllDepartments = () => {
-  return useQuery({
-    queryKey: ["admin-departments"],
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     queryFn: getAllDepartments,
     staleTime: 0,
     refetchOnMount: true,
@@ -36,17 +30,12 @@ export const useCreateDepartment = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createDepartment,
-<<<<<<< HEAD
     onSuccess: (response, _variables, _context) => {
       const department = response?.data?.department;
       if (department) {
         updateAdminDepartmentsCache(queryClient, (departments) => [...departments, department]);
       }
       queryClient.invalidateQueries({ queryKey: ADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
-=======
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };
@@ -55,7 +44,6 @@ export const useUpdateDepartment = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }) => updateDepartment(id, data),
-<<<<<<< HEAD
     onSuccess: (response, _variables) => {
       const department = response?.data?.department;
       if (department) {
@@ -64,10 +52,6 @@ export const useUpdateDepartment = () => {
         );
       }
       queryClient.invalidateQueries({ queryKey: ADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
-=======
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };
@@ -76,7 +60,6 @@ export const useDeleteDepartment = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteDepartment,
-<<<<<<< HEAD
     onSuccess: (_response, departmentId) => {
       if (departmentId) {
         updateAdminDepartmentsCache(queryClient, (departments) =>
@@ -84,10 +67,6 @@ export const useDeleteDepartment = () => {
         );
       }
       queryClient.invalidateQueries({ queryKey: ADMIN_DEPARTMENT_QUERY_KEY, refetchType: "active" });
-=======
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-departments"] });
->>>>>>> 5035b061a1efa021ba50454f6e5a182e4d2740e7
     },
   });
 };

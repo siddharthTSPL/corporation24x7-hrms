@@ -1789,7 +1789,7 @@ function TeamSetupForm({ team, onClose, onSaved }) {
   );
 }
 
-function SettingsPanel({ onClose }) {
+function SettingsPanel({ onClose, isSuperAdmin = false }) {
   const { data, isLoading } = useFieldSettings(true);
   const updateSettings = useUpdateFieldSettings();
   const [formEdits, setForm] = useState({});
@@ -1799,8 +1799,10 @@ function SettingsPanel({ onClose }) {
     event.preventDefault();
     try {
       const adminSettings = { ...form };
-      delete adminSettings.enabled;
-      delete adminSettings.require_face_verification;
+      if (!isSuperAdmin) {
+        delete adminSettings.enabled;
+        delete adminSettings.require_face_verification;
+      }
       await updateSettings.mutateAsync(adminSettings);
       toast.success("Field Operations settings saved");
       onClose();
@@ -1829,28 +1831,27 @@ function SettingsPanel({ onClose }) {
           <p className="mt-6 text-sm text-slate-500">Loading settings…</p>
         ) : (
           <form onSubmit={submit} className="mt-4 space-y-4">
-            {false && (
-              <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-                <span>
-                  <span className="block font-bold text-slate-900">
-                    Field Operations enabled
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    Off by default — turn on only for organisations that do
-                    field work.
-                  </span>
+            <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
+              <span>
+                <span className="block font-bold text-slate-900">
+                  Field Operations enabled
                 </span>
-                <input
-                  type="checkbox"
-                  checked={form.enabled}
-                  onChange={(e) =>
-                    setForm({ ...form, enabled: e.target.checked })
-                  }
-                  className="h-5 w-5 accent-[#7A004B]"
-                />
-              </label>
-            )}
-            <label className="hidden flex items-center justify-between rounded-xl border border-slate-200 p-3">
+                <span className="text-xs text-slate-500">
+                  Off by default — turn on only for organisations that do
+                  field work.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                disabled={!isSuperAdmin}
+                onChange={(e) =>
+                  setForm({ ...form, enabled: e.target.checked })
+                }
+                className="h-5 w-5 accent-[#7A004B]"
+              />
+            </label>
+            <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
               <span>
                 <span className="block font-bold text-slate-900">
                   Require face verification
@@ -1862,6 +1863,7 @@ function SettingsPanel({ onClose }) {
               <input
                 type="checkbox"
                 checked={form.require_face_verification}
+                disabled={!isSuperAdmin}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -2649,6 +2651,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   const [showBulkExcel, setShowBulkExcel] = useState(false);
   const [routeEmployeeId, setRouteEmployeeId] = useState(null);
   const [routeDate, setRouteDate] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
   const deleteTeam = useDeleteFieldTeam();
 
   const live = overview.data?.live || [];
@@ -2691,6 +2694,19 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
     }
   };
 
+  const allTeams = teams.data?.teams || [];
+  const q = teamSearch.trim().toLowerCase();
+  const filteredTeams = useMemo(
+    () =>
+      !q
+        ? allTeams
+        : allTeams.filter((t) =>
+            (t.name || "").toLowerCase().includes(q) ||
+            (t.territory || "").toLowerCase().includes(q),
+          ),
+    [allTeams, q],
+  );
+
   return (
     <div className="space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -2718,30 +2734,30 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             <FiRefreshCw className={isRefreshing ? "animate-spin" : ""} />
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </button>
-          {canManageTeams && (
+          {canManageTeams || isSuperAdmin ? (
             <button
               onClick={() => setShowSettings(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
             >
               <FiSettings /> Settings
             </button>
-          )}
-          {canManageTeams && (
+          ) : null}
+          {canManageTeams || isSuperAdmin ? (
             <button
               onClick={() => setShowBulkExcel(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
             >
               <FiUpload /> Bulk assign (Excel)
             </button>
-          )}
-          {canManageTeams && (
+          ) : null}
+          {canManageTeams || isSuperAdmin ? (
             <button
               onClick={() => setTeamFormTarget(null)}
               className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"
             >
               <FiUsers /> Create field team
             </button>
-          )}
+          ) : null}
         </div>
       </header>
       <OverviewFilters
@@ -2946,9 +2962,19 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
       {canManageTeams && <IndividualAssignmentsPanel />}
       {(canManageTeams || isSuperAdmin) && <AuditLogPanel />}
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold text-slate-900">Your field teams</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold text-slate-900">Your field teams</h2>
+          {canManageTeams && (
+            <input
+              value={teamSearch}
+              onChange={(e) => setTeamSearch(e.target.value)}
+              placeholder="Search team name…"
+              className="w-full max-w-xs rounded-lg border px-2.5 py-1.5 text-sm sm:w-56"
+            />
+          )}
+        </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {(teams.data?.teams || []).map((team) => (
+          {filteredTeams.map((team) => (
             <div
               key={team._id}
               className="flex items-start gap-3 rounded-xl bg-slate-50 p-3"
@@ -2982,9 +3008,11 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               )}
             </div>
           ))}
-          {!teams.data?.teams?.length && (
+          {!filteredTeams.length && (
             <p className="text-sm text-slate-500">
-              Create a team and assign a manager and field employees to begin.
+              {teams.data?.teams?.length
+                ? "No teams match your search."
+                : "Create a team and assign a manager and field employees to begin."}
             </p>
           )}
         </div>
@@ -3010,6 +3038,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
       )}
       {showSettings && (
         <SettingsPanel
+          isSuperAdmin={isSuperAdmin}
           onClose={() => {
             setShowSettings(false);
             overview.refetch();
