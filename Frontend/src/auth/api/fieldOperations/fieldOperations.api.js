@@ -4,9 +4,14 @@ const resolveApiBaseUrl = () => {
   const configured =
     import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_API_URL ||
-    "http://localhost:5000";
+    "http://localhost:5000/api";
   const trimmed = String(configured).trim().replace(/\/+$/, "");
-  return trimmed.endsWith("/api") ? trimmed.slice(0, -"/api".length) : trimmed;
+  // Every field-operations/faceattendance call below is written as
+  // "field-operations/..." with no "api/" prefix, so the base URL itself
+  // must end in "/api" or IIS's "^api/field-operations/..." rewrite rule
+  // never matches and the request falls through to the SPA catch-all,
+  // returning index.html (200) instead of JSON.
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
 const api = axios.create({
