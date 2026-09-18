@@ -25,6 +25,8 @@ import {
   reassignFieldActivity,
   cancelFieldActivity,
   getFieldAuditLog,
+  getMyFieldVisits,
+  getAllFieldVisits,
 } from "../../api/fieldOperations/fieldOperations.api";
 
 export const useMyFieldDuty = (enabled) => {
@@ -151,14 +153,24 @@ export const useSubmitFieldCheckIn = () => {
 };
 
 export const useStartFieldVisit = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionId, body }) => startFieldVisit(sessionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["field-visits"] });
+    },
   });
 };
 
 export const useEndFieldVisit = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ visitId, body }) => endFieldVisit(visitId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["field-visits"] });
+    },
   });
 };
 
@@ -225,6 +237,7 @@ export const useMyAssignedActivities = (enabled) =>
 const invalidateActivities = (queryClient) => {
   queryClient.invalidateQueries({ queryKey: ["field-overview"] });
   queryClient.invalidateQueries({ queryKey: ["field-assigned-activities"] });
+  queryClient.invalidateQueries({ queryKey: ["field-visits"] });
 };
 
 export const useAssignFieldActivity = () => {
@@ -259,4 +272,20 @@ export const useFieldAuditLog = (enabled, page = 1, limit = 25) =>
     staleTime: 1000 * 15,
   });
 
+
+export const useAllFieldVisits = (enabled, filters = {}) =>
+  useQuery({
+    queryKey: ["field-visits", filters],
+    queryFn: () => getAllFieldVisits(filters),
+    enabled,
+    staleTime: 1000 * 15,
+    placeholderData: {
+      success: true,
+      visits: [],
+      total: 0,
+      page: 1,
+      limit: 8,
+      totalPages: 0,
+    },
+  });
 

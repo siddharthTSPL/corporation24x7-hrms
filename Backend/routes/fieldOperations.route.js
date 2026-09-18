@@ -31,6 +31,7 @@ router.post(
 // Assigned Field Activity (optional, spec sections 18/32/33)
 router.get("/activities/mine", asyncHandler(controller.myAssignedActivities));
 router.get("/visits/mine", asyncHandler(controller.myVisits));
+router.get("/visits/all", asyncHandler(controller.getAllFieldVisits));
 router.post("/activities", asyncHandler(controller.assignActivity));
 router.patch(
   "/activities/:activityId/reassign",
@@ -77,6 +78,8 @@ router.delete(
 );
 
 router.get("/export/csv", asyncHandler(controller.exportFieldActivitiesCsv));
+router.get("/export/employees", asyncHandler(controller.exportFieldEmployeesWithVisits));
+router.get("/visits/export/csv", asyncHandler(controller.exportMyVisitsCsv));
 router.get("/audit-log", asyncHandler(controller.getAuditLog));
 
 module.exports = router;

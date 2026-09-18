@@ -47,6 +47,8 @@ const VISIT_PHOTO_MAX_COUNT = 6;
 // Legacy fallback only — real minimum duration now comes from
 // resolveMinDurationMinutes(activityType) in utils/fieldWorkConstants.js.
 const MIN_VISIT_MINUTES = 20;
+const FIELD_VISIT_PAGE_SIZE = 8;
+const FIELD_VISIT_MAX_PAGE_SIZE = 100;
 
 // Checkpoint status derivation shared by myDuty/getOverview (spec section 24).
 function computeCheckpointStatus(session, now = new Date()) {
@@ -2345,6 +2347,189 @@ exports.myVisits = async (req, res) => {
   return res.json({ success: true, visits });
 };
 
+// Admin/SuperAdmin/Manager: get all field visits for employees in their teams
+exports.getAllFieldVisits = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (!["SuperAdmin", "Admin", "Manager"].includes(actor.model))
+    throw httpError("Access denied", 403);
+  await assertFieldOperationsEnabled(organisation_id);
+
+  const requestedPage = Number(req.query.page);
+  const requestedLimit = Number(req.query.limit);
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit =
+    Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, FIELD_VISIT_MAX_PAGE_SIZE)
+      : FIELD_VISIT_PAGE_SIZE;
+  const status = String(req.query.status || "").trim();
+  const type = String(req.query.activityType || "").trim();
+  const assignmentType = String(req.query.assignmentType || "").trim();
+  const teamId = String(req.query.teamId || "").trim();
+  const employeeSearch = String(req.query.employeeSearch || "").trim();
+  const from = req.query.from
+    ? new Date(`${req.query.from}T00:00:00.000Z`)
+    : null;
+  const to = req.query.to
+    ? new Date(`${req.query.to}T23:59:59.999Z`)
+    : null;
+  if (from && Number.isNaN(from.getTime()))
+    throw httpError("Invalid 'from' date", 400);
+  if (to && Number.isNaN(to.getTime()))
+    throw httpError("Invalid 'to' date", 400);
+  if (from && to && from > to)
+    throw httpError("Invalid date range", 400);
+
+  const queryParts = [{ organisation_id }];
+  let roleEmployeeIds = null;
+  let managedTeamIds = [];
+
+  if (actor.model === "Manager") {
+    const [teams, individuals] = await Promise.all([
+      FieldTeam.find({ organisation_id, managers: actor.id })
+        .select("members")
+        .lean(),
+      FieldAssignment.find({ organisation_id, manager: actor.id })
+        .select("employee")
+        .lean(),
+    ]);
+    managedTeamIds = teams.map((team) => String(team._id));
+    roleEmployeeIds = [
+      ...new Set([
+        ...teams.flatMap((team) => team.members.map(String)),
+        ...individuals.map((assignment) => String(assignment.employee)),
+      ]),
+    ];
+
+    const roleScope = [];
+    if (managedTeamIds.length)
+      roleScope.push({ team: { $in: managedTeamIds } });
+    if (roleEmployeeIds.length)
+      roleScope.push({ employee: { $in: roleEmployeeIds } });
+    if (!roleScope.length) {
+      return res.json({
+        success: true,
+        visits: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      });
+    }
+    queryParts.push(
+      roleScope.length === 1 ? roleScope[0] : { $or: roleScope },
+    );
+  }
+
+  if (teamId) {
+    const team = await FieldTeam.findOne({
+      _id: teamId,
+      organisation_id,
+    })
+      .select("members")
+      .lean();
+    if (!team) throw httpError("Field team not found", 404);
+    if (
+      actor.model === "Manager" &&
+      !managedTeamIds.includes(String(team._id))
+    )
+      throw httpError("This field team is not assigned to you", 403);
+
+    const teamMemberIds = team.members.map(String);
+    const teamScope = [{ team: team._id }];
+    if (teamMemberIds.length)
+      teamScope.push({ employee: { $in: teamMemberIds } });
+    queryParts.push(
+      teamScope.length === 1 ? teamScope[0] : { $or: teamScope },
+    );
+  }
+
+  if (employeeSearch) {
+    const searchEmployeeIds =
+      actor.model === "Manager"
+        ? roleEmployeeIds
+        : null;
+    const matchedEmployees = await User.find({
+      ...(searchEmployeeIds
+        ? { _id: { $in: searchEmployeeIds } }
+        : { organisation_id }),
+      organisation_id,
+      $or: [
+        { f_name: { $regex: employeeSearch, $options: "i" } },
+        { l_name: { $regex: employeeSearch, $options: "i" } },
+        { empid: { $regex: employeeSearch, $options: "i" } },
+      ],
+    })
+      .select("_id")
+      .lean();
+    const matchedIds = new Set(
+      matchedEmployees.map((employee) => String(employee._id)),
+    );
+    if (!matchedIds.size) {
+      return res.json({
+        success: true,
+        visits: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      });
+    }
+    queryParts.push({ employee: { $in: [...matchedIds] } });
+  }
+
+  if (status) queryParts.push({ status });
+  if (type) queryParts.push({ activityType: type });
+  if (assignmentType) queryParts.push({ assignmentType });
+
+  if (from || to) {
+    const makeDateRange = () => {
+      const range = {};
+      if (from) range.$gte = from;
+      if (to) range.$lte = to;
+      return range;
+    };
+    queryParts.push({
+      $or: [
+        { startedAt: makeDateRange() },
+        { createdAt: makeDateRange() },
+        {
+          assignmentType: "assigned",
+          status: "pending",
+          scheduledDate: makeDateRange(),
+        },
+        {
+          assignmentType: "assigned",
+          status: "pending",
+          scheduledDate: null,
+        },
+      ],
+    });
+  }
+
+  const visitQuery =
+    queryParts.length === 1 ? queryParts[0] : { $and: queryParts };
+  const [visits, total] = await Promise.all([
+    FieldVisit.find(visitQuery)
+      .populate("employee", "f_name l_name empid")
+      .populate("team", "name")
+      .sort({ createdAt: -1, startedAt: -1, scheduledDate: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    FieldVisit.countDocuments(visitQuery),
+  ]);
+
+  return res.json({
+    success: true,
+    visits,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  });
+};
+
 // ── CSV export (spec section 30) ──────────────────────────────────────────
 function toCsvValue(value) {
   const str = value === null || value === undefined ? "" : String(value);
@@ -2353,8 +2538,8 @@ function toCsvValue(value) {
 
 exports.exportFieldActivitiesCsv = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
-  if (!["SuperAdmin", "Admin"].includes(actor.model))
-    throw httpError("Only an administrator can export Field Work data", 403);
+  if (!["SuperAdmin", "Admin", "Manager"].includes(actor.model))
+    throw httpError("Only an administrator or manager can export Field Work data", 403);
   await assertFieldOperationsEnabled(organisation_id);
 
   const from = req.query.from
@@ -2366,12 +2551,50 @@ exports.exportFieldActivitiesCsv = async (req, res) => {
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
     throw httpError("Invalid from/to date", 400);
 
-  const query = { organisation_id, createdAt: { $gte: from, $lte: to } };
-  if (req.query.teamId) query.team = req.query.teamId;
-  if (req.query.activityType) query.activityType = req.query.activityType;
-  if (req.query.activityStatus) query.status = req.query.activityStatus;
+  // Get accessible employee IDs (same logic as getOverview)
+  let employeeIds = await accessibleEmployeeIds(req);
 
-  const activities = await FieldVisit.find(query)
+  // Apply team filter
+  if (req.query.teamId) {
+    const team = await FieldTeam.findOne({ _id: req.query.teamId, organisation_id, active: true })
+      .select("members")
+      .lean();
+    if (team) {
+      const teamMemberIds = new Set(team.members.map(String));
+      employeeIds = employeeIds.filter((id) => teamMemberIds.has(id));
+    } else {
+      employeeIds = [];
+    }
+  }
+
+  // Apply employee search filter
+  const employeeSearch = String(req.query.employeeSearch || "").trim();
+  if (employeeSearch && employeeIds.length > 0) {
+    const matchedEmployees = await User.find({
+      _id: { $in: employeeIds },
+      organisation_id,
+      $or: [
+        { f_name: { $regex: employeeSearch, $options: "i" } },
+        { l_name: { $regex: employeeSearch, $options: "i" } },
+        { empid: { $regex: employeeSearch, $options: "i" } },
+      ],
+    })
+      .select("_id")
+      .lean();
+    const matchedIds = new Set(matchedEmployees.map((e) => String(e._id)));
+    employeeIds = employeeIds.filter((id) => matchedIds.has(id));
+  }
+
+  // Build visit query
+  const visitQuery = {
+    organisation_id,
+    employee: { $in: employeeIds },
+    createdAt: { $gte: from, $lte: to },
+  };
+  if (req.query.activityType) visitQuery.activityType = req.query.activityType;
+  if (req.query.activityStatus) visitQuery.status = req.query.activityStatus;
+
+  const activities = await FieldVisit.find(visitQuery)
     .populate("employee", "f_name l_name empid")
     .populate("team", "name")
     .sort({ createdAt: -1 })
@@ -2452,6 +2675,278 @@ exports.exportFieldActivitiesCsv = async (req, res) => {
   res.setHeader(
     "Content-Disposition",
     `attachment; filename="field-activities-${new Date().toISOString().slice(0, 10)}.csv"`,
+  );
+  return res.status(200).send(csv);
+};
+
+// ── Export all active employees with their field visit details ───────────────
+exports.exportFieldEmployeesWithVisits = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (!["SuperAdmin", "Admin"].includes(actor.model))
+    throw httpError("Only an administrator can export Field Work data", 403);
+  await assertFieldOperationsEnabled(organisation_id);
+
+  const from = req.query.from
+    ? new Date(`${req.query.from}T00:00:00.000Z`)
+    : new Date(new Date().setHours(0, 0, 0, 0));
+  const to = req.query.to
+    ? new Date(`${req.query.to}T23:59:59.999Z`)
+    : new Date();
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
+    throw httpError("Invalid from/to date", 400);
+
+  // Get accessible employee IDs
+  let employeeIds = await accessibleEmployeeIds(req);
+
+  // Apply team filter
+  if (req.query.teamId) {
+    const team = await FieldTeam.findOne({ _id: req.query.teamId, organisation_id, active: true })
+      .select("members")
+      .lean();
+    if (team) {
+      const teamMemberIds = new Set(team.members.map(String));
+      employeeIds = employeeIds.filter((id) => teamMemberIds.has(id));
+    } else {
+      employeeIds = [];
+    }
+  }
+
+  // Get all active employees (field employees in teams + individual assignments)
+  const employees = await User.find({
+    _id: { $in: employeeIds },
+    organisation_id,
+    working_status: { $nin: ["resigned", "fired", "terminated"] },
+  })
+    .select("f_name l_name empid work_email office_location")
+    .lean();
+
+  // Get visits for the date range
+  const visitQuery = {
+    organisation_id,
+    employee: { $in: employeeIds },
+    createdAt: { $gte: from, $lte: to },
+  };
+  if (req.query.activityType) visitQuery.activityType = req.query.activityType;
+  if (req.query.activityStatus) visitQuery.status = req.query.activityStatus;
+
+  const visits = await FieldVisit.find(visitQuery)
+    .populate("employee", "f_name l_name empid")
+    .populate("team", "name")
+    .sort({ createdAt: -1 })
+    .limit(10000)
+    .lean();
+
+  // Group visits by employee
+  const visitsByEmployee = new Map();
+  for (const visit of visits) {
+    const empId = String(visit.employee?._id || visit.employee);
+    if (!visitsByEmployee.has(empId)) visitsByEmployee.set(empId, []);
+    visitsByEmployee.get(empId).push(visit);
+  }
+
+  // Build team manager cache
+  const teamManagerCache = new Map();
+  const allTeamIds = [...new Set(employees.flatMap(e => e.team ? String(e.team) : []))];
+  for (const teamId of allTeamIds) {
+    if (teamId) {
+      const teamDoc = await FieldTeam.findById(teamId)
+        .populate("managers", "f_name l_name")
+        .select("managers name")
+        .lean();
+      if (teamDoc) {
+        teamManagerCache.set(teamId, {
+          name: teamDoc.name,
+          managers: (teamDoc.managers || []).map(m => `${m.f_name || ""} ${m.l_name || ""}`.trim()).join("; "),
+        });
+      }
+    }
+  }
+
+  // CSV headers
+  const header = [
+    "Employee Name",
+    "Employee ID",
+    "Email",
+    "Office Location",
+    "Team",
+    "Team Manager(s)",
+    "Total Visits",
+    "Completed Visits",
+    "In Progress Visits",
+    "Skipped Visits",
+    "Follow Up Visits",
+    "Total Duration (minutes)",
+  ];
+
+  // Add visit detail columns (expand each visit)
+  const maxVisits = Math.max(...Array.from(visitsByEmployee.values()).map(v => v.length), 0);
+  for (let i = 1; i <= Math.min(maxVisits, 10); i++) {
+    header.push(`Visit ${i} Date`);
+    header.push(`Visit ${i} Customer`);
+    header.push(`Visit ${i} Type`);
+    header.push(`Visit ${i} Purpose`);
+    header.push(`Visit ${i} Start Time`);
+    header.push(`Visit ${i} End Time`);
+    header.push(`Visit ${i} Duration (min)`);
+    header.push(`Visit ${i} Status`);
+    header.push(`Visit ${i} Location`);
+  }
+
+  const rows = [header];
+
+  for (const emp of employees) {
+    const empVisits = visitsByEmployee.get(String(emp._id)) || [];
+    const completed = empVisits.filter(v => v.status === "completed").length;
+    const inProgress = empVisits.filter(v => v.status === "in_progress").length;
+    const skipped = empVisits.filter(v => v.status === "skipped").length;
+    const followUp = empVisits.filter(v => v.status === "follow_up_required").length;
+    const totalDuration = empVisits
+      .filter(v => v.startedAt && v.endedAt)
+      .reduce((sum, v) => sum + Math.round((new Date(v.endedAt) - new Date(v.startedAt)) / 60000), 0);
+
+    const teamInfo = emp.team ? teamManagerCache.get(String(emp.team)) : null;
+
+    const row = [
+      `${emp.f_name || ""} ${emp.l_name || ""}`.trim(),
+      emp.empid || "",
+      emp.work_email || "",
+      emp.office_location || "",
+      teamInfo?.name || "",
+      teamInfo?.managers || "",
+      empVisits.length,
+      completed,
+      inProgress,
+      skipped,
+      followUp,
+      totalDuration,
+    ];
+
+    // Add visit details
+    for (let i = 0; i < Math.min(empVisits.length, 10); i++) {
+      const v = empVisits[i];
+      const duration = v.startedAt && v.endedAt
+        ? Math.round((new Date(v.endedAt) - new Date(v.startedAt)) / 60000)
+        : "";
+      row.push(
+        v.startedAt ? new Date(v.startedAt).toISOString().slice(0, 10) : "",
+        v.customerName || "",
+        v.activityType || "",
+        v.purpose || "",
+        v.startedAt ? new Date(v.startedAt).toISOString() : "",
+        v.endedAt ? new Date(v.endedAt).toISOString() : "",
+        duration,
+        v.status || "",
+        v.startLocation ? "yes" : "no"
+      );
+    }
+
+    rows.push(row);
+  }
+
+  const csv = rows.map((row) => row.map(toCsvValue).join(",")).join("\r\n");
+
+  await logAudit({
+    organisation_id,
+    module: "field_work",
+    action: "data.exported",
+    actor,
+    meta: { rows: employees.length, type: "employees_with_visits" },
+  });
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="field-employees-visits-${new Date().toISOString().slice(0, 10)}.csv"`,
+  );
+  return res.status(200).send(csv);
+};
+
+// ── Employee's own visits CSV (spec section 30) ────────────────────────────
+// The employee's own "My field visits" list already filters by date/status/
+// type on the client, so the export mirrors those filters and lets the
+// employee download exactly what they see on screen.
+exports.exportMyVisitsCsv = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (actor.model !== "User")
+    throw httpError("Only a field employee can export their own visits", 403);
+  await assertFieldOperationsEnabled(organisation_id);
+
+  const status = String(req.query.status || "").trim();
+  const type = String(req.query.activityType || "").trim();
+  const from = req.query.from ? new Date(req.query.from) : null;
+  const to = req.query.to ? new Date(req.query.to) : null;
+  if (from && Number.isNaN(from.getTime())) throw httpError("Invalid 'from' date", 400);
+  if (to && Number.isNaN(to.getTime())) throw httpError("Invalid 'to' date", 400);
+
+  const query = { organisation_id, employee: actor.id };
+  if (status) query.status = status;
+  if (type) query.activityType = type;
+  if (from || to) {
+    query.startedAt = {};
+    if (from) query.startedAt.$gte = from;
+    if (to) {
+      const end = new Date(to);
+      end.setHours(23, 59, 59, 999);
+      query.startedAt.$lte = end;
+    }
+  }
+
+  const visits = await FieldVisit.find(query)
+    .sort({ startedAt: -1 })
+    .limit(10000)
+    .lean();
+
+  const header = [
+    "Date",
+    "Customer",
+    "Organisation",
+    "Contact",
+    "Activity Type",
+    "Visit Type",
+    "Purpose",
+    "Start Time",
+    "End Time",
+    "Duration (minutes)",
+    "Status",
+    "Assignment Type",
+    "Location Available",
+  ];
+  const rows = [header];
+  for (const v of visits) {
+    const durationMinutes =
+      v.startedAt && v.endedAt
+        ? Math.round((new Date(v.endedAt) - new Date(v.startedAt)) / 60000)
+        : "";
+    rows.push([
+      new Date(v.startedAt).toISOString().slice(0, 10),
+      v.customerName || "",
+      v.organisationName || "",
+      v.contactNumber || "",
+      v.activityType || "",
+      v.visitType || "",
+      v.purpose || "",
+      v.startedAt ? new Date(v.startedAt).toISOString() : "",
+      v.endedAt ? new Date(v.endedAt).toISOString() : "",
+      durationMinutes,
+      v.status,
+      v.assignmentType,
+      v.startLocation ? "yes" : "no",
+    ]);
+  }
+  const csv = rows.map((row) => row.map(toCsvValue).join(",")).join("\r\n");
+
+  await logAudit({
+    organisation_id,
+    module: "field_work",
+    action: "data.exported",
+    actor,
+    meta: { rows: visits.length, scope: "my_visits" },
+  });
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="my-field-visits-${new Date().toISOString().slice(0, 10)}.csv"`,
   );
   return res.status(200).send(csv);
 };

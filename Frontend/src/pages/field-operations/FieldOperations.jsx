@@ -6,6 +6,7 @@ import {
   FiCamera,
   FiCheckCircle,
   FiClock,
+  FiDownload,
   FiMapPin,
   FiNavigation,
   FiPause,
@@ -25,6 +26,7 @@ import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import {
   sendFieldLocation,
   exportFieldActivitiesCsvUrl,
+  exportMyVisitsCsvUrl,
   downloadBulkAssignTemplateUrl,
   uploadBulkAssignFile,
 } from "../../auth/api/fieldOperations/fieldOperations.api";
@@ -51,6 +53,7 @@ import {
   useRemoveIndividualFieldAssignment,
   useMyAssignedActivities,
   useMyFieldVisits,
+  useAllFieldVisits,
   useAssignFieldActivity,
   useReassignFieldActivity,
   useCancelFieldActivity,
@@ -134,6 +137,17 @@ function currentPosition() {
   });
 }
 
+// Non-blocking GPS — returns a point (or null) without throwing, so a slow
+// or unavailable GPS never blocks starting a visit or finishing one.
+async function safeCurrentPosition() {
+  try {
+    const pos = await currentPosition();
+    return pointFromPosition(pos);
+  } catch {
+    return null;
+  }
+}
+
 function StatusPill({ status }) {
   const styles = {
     active: "bg-emerald-100 text-emerald-700",
@@ -185,34 +199,40 @@ function ShareOnWhatsAppButton({ session }) {
   );
 }
 
-function LiveMap({ session, big = false }) {
+function LiveMap({ session, big = false, markers: extraMarkers = [] }) {
   const location = session?.lastLocation || session?.startLocation;
-  if (!location)
+  const allMarkers = [];
+  if (location) {
+    const lat = Number(location.latitude);
+    const lon = Number(location.longitude);
+    const accuracy = Number(location.accuracy);
+    allMarkers.push({
+      latitude: lat,
+      longitude: lon,
+      type: "live",
+      label:
+        session?.employee?.f_name || session?.employee?.l_name
+          ? `${session.employee.f_name || ""} ${session.employee.l_name || ""}`.trim()
+          : "Current location",
+      accuracy,
+      timestamp: location.capturedAt,
+    });
+  }
+  allMarkers.push(...extraMarkers);
+  if (!allMarkers.length)
     return (
       <div className="grid min-h-64 place-items-center rounded-2xl bg-slate-100 text-sm text-slate-500">
         No live GPS point yet
       </div>
     );
-  const lat = Number(location.latitude);
-  const lon = Number(location.longitude);
-  const accuracy = Number(location.accuracy);
   return (
     <div>
       <FieldMap
         big={big}
         height={256}
-        markers={[
-          {
-            latitude: lat,
-            longitude: lon,
-            type: "live",
-            label: "Current location",
-            accuracy,
-            timestamp: location.capturedAt,
-          },
-        ]}
+        markers={allMarkers}
       />
-      <AccuracyBadge accuracy={accuracy} />
+      {location && <AccuracyBadge accuracy={Number(location.accuracy)} />}
     </div>
   );
 }
@@ -726,7 +746,6 @@ function EmployeeDuty({ auth }) {
   const submitCheckIn = useSubmitFieldCheckIn();
   const startVisitMut = useStartFieldVisit();
   const endVisitMut = useEndFieldVisit();
-
   const watchId = useRef(null);
   const lastSent = useRef(0);
   const promptedForRef = useRef(null);
@@ -786,18 +805,74 @@ function EmployeeDuty({ auth }) {
     refreshPendingCount();
   }, [refreshPendingCount]);
 
+  // Restore any visit that was left "in_progress" before a page refresh —
+  // the openVisit state is local only, so a reload would otherwise drop the
+  // employee back to the start-visit screen and they'd lose their chance to
+  // finish it. Retry until the visit is restored or the employee closes it.
+  useEffect(() => {
+    let cancelled = false;
+    let retryTimer = null;
+    let attempts = 0;
+    const restoreOpenVisit = async () => {
+      try {
+        const res = await myVisits.refetch();
+        // getMyFieldVisits resolves to { success, visits } — the visits are
+        // nested under `visits`, not at the top level. Reading res.data as an
+        // array used to throw, the catch swallowed it, and the retry loop
+        // fired forever — so a refreshed page never restored the visit.
+        const inProgress = (res.data?.visits || []).find(
+          (v) => v.status === "in_progress",
+        );
+        if (!cancelled && inProgress) {
+          setOpenVisit(inProgress);
+          // Also restore the visit form so the employee can continue editing
+          // the same visit instead of starting a new one.
+          setVisitForm({
+            customerName: inProgress.customerName || "",
+            organisationName: inProgress.organisationName || "",
+            contactNumber: inProgress.contactNumber || "",
+            purpose: inProgress.purpose || "",
+            visitType: inProgress.visitType || "",
+          });
+          return;
+        }
+        // Once the query has settled with no in-progress visit, there isn't
+        // one to restore — stop retrying instead of polling forever.
+        if (res.data && !myVisits.isLoading) return;
+      } catch {
+        // best-effort restore; ignore failures
+      }
+      if (!cancelled && attempts < 10) {
+        attempts += 1;
+        retryTimer = setTimeout(restoreOpenVisit, 3000);
+      }
+    };
+    restoreOpenVisit();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const syncQueue = useCallback(async () => {
     const queued = await pendingFieldEvents();
     for (const event of queued) {
       try {
-        await sendFieldLocation(event.sessionId, event.payload);
+        if (event.payload?.type === "end_visit") {
+          await endVisitMut.mutateAsync({
+            visitId: event.payload.visitId,
+            body: { location: event.payload.location, status: event.payload.status },
+          });
+        } else {
+          await sendFieldLocation(event.sessionId, event.payload);
+        }
         await removeFieldEvent(event.id);
       } catch {
         break;
       }
     }
     refreshPendingCount();
-  }, [refreshPendingCount]);
+  }, [refreshPendingCount, endVisitMut]);
 
   const sendLocation = useCallback(
     async (position) => {
@@ -809,7 +884,12 @@ function EmployeeDuty({ auth }) {
       try {
         if (!navigator.onLine) throw new Error("offline");
         await sendFieldLocation(session._id, payload);
-      } catch {
+      } catch (error) {
+        // A 403 means the session no longer belongs to this employee (e.g.
+        // the page was refreshed and the session was recreated). Don't
+        // queue it — the new session will pick up location sharing on its
+        // own watchPosition. Only queue genuine offline/network failures.
+        if (error?.response?.status === 403) return;
         await queueFieldEvent({
           id: payload.eventId,
           sessionId: session._id,
@@ -933,13 +1013,16 @@ function EmployeeDuty({ auth }) {
   const beginVisit = async (event, assignedActivity = null) => {
     event?.preventDefault();
     try {
-      const position = await currentPosition();
+      // GPS is best-effort — never block starting a visit because of a slow
+      // or unavailable signal. The visit still starts; location is filled in
+      // if the device can give one.
+      const location = await safeCurrentPosition();
       const result = await startVisitMut.mutateAsync({
         sessionId: session._id,
         body: {
           ...visitForm,
           ...(assignedActivity ? { activityId: assignedActivity._id } : {}),
-          location: pointFromPosition(position),
+          location,
           eventId: newId(),
         },
       });
@@ -952,6 +1035,11 @@ function EmployeeDuty({ auth }) {
         purpose: "",
         visitType: "",
       });
+      // Force the visit list to refresh so the manager/admin/superadmin
+      // dashboards show the newly-started visit immediately — without this
+      // the query's 15s staleTime means the visit "disappears" until the
+      // next automatic refresh.
+      await myVisits.refetch();
       toast.success("Visit started");
     } catch (error) {
       toast.error(
@@ -976,20 +1064,17 @@ function EmployeeDuty({ auth }) {
   const [pendingCompletePhoto, setPendingCompletePhoto] = useState(false);
   const [visitFilter, setVisitFilter] = useState({ status: "", type: "" });
   const uploadCompletionPhoto = useUploadVisitPhoto();
-  const myVisits = useMyFieldVisits(true);
+  const myVisits = useMyFieldVisits(true, visitFilter);
 
   const finishVisit = async (status = "completed") => {
     if (!openVisit) return;
     try {
-      let location = {};
-      try {
-        location = { location: pointFromPosition(await currentPosition()) };
-      } catch {
-        location = {};
-      }
+      // GPS is best-effort — a slow/unavailable signal must not block the
+      // employee from finishing the visit.
+      const location = await safeCurrentPosition();
       const result = await endVisitMut.mutateAsync({
         visitId: openVisit._id,
-        body: { ...location, status },
+        body: { location, status },
       });
       setLastFinishedVisit(result.visit);
       setOpenVisit(null);
@@ -997,6 +1082,29 @@ function EmployeeDuty({ auth }) {
         status === "skipped" ? "Visit marked as skipped" : "Visit completed",
       );
     } catch (error) {
+      // If the network is down, queue the visit-end so it syncs later
+      // instead of silently dropping it.
+      if (error?.message === "offline" || !navigator.onLine) {
+        try {
+          await queueFieldEvent({
+            id: newId(),
+            sessionId: session?._id,
+            payload: {
+              type: "end_visit",
+              visitId: openVisit._id,
+              status,
+              eventId: newId(),
+            },
+            createdAt: Date.now(),
+          });
+          refreshPendingCount();
+          setOpenVisit(null);
+          toast.success("Visit queued — will sync when you're back online");
+          return;
+        } catch {
+          // fall through to the normal error path
+        }
+      }
       toast.error(error?.response?.data?.message || "Could not update visit");
     }
   };
@@ -1142,6 +1250,14 @@ function EmployeeDuty({ auth }) {
           </button>
         )}
       </div>
+      {session?.lastLocation && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            Your live location
+          </p>
+          <LiveMap session={session} big />
+        </div>
+      )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex gap-3">
           <FiWifiOff
@@ -1222,7 +1338,7 @@ function EmployeeDuty({ auth }) {
                 Started {formatTime(openVisit.startedAt)}
               </p>
               <VisitPhotoUploader visit={openVisit} onUploaded={setOpenVisit} />
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <button
                   disabled={busy || !visitCanComplete}
                   onClick={requestCompleteVisit}
@@ -1235,15 +1351,23 @@ function EmployeeDuty({ auth }) {
                 <button
                   disabled={busy}
                   onClick={() => finishVisit("skipped")}
-                  className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-bold text-blue-700 disabled:opacity-40"
+                  className="rounded-lg border border-amber-300 px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-40"
                 >
-                  Skip (unavailable)
+                  Skip
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => finishVisit("follow_up_required")}
+                  className="rounded-lg border border-violet-300 px-3 py-2 text-sm font-bold text-violet-700 disabled:opacity-40"
+                >
+                  Follow up
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-blue-600">
                 Visits need at least {MIN_VISIT_MINUTES} minutes before they can
                 be marked complete, and a live camera photo to close it out. Use
-                Skip if the customer wasn't available.
+                Skip or Follow up if the customer wasn't available — those are
+                always allowed.
               </p>
               <GeofenceResult
                 result={openVisit.geofenceStatus?.atStart}
@@ -1328,6 +1452,13 @@ function EmployeeDuty({ auth }) {
                 </option>
               ))}
             </select>
+            <a
+              href={exportMyVisitsCsvUrl(visitFilter)}
+              download
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#7A004B] px-2.5 py-1 text-xs font-bold text-[#7A004B] hover:bg-[#fdf0f6]"
+            >
+              <FiDownload size={13} /> Export CSV
+            </a>
           </div>
         </div>
         <div className="mt-3 space-y-2">
@@ -1798,12 +1929,12 @@ function SettingsPanel({ onClose, isSuperAdmin = false }) {
   const submit = async (event) => {
     event.preventDefault();
     try {
-      const adminSettings = { ...form };
+      const payload = { ...form };
       if (!isSuperAdmin) {
-        delete adminSettings.enabled;
-        delete adminSettings.require_face_verification;
+        delete payload.enabled;
+        delete payload.require_face_verification;
       }
-      await updateSettings.mutateAsync(adminSettings);
+      await updateSettings.mutateAsync(payload);
       toast.success("Field Operations settings saved");
       onClose();
     } catch (error) {
@@ -1831,66 +1962,6 @@ function SettingsPanel({ onClose, isSuperAdmin = false }) {
           <p className="mt-6 text-sm text-slate-500">Loading settings…</p>
         ) : (
           <form onSubmit={submit} className="mt-4 space-y-4">
-            <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-              <span>
-                <span className="block font-bold text-slate-900">
-                  Field Operations enabled
-                </span>
-                <span className="text-xs text-slate-500">
-                  Off by default — turn on only for organisations that do
-                  field work.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                disabled={!isSuperAdmin}
-                onChange={(e) =>
-                  setForm({ ...form, enabled: e.target.checked })
-                }
-                className="h-5 w-5 accent-[#7A004B]"
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-              <span>
-                <span className="block font-bold text-slate-900">
-                  Require face verification
-                </span>
-                <span className="text-xs text-slate-500">
-                  Employees must verify their face before starting field duty.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                checked={form.require_face_verification}
-                disabled={!isSuperAdmin}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    require_face_verification: e.target.checked,
-                  })
-                }
-                className="h-5 w-5 accent-[#7A004B]"
-              />
-            </label>
-            <label className="block text-xs font-bold text-slate-600">
-              Activity geofence mode
-              <select
-                value={form.geofence_mode || "off"}
-                onChange={(e) =>
-                  setForm({ ...form, geofence_mode: e.target.value })
-                }
-                className="mt-1 w-full rounded-lg border px-2 py-2 text-sm font-normal"
-              >
-                <option value="off">Off — record location only</option>
-                <option value="warning">
-                  Warning — record outside-fence result
-                </option>
-                <option value="strict">
-                  Strict — block completion outside the fence
-                </option>
-              </select>
-            </label>
             <div>
               <p className="text-xs font-bold text-slate-600">
                 Minimum activity duration (minutes)
@@ -2010,76 +2081,91 @@ function OverviewFilters({
 }) {
   const set = (key) => (e) => onChange({ ...filters, [key]: e.target.value });
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
-      <input
-        type="date"
-        value={filters.date}
-        onChange={set("date")}
-        className="rounded-lg border px-2.5 py-1.5 text-sm"
-      />
-      {canManageTeams && (
+<div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3">
+        <input
+          type="date"
+          value={filters.date}
+          onChange={set("date")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="Search employee name…"
+          value={filters.employeeSearch || ""}
+          onChange={set("employeeSearch")}
+          className="min-w-[140px] flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
+        />
+        {canManageTeams && (
+          <select
+            value={filters.teamId}
+            onChange={set("teamId")}
+            className="rounded-lg border px-2.5 py-1.5 text-sm"
+          >
+            <option value="">All teams</option>
+            {teamOptions.map((team) => (
+              <option key={team._id} value={team._id}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        )}
         <select
-          value={filters.teamId}
-          onChange={set("teamId")}
+          value={filters.dutyStatus}
+          onChange={set("dutyStatus")}
           className="rounded-lg border px-2.5 py-1.5 text-sm"
         >
-          <option value="">All teams</option>
-          {teamOptions.map((team) => (
-            <option key={team._id} value={team._id}>
-              {team.name}
+          {DUTY_STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
             </option>
           ))}
         </select>
-      )}
-      <select
-        value={filters.dutyStatus}
-        onChange={set("dutyStatus")}
-        className="rounded-lg border px-2.5 py-1.5 text-sm"
-      >
-        {DUTY_STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <select
-        value={filters.checkpointStatus}
-        onChange={set("checkpointStatus")}
-        className="rounded-lg border px-2.5 py-1.5 text-sm"
-      >
-        {CHECKPOINT_STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {(filters.date ||
-        filters.teamId ||
-        filters.dutyStatus ||
-        filters.checkpointStatus) && (
-        <button
-          onClick={() =>
-            onChange({
-              date: "",
-              teamId: "",
-              dutyStatus: "",
-              checkpointStatus: "",
-            })
-          }
-          className="text-xs font-bold text-slate-500 underline"
+        <select
+          value={filters.checkpointStatus}
+          onChange={set("checkpointStatus")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
         >
-          Clear filters
-        </button>
-      )}
-      {canManageTeams && (
-        <a
-          href={onExport(filters)}
-          className="ml-auto inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-bold text-[#7A004B]"
-        >
-          Export CSV
-        </a>
-      )}
-    </div>
+          {CHECKPOINT_STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        {(filters.date ||
+          filters.teamId ||
+          filters.dutyStatus ||
+          filters.checkpointStatus ||
+          filters.employeeSearch) && (
+          <button
+            onClick={() =>
+              onChange({
+                date: "",
+                teamId: "",
+                dutyStatus: "",
+                checkpointStatus: "",
+                employeeSearch: "",
+              })
+            }
+            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+          >
+            Clear all
+          </button>
+        )}
+        {onExport && (
+          <a
+            href={onExport({
+              from: filters.date || new Date().toISOString().slice(0, 10),
+              to: filters.date || new Date().toISOString().slice(0, 10),
+              teamId: filters.teamId,
+              activityStatus: filters.dutyStatus,
+            })}
+            download
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#7A004B] px-2.5 py-1 text-xs font-bold text-[#7A004B] hover:bg-[#fdf0f6]"
+          >
+            <FiDownload size={13} /> Export CSV
+          </a>
+        )}
+      </div>
   );
 }
 
@@ -2636,22 +2722,95 @@ function AuditLogPanel() {
   );
 }
 
+function TeamDetailModal({ team, onClose }) {
+  if (!team) return null;
+  const members = team.members || [];
+  const managers = team.managers || [];
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+      <div className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+        <div className="flex justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold">{team.name}</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              {team.territory || "No territory"} ·{" "}
+              {members.length} field employee(s) ·{" "}
+              {managers.length} manager(s)
+            </p>
+          </div>
+          <button type="button" onClick={onClose}>
+            <FiX />
+          </button>
+        </div>
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Managers
+            </p>
+            <ul className="mt-1 space-y-1">
+              {managers.length ? (
+                managers.map((m) => (
+                  <li key={m._id} className="text-sm text-slate-700">
+                    {m.f_name} {m.l_name}
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-slate-400">No manager assigned</li>
+              )}
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+              Field employees
+            </p>
+            <ul className="mt-1 space-y-1">
+              {members.length ? (
+                members.map((m) => (
+                  <li key={m._id} className="text-sm text-slate-700">
+                    {m.f_name} {m.l_name}
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-slate-400">No field employees assigned</li>
+              )}
+            </ul>
+          </div>
+          {team.geofence && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Geofence
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                Lat {team.geofence.latitude}, Lon {team.geofence.longitude}
+                {team.geofence.radiusMeters ? ` · ${team.geofence.radiusMeters} m radius` : ""}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   const [filters, setFilters] = useState({
     date: "",
     teamId: "",
     dutyStatus: "",
     checkpointStatus: "",
+    employeeSearch: "",
   });
   const overview = useFieldOverview(true, filters);
   const teams = useFieldTeams(true);
   const [selected, setSelected] = useState(null);
   const [teamFormTarget, setTeamFormTarget] = useState(undefined);
+  const [teamDetail, setTeamDetail] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showBulkExcel, setShowBulkExcel] = useState(false);
   const [routeEmployeeId, setRouteEmployeeId] = useState(null);
   const [routeDate, setRouteDate] = useState("");
   const [teamSearch, setTeamSearch] = useState("");
+  const [showAllOnMap, setShowAllOnMap] = useState(false);
   const deleteTeam = useDeleteFieldTeam();
 
   const live = overview.data?.live || [];
@@ -2707,6 +2866,44 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
     [allTeams, q],
   );
 
+// Filter the live sessions list by every filter the user has set —
+      // date, team, duty status, checkpoint status, visit status, activity
+      // type, and a free-text employee-name search. The map, the right-hand
+      // "Field employees" list, and the team cards all use this filtered set,
+      // so they stay in sync with whatever the user picks.
+      const filteredLive = useMemo(() => {
+        const list = overview.data?.live || [];
+        const empQ = (filters.employeeSearch || "").trim().toLowerCase();
+        return list.filter((s) => {
+          if (filters.date) {
+            const d = new Date(filters.date);
+            const sDate = s.lastSeenAt ? new Date(s.lastSeenAt) : null;
+            if (!sDate || sDate.toISOString().slice(0, 10) !== d.toISOString().slice(0, 10))
+              return false;
+          }
+          if (filters.teamId && s.team?._id !== filters.teamId) return false;
+          if (filters.dutyStatus && s.status !== filters.dutyStatus) return false;
+          if (filters.checkpointStatus) {
+            const cs = s.checkpointStatus || "not_due";
+            if (cs !== filters.checkpointStatus) return false;
+          }
+          if (empQ) {
+            const name = `${s.employee?.f_name || ""} ${s.employee?.l_name || ""}`.toLowerCase();
+            if (!name.includes(empQ)) return false;
+          }
+          return true;
+        });
+      }, [overview.data?.live, filters]);
+
+      // Filter the team cards by the same team search + team filter.
+      const visibleTeams = useMemo(() => {
+        let list = filteredTeams;
+        if (filters.teamId) {
+          list = list.filter((t) => t._id === filters.teamId);
+        }
+        return list;
+      }, [filteredTeams, filters.teamId]);
+
   return (
     <div className="space-y-5 p-4 sm:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -2734,7 +2931,15 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             <FiRefreshCw className={isRefreshing ? "animate-spin" : ""} />
             {isRefreshing ? "Refreshing…" : "Refresh"}
           </button>
-          {canManageTeams || isSuperAdmin ? (
+          <button
+            onClick={() => setShowAllOnMap((v) => !v)}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold ${
+              showAllOnMap ? "bg-[#7A004B] text-white" : ""
+            }`}
+          >
+            <FiUsers /> {showAllOnMap ? "Hide all" : "Show all on map"}
+          </button>
+          {canManageTeams ? (
             <button
               onClick={() => setShowSettings(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
@@ -2742,7 +2947,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               <FiSettings /> Settings
             </button>
           ) : null}
-          {canManageTeams || isSuperAdmin ? (
+          {canManageTeams ? (
             <button
               onClick={() => setShowBulkExcel(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
@@ -2750,7 +2955,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               <FiUpload /> Bulk assign (Excel)
             </button>
           ) : null}
-          {canManageTeams || isSuperAdmin ? (
+          {canManageTeams ? (
             <button
               onClick={() => setTeamFormTarget(null)}
               className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"
@@ -2767,7 +2972,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
         canManageTeams={canManageTeams || isSuperAdmin}
         onExport={exportFieldActivitiesCsvUrl}
       />
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           icon={<FiActivity />}
           label="Active now"
@@ -2789,10 +2994,28 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           value={overview.data?.summary?.checkpointOverdue || 0}
         />
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_360px]">
-        <section className="space-y-5">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_360px]">
+        <section className="space-y-3 min-w-0">
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
-            <LiveMap session={active} big />
+            <LiveMap
+              session={active}
+              big={false}
+              height={220}
+              markers={
+                showAllOnMap
+                  ? live
+                      .filter((s) => s.lastLocation && s._id !== active?._id)
+                      .map((s) => ({
+                        latitude: Number(s.lastLocation.latitude),
+                        longitude: Number(s.lastLocation.longitude),
+                        type: "live",
+                        label: `${s.employee?.f_name} ${s.employee?.l_name}`,
+                        accuracy: Number(s.lastLocation.accuracy),
+                        timestamp: s.lastSeenAt,
+                      }))
+                  : []
+              }
+            />
             {active && (
               <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3">
                 <div>
@@ -2816,22 +3039,22 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             <RouteTrail
               employeeId={routeEmployeeId || active.employee._id}
               date={routeDate}
-              showPicker
+              showPicker={false}
               employees={activityEmployees}
               selectedEmployeeId={routeEmployeeId}
               onEmployeeChange={setRouteEmployeeId}
               onDateChange={setRouteDate}
-              big
+              big={false}
             />
           )}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-3">
           <h2 className="px-1 pb-3 font-bold text-slate-900">
-            Field employees ({live.length})
+            Field employees ({filteredLive.length})
           </h2>
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
-            {live.length ? (
-              live.map((item) => (
+            {filteredLive.length ? (
+              filteredLive.map((item) => (
                 <button
                   key={item._id}
                   onClick={() => setSelected(item)}
@@ -2853,7 +3076,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                     </div>
                     <StatusPill status={item.status} />
                   </div>
-                  <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-500">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                     <span>
                       {formatDistance(item.totalDistanceMeters)} travelled
                     </span>
@@ -2884,100 +3107,26 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           </div>
         </section>
       </div>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="font-bold text-slate-900">Today's visits</h2>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="border-b text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="pb-2">Employee</th>
-                <th className="pb-2">Customer</th>
-                <th className="pb-2">Type</th>
-                <th className="pb-2">Started</th>
-                <th className="pb-2">Photos</th>
-                <th className="pb-2">Geofence</th>
-                <th className="pb-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(overview.data?.visits || []).map((visit) => (
-                <tr key={visit._id} className="border-b last:border-0">
-                  <td className="py-3 font-medium">
-                    {visit.employee?.f_name} {visit.employee?.l_name}
-                  </td>
-                  <td className="py-3">{visit.customerName}</td>
-                  <td className="py-3 text-slate-500">
-                    {visit.visitType || visit.purpose || "—"}
-                  </td>
-                  <td className="py-3">{formatTime(visit.startedAt)}</td>
-                  <td className="py-3">
-                    {visit.attachments?.length
-                      ? `${visit.attachments.length} photo${visit.attachments.length === 1 ? "" : "s"}`
-                      : "—"}
-                  </td>
-                  <td className="py-3 text-xs">
-                    {visit.geofenceStatus?.atEnd ? (
-                      <span
-                        className={
-                          visit.geofenceStatus.atEnd.withinFence
-                            ? "text-emerald-700"
-                            : "font-bold text-rose-700"
-                        }
-                      >
-                        {visit.geofenceStatus.atEnd.withinFence
-                          ? "Within"
-                          : "Outside"}
-                        {Number.isFinite(
-                          visit.geofenceStatus.atEnd.distanceMeters,
-                        )
-                          ? ` (${formatDistance(visit.geofenceStatus.atEnd.distanceMeters)})`
-                          : ""}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="py-3">
-                    <StatusPill status={visit.status} />
-                  </td>
-                </tr>
-              ))}
-              {!overview.data?.visits?.length && (
-                <tr>
-                  <td className="py-5 text-center text-slate-500" colSpan="7">
-                    No visits recorded today.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      {!isSuperAdmin && (
-        <AssignedActivitiesPanel
-          employees={activityEmployees}
-          visits={overview.data?.visits || []}
-        />
-      )}
-      {canManageTeams && <IndividualAssignmentsPanel />}
-      {(canManageTeams || isSuperAdmin) && <AuditLogPanel />}
+      <FieldVisitsSection
+        canManageTeams={canManageTeams || isSuperAdmin}
+        onExport={exportFieldActivitiesCsvUrl}
+      />
       <section className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-bold text-slate-900">Your field teams</h2>
-          {canManageTeams && (
-            <input
-              value={teamSearch}
-              onChange={(e) => setTeamSearch(e.target.value)}
-              placeholder="Search team name…"
-              className="w-full max-w-xs rounded-lg border px-2.5 py-1.5 text-sm sm:w-56"
-            />
-          )}
+          <input
+            value={teamSearch}
+            onChange={(e) => setTeamSearch(e.target.value)}
+            placeholder="Search team name…"
+            className="w-full max-w-xs rounded-lg border px-2.5 py-1.5 text-sm sm:w-56"
+          />
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {filteredTeams.map((team) => (
+          {visibleTeams.map((team) => (
             <div
               key={team._id}
-              className="flex items-start gap-3 rounded-xl bg-slate-50 p-3"
+              className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 cursor-pointer hover:bg-slate-100"
+              onClick={() => setTeamDetail(team)}
             >
               <span
                 className="mt-1 h-3 w-3 shrink-0 rounded-full"
@@ -2991,7 +3140,10 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                 </p>
               </div>
               {canManageTeams && (
-                <div className="flex shrink-0 gap-2 text-xs font-bold">
+                <div
+                  className="flex shrink-0 gap-2 text-xs font-bold"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <button
                     onClick={() => setTeamFormTarget(team)}
                     className="text-[#7A004B]"
@@ -3008,7 +3160,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               )}
             </div>
           ))}
-          {!filteredTeams.length && (
+          {!visibleTeams.length && (
             <p className="text-sm text-slate-500">
               {teams.data?.teams?.length
                 ? "No teams match your search."
@@ -3017,6 +3169,12 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           )}
         </div>
       </section>
+      {teamDetail && (
+        <TeamDetailModal
+          team={teamDetail}
+          onClose={() => setTeamDetail(null)}
+        />
+      )}
       {teamFormTarget !== undefined && (
         <TeamSetupForm
           team={teamFormTarget}
@@ -3049,6 +3207,220 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   );
 }
 
+// ── Field visits ─────────────────────────────────────────────────────────────
+// A dedicated, filterable, exportable table of field visits. Visible to every
+// staff role with field access. The backend scopes results by role: managers see
+// their assigned teams and administrators see the organisation.
+function FieldVisitsSection({ canManageTeams, onExport }) {
+  const [filters, setFilters] = useState({
+    from: "",
+    to: "",
+    teamId: "",
+    status: "",
+    activityType: "",
+    employeeSearch: "",
+  });
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
+  const visitsQuery = useAllFieldVisits(true, {
+    ...filters,
+    page,
+    limit: pageSize,
+  });
+  const teamsQuery = useFieldTeams(true);
+  const teamOptions = teamsQuery.data?.teams || [];
+
+  const set = (key) => (e) => {
+    setFilters((f) => ({ ...f, [key]: e.target.value }));
+    setPage(1);
+  };
+
+  const exportUrl = onExport
+    ? onExport({
+        from: filters.from,
+        to: filters.to,
+        teamId: filters.teamId,
+        status: filters.status,
+        activityType: filters.activityType,
+        employeeSearch: filters.employeeSearch,
+      })
+    : "";
+
+  const visits = visitsQuery.data?.visits || [];
+  const total = visitsQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const firstRecord = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastRecord = Math.min(page * pageSize, total);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold text-slate-900">Field visits</h2>
+        <div className="flex items-center gap-2">
+          {exportUrl ? (
+            <a
+              href={exportUrl}
+              download
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#7A004B] px-2.5 py-1 text-xs font-bold text-[#7A004B] hover:bg-[#fdf0f6]"
+            >
+              <FiDownload size={13} /> Export Visits
+            </a>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={filters.from}
+          onChange={set("from")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
+        />
+        <span className="text-xs text-slate-400">to</span>
+        <input
+          type="date"
+          value={filters.to}
+          onChange={set("to")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="Search employee name…"
+          value={filters.employeeSearch}
+          onChange={set("employeeSearch")}
+          className="min-w-[140px] flex-1 rounded-lg border px-2.5 py-1.5 text-sm"
+        />
+        {canManageTeams && (
+          <select
+            value={filters.teamId}
+            onChange={set("teamId")}
+            className="rounded-lg border px-2.5 py-1.5 text-sm"
+          >
+            <option value="">All teams</option>
+            {teamOptions.map((team) => (
+              <option key={team._id} value={team._id}>
+                {team.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <select
+          value={filters.status}
+          onChange={set("status")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
+        >
+          <option value="">All statuses</option>
+          <option value="completed">Completed</option>
+          <option value="skipped">Skipped</option>
+          <option value="follow_up_required">Follow up</option>
+          <option value="in_progress">In progress</option>
+        </select>
+        <select
+          value={filters.activityType}
+          onChange={set("activityType")}
+          className="rounded-lg border px-2.5 py-1.5 text-sm"
+        >
+          <option value="">All types</option>
+          {ACTIVITY_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {titleize(t)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        {visitsQuery.isLoading ? (
+          <p className="text-sm text-slate-500">Loading visits…</p>
+        ) : visitsQuery.isError ? (
+          <p className="text-sm font-medium text-rose-700">
+            Unable to load field visits.
+          </p>
+        ) : visits.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No visits recorded for this date range.
+          </p>
+        ) : (
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <th className="py-2 pr-3">Employee</th>
+                <th className="py-2 pr-3">Team</th>
+                <th className="py-2 pr-3">Customer</th>
+                <th className="py-2 pr-3">Type</th>
+                <th className="py-2 pr-3">Start</th>
+                <th className="py-2 pr-3">End</th>
+                <th className="py-2 pr-3">Duration</th>
+                <th className="py-2 pr-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visits.map((v) => (
+                <tr key={v._id} className="border-b border-slate-100">
+                  <td className="py-2 pr-3 font-medium">
+                    {v.employee
+                      ? `${v.employee.f_name || ""} ${v.employee.l_name || ""}`.trim()
+                      : "—"}
+                  </td>
+                  <td className="py-2 pr-3 text-slate-500">
+                    {v.team?.name || "—"}
+                  </td>
+                  <td className="py-2 pr-3">{v.customerName || "—"}</td>
+                  <td className="py-2 pr-3">{titleize(v.activityType)}</td>
+                  <td className="py-2 pr-3 text-slate-500">
+                    {v.startedAt ? formatTime(v.startedAt) : "—"}
+                  </td>
+                  <td className="py-2 pr-3 text-slate-500">
+                    {v.endedAt ? formatTime(v.endedAt) : "—"}
+                  </td>
+                  <td className="py-2 pr-3">
+                    {v.startedAt && v.endedAt
+                      ? `${Math.round(
+                          (new Date(v.endedAt) - new Date(v.startedAt)) / 60000,
+                        )}m`
+                      : "—"}
+                  </td>
+                  <td className="py-2 pr-3">
+                    <StatusPill status={v.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {total > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3">
+          <p className="text-xs text-slate-500">
+            Showing {firstRecord}–{lastRecord} of {total} visits
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1 || visitsQuery.isFetching}
+              className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-xs font-medium text-slate-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
+              disabled={page >= totalPages || visitsQuery.isFetching}
+              className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Stat({ icon, label, value }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -3071,9 +3443,9 @@ export default function FieldOperations() {
   return isEmployee ? (
     <EmployeeDuty auth={auth} />
   ) : (
-    <ManagerDashboard
-      canManageTeams={role === "admin"}
-      isSuperAdmin={role === "superadmin"}
-    />
+      <ManagerDashboard
+        canManageTeams={role === "admin"}
+        isSuperAdmin={role === "superadmin"}
+      />
   );
 }

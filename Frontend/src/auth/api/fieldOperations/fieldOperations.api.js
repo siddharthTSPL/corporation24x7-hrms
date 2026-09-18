@@ -82,6 +82,19 @@ export const exportFieldActivitiesCsvUrl = (filters = {}) => {
   if (filters.date) params.set("to", filters.date);
   return `${resolveApiBaseUrl()}/field-operations/export/csv${params.size ? `?${params}` : ""}`;
 };
+export const exportMyVisitsCsvUrl = (filters = {}) => {
+  const params = new URLSearchParams(
+    Object.entries(filters)
+      .filter(([, value]) => value !== "" && value != null)
+      .map(([key, value]) => {
+        if (key === "from") return ["from", value];
+        if (key === "to") return ["to", value];
+        if (key === "type") return ["activityType", value];
+        return [key, value];
+      }),
+  );
+  return `${resolveApiBaseUrl()}/field-operations/visits/export/csv${params.size ? `?${params}` : ""}`;
+};
 
 export const submitFieldCheckIn = (sessionId, body) =>
   api
@@ -139,5 +152,14 @@ export const getFieldAuditLog = ({ page = 1, limit = 50, action } = {}) =>
   api
     .get("field-operations/audit-log", { params: { page, limit, action } })
     .then((r) => r.data);
+
+export const getAllFieldVisits = (filters = {}) => {
+  const params = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== "" && value != null),
+  );
+  return api
+    .get("field-operations/visits/all", { params })
+    .then((response) => response.data);
+};
 
 export const fieldOperationsApi = api;
