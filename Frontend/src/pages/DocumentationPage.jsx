@@ -7,6 +7,7 @@ import {
   FaSitemap, FaBell, FaUserCog, FaSignInAlt, FaCalendarCheck,
 } from "react-icons/fa";
 
+
 const BEETROOT = {
   900: "#5C1730", 
   700: "#730042", 
@@ -14,9 +15,8 @@ const BEETROOT = {
   300: "#C98096", 
   100: "#E9C7D0", 
   50: "#F3E1E7",  
-  textMid: "#7A2A41", 
+  textMid: "#7A2A41",
 };
-
 
 
 const CATEGORIES = [
@@ -1366,32 +1366,54 @@ export default function DocumentationPage() {
     <div className="h-screen w-full overflow-y-auto overflow-x-hidden bg-[#FAFAFA]">
       {/* Header */}
       <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-5" style={{ background: BEETROOT[50] }}>
-        <div className="max-w-5xl mx-auto flex items-start gap-3">
-          <div
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center flex-shrink-0 bg-white shadow-sm mt-0.5"
-            style={{ borderColor: BEETROOT[300] }}
-          >
-            <FaBook style={{ color: BEETROOT[700] }} size={20} />
+        <div className="max-w-5xl mx-auto flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center flex-shrink-0 bg-white shadow-sm mt-0.5"
+              style={{ borderColor: BEETROOT[300] }}
+            >
+              <FaBook style={{ color: BEETROOT[700] }} size={20} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-[26px] sm:text-[34px] leading-tight font-bold tracking-tight" style={{ color: BEETROOT[700] }}>
+                {isLanding ? "Documentation" : currentCategory ? currentCategory.label : "Documentation"}
+              </h1>
+              <p className="text-[13px] sm:text-[14px] mt-1 break-words" style={{ color: BEETROOT.textMid }}>
+                {isLanding
+                  ? `Detailed, step-by-step guides for every feature in TorchX Talent — ${CATEGORIES.length} categories, ${totalArticles} articles.`
+                  : "Detailed, step-by-step guides for every feature in TorchX Talent."}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            {!isLanding && (
-              <button
-                onClick={backToGrid}
-                className="text-[11.5px] font-semibold mb-1 flex items-center gap-1 hover:underline"
-                style={{ color: BEETROOT[700] }}
-              >
-                <FaChevronRight size={8} className="rotate-180" /> All documentation
-              </button>
-            )}
-            <h1 className="text-[26px] sm:text-[34px] leading-tight font-bold tracking-tight" style={{ color: BEETROOT[700] }}>
-              {isLanding ? "Documentation" : currentCategory ? currentCategory.label : "Documentation"}
-            </h1>
-            <p className="text-[13px] sm:text-[14px] mt-1 break-words" style={{ color: BEETROOT.textMid }}>
-              {isLanding
-                ? `Detailed, step-by-step guides for every feature in TorchX Talent — ${CATEGORIES.length} categories, ${totalArticles} articles.`
-                : "Detailed, step-by-step guides for every feature in TorchX Talent."}
-            </p>
-          </div>
+
+          {!isLanding && (
+            <button
+              onClick={backToGrid}
+              className="group flex-shrink-0 flex items-center gap-1.5 mt-1 px-3.5 py-1.5 rounded-full
+                         text-[13px] sm:text-[14px] font-semibold whitespace-nowrap
+                         border transition-all duration-300 ease-out"
+              style={{
+                color: BEETROOT[700],
+                borderColor: BEETROOT[300],
+                background: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = BEETROOT[700];
+                e.currentTarget.style.color = "#fff";
+                e.currentTarget.style.borderColor = BEETROOT[700];
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = BEETROOT[700];
+                e.currentTarget.style.borderColor = BEETROOT[300];
+              }}
+            >
+              <FaChevronRight size={9} className="rotate-180 transition-transform duration-300 group-hover:-translate-x-0.5" />
+              <span className="underline underline-offset-4 decoration-2" style={{ textDecorationColor: "currentColor" }}>
+                Back
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="max-w-5xl mx-auto mt-5">

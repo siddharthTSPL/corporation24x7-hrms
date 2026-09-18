@@ -38,6 +38,9 @@ const authemployee = async (req, res, next) => {
 
     req.employee = employee;
     req.user = employee;
+    // Raw decoded claims (sid included) — needed by logout to revoke this
+    // device's Single Sign-In session row.
+    req.tokenPayload = decoded;
 
     next();
   } catch (error) {

@@ -43,6 +43,9 @@ const superAdminAuth = async (req, res, next) => {
 
     req.superAdmin = superAdmin;
     req.user = superAdmin;
+    // Raw decoded claims (sid included) — needed by logout to revoke this
+    // device's Single Sign-In session row.
+    req.tokenPayload = decoded;
     next();
   } catch (error) {
     return res.status(401).json({ message: "Invalid token" });

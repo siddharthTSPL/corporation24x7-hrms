@@ -17,6 +17,7 @@ const SuperAdminModel = require("../Models/superadmin.model");
 const Managermodel = require("../Models/manager.model");
 const { notifyLeaveApplied, notifyWFHApplied } = require("../utils/notify.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
+const { revokeSession } = require("../utils/singleSignIn.utils");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -216,6 +217,11 @@ const userlogout = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   // `status` = account state, checked on every request by the auth
   // middleware. Do not set it to "inactive" here — see adminlogout note.
+
+  // Single Sign-In: release this device's session slot (no-op if the
+  // feature was never active for this login, i.e. no `sid` on the token).
+  await revokeSession(req.tokenPayload?.sid);
+
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,

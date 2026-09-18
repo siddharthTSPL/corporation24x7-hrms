@@ -30,18 +30,19 @@ function Badge({ children }) {
 }
 
 function PlatformHero() {
+
   return (
-    <section className="bg-white pt-24 sm:pt-28 lg:pt-32 pb-12 sm:pb-16">
+    <section className="bg-white pt-20 sm:pt-24 lg:pt-28 pb-10 sm:pb-12">
       <Wrap>
-        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center max-w-[820px] mx-auto mb-10 sm:mb-12 px-4">
+        <motion.div variants={fadeUp} initial="hidden" animate="show" className="text-center max-w-[820px] mx-auto mb-8 sm:mb-10 px-4">
           <div className="flex justify-center mb-5"><Badge>TorchX Talent Platform Architecture</Badge></div>
           <h1 className="font-hero font-medium text-[#111] leading-[1.15] mb-5 text-[clamp(1.6rem,6vw,2.9rem)] tracking-[-1px]">
             Unified Human Capital HRMS Built for Enterprise Velocity
           </h1>
-          <p className="font-body text-[#555] leading-[1.8] mb-8 text-[14px] sm:text-[15.5px] max-w-[680px] mx-auto">
-            Discover how TorchX Talent streamlines the full employee lifecycle from talent acquisition to autonomous
-            payroll and continuous performance intelligence — eliminating administrative friction.
-          </p>
+         <p className="font-body text-[#555] leading-[1.7] mb-8 text-[14px] sm:text-[15.5px] max-w-[780px] mx-auto [text-wrap:pretty]">
+  Discover how TorchX Talent streamlines the full employee lifecycle from talent acquisition to autonomous
+  payroll and continuous performance intelligence — eliminating administrative friction.
+</p>
           <a
             href="tel:+917017415604"
             className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[14px] sm:text-[15px] font-ui font-semibold px-6 sm:px-7 py-3 sm:py-3.5 rounded-full shadow-[0_8px_24px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
@@ -50,20 +51,19 @@ function PlatformHero() {
           </a>
         </motion.div>
 
-        <motion.div    
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} transition={{ delay: 0.15 }}
+        <motion.div
+          variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }}
           className="relative max-w-[980px] mx-auto px-4 sm:px-0"
         >
-          {/* Frame: fixed, responsive aspect-ratio box. object-cover + h-full makes the image
-              fill the frame completely at every breakpoint — no empty background peeking through. */}
+          
           <div className="relative w-full aspect-[4/3] xs:aspect-[16/11] sm:aspect-[16/10] lg:aspect-[16/9] rounded-2xl sm:rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_12px_32px_rgba(115,0,66,0.14)] sm:shadow-[0_24px_64px_rgba(115,0,66,0.16)]">
             <img
               src={slideNavyOffice}
               alt="TorchX Talent enterprise dashboard"
-              className="absolute inset-0 w-full h-full object-cover bg-[#F3E4EC]"
+              className="absolute inset-0 w-full h-full object-cover object-center bg-[#F3E4EC]"
               loading="eager"
-              fetchpriority="high"
-              decoding="async"
+              fetchPriority="high"
+              decoding="sync"
             />
           </div>
 
@@ -117,11 +117,11 @@ function CapabilitiesDirectory() {
     },
   ]
   return (
-    <section className="bg-white py-12 sm:py-16">
+    <section className="bg-white py-10 sm:py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-          className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10 sm:mb-12 px-4 sm:px-0"
+          className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8 sm:mb-10 px-4 sm:px-0"
         >
           <div>
             <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[11px] sm:text-[12px] mb-2">Capabilities Directory</p>
@@ -175,7 +175,7 @@ function EnterpriseArchitectureBanner() {
     { icon: <FiRefreshCw />, title: 'Zero-Downtime Data Sovereignty', desc: 'In-region tenant isolation guarantees strict adherence to GDPR, CCPA, and statutory localized employment regulations globally.' },
   ]
   return (
-    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-12 sm:py-16">
+    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-10 sm:py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
@@ -209,8 +209,7 @@ function EnterpriseArchitectureBanner() {
           </div>
 
           <div className="relative">
-            {/* Frame: fixed aspect-ratio box that scales with the grid column. object-cover fills
-                it edge-to-edge (cropping as needed) so no empty background shows around the photo. */}
+
             <div className="relative w-full aspect-[4/3] sm:aspect-[5/4] rounded-2xl overflow-hidden border border-white/20 shadow-[0_12px_32px_rgba(0,0,0,0.25)] sm:shadow-[0_24px_64px_rgba(0,0,0,0.3)]">
               <img
                 src={slideWhiteOffice}
@@ -247,9 +246,9 @@ function TechnicalFoundations() {
     { icon: <FiFileText />, title: 'Automated Audit Logs', desc: 'Complete non-repudiation audit trails for compliance audits, wage adjustments, and credential modifications.', tag: 'SIEM Streaming Ready' },
   ]
   return (
-    <section className="bg-[#F8F5F7] py-12 sm:py-16">
+    <section className="bg-[#F8F5F7] py-10 sm:py-12">
       <Wrap>
-        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-10 sm:mb-12 px-4 sm:px-0">
+        <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }} className="text-center mb-8 sm:mb-10 px-4 sm:px-0">
           <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[11px] sm:text-[12px] mb-2">Technical Foundations</p>
           <h2 className="font-hero font-medium text-[#111] leading-[1.2] mb-4 text-[clamp(1.5rem,4.5vw,2.3rem)]">
             Enterprise Trust &amp; Open Extensibility
@@ -281,7 +280,7 @@ function TechnicalFoundations() {
 
 function PlatformCTA() {
   return (
-    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-12 sm:py-16">
+    <section className="bg-gradient-to-br from-[#7A004B] to-[#4a002d] py-10 sm:py-12">
       <Wrap>
         <motion.div
           variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
