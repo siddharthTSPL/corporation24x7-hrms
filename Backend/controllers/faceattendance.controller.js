@@ -4,6 +4,7 @@ const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
+const FieldTeam = require("../Models/fieldTeam.model");
 const { updateSummary } = require("../automatic/monthattendanceupdate");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
 const { startOfISTDay } = require("../utils/istDate.utils");
@@ -41,10 +42,14 @@ const enrollFace = async (req, res) => {
         .json({ message: "employeeId, onModel and role are required" });
 
     if (!["User", "Manager", "Admin"].includes(onModel))
-      return res.status(400).json({ message: "onModel must be User, Manager or Admin" });
+      return res
+        .status(400)
+        .json({ message: "onModel must be User, Manager or Admin" });
 
     if (!req.file)
-      return res.status(400).json({ message: "A photo file is required (field name: photo)" });
+      return res
+        .status(400)
+        .json({ message: "A photo file is required (field name: photo)" });
 
     const organisation_id = req.admin.organisation_id;
     const imageBase64 = req.file.buffer.toString("base64");
@@ -61,7 +66,7 @@ const enrollFace = async (req, res) => {
         embedding,
         enrolledBy: req.admin._id,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.status(200).json({
@@ -88,7 +93,10 @@ const listEnrolled = async (req, res) => {
 const removeFace = async (req, res) => {
   try {
     const organisation_id = req.admin.organisation_id;
-    await FaceProfile.findOneAndDelete({ organisation_id, employee: req.params.employeeId });
+    await FaceProfile.findOneAndDelete({
+      organisation_id,
+      employee: req.params.employeeId,
+    });
     res.json({ message: "Face profile removed" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -98,12 +106,14 @@ const removeFace = async (req, res) => {
 const scanFace = async (req, res) => {
   try {
     const { image, gate } = req.body;
-    if (!image) return res.status(400).json({ message: "image (base64) is required" });
+    if (!image)
+      return res.status(400).json({ message: "image (base64) is required" });
 
     // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
     // value. Just cap length/sanitize - this is a location label, not a
     // permission gate, so we don't hard-reject unrecognised values.
-    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
+    const gateName =
+      typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
 
     const { organisation_id } = req.kiosk;
 
@@ -112,7 +122,8 @@ const scanFace = async (req, res) => {
     const profiles = await FaceProfile.find({ organisation_id }).lean();
     if (!profiles.length)
       return res.status(404).json({
-        message: "No employees are registered for face attendance yet. Please register first.",
+        message:
+          "No employees are registered for face attendance yet. Please register first.",
         reason: "not_registered",
       });
 
@@ -128,7 +139,8 @@ const scanFace = async (req, res) => {
 
     if (!best || bestScore < SIMILARITY_THRESHOLD)
       return res.status(404).json({
-        message: "Face not recognized. If you're new here, please register first.",
+        message:
+          "Face not recognized. If you're new here, please register first.",
         reason: "not_registered",
       });
 
@@ -138,11 +150,32 @@ const scanFace = async (req, res) => {
       .lean();
 
     if (!employeeDoc)
-      return res.status(404).json({ message: "Matched employee record no longer exists" });
+      return res
+        .status(404)
+        .json({ message: "Matched employee record no longer exists" });
 
-    const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
+    if (best.onModel === "User") {
+      const onFieldTeam = await FieldTeam.exists({
+        organisation_id,
+        members: best.employee,
+        active: true,
+      });
+      if (onFieldTeam)
+        return res.status(409).json({
+          message:
+            "This employee is assigned to field work and checks in from the Field Duty app, not the kiosk.",
+          reason: "field_work_assigned",
+        });
+    }
+
+    const employeeName =
+      `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
     const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
-    const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
+    const shiftInfo = {
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    };
 
     const now = new Date();
     const today = startOfISTDay(now); // IST-based day boundary, not server-local
@@ -176,7 +209,10 @@ const scanFace = async (req, res) => {
     }
 
     if (needsRealCheckin) {
-      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
+      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(
+        shift,
+        now,
+      );
 
       if (!allowed) {
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
@@ -224,7 +260,11 @@ const scanFace = async (req, res) => {
       // Exact instant checkout unlocks, so the kiosk can show a live
       // countdown chip right after check-in instead of only surfacing it
       // reactively after a blocked second scan.
-      const { checkoutOpensAt } = evaluateCheckoutWindow(shift, attendance.checkIn, attendance.checkIn);
+      const { checkoutOpensAt } = evaluateCheckoutWindow(
+        shift,
+        attendance.checkIn,
+        attendance.checkIn,
+      );
 
       return res.json({
         message: checkinMessage,
@@ -250,7 +290,11 @@ const scanFace = async (req, res) => {
         checkOut: attendance.checkOut,
       });
 
-    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
+    const checkoutWindow = evaluateCheckoutWindow(
+      shift,
+      now,
+      attendance.checkIn,
+    );
 
     if (!checkoutWindow.allowed) {
       const who = employeeName || "You";
@@ -270,7 +314,9 @@ const scanFace = async (req, res) => {
 
     attendance.checkOut = now;
     attendance.checkOutGate = gateName;
-    const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
+    const durationMinutes = Math.round(
+      (attendance.checkOut - attendance.checkIn) / 60000,
+    );
     attendance.activeMinutes = durationMinutes;
 
     // Face-only rule: judged as a PERCENTAGE of this shift's own total
@@ -290,11 +336,12 @@ const scanFace = async (req, res) => {
       auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
     }[remark];
 
-    const finalMessage = attendance.status === "absent"
-      ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
-      : attendance.status === "half_day"
-        ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
-        : remarkMessage;
+    const finalMessage =
+      attendance.status === "absent"
+        ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
+        : attendance.status === "half_day"
+          ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
+          : remarkMessage;
 
     return res.json({
       message: finalMessage,
