@@ -853,7 +853,7 @@ function Features() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-16">
-            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(42px,5vw,52px)]">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
             <p className="text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
@@ -868,6 +868,7 @@ function Features() {
   )
 }
 
+
 function Pricing() {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
 
@@ -878,8 +879,8 @@ function Pricing() {
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave Management', 'Basic Payroll', 'Analytical and Digital Dashboard'],
-      crossFeatures: []
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
     },
     {
       name: 'Advance',
@@ -888,7 +889,7 @@ function Pricing() {
       monthlyPrice: 99,
       yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Live Map Tracking', 'Recruitment / Applicant Tracking', 'Face Attendance', 'Performance Management', 'Integrated Advanced Payroll'],
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
       crossFeatures: []
     },
     {
@@ -898,11 +899,13 @@ function Pricing() {
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
-        'Free Smartphone gift/offer',
-        'Face Attendance',
+        'Free Smartphone gifthamper',
+        'Face Attendence',
         'Custom Integrations',
         'Single Sign-On',
-        'API Access',
+        'API access',
+        'On-premises/ Private cloud hosting',
+        'Dedicated account manager',
       ],
       crossFeatures: []
     }
@@ -959,11 +962,13 @@ function Pricing() {
             </div>
           </div>
 
-          
+          {/* items-stretch (not items-center) so every card fills the row's full height —
+              combined with h-full below, this keeps Basic / Advance / Enterprise
+              all exactly the same size regardless of how many features each lists. */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
-              const suffix = billing === 'yearly' ? '/user/year' : '/user/mo'
+              const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
               return (
                 <div
                   key={p.name}
@@ -1072,6 +1077,7 @@ function Pricing() {
 
 
 
+
 function Testimonials() {
   const testimonials = [
     { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
@@ -1089,7 +1095,7 @@ function Testimonials() {
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-16">
-            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(26px,3.2vw,40px)] leading-tight">
+            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Loved by <span className="text-[#7A004B]">Teams</span>, Trusted by <span className="text-[#7A004B]">Leaders</span>
             </h2>
             <p className="text-lg text-[#555] max-w-[440px] mx-auto leading-relaxed">
@@ -1343,16 +1349,12 @@ export default function LandingPage() {
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
 
-  // "Access Your Talent Account" when a live session is found; falls back to
-  // "Sign in to your Talent Account" while auth is still resolving/expired
-  // so the button never flashes the wrong label once it's checked.
   const accountLabel = isAuthenticated
     ? 'Access Your Talent Account'
     : 'Sign in to your Talent Account'
 
   const handleAccountClick = () => {
-    // /redirect resolves the logged-in person's role and sends them to the
-    // right dashboard; if the session token expired it bounces to /login.
+    
     navigate(isAuthenticated ? '/redirect' : '/login')
   }
 
