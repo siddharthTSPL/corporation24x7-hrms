@@ -6,7 +6,7 @@ import {
 } from "../../auth/server-state/fieldOperations/Fieldoperations.hook";
 
 // Field Work org-level settings card.
-// Rendered inside the nav Settings pages (Super Admin + Admin) so the on/off
+// Rendered inside TorchX Management for Super Admins and Admins so the on/off
 // toggle is always reachable — even when Field Work is currently disabled —
 // alongside the face-verification option. Seat limits / data retention are
 // intentionally not exposed here; they are platform-level concerns.

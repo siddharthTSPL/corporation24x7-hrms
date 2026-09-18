@@ -11,7 +11,6 @@ import {
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
-import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -512,36 +511,6 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             stroke="currentColor"
             strokeWidth="1.4"
             strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: "field_work",
-      label: "Field Work",
-      icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M2 14V6l6-4 6 4v8"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-          />
-          <rect
-            x="6"
-            y="9"
-            width="4"
-            height="5"
-            rx="1"
-            stroke="currentColor"
-            strokeWidth="1.4"
-          />
-          <circle
-            cx="8"
-            cy="6.5"
-            r="1.8"
-            stroke="currentColor"
-            strokeWidth="1.4"
           />
         </svg>
       ),
@@ -1585,7 +1554,6 @@ export default function SuperAdminSettingsPage() {
         />
 
         <div className="flex-1 w-full min-w-0">
-          {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
           {tab === "overview" && <OverviewTab superAdmin={superAdmin} />}
           {tab === "profile" && (
             <ProfileTab

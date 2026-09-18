@@ -48,6 +48,7 @@ const VISIT_PHOTO_MAX_COUNT = 6;
 // resolveMinDurationMinutes(activityType) in utils/fieldWorkConstants.js.
 const MIN_VISIT_MINUTES = 20;
 const FIELD_VISIT_PAGE_SIZE = 8;
+const MY_FIELD_VISIT_PAGE_SIZE = 6;
 const FIELD_VISIT_MAX_PAGE_SIZE = 100;
 
 // Checkpoint status derivation shared by myDuty/getOverview (spec section 24).
@@ -1450,15 +1451,9 @@ exports.updateSettings = async (req, res) => {
   const next = { ...(current.toObject?.() ?? current) };
   const wasEnabled = Boolean(current.enabled);
 
-  // Only a Super Admin may flip the master switch (spec section 9) — an
-  // Admin can tune limits/verification/geofence but not turn the module on
-  // or off for the whole organisation.
+  // Super Admins and organisation Admins can control the Field Work master
+  // switch from TorchX Management.
   if (req.body.enabled !== undefined) {
-    if (actor.model !== "SuperAdmin")
-      throw httpError(
-        "Only the Super Admin can enable or disable Field Work for this organisation",
-        403,
-      );
     next.enabled = Boolean(req.body.enabled);
   }
   if (req.body.require_face_verification !== undefined)
@@ -2317,10 +2312,25 @@ exports.myAssignedActivities = async (req, res) => {
 exports.myVisits = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
   if (actor.model !== "User")
-    return res.json({ success: true, visits: [] });
+    return res.json({
+      success: true,
+      visits: [],
+      total: 0,
+      page: 1,
+      limit: MY_FIELD_VISIT_PAGE_SIZE,
+      totalPages: 0,
+    });
   await assertFieldOperationsEnabled(organisation_id);
+  const requestedPage = Number(req.query.page);
+  const requestedLimit = Number(req.query.limit);
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit =
+    Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, FIELD_VISIT_MAX_PAGE_SIZE)
+      : MY_FIELD_VISIT_PAGE_SIZE;
   const status = String(req.query.status || "").trim();
-  const type = String(req.query.activityType || "").trim();
+  const type = String(req.query.activityType || req.query.type || "").trim();
   const from = req.query.from ? new Date(req.query.from) : null;
   const to = req.query.to ? new Date(req.query.to) : null;
   if (from && Number.isNaN(from.getTime()))
@@ -2340,11 +2350,22 @@ exports.myVisits = async (req, res) => {
       query.startedAt.$lte = end;
     }
   }
-  const visits = await FieldVisit.find(query)
-    .sort({ startedAt: -1 })
-    .limit(200)
-    .lean();
-  return res.json({ success: true, visits });
+  const [visits, total] = await Promise.all([
+    FieldVisit.find(query)
+      .sort({ startedAt: -1, createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    FieldVisit.countDocuments(query),
+  ]);
+  return res.json({
+    success: true,
+    visits,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  });
 };
 
 // Admin/SuperAdmin/Manager: get all field visits for employees in their teams

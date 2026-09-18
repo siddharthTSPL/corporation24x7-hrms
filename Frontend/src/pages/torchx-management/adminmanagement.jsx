@@ -56,6 +56,7 @@ import {
   useUpdateDepartment,
   useDeleteDepartment,
 } from "../../auth/server-state/department/department.hook";
+import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
 
 const DAYS = [
   "monday",
@@ -2206,6 +2207,7 @@ const TABS = [
   { key: "holidays", label: "Holidays", icon: CalendarDays },
   { key: "weekoff", label: "Week-off policy", icon: Settings2 },
   { key: "departments", label: "Departments", icon: Building2 },
+  { key: "field_work", label: "Field Work", icon: Settings2 },
 ];
 
 export default function AdminManagement() {
@@ -2253,6 +2255,7 @@ export default function AdminManagement() {
         {tab === "holidays" && <HolidaysPanel notify={notify} />}
         {tab === "weekoff" && <WeekOffPanel notify={notify} />}
         {tab === "departments" && <DepartmentsPanel notify={notify} />}
+        {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
       </div>
     </div>
   );

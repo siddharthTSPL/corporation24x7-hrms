@@ -5,6 +5,8 @@ import {
   FiAlertTriangle,
   FiCamera,
   FiCheckCircle,
+  FiChevronLeft,
+  FiChevronRight,
   FiClock,
   FiDownload,
   FiMapPin,
@@ -101,6 +103,24 @@ const ACTIVITY_TYPES = [
   "other",
 ];
 const titleize = (value) => String(value || "").replaceAll("_", " ");
+const personName = (person) =>
+  `${person?.f_name || ""} ${person?.l_name || ""}`.trim() || "Unassigned";
+const personInitials = (person) =>
+  personName(person)
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+const formatVisitDate = (value) =>
+  value
+    ? new Intl.DateTimeFormat("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(new Date(value))
+    : "Date not recorded";
 function GeofenceResult({ result, label }) {
   if (!result || typeof result.withinFence !== "boolean") return null;
   return (
@@ -1063,8 +1083,39 @@ function EmployeeDuty({ auth }) {
 
   const [pendingCompletePhoto, setPendingCompletePhoto] = useState(false);
   const [visitFilter, setVisitFilter] = useState({ status: "", type: "" });
+  const [visitPage, setVisitPage] = useState(1);
+  const visitPageSize = 6;
   const uploadCompletionPhoto = useUploadVisitPhoto();
-  const myVisits = useMyFieldVisits(true, visitFilter);
+  const myVisits = useMyFieldVisits(true, {
+    ...visitFilter,
+    page: visitPage,
+    limit: visitPageSize,
+  });
+  const allMyVisits = myVisits.data?.visits || [];
+  const reportedVisitTotal = Number(myVisits.data?.total);
+  const hasServerPagination = Number.isFinite(reportedVisitTotal);
+  // Old running API instances return only `visits`. Keep the UI paginated in
+  // that case as well, while the current API uses server-side pagination.
+  const myVisitTotal = hasServerPagination
+    ? Math.max(reportedVisitTotal, allMyVisits.length)
+    : allMyVisits.length;
+  const myVisitItems = hasServerPagination
+    ? allMyVisits
+    : allMyVisits.slice(
+        (visitPage - 1) * visitPageSize,
+        visitPage * visitPageSize,
+      );
+  const myVisitTotalPages = Math.max(
+    1,
+    Math.ceil(myVisitTotal / visitPageSize),
+  );
+  const myVisitFirstRecord =
+    myVisitTotal === 0 ? 0 : (visitPage - 1) * visitPageSize + 1;
+  const myVisitLastRecord = Math.min(visitPage * visitPageSize, myVisitTotal);
+  const updateVisitFilter = (key) => (event) => {
+    setVisitFilter((filters) => ({ ...filters, [key]: event.target.value }));
+    setVisitPage(1);
+  };
 
   const finishVisit = async (status = "completed") => {
     if (!openVisit) return;
@@ -1404,32 +1455,34 @@ function EmployeeDuty({ auth }) {
           />
         </div>
       )}
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold text-slate-900">My field visits</h2>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="p-4 pb-0">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7A004B]">
+              Visit history
+            </p>
+            <h2 className="mt-1 font-bold text-slate-900">My field visits</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Your latest visits appear first. Use filters to find a record quickly.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 p-4 pb-0">
             <input
               type="date"
               value={visitFilter.from || ""}
-              onChange={(e) =>
-                setVisitFilter((f) => ({ ...f, from: e.target.value }))
-              }
+              onChange={updateVisitFilter("from")}
               className="rounded-lg border px-2 py-1 text-xs"
             />
             <span className="text-xs text-slate-400">to</span>
             <input
               type="date"
               value={visitFilter.to || ""}
-              onChange={(e) =>
-                setVisitFilter((f) => ({ ...f, to: e.target.value }))
-              }
+              onChange={updateVisitFilter("to")}
               className="rounded-lg border px-2 py-1 text-xs"
             />
             <select
               value={visitFilter.status}
-              onChange={(e) =>
-                setVisitFilter((f) => ({ ...f, status: e.target.value }))
-              }
+              onChange={updateVisitFilter("status")}
               className="rounded-lg border px-2 py-1 text-xs"
             >
               <option value="">All statuses</option>
@@ -1440,9 +1493,7 @@ function EmployeeDuty({ auth }) {
             </select>
             <select
               value={visitFilter.type}
-              onChange={(e) =>
-                setVisitFilter((f) => ({ ...f, type: e.target.value }))
-              }
+              onChange={updateVisitFilter("type")}
               className="rounded-lg border px-2 py-1 text-xs"
             >
               <option value="">All types</option>
@@ -1461,59 +1512,106 @@ function EmployeeDuty({ auth }) {
             </a>
           </div>
         </div>
-        <div className="mt-3 space-y-2">
+        <div className="m-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-2 sm:p-3">
           {myVisits.isLoading ? (
-            <p className="text-sm text-slate-500">Loading visits…</p>
-          ) : (myVisits.data?.visits || []).length === 0 ? (
-            <p className="text-sm text-slate-500">No visits recorded yet.</p>
+            <p className="p-3 text-sm text-slate-500">Loading visits…</p>
+          ) : myVisitItems.length === 0 ? (
+            <p className="p-3 text-sm text-slate-500">No visits recorded yet.</p>
           ) : (
-            myVisits.data.visits.map((visit) => (
-              <div key={visit._id} className="rounded-xl bg-slate-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-slate-900">
-                      {visit.customerName}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {titleize(visit.activityType || "open")} ·{" "}
-                      {visit.assignmentType}
-                      {visit.startedAt
-                        ? ` · started ${formatTime(visit.startedAt)}`
-                        : ""}
-                    </p>
+            myVisitItems.map((visit, visitIndex) => (
+              <article
+                key={visit._id}
+                className="group mb-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#d7a6c0] hover:shadow-md last:mb-0"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fdf0f6] text-sm font-extrabold text-[#7A004B]">
+                    {(visitPage - 1) * visitPageSize + visitIndex + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-900">
+                          {visit.customerName || "Customer visit"}
+                        </p>
+                        <p className="mt-0.5 text-xs font-medium text-slate-500">
+                          {titleize(visit.activityType || "open")} · {formatVisitDate(visit.startedAt)}
+                        </p>
+                      </div>
+                      <StatusPill status={visit.status} />
+                    </div>
                     {visit.purpose && (
-                      <p className="mt-1 text-xs text-slate-600">
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">
                         {visit.purpose}
                       </p>
                     )}
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-slate-600">
+                        <FiClock size={11} /> Started {formatTime(visit.startedAt)}
+                      </span>
+                      {visit.assignmentType && (
+                        <span className="rounded-full bg-violet-50 px-2 py-1 text-violet-700">
+                          {titleize(visit.assignmentType)}
+                        </span>
+                      )}
+                      {visit.attachments?.length ? (
+                        <span className="rounded-full bg-sky-50 px-2 py-1 text-sky-700">
+                          {visit.attachments.length} photo{visit.attachments.length === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                      {visit.geofenceStatus?.atEnd ? (
+                        <span
+                          className={`rounded-full px-2 py-1 ${
+                            visit.geofenceStatus.atEnd.withinFence
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-rose-50 font-bold text-rose-700"
+                          }`}
+                        >
+                          {visit.geofenceStatus.atEnd.withinFence ? "Within geofence" : "Outside geofence"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <StatusPill status={visit.status} />
                 </div>
-                <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
-                  {visit.attachments?.length ? (
-                    <span>
-                      {visit.attachments.length} photo
-                      {visit.attachments.length === 1 ? "" : "s"}
-                    </span>
-                  ) : null}
-                  {visit.geofenceStatus?.atEnd ? (
-                    <span
-                      className={
-                        visit.geofenceStatus.atEnd.withinFence
-                          ? "text-emerald-700"
-                          : "font-bold text-rose-700"
-                      }
-                    >
-                      {visit.geofenceStatus.atEnd.withinFence
-                        ? "Within"
-                        : "Outside"}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
+              </article>
             ))
           )}
         </div>
+        {myVisitTotal > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-3">
+            <p className="text-xs font-medium text-slate-500">
+              Showing <span className="font-bold text-slate-700">{myVisitFirstRecord}–{myVisitLastRecord}</span> of {myVisitTotal} visits
+            </p>
+            <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setVisitPage((current) => Math.max(1, current - 1))
+                }
+                disabled={visitPage === 1 || myVisits.isFetching}
+                aria-label="Previous visits page"
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FiChevronLeft size={14} /> Previous
+              </button>
+              <span className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-[#7A004B] shadow-sm">
+                Page {visitPage} of {myVisitTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setVisitPage((current) =>
+                    Math.min(myVisitTotalPages, current + 1),
+                  )
+                }
+                disabled={visitPage >= myVisitTotalPages || myVisits.isFetching}
+                aria-label="Next visits page"
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next <FiChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
       {(assignedActivities.data?.activities || []).length > 0 && (
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -2726,65 +2824,127 @@ function TeamDetailModal({ team, onClose }) {
   if (!team) return null;
   const members = team.members || [];
   const managers = team.managers || [];
+  const teamColor = team.color || "#7A004B";
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
-      <div className="mx-auto my-6 max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
-        <div className="flex justify-between">
-          <div>
-            <h2 className="text-lg font-extrabold">{team.name}</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              {team.territory || "No territory"} ·{" "}
-              {members.length} field employee(s) ·{" "}
-              {managers.length} manager(s)
-            </p>
-          </div>
-          <button type="button" onClick={onClose}>
-            <FiX />
-          </button>
-        </div>
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Managers
-            </p>
-            <ul className="mt-1 space-y-1">
-              {managers.length ? (
-                managers.map((m) => (
-                  <li key={m._id} className="text-sm text-slate-700">
-                    {m.f_name} {m.l_name}
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-slate-400">No manager assigned</li>
-              )}
-            </ul>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-              Field employees
-            </p>
-            <ul className="mt-1 space-y-1">
-              {members.length ? (
-                members.map((m) => (
-                  <li key={m._id} className="text-sm text-slate-700">
-                    {m.f_name} {m.l_name}
-                  </li>
-                ))
-              ) : (
-                <li className="text-sm text-slate-400">No field employees assigned</li>
-              )}
-            </ul>
-          </div>
-          {team.geofence && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                Geofence
-              </p>
-              <p className="mt-1 text-sm text-slate-700">
-                Lat {team.geofence.latitude}, Lon {team.geofence.longitude}
-                {team.geofence.radiusMeters ? ` · ${team.geofence.radiusMeters} m radius` : ""}
-              </p>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="team-detail-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-2xl overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+        <div className="relative overflow-hidden px-5 pb-6 pt-5 text-white sm:px-6">
+          <div
+            className="absolute inset-0 opacity-95"
+            style={{ background: `linear-gradient(135deg, ${teamColor}, #3f1230)` }}
+          />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/30">
+                <FiUsers size={23} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/70">
+                  Field team
+                </p>
+                <h2 id="team-detail-title" className="truncate text-xl font-extrabold">
+                  {team.name}
+                </h2>
+                <p className="mt-1 flex items-center gap-1 text-xs text-white/80">
+                  <FiMapPin size={12} /> {team.territory || "No territory assigned"}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close team details"
+              className="rounded-xl bg-white/10 p-2 text-white transition hover:bg-white/20"
+            >
+              <FiX size={19} />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[70vh] space-y-5 overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Employees</p>
+              <p className="mt-1 text-xl font-extrabold text-slate-900">{members.length}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Managers</p>
+              <p className="mt-1 text-xl font-extrabold text-slate-900">{managers.length}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Department</p>
+              <p className="mt-1 truncate text-sm font-bold text-slate-900">{team.department?.name || "Not set"}</p>
+            </div>
+          </div>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-slate-900">Team managers</h3>
+              <span className="rounded-full bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700">{managers.length} assigned</span>
+            </div>
+            {managers.length ? (
+              <div className="flex flex-wrap gap-2">
+                {managers.map((manager) => (
+                  <div key={manager._id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-extrabold text-violet-700">
+                      {personInitials(manager)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block max-w-36 truncate text-xs font-bold text-slate-800">{personName(manager)}</span>
+                      <span className="block text-[10px] text-slate-500">{manager.empid || "Manager"}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">No manager is assigned to this team yet.</p>
+            )}
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-slate-900">Field employees</h3>
+              <span className="rounded-full bg-[#fdf0f6] px-2 py-1 text-[11px] font-bold text-[#7A004B]">{members.length} assigned</span>
+            </div>
+            {members.length ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {members.map((member) => (
+                  <div key={member._id} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdf0f6] text-xs font-extrabold text-[#7A004B]">
+                      {personInitials(member)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-800">{personName(member)}</span>
+                      <span className="block truncate text-[11px] text-slate-500">{member.empid || "Field employee"}{member.office_location ? ` · ${member.office_location}` : ""}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">No field employees are assigned to this team yet.</p>
+            )}
+          </section>
+
+          {team.geofence?.latitude != null && team.geofence?.longitude != null && (
+            <section className="rounded-2xl border border-sky-100 bg-sky-50 p-3.5">
+              <div className="flex items-start gap-2.5">
+                <span className="rounded-xl bg-white p-2 text-sky-700 shadow-sm"><FiMapPin size={17} /></span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-extrabold text-slate-900">Geofence enabled</h3>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                    {team.geofence.radiusMeters ? `${team.geofence.radiusMeters} m radius` : "Location radius not set"} · {Number(team.geofence.latitude).toFixed(5)}, {Number(team.geofence.longitude).toFixed(5)}
+                  </p>
+                </div>
+              </div>
+            </section>
           )}
         </div>
       </div>
@@ -2812,6 +2972,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   const [teamSearch, setTeamSearch] = useState("");
   const [showAllOnMap, setShowAllOnMap] = useState(false);
   const deleteTeam = useDeleteFieldTeam();
+  const canEditTeams = canManageTeams || isSuperAdmin;
 
   const live = overview.data?.live || [];
   const active = selected || live[0] || null;
@@ -2939,7 +3100,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           >
             <FiUsers /> {showAllOnMap ? "Hide all" : "Show all on map"}
           </button>
-          {canManageTeams ? (
+          {canEditTeams ? (
             <button
               onClick={() => setShowSettings(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
@@ -2947,7 +3108,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               <FiSettings /> Settings
             </button>
           ) : null}
-          {canManageTeams ? (
+          {canEditTeams ? (
             <button
               onClick={() => setShowBulkExcel(true)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-bold"
@@ -2955,7 +3116,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               <FiUpload /> Bulk assign (Excel)
             </button>
           ) : null}
-          {canManageTeams ? (
+          {canEditTeams ? (
             <button
               onClick={() => setTeamFormTarget(null)}
               className="inline-flex items-center gap-2 rounded-lg bg-[#7A004B] px-3 py-2 text-sm font-bold text-white"
@@ -3111,48 +3272,79 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
         canManageTeams={canManageTeams || isSuperAdmin}
         onExport={exportFieldActivitiesCsvUrl}
       />
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold text-slate-900">Your field teams</h2>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7A004B]">Team workspace</p>
+            <h2 className="mt-1 font-bold text-slate-900">Your field teams</h2>
+            <p className="mt-1 text-xs text-slate-500">Select a team to view people, territory and geofence details.</p>
+          </div>
           <input
             value={teamSearch}
             onChange={(e) => setTeamSearch(e.target.value)}
             placeholder="Search team name…"
-            className="w-full max-w-xs rounded-lg border px-2.5 py-1.5 text-sm sm:w-56"
+            className="w-full max-w-xs rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-[#7A004B] focus:ring-2 focus:ring-[#7A004B]/10 sm:w-56"
           />
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {visibleTeams.map((team) => (
             <div
               key={team._id}
-              className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 cursor-pointer hover:bg-slate-100"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setTeamDetail(team);
+                }
+              }}
+              className="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#d7a6c0] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7A004B]/20"
               onClick={() => setTeamDetail(team)}
             >
               <span
-                className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                className="absolute inset-x-0 top-0 h-1"
                 style={{ backgroundColor: team.color || "#7A004B" }}
               />
-              <div className="flex-1">
-                <p className="font-bold">{team.name}</p>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: team.color || "#7A004B" }}>
+                  <FiUsers size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                <p className="truncate font-extrabold text-slate-900">{team.name}</p>
                 <p className="text-xs text-slate-500">
                   {team.territory || "No territory"} ·{" "}
                   {team.members?.length || 0} field employee(s)
                 </p>
               </div>
-              {canManageTeams && (
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-slate-50 px-2.5 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Employees</p>
+                  <p className="mt-0.5 text-sm font-extrabold text-slate-800">{team.members?.length || 0}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-2.5 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Managers</p>
+                  <p className="mt-0.5 text-sm font-extrabold text-slate-800">{team.managers?.length || 0}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                <span className="truncate text-[11px] font-medium text-slate-500">{team.department?.name || "No department"}</span>
+                <span className="text-xs font-bold text-[#7A004B]">View details</span>
+              </div>
+              {canEditTeams && (
                 <div
-                  className="flex shrink-0 gap-2 text-xs font-bold"
+                  className="mt-3 flex gap-2 border-t border-slate-100 pt-3 text-xs font-bold"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     onClick={() => setTeamFormTarget(team)}
-                    className="text-[#7A004B]"
+                    className="rounded-lg bg-[#fdf0f6] px-2.5 py-1.5 text-[#7A004B] transition hover:bg-[#f7dce9]"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => removeTeam(team)}
-                    className="text-rose-600"
+                    className="rounded-lg bg-rose-50 px-2.5 py-1.5 text-rose-600 transition hover:bg-rose-100"
                   >
                     Remove
                   </button>

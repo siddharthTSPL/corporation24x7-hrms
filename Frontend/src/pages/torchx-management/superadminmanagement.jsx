@@ -60,6 +60,7 @@ import {
   useUpdateDepartmentSuperAdmin,
   useDeleteDepartmentSuperAdmin,
 } from '../../auth/server-state/superadmin/department/Sudepartment.hook';
+import FieldWorkSettingsCard from '../field-operations/FieldWorkSettingsCard';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABEL = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
@@ -1716,6 +1717,7 @@ const TABS = [
   { key: 'weekoff', label: 'Week-off policy', icon: Settings2 },
   { key: 'leavepolicy', label: 'Leave policy', icon: Umbrella },
   { key: 'departments', label: 'Departments', icon: Building2 },
+  { key: 'field_work', label: 'Field Work', icon: Settings2 },
 ];
 
 export default function SuperAdminManagement() {
@@ -1761,6 +1763,7 @@ export default function SuperAdminManagement() {
         {tab === 'weekoff' && <WeekOffPanel notify={notify} />}
         {tab === 'leavepolicy' && <LeavePolicyPanel notify={notify} />}
         {tab === 'departments' && <DepartmentsPanel notify={notify} />}
+        {tab === 'field_work' && <FieldWorkSettingsCard canToggleEnabled />}
       </div>
     </div>
   );
