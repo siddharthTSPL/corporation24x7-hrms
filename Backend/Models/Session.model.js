@@ -10,6 +10,13 @@ const deviceInfoSchema = new mongoose.Schema(
     userAgent: { type: String, default: "" },
     ip: { type: String, default: "" },
     label: { type: String, default: "" },
+    geo: {
+      latitude: { type: Number, default: null },
+      longitude: { type: Number, default: null },
+      city: { type: String, default: null },
+      country: { type: String, default: null },
+      at: { type: Date, default: null },
+    },
   },
   { _id: false }
 );

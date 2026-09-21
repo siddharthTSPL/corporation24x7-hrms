@@ -37,6 +37,10 @@ import HelpTour from "./help/HelpTour";
 import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
 import DocumentationModal from "./help/DocumentationModal";
+import {
+  checkoutFieldDuty,
+  getMyFieldDuty,
+} from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
 
@@ -156,6 +160,9 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showSupport, setShowSupport] = useState(false);
   const [showDocs,    setShowDocs]    = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [activeDutySession, setActiveDutySession] = useState(null);
+  const [checkingOutDuty, setCheckingOutDuty] = useState(false);
+  const [logoutDutyError, setLogoutDutyError] = useState("");
   const [upgradeFeatureName, setUpgradeFeatureName] = useState(null);
 
   // Field Operations isn't a plan upsell — it's an org-type toggle. Orgs
@@ -243,14 +250,28 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     setShowDocs(true);
   };
 
-  const openLogoutConfirm = () => {
+  const openLogoutConfirm = async () => {
     if (isPending) return;
+    setLogoutDutyError("");
+    setActiveDutySession(null);
+    // This is only a courtesy prompt. If the check cannot run, logout remains
+    // available; the server-side duty device lock remains the security bound.
+    if (role === "employee") {
+      try {
+        const result = await getMyFieldDuty();
+        if (result.session) setActiveDutySession(result.session);
+      } catch {
+        // A field-operations-disabled org or a temporary network failure must
+        // not prevent an employee from logging out.
+      }
+    }
     setShowLogoutConfirm(true);
   };
 
   const closeLogoutConfirm = () => {
     if (isPending) return;
     setShowLogoutConfirm(false);
+    setActiveDutySession(null);
   };
 
   const handleLogout = () => {
@@ -266,6 +287,22 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     else if (role === "admin")    logoutAdmin(undefined, { onSuccess });
     else if (role === "manager")  logoutManager(undefined, { onSuccess });
     else                          logoutEmployee(undefined, { onSuccess });
+  };
+
+  const checkoutThenLogout = async () => {
+    if (!activeDutySession?._id) return handleLogout();
+    setCheckingOutDuty(true);
+    setLogoutDutyError("");
+    try {
+      await checkoutFieldDuty(activeDutySession._id);
+      handleLogout();
+    } catch (error) {
+      setLogoutDutyError(
+        error?.response?.data?.message || "Could not check out your field duty.",
+      );
+    } finally {
+      setCheckingOutDuty(false);
+    }
   };
 
   return (
@@ -433,29 +470,46 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
                 <FaSignOutAlt className="text-[#730042]" size={16} />
               </div>
-              <h3 className="text-center text-[15px] font-semibold text-[#730042]">Are you sure you want to logout?</h3>
+              <h3 className="text-center text-[15px] font-semibold text-[#730042]">
+                {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}
+              </h3>
               <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
-                If you continue, your current session will be closed.
+                {activeDutySession
+                  ? "Logging out won't end it. Check out now, log out anyway, or cancel."
+                  : "If you continue, your current session will be closed."}
               </p>
             </div>
 
+            {logoutDutyError && (
+              <p className="px-6 pt-4 text-center text-[12px] text-rose-600">{logoutDutyError}</p>
+            )}
             <div className="flex gap-3 px-6 py-5">
               <button
                 type="button"
                 onClick={closeLogoutConfirm}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
+              {activeDutySession && (
+                <button
+                  type="button"
+                  onClick={checkoutThenLogout}
+                  disabled={isPending || checkingOutDuty}
+                  className="flex-1 rounded-xl border border-[#730042] py-2.5 text-[12px] font-medium text-[#730042] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {checkingOutDuty ? "Checking out..." : "Check out now"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: "#730042" }}
               >
-                {isPending ? "Logging out..." : "Yes, Logout"}
+                {isPending ? "Logging out..." : activeDutySession ? "Log out anyway" : "Yes, Logout"}
               </button>
             </div>
           </div>

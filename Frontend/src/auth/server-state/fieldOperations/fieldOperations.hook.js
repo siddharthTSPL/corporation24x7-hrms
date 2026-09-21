@@ -11,6 +11,7 @@ import {
   updateFieldDutyStatus,
   checkoutFieldDuty,
   submitFieldCheckIn,
+  takeOverDuty,
   updateFieldTeam,
   deleteFieldTeam,
   startFieldVisit,
@@ -136,6 +137,16 @@ export const useCheckoutFieldDuty = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionId, body }) => checkoutFieldDuty(sessionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-my-duty"] });
+    },
+  });
+};
+
+export const useTakeOverDuty = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: takeOverDuty,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["field-my-duty"] });
     },

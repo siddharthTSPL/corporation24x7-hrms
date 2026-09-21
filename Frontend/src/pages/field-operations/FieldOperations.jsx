@@ -24,6 +24,7 @@ import {
   FiXCircle,
   FiTrash2,
 } from "react-icons/fi";
+import { FaAngleDown } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import {
   sendFieldLocation,
@@ -45,6 +46,7 @@ import {
   useStartFieldDuty,
   useUpdateFieldDutyStatus,
   useCheckoutFieldDuty,
+  useTakeOverDuty,
   useSubmitFieldCheckIn,
   useStartFieldVisit,
   useEndFieldVisit,
@@ -149,11 +151,43 @@ function currentPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation)
       return reject(new Error("This browser does not support GPS location."));
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 10000,
-    });
+    let best = null;
+    let settled = false;
+    const watchIdRef = { current: null };
+    const clear = () => {
+      if (watchIdRef.current !== null)
+        navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (settled) return;
+        const { accuracy } = pos.coords;
+        if (!best || accuracy < best.accuracy) best = pos;
+        if (accuracy <= 30) {
+          settled = true;
+          clear();
+          resolve(best);
+        }
+      },
+      () => {
+        if (settled) return;
+        clear();
+        // A transient watch error should still get the one-shot fallback
+        // below; do not throw away the six-second sampling attempt early.
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      clear();
+      if (best) return resolve(best);
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    }, 6000);
   });
 }
 
@@ -297,6 +331,84 @@ function LiveDuration({ startedAt }) {
   );
 }
 
+function SearchableSelect({ value, onChange, options, placeholder = "Select…" }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedLabel =
+    options.find((o) => o.value === value)?.label || "";
+  const filtered = query
+    ? options.filter((o) =>
+        o.label.toLowerCase().includes(query.toLowerCase()),
+      )
+    : options;
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-left outline-none transition min-h-[32px] hover:border-slate-300 focus:border-[#7A004B] focus:ring-2 focus:ring-[#7A004B]/10"
+      >
+        <span
+          className={`truncate ${selectedLabel ? "text-slate-900" : "text-slate-400"}`}
+        >
+          {selectedLabel || placeholder}
+        </span>
+        <FaAngleDown
+          size={11}
+          className={`text-slate-400 flex-shrink-0 ml-2 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 flex flex-col overflow-hidden">
+          <div className="p-2 border-b border-slate-100 flex-shrink-0">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] text-slate-900 outline-none focus:border-[#7A004B] placeholder:text-slate-400"
+            />
+          </div>
+          <div className="overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-slate-400">No results</p>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[#fdf5f9] transition-colors ${o.value === value ? "bg-[#fdf0f6] text-[#7A004B] font-semibold" : "text-slate-900"}`}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RouteTrail({
   employeeId,
   date,
@@ -328,21 +440,38 @@ function RouteTrail({
   // the trail only appears when the employee is genuinely travelling.
   const MIN_MOVE_METERS = 25;
   const path = useMemo(() => {
-    const raw = points.map((p) => [
-      p.location.coordinates[1],
-      p.location.coordinates[0],
-    ]);
-    if (raw.length < 2) return raw;
-    const simplified = [raw[0]];
-    for (let i = 1; i < raw.length; i++) {
-      const prev = simplified[simplified.length - 1];
-      const a = prev;
-      const b = raw[i];
-      const dLat = (b[0] - a[0]) * 111320;
-      const dLon = (b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
-      if (Math.hypot(dLat, dLon) >= MIN_MOVE_METERS) simplified.push(b);
+    const trusted = points.filter((p) => !p.isMocked);
+    const segments = [];
+    let currentSegment = [];
+    for (let i = 0; i < trusted.length; i++) {
+      if (
+        i > 0 &&
+        trusted[i].crossSessionGapFlag &&
+        trusted[i - 1].crossSessionGapFlag
+      ) {
+        if (currentSegment.length > 0) segments.push(currentSegment);
+        currentSegment = [];
+      }
+      currentSegment.push([
+        trusted[i].location.coordinates[1],
+        trusted[i].location.coordinates[0],
+      ]);
     }
-    return simplified;
+    if (currentSegment.length > 0) segments.push(currentSegment);
+    const simplifiedSegments = segments.map((segment) => {
+      if (segment.length < 2) return segment;
+      const simplified = [segment[0]];
+      for (let i = 1; i < segment.length; i++) {
+        const prev = simplified[simplified.length - 1];
+        const a = prev;
+        const b = segment[i];
+        const dLat = (b[0] - a[0]) * 111320;
+        const dLon = (b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
+        if (Math.hypot(dLat, dLon) >= MIN_MOVE_METERS) simplified.push(b);
+      }
+      return simplified;
+    });
+    return simplifiedSegments.filter((s) => s.length >= 2);
   }, [points]);
   const markers = useMemo(() => {
     const list = [];
@@ -395,18 +524,15 @@ function RouteTrail({
         <h3 className="font-bold text-slate-900">Today's route</h3>
         <div className="flex flex-wrap items-center gap-2">
           {showPicker && employees && onEmployeeChange && (
-            <select
+            <SearchableSelect
               value={selectedEmployeeId || ""}
-              onChange={(e) => onEmployeeChange(e.target.value)}
-              className="rounded-lg border px-2 py-1 text-xs font-bold"
-            >
-              <option value="">Select employee…</option>
-              {employees.map((emp) => (
-                <option key={emp._id} value={emp._id}>
-                  {emp.f_name} {emp.l_name}
-                </option>
-              ))}
-            </select>
+              onChange={onEmployeeChange}
+              options={employees.map((emp) => ({
+                value: emp._id,
+                label: `${emp.f_name} ${emp.l_name}`,
+              }))}
+              placeholder="Select employee…"
+            />
           )}
           {onDateChange && (
             <input
@@ -423,7 +549,11 @@ function RouteTrail({
           )}
         </div>
       </div>
-      {isLoading ? (
+      {!employeeId ? (
+        <div className="mt-3 grid h-48 place-items-center rounded-xl bg-slate-50 text-sm text-slate-500">
+          No field employee selected — choose one above
+        </div>
+      ) : isLoading ? (
         <div className="mt-3 grid h-48 place-items-center text-sm text-slate-400">
           Loading route…
         </div>
@@ -764,6 +894,7 @@ function EmployeeDuty({ auth }) {
   const updateStatus = useUpdateFieldDutyStatus();
   const checkoutDuty = useCheckoutFieldDuty();
   const submitCheckIn = useSubmitFieldCheckIn();
+  const takeOverDutyMutation = useTakeOverDuty();
   const startVisitMut = useStartFieldVisit();
   const endVisitMut = useEndFieldVisit();
   const watchId = useRef(null);
@@ -783,12 +914,15 @@ function EmployeeDuty({ auth }) {
   const [checkInMode, setCheckInMode] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30000);
-    return () => window.clearInterval(timer);
-  }, []);
   const [visitTick, setVisitTick] = useState(() => Date.now());
+  const [deviceTokenMismatch, setDeviceTokenMismatch] = useState(false);
+  const [showTakeOverFaceCheck, setShowTakeOverFaceCheck] = useState(false);
+  useEffect(() => {
+    const onDeviceConflict = () => setDeviceTokenMismatch(true);
+    window.addEventListener("field-duty-device-conflict", onDeviceConflict);
+    return () =>
+      window.removeEventListener("field-duty-device-conflict", onDeviceConflict);
+  }, []);
   useEffect(() => {
     if (!openVisit) return undefined;
     const timer = window.setInterval(() => setVisitTick(Date.now()), 1000);
@@ -816,6 +950,32 @@ function EmployeeDuty({ auth }) {
       setCheckInMode("checkin");
     }
   }, [checkInOverdue, nextCheckInDueAt, checkInMode]);
+
+  // The backend never sends the raw device token in this response. A device
+  // that did not start/take over this session therefore has no local token and
+  // must verify its face before it can continue.
+  useEffect(() => {
+    if (!session?._id) { setDeviceTokenMismatch(false); return; }
+    const stored = localStorage.getItem(`deviceToken_${session._id}`);
+    if (session.deviceLockActive && !stored) {
+      setDeviceTokenMismatch(true);
+    } else {
+      setDeviceTokenMismatch(false);
+    }
+  }, [session]);
+
+  // Old, unclaimed sessions need a client token for their first protected
+  // request. The server then claims that legacy session without disruption.
+  useEffect(() => {
+    if (session?._id) {
+      localStorage.setItem("activeFieldSessionId", session._id);
+      if (!session.deviceLockActive && !localStorage.getItem(`deviceToken_${session._id}`)) {
+        localStorage.setItem(`deviceToken_${session._id}`, newId());
+      }
+    } else {
+      localStorage.removeItem("activeFieldSessionId");
+    }
+  }, [session]);
 
   const refreshPendingCount = useCallback(
     async () => setPendingCount((await pendingFieldEvents()).length),
@@ -875,6 +1035,7 @@ function EmployeeDuty({ auth }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const syncQueue = useCallback(async () => {
+    if (deviceTokenMismatch) return;
     const queued = await pendingFieldEvents();
     for (const event of queued) {
       try {
@@ -887,16 +1048,20 @@ function EmployeeDuty({ auth }) {
           await sendFieldLocation(event.sessionId, event.payload);
         }
         await removeFieldEvent(event.id);
-      } catch {
+      } catch (error) {
+        if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+          setDeviceTokenMismatch(true);
+          break;
+        }
         break;
       }
     }
     refreshPendingCount();
-  }, [refreshPendingCount, endVisitMut]);
+  }, [refreshPendingCount, endVisitMut, deviceTokenMismatch]);
 
   const sendLocation = useCallback(
     async (position) => {
-      if (!session?._id || session.status !== "active") return;
+      if (!session?._id || session.status !== "active" || deviceTokenMismatch) return;
       const now = Date.now();
       if (now - lastSent.current < 30000) return;
       lastSent.current = now;
@@ -905,10 +1070,10 @@ function EmployeeDuty({ auth }) {
         if (!navigator.onLine) throw new Error("offline");
         await sendFieldLocation(session._id, payload);
       } catch (error) {
-        // A 403 means the session no longer belongs to this employee (e.g.
-        // the page was refreshed and the session was recreated). Don't
-        // queue it — the new session will pick up location sharing on its
-        // own watchPosition. Only queue genuine offline/network failures.
+        if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+          setDeviceTokenMismatch(true);
+          return;
+        }
         if (error?.response?.status === 403) return;
         await queueFieldEvent({
           id: payload.eventId,
@@ -919,11 +1084,16 @@ function EmployeeDuty({ auth }) {
         refreshPendingCount();
       }
     },
-    [session, refreshPendingCount],
+    [session, refreshPendingCount, deviceTokenMismatch],
   );
 
   useEffect(() => {
-    if (!session?._id || session.status !== "active" || !navigator.geolocation)
+    if (
+      !session?._id ||
+      session.status !== "active" ||
+      deviceTokenMismatch ||
+      !navigator.geolocation
+    )
       return undefined;
     watchId.current = navigator.geolocation.watchPosition(
       sendLocation,
@@ -934,7 +1104,7 @@ function EmployeeDuty({ auth }) {
       if (watchId.current !== null)
         navigator.geolocation.clearWatch(watchId.current);
     };
-  }, [session?._id, session?.status, sendLocation]);
+  }, [session?._id, session?.status, sendLocation, deviceTokenMismatch]);
 
   useEffect(() => {
     const onOnline = () => syncQueue();
@@ -957,7 +1127,7 @@ function EmployeeDuty({ auth }) {
           "Connect to the internet once to start field duty. GPS updates are safely queued after duty starts.",
         );
       const position = await currentPosition();
-      await startDuty.mutateAsync({
+      const result = await startDuty.mutateAsync({
         location: pointFromPosition(position),
         selfieBase64,
         eventId: newId(),
@@ -967,6 +1137,10 @@ function EmployeeDuty({ auth }) {
           batteryLevel: null,
         },
       });
+      if (result.activeDeviceToken && result.session?._id) {
+        localStorage.setItem(`deviceToken_${result.session._id}`, result.activeDeviceToken);
+        localStorage.setItem("activeFieldSessionId", result.session._id);
+      }
       toast.success("Field duty started. Live location sharing is on.");
     } catch (error) {
       toast.error(
@@ -986,6 +1160,10 @@ function EmployeeDuty({ auth }) {
       });
       toast.success("Check-in recorded — thanks!");
     } catch (error) {
+      if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+        setDeviceTokenMismatch(true);
+        return;
+      }
       toast.error(
         error?.response?.data?.message ||
           error.message ||
@@ -1010,6 +1188,10 @@ function EmployeeDuty({ auth }) {
           : "Location sharing resumed",
       );
     } catch (error) {
+      if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+        setDeviceTokenMismatch(true);
+        return;
+      }
       toast.error(error?.response?.data?.message || "Could not update duty");
     }
   };
@@ -1026,7 +1208,26 @@ function EmployeeDuty({ auth }) {
       setOpenVisit(null);
       toast.success("Field duty checked out. Location sharing stopped.");
     } catch (error) {
+      if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+        setDeviceTokenMismatch(true);
+        return;
+      }
       toast.error(error?.response?.data?.message || "Could not check out");
+    }
+  };
+
+  const handleTakeOver = async (selfieBase64) => {
+    try {
+      const result = await takeOverDutyMutation.mutateAsync({ selfieBase64 });
+      localStorage.setItem(
+        `deviceToken_${session._id}`,
+        result.activeDeviceToken,
+      );
+      setShowTakeOverFaceCheck(false);
+      setDeviceTokenMismatch(false);
+      toast.success("Face verified — you're back in control of this duty.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Face verification failed");
     }
   };
 
@@ -1062,6 +1263,10 @@ function EmployeeDuty({ auth }) {
       await myVisits.refetch();
       toast.success("Visit started");
     } catch (error) {
+      if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+        setDeviceTokenMismatch(true);
+        return;
+      }
       toast.error(
         error?.response?.data?.message ||
           error.message ||
@@ -1133,6 +1338,10 @@ function EmployeeDuty({ auth }) {
         status === "skipped" ? "Visit marked as skipped" : "Visit completed",
       );
     } catch (error) {
+      if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+        setDeviceTokenMismatch(true);
+        return;
+      }
       // If the network is down, queue the visit-end so it syncs later
       // instead of silently dropping it.
       if (error?.message === "offline" || !navigator.onLine) {
@@ -1207,6 +1416,39 @@ function EmployeeDuty({ auth }) {
     return (
       <div className="p-8 text-sm text-slate-500">Loading your field duty…</div>
     );
+
+  // DEVICE LOCK: session is active but this device doesn't hold a matching
+  // token. Block everything until the employee verifies their face.
+  if (deviceTokenMismatch && session) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-sm rounded-2xl border border-[#F4C0D1] bg-white p-6 shadow-xl">
+          <FiAlertTriangle className="mx-auto text-[#730042]" size={48} />
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Your field duty is already active
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            This duty session was started on another device. To continue here,
+            verify your face to take over the session.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowTakeOverFaceCheck(true)}
+            className="mt-5 rounded-lg bg-[#730042] px-4 py-2 text-sm font-bold text-white"
+          >
+            Verify face to continue
+          </button>
+          {showTakeOverFaceCheck && (
+            <FaceCheckModal
+              heading="Verify to take over field duty"
+              onClose={() => setShowTakeOverFaceCheck(false)}
+              onCaptured={handleTakeOver}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
@@ -2960,7 +3202,6 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
     checkpointStatus: "",
     employeeSearch: "",
   });
-  const overview = useFieldOverview(true, filters);
   const teams = useFieldTeams(true);
   const [selected, setSelected] = useState(null);
   const [teamFormTarget, setTeamFormTarget] = useState(undefined);
@@ -2969,6 +3210,10 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
   const [showBulkExcel, setShowBulkExcel] = useState(false);
   const [routeEmployeeId, setRouteEmployeeId] = useState(null);
   const [routeDate, setRouteDate] = useState("");
+  const [rosterEmployees, setRosterEmployees] = useState([]);
+  const teamOptionsMutation = useFieldTeamOptions();
+  const { employeeSearch, ...serverFilters } = filters;
+  const overview = useFieldOverview(true, serverFilters);
   const [teamSearch, setTeamSearch] = useState("");
   const [showAllOnMap, setShowAllOnMap] = useState(false);
   const deleteTeam = useDeleteFieldTeam();
@@ -2996,6 +3241,14 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
       ),
     );
   }, [teams.data?.teams, overview.data?.visits]);
+
+  useEffect(() => {
+    teamOptionsMutation
+      .mutateAsync()
+      .then((data) => setRosterEmployees(data.employees || []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const removeTeam = async (team) => {
     if (
@@ -3177,6 +3430,11 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                   : []
               }
             />
+            {!active && (
+              <div className="mt-3 grid h-24 place-items-center rounded-xl bg-slate-50 text-sm text-slate-500">
+                No employee is currently active in the field right now
+              </div>
+            )}
             {active && (
               <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3">
                 <div>
@@ -3196,18 +3454,16 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               </div>
             )}
           </div>
-          {active?.employee?._id && (
-            <RouteTrail
-              employeeId={routeEmployeeId || active.employee._id}
-              date={routeDate}
-              showPicker={false}
-              employees={activityEmployees}
-              selectedEmployeeId={routeEmployeeId}
-              onEmployeeChange={setRouteEmployeeId}
-              onDateChange={setRouteDate}
-              big={false}
-            />
-          )}
+          <RouteTrail
+            employeeId={routeEmployeeId || active?.employee?._id || activityEmployees[0]?._id}
+            date={routeDate}
+            showPicker={true}
+            employees={rosterEmployees}
+            selectedEmployeeId={routeEmployeeId}
+            onEmployeeChange={setRouteEmployeeId}
+            onDateChange={setRouteDate}
+            big={false}
+          />
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-3">
           <h2 className="px-1 pb-3 font-bold text-slate-900">

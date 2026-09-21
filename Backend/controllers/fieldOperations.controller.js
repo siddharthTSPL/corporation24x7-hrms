@@ -1,9 +1,11 @@
 const FieldTeam = require("../Models/fieldTeam.model");
+const crypto = require("crypto");
 const FieldDutySession = require("../Models/fieldDutySession.model");
 const FieldLocation = require("../Models/fieldLocation.model");
 const FieldVisit = require("../Models/fieldVisit.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
 const User = require("../Models/user.model");
+const Admin = require("../Models/Admin.model");
 const Manager = require("../Models/manager.model");
 const SuperAdmin = require("../Models/superadmin.model");
 const FaceProfile = require("../Models/faceprofile.model");
@@ -31,16 +33,14 @@ const {
   GEOFENCE_MODES,
   FIELD_CHECKPOINT_INTERVAL_MINUTES,
   FIELD_CHECKPOINT_GRACE_PERIOD_MINUTES,
+  IMPLAUSIBLE_SPEED_KPH,
   resolveMinDurationMinutes,
 } = require("../utils/fieldWorkConstants");
+const { checkLocationPlausibility } = require("../utils/locationPlausibility.utils");
 
 const OPEN_STATUSES = ["active", "paused", "offline"];
 const STAFF_ROLES = ["SuperAdmin", "Admin", "Manager"];
 const FACE_MATCH_THRESHOLD = 0.62;
-// A field employee moving faster than this between two GPS fixes almost
-// certainly isn't walking/driving there for real — flag the point instead
-// of trusting it for the live marker, distance total, or duration.
-const IMPLAUSIBLE_SPEED_KPH = 180;
 const VISIT_PHOTO_ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
 const VISIT_PHOTO_MAX_SIZE = 4 * 1024 * 1024;
 const VISIT_PHOTO_MAX_COUNT = 6;
@@ -50,6 +50,66 @@ const MIN_VISIT_MINUTES = 20;
 const FIELD_VISIT_PAGE_SIZE = 8;
 const MY_FIELD_VISIT_PAGE_SIZE = 6;
 const FIELD_VISIT_MAX_PAGE_SIZE = 100;
+
+// Alerts are a best-effort side effect: fraud detection must never depend on
+// notification storage or recipient lookups succeeding.
+async function notifyFieldSecurity({
+  organisation_id,
+  employeeId,
+  session,
+  title,
+  message,
+  meta,
+  priority = "high",
+  managerOnly = false,
+}) {
+  try {
+    const organisation = await SuperAdmin.findById(organisation_id)
+      .select("field_operations")
+      .lean();
+    if (organisation?.field_operations?.security_alerts_enabled === false)
+      return;
+    const [employee, admins, team] = await Promise.all([
+      User.findById(employeeId).select("f_name l_name").lean(),
+      managerOnly
+        ? []
+        : Admin.find({ organisation_id, working_status: { $nin: ["resigned", "fired", "terminated"] } })
+            .select("_id")
+            .lean(),
+      session?.team
+        ? FieldTeam.findById(session.team).select("managers").lean()
+        : null,
+    ]);
+    const recipients = managerOnly
+      ? []
+      : [
+          { recipientModel: "SuperAdmin", recipientId: organisation_id },
+          ...admins.map((admin) => ({ recipientModel: "Admin", recipientId: admin._id })),
+        ];
+    (team?.managers || []).forEach((managerId) =>
+      recipients.push({ recipientModel: "Manager", recipientId: managerId }),
+    );
+    const uniqueRecipients = [...new Map(
+      recipients.map((recipient) => [`${recipient.recipientModel}:${recipient.recipientId}`, recipient]),
+    ).values()];
+    if (!uniqueRecipients.length) return;
+    const employeeName = employee
+      ? `${employee.f_name || ""} ${employee.l_name || ""}`.trim() || "A field employee"
+      : "A field employee";
+    await createBulkNotifications({
+      recipients: uniqueRecipients,
+      organisation_id,
+      type: "field_ops_security",
+      priority,
+      title: title.replace("{employee}", employeeName),
+      message: message.replace("{employee}", employeeName),
+      link: `/field-operations?employeeId=${employeeId}`,
+      meta: { employeeId, sessionId: session?._id, flaggedAt: new Date(), ...meta },
+    });
+  } catch (err) {
+    console.error("[field-security] notification failed:", err?.stack || err);
+  }
+}
 
 // Checkpoint status derivation shared by myDuty/getOverview (spec section 24).
 function computeCheckpointStatus(session, now = new Date()) {
@@ -94,6 +154,79 @@ const asPoint = (input, required = true) => {
       : null,
     capturedAt,
   };
+};
+
+async function assertDeviceToken(session, req, actor) {
+  try {
+    const deviceToken = String(req.headers["x-device-token"] || "").trim();
+    // Sessions created before device locking are deliberately claimable. New
+    // clients seed a token locally before their first protected request.
+    if (session.activeDeviceToken === null) {
+      if (!deviceToken) return { ok: true, claimed: false };
+      session.activeDeviceToken = deviceToken;
+      await session.save();
+      return { ok: true, claimed: true };
+    }
+    if (deviceToken && session.activeDeviceToken === deviceToken)
+      return { ok: true, claimed: false };
+  } catch (err) {
+    // A storage failure must not break normal field work. A genuine token
+    // mismatch below is the one intentional blocking case.
+    console.error("[device-lock] token check failed open:", err?.stack || err);
+    return { ok: true, claimed: false };
+  }
+  try {
+    const shouldNotify = !session.deviceMismatchAlertedAt;
+    session.needsReview = true;
+    if (shouldNotify) session.deviceMismatchAlertedAt = new Date();
+    await session.save();
+    await logAudit({
+      organisation_id: session.organisation_id,
+      module: "field_work",
+      action: "duty_session_on_another_device",
+      actor: { id: actor.id, model: actor.model, name: actor.name || "" },
+      target: { id: session._id, model: "FieldDutySession", name: `Session ${session._id}` },
+      meta: {
+        sessionId: session._id,
+        tokenMismatch: true,
+        employeeId: session.employee,
+      },
+    });
+    if (shouldNotify) {
+      void notifyFieldSecurity({
+        organisation_id: session.organisation_id,
+        employeeId: session.employee,
+        session,
+        title: "Field duty accessed from an unrecognized device — {employee}",
+        message: "A field-duty request for {employee} was rejected because it came from an unrecognized device.",
+        meta: { source: "device_lock_conflict" },
+      });
+    }
+  } catch (err) {
+    console.error("[device-lock] audit log failed:", err?.stack || err);
+  }
+  return { ok: false, code: "DUTY_SESSION_ON_ANOTHER_DEVICE" };
+}
+
+const withoutDeviceToken = (session) => {
+  if (!session) return null;
+  const plain = session.toObject ? session.toObject() : { ...session };
+  delete plain.activeDeviceToken;
+  return plain;
+};
+
+const sessionForEmployee = (session) => {
+  const plain = withoutDeviceToken(session);
+  if (!plain) return null;
+  // Generic responses never reveal the bearer token. This boolean is enough
+  // for the employee app to decide whether face take-over is necessary.
+  return { ...plain, deviceLockActive: Boolean(session.activeDeviceToken) };
+};
+
+const rejectOtherDevice = () => {
+  const err = httpError("This duty session is active on another device", 409);
+  err.code = "DUTY_SESSION_ON_ANOTHER_DEVICE";
+  throw err;
 };
 
 const actorContext = (req) => ({
@@ -191,6 +324,7 @@ async function assertFieldOperationsEnabled(organisation_id) {
       max_managers: 10,
       data_retention_days: 180,
       require_face_verification: false,
+      security_alerts_enabled: true,
       geofence_mode: "off",
       min_duration_overrides: {},
     }
@@ -351,7 +485,12 @@ exports.startDuty = async (req, res) => {
     if (existing)
       return res
         .status(200)
-        .json({ success: true, session: existing, idempotent: true });
+        .json({
+          success: true,
+          session: withoutDeviceToken(existing),
+          activeDeviceToken: existing.activeDeviceToken,
+          idempotent: true,
+        });
   }
 
   const open = await FieldDutySession.findOne({
@@ -363,14 +502,14 @@ exports.startDuty = async (req, res) => {
     return res.status(409).json({
       success: false,
       message: "You already have an open field-duty session",
-      session: open,
+      session: withoutDeviceToken(open),
     });
 
   const face = await verifyDutySelfie({
     organisation_id,
     employeeId: actor.id,
     selfieBase64: req.body.selfieBase64,
-    required: settings.require_face_verification,
+    required: true,
   });
   const team = teamId ? await FieldTeam.findById(teamId).select("geofence").lean() : null;
   const session = await FieldDutySession.create({
@@ -381,6 +520,7 @@ exports.startDuty = async (req, res) => {
     lastLocation: startLocation,
     lastSeenAt: startLocation.capturedAt,
     clientEventId,
+    activeDeviceToken: crypto.randomUUID(),
     activity: {
       withinTeamGeofence: isInsideGeofence(startLocation, team?.geofence),
       faceVerifiedAt: face?.verifiedAt || null,
@@ -394,7 +534,11 @@ exports.startDuty = async (req, res) => {
         : null,
     },
   });
-  return res.status(201).json({ success: true, session });
+  return res.status(201).json({
+    success: true,
+    session: withoutDeviceToken(session),
+    activeDeviceToken: session.activeDeviceToken,
+  });
 };
 
 exports.myDuty = async (req, res) => {
@@ -409,7 +553,7 @@ exports.myDuty = async (req, res) => {
   const checkpoint = computeCheckpointStatus(session);
   return res.json({
     success: true,
-    session,
+    session: sessionForEmployee(session),
     faceVerificationRequired: Boolean(settings.require_face_verification),
     checkInIntervalMinutes: FIELD_CHECKPOINT_INTERVAL_MINUTES,
     checkpointGracePeriodMinutes: FIELD_CHECKPOINT_GRACE_PERIOD_MINUTES,
@@ -419,10 +563,12 @@ exports.myDuty = async (req, res) => {
 };
 
 exports.updateDutyStatus = async (req, res) => {
-  await assertEmployeeCanUseFieldOperations(req);
+  const { actor } = await assertEmployeeCanUseFieldOperations(req);
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
+  const deviceCheck = await assertDeviceToken(session, req, actor);
+  if (!deviceCheck.ok) rejectOtherDevice();
   if (!OPEN_STATUSES.includes(session.status))
     throw httpError("This field-duty session is already checked out", 409);
   const status = String(req.body.status || "");
@@ -430,7 +576,7 @@ exports.updateDutyStatus = async (req, res) => {
     throw httpError("Invalid duty status", 400);
   session.status = status;
   await session.save();
-  return res.json({ success: true, session });
+  return res.json({ success: true, session: withoutDeviceToken(session) });
 };
 
 exports.addLocation = async (req, res) => {
@@ -439,6 +585,10 @@ exports.addLocation = async (req, res) => {
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
+  const deviceCheck = await assertDeviceToken(session, req, actor);
+  if (!deviceCheck.ok) {
+    rejectOtherDevice();
+  }
   if (!OPEN_STATUSES.includes(session.status))
     throw httpError(
       "Location sharing has stopped because duty is checked out",
@@ -455,18 +605,22 @@ exports.addLocation = async (req, res) => {
     point,
     speedMps: req.body.speedMps,
   });
+  const plausibility = checkLocationPlausibility({
+    previous: session.lastLocation,
+    point,
+  });
   const withinTeamGeofence = isInsideGeofence(point, team?.geofence);
   // A browser can't read a native "mock provider" flag, so this is a
   // heuristic: treat an implausible jump (or an explicit flag from a
   // native wrapper, once one exists) as suspicious rather than trusting it.
   const isMocked =
-    Boolean(req.body.isMocked) ||
-    (movement.speedKph !== null && movement.speedKph > IMPLAUSIBLE_SPEED_KPH);
+    Boolean(req.body.isMocked) || plausibility.isMocked;
   const provider = ["gps", "network", "fused"].includes(req.body.provider)
     ? req.body.provider
     : "unknown";
 
   let location;
+  let locationWasCreated = true;
   try {
     location = await FieldLocation.create({
       organisation_id,
@@ -498,6 +652,28 @@ exports.addLocation = async (req, res) => {
   } catch (error) {
     if (error?.code !== 11000) throw error;
     location = await FieldLocation.findOne({ organisation_id, eventId });
+    locationWasCreated = false;
+  }
+
+  const needsReviewBefore = Boolean(session.needsReview);
+  if (isMocked && locationWasCreated) {
+    session.flaggedPointsCount = (session.flaggedPointsCount || 0) + 1;
+    if (session.flaggedPointsCount >= 2) session.needsReview = true;
+    await session.save();
+    if (!needsReviewBefore && session.needsReview) {
+      void notifyFieldSecurity({
+        organisation_id,
+        employeeId: actor.id,
+        session,
+        title: "Suspicious location activity — {employee}",
+        message: `{employee}'s GPS jump of ${(plausibility.distanceMeters || 0) / 1000} km at ${plausibility.speedKph || "unknown"} km/h was flagged as implausible.`,
+        meta: {
+          speedKph: plausibility.speedKph,
+          distanceKm: Number(((plausibility.distanceMeters || 0) / 1000).toFixed(2)),
+          source: "gps_ping",
+        },
+      });
+    }
   }
 
   // A delayed offline point must never move the live marker backwards, and
@@ -567,6 +743,10 @@ exports.submitCheckIn = async (req, res) => {
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
+  const deviceCheck = await assertDeviceToken(session, req, actor);
+  if (!deviceCheck.ok) {
+    rejectOtherDevice();
+  }
   if (!OPEN_STATUSES.includes(session.status))
     throw httpError("Duty is already checked out", 409);
   const point = asPoint(req.body.location || req.body);
@@ -577,6 +757,10 @@ exports.submitCheckIn = async (req, res) => {
     required: true,
     context: "for this periodic check-in",
   });
+  const plausibility = checkLocationPlausibility({
+    previous: session.lastLocation,
+    point,
+  });
   session.checkIns = session.checkIns || [];
   session.checkIns.push({
     capturedAt: point.capturedAt,
@@ -584,17 +768,38 @@ exports.submitCheckIn = async (req, res) => {
     longitude: point.longitude,
     accuracy: point.accuracy,
     faceMatchScore: face?.score ?? null,
+    isMocked: plausibility.isMocked,
   });
   session.lastCheckInAt = point.capturedAt;
   // A live check-in also refreshes the live marker, same as a normal GPS ping.
-  if (!session.lastSeenAt || point.capturedAt >= session.lastSeenAt) {
+  // But a mocked check-in must not overwrite the trusted lastLocation.
+  if (!plausibility.isMocked && (!session.lastSeenAt || point.capturedAt >= session.lastSeenAt)) {
     session.lastLocation = point;
     session.lastSeenAt = point.capturedAt;
   }
+  const needsReviewBefore = Boolean(session.needsReview);
+  if (plausibility.isMocked) {
+    session.flaggedPointsCount = (session.flaggedPointsCount || 0) + 1;
+    if (session.flaggedPointsCount >= 2) session.needsReview = true;
+  }
   await session.save();
+  if (!needsReviewBefore && session.needsReview) {
+    void notifyFieldSecurity({
+      organisation_id,
+      employeeId: actor.id,
+      session,
+      title: "Suspicious location activity — {employee}",
+      message: `{employee}'s check-in jump of ${(plausibility.distanceMeters || 0) / 1000} km at ${plausibility.speedKph || "unknown"} km/h was flagged as implausible.`,
+      meta: {
+        speedKph: plausibility.speedKph,
+        distanceKm: Number(((plausibility.distanceMeters || 0) / 1000).toFixed(2)),
+        source: "check_in",
+      },
+    });
+  }
   return res.status(201).json({
     success: true,
-    session,
+    session: withoutDeviceToken(session),
     nextCheckInDueAt: new Date(
       point.capturedAt.getTime() + CHECK_IN_INTERVAL_MINUTES * 60000,
     ),
@@ -602,12 +807,16 @@ exports.submitCheckIn = async (req, res) => {
 };
 
 exports.checkoutDuty = async (req, res) => {
-  await assertEmployeeCanUseFieldOperations(req);
+  const { actor } = await assertEmployeeCanUseFieldOperations(req);
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
+  const deviceCheck = await assertDeviceToken(session, req, actor);
+  if (!deviceCheck.ok) {
+    rejectOtherDevice();
+  }
   if (session.status === "checked_out")
-    return res.json({ success: true, session, idempotent: true });
+    return res.json({ success: true, session: withoutDeviceToken(session), idempotent: true });
   const endLocation =
     asPoint(req.body.location || req.body, false) || session.lastLocation;
   if (!endLocation)
@@ -625,7 +834,44 @@ exports.checkoutDuty = async (req, res) => {
     session.device.batteryAtEnd = Number(req.body.batteryLevel);
   }
   await session.save();
-  return res.json({ success: true, session });
+  return res.json({ success: true, session: withoutDeviceToken(session) });
+};
+
+exports.takeOverDuty = async (req, res) => {
+  const { actor, organisation_id } =
+    await assertEmployeeCanUseFieldOperations(req);
+  const session = await FieldDutySession.findOne({
+    organisation_id,
+    employee: actor.id,
+    status: { $in: OPEN_STATUSES },
+  }).sort({ startedAt: -1 });
+  if (!session)
+    throw httpError("No active field-duty session to take over", 404);
+  await verifyDutySelfie({
+    organisation_id,
+    employeeId: actor.id,
+    selfieBase64: req.body.selfieBase64,
+    required: true,
+    context: "to take over an active duty session",
+  });
+  session.activeDeviceToken = crypto.randomUUID();
+  session.needsReview = false;
+  await session.save();
+  void notifyFieldSecurity({
+    organisation_id,
+    employeeId: actor.id,
+    session,
+    title: "Field duty taken over on a new device — {employee}",
+    message: "{employee} completed face verification and took over this field duty on a new device.",
+    priority: "medium",
+    managerOnly: true,
+    meta: { source: "face_verified_takeover" },
+  });
+  return res.json({
+    success: true,
+    session: withoutDeviceToken(session),
+    activeDeviceToken: session.activeDeviceToken,
+  });
 };
 
 exports.startVisit = async (req, res) => {
@@ -634,6 +880,10 @@ exports.startVisit = async (req, res) => {
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
+  const deviceCheck = await assertDeviceToken(session, req, actor);
+  if (!deviceCheck.ok) {
+    rejectOtherDevice();
+  }
   if (!OPEN_STATUSES.includes(session.status))
     throw httpError("Start field duty before starting a visit", 409);
   const clientEventId = String(req.body.eventId || "").trim() || null;
@@ -738,6 +988,13 @@ exports.endVisit = async (req, res) => {
   if (!visit) throw httpError("Visit not found", 404);
   if (visit.status !== "in_progress")
     return res.json({ success: true, visit, idempotent: true });
+  const session = await FieldDutySession.findById(visit.session);
+  if (session) {
+    const deviceCheck = await assertDeviceToken(session, req, actor);
+    if (!deviceCheck.ok) {
+      rejectOtherDevice();
+    }
+  }
   const status = ["completed", "skipped", "follow_up_required"].includes(
     req.body.status,
   )
@@ -818,6 +1075,11 @@ exports.uploadVisitPhoto = async (req, res) => {
     employee: actor.id,
   });
   if (!visit) throw httpError("Visit not found", 404);
+  const session = await FieldDutySession.findById(visit.session);
+  if (session) {
+    const deviceCheck = await assertDeviceToken(session, req, actor);
+    if (!deviceCheck.ok) rejectOtherDevice();
+  }
   if (!req.file) throw httpError("A photo file is required", 400);
   if (!VISIT_PHOTO_ALLOWED_MIME.includes(req.file.mimetype))
     throw httpError("Only PNG, JPG, or WEBP photos are allowed", 400);
@@ -899,7 +1161,7 @@ exports.getOverview = async (req, res) => {
   // filter/badge "Checkpoint Overdue" without a second round trip.
   const now = new Date();
   live = live.map((session) => ({
-    ...session,
+    ...withoutDeviceToken(session),
     checkpoint: computeCheckpointStatus(session, now),
   }));
 
@@ -1002,12 +1264,10 @@ exports.getRoute = async (req, res) => {
     .sort({ startedAt: 1 })
     .lean();
 
-  // A manual checkpoint is an important part of an employee's actual route.
-  // It used to be saved only inside the duty session, while the route API
-  // returned only background GPS pings. Consequently, a sequence such as
-  // Bareilly -> Baheri -> Haldwani could omit Baheri from the drawn line.
-  // Keep the raw `points` response for audit/compatibility, and provide one
-  // chronological stream which also contains the checkpoint positions.
+  const sameDay = (d1, d2) =>
+    new Date(d1).toISOString().slice(0, 10) ===
+    new Date(d2).toISOString().slice(0, 10);
+
   const routePoints = [
     ...points.map((point) => ({
       location: point.location,
@@ -1017,10 +1277,33 @@ exports.getRoute = async (req, res) => {
       isMocked: point.isMocked,
       source: "gps",
     })),
-    ...sessions.flatMap((session) => {
+    ...sessions.flatMap((session, idx) => {
       const startAt = new Date(session.startedAt);
       if (!(startAt >= from && startAt < to) || !session.startLocation)
         return [];
+      let isMocked = false;
+      const prevSession = idx > 0 ? sessions[idx - 1] : null;
+      if (
+        prevSession &&
+        prevSession.endLocation &&
+        sameDay(prevSession.startedAt, session.startedAt)
+      ) {
+        const plausibility = checkLocationPlausibility({
+          previous: {
+            latitude: prevSession.endLocation.latitude,
+            longitude: prevSession.endLocation.longitude,
+            capturedAt:
+              prevSession.endLocation.capturedAt || prevSession.endedAt,
+          },
+          point: {
+            latitude: session.startLocation.latitude,
+            longitude: session.startLocation.longitude,
+            capturedAt:
+              session.startLocation.capturedAt || session.startedAt,
+          },
+        });
+        isMocked = plausibility.isMocked;
+      }
       return [
         {
           location: {
@@ -1033,7 +1316,7 @@ exports.getRoute = async (req, res) => {
           accuracy: session.startLocation.accuracy,
           deviceTimestamp: session.startLocation.capturedAt || session.startedAt,
           session: session._id,
-          isMocked: false,
+          isMocked,
           source: "duty_start",
         },
       ];
@@ -1052,7 +1335,7 @@ exports.getRoute = async (req, res) => {
           accuracy: checkIn.accuracy,
           deviceTimestamp: checkIn.capturedAt,
           session: session._id,
-          isMocked: false,
+          isMocked: checkIn.isMocked || false,
           source: "check_in",
         })),
     ),
@@ -1087,8 +1370,71 @@ exports.getRoute = async (req, res) => {
       );
     })
     .sort(
-      (a, b) => new Date(a.deviceTimestamp).getTime() - new Date(b.deviceTimestamp).getTime(),
+      (a, b) =>
+        new Date(a.deviceTimestamp).getTime() -
+        new Date(b.deviceTimestamp).getTime(),
     );
+
+  // duty_end: run plausibility against last trusted point before it.
+  for (let i = 0; i < routePoints.length; i++) {
+    const rp = routePoints[i];
+    if (rp.source !== "duty_end") continue;
+    let lastTrusted = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (!routePoints[j].isMocked) {
+        lastTrusted = routePoints[j];
+        break;
+      }
+    }
+    if (lastTrusted) {
+      const plausibility = checkLocationPlausibility({
+        previous: {
+          latitude: lastTrusted.location.coordinates[1],
+          longitude: lastTrusted.location.coordinates[0],
+          capturedAt: lastTrusted.deviceTimestamp,
+        },
+        point: {
+          latitude: rp.location.coordinates[1],
+          longitude: rp.location.coordinates[0],
+          capturedAt: rp.deviceTimestamp,
+        },
+      });
+      rp.isMocked = plausibility.isMocked;
+    }
+  }
+
+  // Cross-session gap validation: for consecutive sessions same day,
+  // check if the jump from session A's end to session B's start is implausible.
+  for (let i = 0; i < sessions.length - 1; i++) {
+    const a = sessions[i];
+    const b = sessions[i + 1];
+    if (!sameDay(a.startedAt, b.startedAt)) continue;
+    const endA = routePoints.find(
+      (rp) => String(rp.session) === String(a._id) && rp.source === "duty_end",
+    );
+    const startB = routePoints.find(
+      (rp) =>
+        String(rp.session) === String(b._id) && rp.source === "duty_start",
+    );
+    if (!endA || !startB) continue;
+    if (endA.isMocked || startB.isMocked) continue;
+    const plausibility = checkLocationPlausibility({
+      previous: {
+        latitude: endA.location.coordinates[1],
+        longitude: endA.location.coordinates[0],
+        capturedAt: endA.deviceTimestamp,
+      },
+      point: {
+        latitude: startB.location.coordinates[1],
+        longitude: startB.location.coordinates[0],
+        capturedAt: startB.deviceTimestamp,
+      },
+    });
+    if (plausibility.isMocked) {
+      endA.crossSessionGapFlag = true;
+      startB.crossSessionGapFlag = true;
+    }
+  }
 
   const now = new Date();
   const totalDistanceMeters = sessions.reduce(
@@ -1460,6 +1806,8 @@ exports.updateSettings = async (req, res) => {
     next.require_face_verification = Boolean(
       req.body.require_face_verification,
     );
+  if (req.body.security_alerts_enabled !== undefined)
+    next.security_alerts_enabled = Boolean(req.body.security_alerts_enabled);
   if (req.body.geofence_mode !== undefined) {
     if (!GEOFENCE_MODES.includes(req.body.geofence_mode))
       throw httpError("geofence_mode must be off, warning, or strict", 400);
@@ -1521,12 +1869,16 @@ exports.updateSettings = async (req, res) => {
 
 exports.teamOptions = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
-  if (!["SuperAdmin", "Admin"].includes(actor.model))
-    throw httpError("Only an administrator can manage field teams", 403);
+  if (!["SuperAdmin", "Admin", "Manager"].includes(actor.model))
+    throw httpError("Access denied", 403);
   await assertFieldOperationsEnabled(organisation_id);
   const active = { $nin: ["resigned", "fired", "terminated"] };
+  const employeeQuery = { organisation_id, working_status: active };
+  if (actor.model === "Manager") {
+    employeeQuery._id = { $in: await accessibleEmployeeIds(req) };
+  }
   const [employees, managers, departments] = await Promise.all([
-    User.find({ organisation_id, working_status: active })
+    User.find(employeeQuery)
       .select("f_name l_name empid office_location")
       .sort({ f_name: 1 })
       .lean(),
@@ -2980,6 +3332,30 @@ exports.getAuditLog = async (req, res) => {
   const AuditLog = require("../Models/auditLog.model");
   const query = { organisation_id, module: "field_work" };
   if (req.query.action) query.action = req.query.action;
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Number(req.query.limit) || 50);
+  const [entries, total] = await Promise.all([
+    AuditLog.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    AuditLog.countDocuments(query),
+  ]);
+  return res.json({ success: true, entries, total, page, limit });
+};
+
+// Login anomaly events (impossible-travel flags from unified login)
+exports.getLoginAnomalies = async (req, res) => {
+  const { actor, organisation_id } = actorContext(req);
+  if (!["SuperAdmin", "Admin"].includes(actor.model))
+    throw httpError("Only an administrator can view login anomalies", 403);
+  const AuditLog = require("../Models/auditLog.model");
+  const query = {
+    organisation_id,
+    module: "auth",
+    action: "login_impossible_travel",
+  };
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.min(100, Number(req.query.limit) || 50);
   const [entries, total] = await Promise.all([
