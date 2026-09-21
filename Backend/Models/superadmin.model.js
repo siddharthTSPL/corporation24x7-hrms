@@ -203,6 +203,7 @@ const superAdminSchema = new mongoose.Schema(
       max_managers: { type: Number, default: 10, min: 0 },
       data_retention_days: { type: Number, default: 180, min: 1 },
       require_face_verification: { type: Boolean, default: false },
+      security_alerts_enabled: { type: Boolean, default: true },
 
       // OFF: no geofence enforcement. WARNING: distance shown to the user
       // but never blocks. STRICT: an activity with a known expectedLocation

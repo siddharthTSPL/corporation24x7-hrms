@@ -16,6 +16,7 @@ router.patch(
 );
 router.post("/duty/:sessionId/locations", asyncHandler(controller.addLocation));
 router.post("/duty/:sessionId/checkout", asyncHandler(controller.checkoutDuty));
+router.post("/duty/take-over", asyncHandler(controller.takeOverDuty));
 router.post(
   "/duty/:sessionId/check-in",
   asyncHandler(controller.submitCheckIn),
@@ -81,5 +82,6 @@ router.get("/export/csv", asyncHandler(controller.exportFieldActivitiesCsv));
 router.get("/export/employees", asyncHandler(controller.exportFieldEmployeesWithVisits));
 router.get("/visits/export/csv", asyncHandler(controller.exportMyVisitsCsv));
 router.get("/audit-log", asyncHandler(controller.getAuditLog));
+router.get("/login-anomalies", asyncHandler(controller.getLoginAnomalies));
 
 module.exports = router;

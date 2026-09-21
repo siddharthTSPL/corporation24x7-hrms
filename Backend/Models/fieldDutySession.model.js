@@ -101,8 +101,13 @@ const fieldDutySessionSchema = new mongoose.Schema(
         longitude: Number,
         accuracy: Number,
         faceMatchScore: { type: Number, default: null },
+        isMocked: { type: Boolean, default: false },
       },
     ],
+    flaggedPointsCount: { type: Number, default: 0 },
+    activeDeviceToken: { type: String, default: null },
+    needsReview: { type: Boolean, default: false },
+    deviceMismatchAlertedAt: { type: Date, default: null },
 
     device: {
       platform: { type: String, trim: true, maxlength: 40, default: "" },

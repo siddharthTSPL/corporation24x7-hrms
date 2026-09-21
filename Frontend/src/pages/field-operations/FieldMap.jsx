@@ -103,10 +103,17 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
       (m) => Number.isFinite(m.latitude) && Number.isFinite(m.longitude),
     );
 
-    if (path.length > 1 && pathVisible && showPath) {
-      L.polyline(path, { color: "#7A004B", weight: 3, opacity: 0.7 }).addTo(
-        layer,
-      );
+    if (pathVisible && showPath && path.length > 0) {
+      const segments = Array.isArray(path[0]) ? path : [path];
+      segments.forEach((segment) => {
+        if (segment.length > 1) {
+          L.polyline(segment, {
+            color: "#7A004B",
+            weight: 3,
+            opacity: 0.7,
+          }).addTo(layer);
+        }
+      });
     }
 
     validMarkers.forEach((marker) => {
@@ -131,7 +138,7 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
 
     const allPoints = [
       ...validMarkers.map((m) => [m.latitude, m.longitude]),
-      ...path,
+      ...path.flat(),
     ];
     if (allPoints.length === 1) {
       map.setView(allPoints[0], 15);

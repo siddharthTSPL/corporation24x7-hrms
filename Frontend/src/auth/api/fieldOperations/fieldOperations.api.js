@@ -14,6 +14,32 @@ const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use((config) => {
+  const match = config.url?.match(/duty\/([^/]+)/);
+  const sessionId = match?.[1] ||
+    (config.url?.includes("field-operations/visits/")
+      ? localStorage.getItem("activeFieldSessionId")
+      : null);
+  if (sessionId && sessionId !== "take-over") {
+    const token = localStorage.getItem(`deviceToken_${sessionId}`);
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers["X-Device-Token"] = token;
+    }
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
+      window.dispatchEvent(new CustomEvent("field-duty-device-conflict"));
+    }
+    return Promise.reject(error);
+  },
+);
+
 export const getMyFieldDuty = () =>
   api.get("field-operations/my-duty").then((r) => r.data);
 export const getFieldOverview = (filters = {}) => {
@@ -36,6 +62,8 @@ export const checkoutFieldDuty = (sessionId, body = {}) =>
   api
     .post(`field-operations/duty/${sessionId}/checkout`, body)
     .then((r) => r.data);
+export const takeOverDuty = (body) =>
+  api.post("field-operations/duty/take-over", body).then((r) => r.data);
 export const startFieldVisit = (sessionId, body) =>
   api
     .post(`field-operations/duty/${sessionId}/visits`, body)

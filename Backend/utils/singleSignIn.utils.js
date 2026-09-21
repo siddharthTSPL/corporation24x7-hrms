@@ -9,11 +9,17 @@ const ROLE_TO_ACCOUNT_MODEL = {
   employee: "User",
 };
 
-const buildDeviceInfo = (req) => ({
-  userAgent: req.headers["user-agent"] || "",
-  ip: req.ip || req.headers["x-forwarded-for"] || "",
-  label: describeDevice(req.headers["user-agent"] || ""),
-});
+const buildDeviceInfo = (req) => {
+  const { getIp, locateIp } = require("./loginAnomaly.utils");
+  const ip = getIp(req);
+  return {
+    userAgent: req.headers["user-agent"] || "",
+    ip,
+    label: describeDevice(req.headers["user-agent"] || ""),
+    // IP lookup is local/offline and returns null for private or unknown IPs.
+    geo: locateIp(ip),
+  };
+};
 
 // Very small heuristic label — good enough for "which device is this" in a
 // prompt, not meant to be a full UA parser.

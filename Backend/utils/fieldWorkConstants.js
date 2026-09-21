@@ -45,6 +45,11 @@ const GEOFENCE_MODES = ["off", "warning", "strict"];
 
 const ACTIVITY_PRIORITIES = ["low", "medium", "high"];
 
+// A field employee moving faster than this between two GPS fixes almost
+// certainly isn't walking/driving there for real — flag the point instead
+// of trusting it for the live marker, distance total, or duration.
+const IMPLAUSIBLE_SPEED_KPH = 180;
+
 function resolveMinDurationMinutes(activityType, overrides = {}) {
   const key = ACTIVITY_TYPES.includes(activityType) ? activityType : "other";
   const overrideValue = Number(overrides?.[key]);
@@ -63,4 +68,5 @@ module.exports = {
   GEOFENCE_MODES,
   ACTIVITY_PRIORITIES,
   resolveMinDurationMinutes,
+  IMPLAUSIBLE_SPEED_KPH,
 };
