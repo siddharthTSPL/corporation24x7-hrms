@@ -96,9 +96,14 @@ export const getFieldRoute = (employeeId, date) =>
       params: date ? { date } : {},
     })
     .then((r) => r.data);
-export const uploadVisitPhoto = (visitId, file) => {
+export const uploadVisitPhoto = (visitId, file, location) => {
   const form = new FormData();
   form.append("photo", file);
+  if (location && Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
+    form.append("latitude", location.latitude);
+    form.append("longitude", location.longitude);
+    if (Number.isFinite(location.accuracy)) form.append("accuracy", location.accuracy);
+  }
   return api
     .post(`field-operations/visits/${visitId}/photo`, form, {
       headers: { "Content-Type": "multipart/form-data" },

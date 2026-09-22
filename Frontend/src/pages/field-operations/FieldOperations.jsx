@@ -496,8 +496,21 @@ function RouteTrail({
   // first point of each cluster and every point that actually moved, so
   // the trail only appears when the employee is genuinely travelling.
   const MIN_MOVE_METERS = 25;
+  // Phone GPS drifts 40-100m indoors/urban-canyon even standing still. A
+  // flat 25m floor treats that drift as a "walk". Two fixes:
+  //  1. Pings whose own accuracy is too poor to trust for a *trail* (as
+  //     opposed to a single marker) are dropped before clustering at all.
+  //  2. The move threshold between two points scales with their combined
+  //     GPS error margin, not just a fixed distance — a jump only counts
+  //     as real movement once it clears both readings' noise floor.
+  const MAX_USABLE_ACCURACY_METERS = 75;
   const rawPath = useMemo(() => {
-    const trusted = points.filter((p) => !p.isMocked);
+    const trusted = points.filter(
+      (p) =>
+        !p.isMocked &&
+        (!Number.isFinite(p.accuracy) ||
+          p.accuracy <= MAX_USABLE_ACCURACY_METERS),
+    );
     const segments = [];
     let currentSegment = [];
     for (let i = 0; i < trusted.length; i++) {
@@ -509,24 +522,29 @@ function RouteTrail({
         if (currentSegment.length > 0) segments.push(currentSegment);
         currentSegment = [];
       }
-      currentSegment.push([
-        trusted[i].location.coordinates[1],
-        trusted[i].location.coordinates[0],
-      ]);
+      currentSegment.push({
+        lat: trusted[i].location.coordinates[1],
+        lng: trusted[i].location.coordinates[0],
+        accuracy: trusted[i].accuracy,
+      });
     }
     if (currentSegment.length > 0) segments.push(currentSegment);
     const simplifiedSegments = segments.map((segment) => {
-      if (segment.length < 2) return segment;
+      if (segment.length < 2) return segment.map((p) => [p.lat, p.lng]);
       const simplified = [segment[0]];
       for (let i = 1; i < segment.length; i++) {
-        const prev = simplified[simplified.length - 1];
-        const a = prev;
+        const a = simplified[simplified.length - 1];
         const b = segment[i];
-        const dLat = (b[0] - a[0]) * 111320;
-        const dLon = (b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
-        if (Math.hypot(dLat, dLon) >= MIN_MOVE_METERS) simplified.push(b);
+        const dLat = (b.lat - a.lat) * 111320;
+        const dLon =
+          (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+        const requiredMoveMeters = Math.max(
+          MIN_MOVE_METERS,
+          (a.accuracy || 0) + (b.accuracy || 0),
+        );
+        if (Math.hypot(dLat, dLon) >= requiredMoveMeters) simplified.push(b);
       }
-      return simplified;
+      return simplified.map((p) => [p.lat, p.lng]);
     });
     return simplifiedSegments.filter((s) => s.length >= 2);
   }, [points]);
@@ -606,18 +624,31 @@ function RouteTrail({
         });
     });
     dayVisits.forEach((visit) => {
-      const loc = visit.endLocation || visit.startLocation;
-      if (!loc || !(visit.attachments || []).length) return;
-      visit.attachments.forEach((url, idx) =>
+      const fallbackLoc = visit.endLocation || visit.startLocation;
+      if (!(visit.attachments || []).length) return;
+      const locationsByUrl = new Map(
+        (visit.attachmentLocations || []).map((entry) => [entry.url, entry]),
+      );
+      visit.attachments.forEach((url, idx) => {
+        // Pin each photo at the spot it was actually taken. Older photos
+        // uploaded before per-photo location was captured fall back to the
+        // visit's own start/end location so they still show up somewhere.
+        const own = locationsByUrl.get(url);
+        const loc =
+          own && Number.isFinite(own.latitude) && Number.isFinite(own.longitude)
+            ? own
+            : fallbackLoc;
+        if (!loc) return;
         list.push({
           latitude: loc.latitude,
           longitude: loc.longitude,
+          accuracy: own?.accuracy,
           type: "photo",
           photoUrl: url,
           label: `${visit.customerName || titleize(visit.activityType)}${visit.attachments.length > 1 ? ` (${idx + 1}/${visit.attachments.length})` : ""}`,
-          timestamp: visit.endedAt || visit.startedAt,
-        }),
-      );
+          timestamp: own?.capturedAt || visit.endedAt || visit.startedAt,
+        });
+      });
     });
     return list;
   }, [points, sessions, dayVisits]);
@@ -943,9 +974,14 @@ function VisitPhotoUploader({ visit, onUploaded }) {
     setShowCamera(false);
     if (!visit?._id) return;
     try {
+      // Best-effort — a slow/unavailable GPS must never block the upload.
+      // Without a location the photo still uploads, it just falls back to
+      // pinning at the visit's shared start/end location on the map.
+      const location = await safeCurrentPosition();
       const result = await uploadPhoto.mutateAsync({
         visitId: visit._id,
         file,
+        location,
       });
       onUploaded?.(result.visit);
     } catch (error) {
@@ -1553,9 +1589,11 @@ function EmployeeDuty({ auth }) {
   const handleCompletionPhoto = async (file) => {
     setPendingCompletePhoto(false);
     try {
+      const location = await safeCurrentPosition();
       const result = await uploadCompletionPhoto.mutateAsync({
         visitId: openVisit._id,
         file,
+        location,
       });
       setOpenVisit(result.visit);
       await finishVisit("completed");
@@ -3697,16 +3735,23 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                       ...(overview.data?.visits || [])
                         .filter((v) => (v.attachments || []).length)
                         .flatMap((v) => {
-                          const loc = v.endLocation || v.startLocation;
+                          const latestUrl = v.attachments[v.attachments.length - 1];
+                          const own = (v.attachmentLocations || []).find(
+                            (entry) => entry.url === latestUrl,
+                          );
+                          const loc =
+                            own && Number.isFinite(own.latitude) && Number.isFinite(own.longitude)
+                              ? own
+                              : v.endLocation || v.startLocation;
                           if (!loc) return [];
                           return [
                             {
                               latitude: Number(loc.latitude),
                               longitude: Number(loc.longitude),
                               type: "photo",
-                              photoUrl: v.attachments[v.attachments.length - 1],
+                              photoUrl: latestUrl,
                               label: `${v.customerName || titleize(v.activityType)} — visit photo`,
-                              timestamp: v.endedAt || v.startedAt,
+                              timestamp: own?.capturedAt || v.endedAt || v.startedAt,
                             },
                           ];
                         }),

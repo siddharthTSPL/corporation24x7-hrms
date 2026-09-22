@@ -187,7 +187,8 @@ export const useEndFieldVisit = () => {
 
 export const useUploadVisitPhoto = () => {
   return useMutation({
-    mutationFn: ({ visitId, file }) => uploadVisitPhoto(visitId, file),
+    mutationFn: ({ visitId, file, location }) =>
+      uploadVisitPhoto(visitId, file, location),
   });
 };
 
@@ -299,4 +300,3 @@ export const useAllFieldVisits = (enabled, filters = {}) =>
       totalPages: 0,
     },
   });
-
