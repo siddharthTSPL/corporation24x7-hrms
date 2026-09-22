@@ -43,31 +43,37 @@ async function matchChunk(chunk, signal) {
 // Snaps one continuous trail (array of [lat, lon]) to roads. Falls back to
 // the original straight-line points for any chunk OSRM can't match (e.g. no
 // nearby road data, or the demo server is rate-limiting us) so the map
-// never ends up with a gap — worst case it looks the way it does today for
-// just that stretch.
+// never ends up with a gap. Returns { coords, dashed } — `dashed: true`
+// means part (or all) of this stretch is the raw straight-line fallback,
+// not an actual road match, so the caller can render it visibly different
+// (dashed/grey) instead of a solid line that looks just as confident as a
+// real snapped road — which is what made a failed match look like the
+// drawn path was cutting through buildings on purpose.
 export async function snapSegmentToRoads(segment, signal) {
-  if (segment.length < 2) return segment;
+  if (segment.length < 2) return { coords: segment, dashed: false };
   const chunks = [];
   for (let i = 0; i < segment.length; i += MAX_POINTS_PER_REQUEST - 1) {
     chunks.push(segment.slice(i, i + MAX_POINTS_PER_REQUEST));
     if (i + MAX_POINTS_PER_REQUEST >= segment.length) break;
   }
   const snappedChunks = [];
+  let anyFallback = false;
   for (let i = 0; i < chunks.length; i++) {
     if (i > 0) await sleep(REQUEST_GAP_MS);
     try {
       snappedChunks.push(await matchChunk(chunks[i], signal));
     } catch (error) {
       if (error.name === "AbortError") throw error;
+      anyFallback = true;
       snappedChunks.push(chunks[i]);
     }
   }
-  return snappedChunks.flat();
+  return { coords: snappedChunks.flat(), dashed: anyFallback };
 }
 
 // Snaps every segment (the trail is already split into segments wherever
 // there's a cross-session gap) and returns them in the same shape the map
-// expects: an array of polylines.
+// expects: an array of { coords, dashed } polylines.
 export async function snapPathToRoads(segments, signal) {
   const results = [];
   for (let i = 0; i < segments.length; i++) {
