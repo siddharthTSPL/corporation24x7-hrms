@@ -1315,6 +1315,20 @@ function EmployeeDuty({ auth }) {
   };
 
   const endDuty = async () => {
+    // Checking out never used to check for a still-open customer visit —
+    // the backend happily checks out duty regardless, and this then did
+    // setOpenVisit(null) unconditionally, silently dropping the in-progress
+    // visit from view. The FieldVisit itself stayed stuck at "in_progress"
+    // in the database (nothing here ever completed/skipped it), and the
+    // employee had no indication anything was left unfinished — only a
+    // fresh page load's restore-in-progress-visit effect would bring it
+    // back. Block checkout here instead so it can't happen silently.
+    if (openVisit) {
+      toast.error(
+        "Finish or skip your open visit before checking out of field duty.",
+      );
+      return;
+    }
     try {
       let body = {};
       try {
