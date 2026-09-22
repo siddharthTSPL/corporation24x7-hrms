@@ -53,6 +53,101 @@ const MARKER_COLORS = {
   live: "#7A004B",
 };
 
+const PULSE_STYLE_ID = "field-map-live-pulse-style";
+function ensurePulseStyles() {
+  if (typeof document === "undefined" || document.getElementById(PULSE_STYLE_ID))
+    return;
+  const style = document.createElement("style");
+  style.id = PULSE_STYLE_ID;
+  style.textContent = `
+@keyframes fieldMapPulse {
+  0% { transform: scale(0.6); opacity: 0.55; }
+  70% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.field-map-live-dot { position: relative; width: 18px; height: 18px; }
+.field-map-live-dot .ring {
+  position: absolute; inset: 0; border-radius: 9999px;
+  animation: fieldMapPulse 1.8s ease-out infinite;
+}
+.field-map-live-dot .core {
+  position: absolute; inset: 4px; border-radius: 9999px;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+.field-map-photo-pin { position: relative; width: 44px; height: 52px; }
+.field-map-photo-pin .thumb {
+  width: 40px; height: 40px; border-radius: 9999px; overflow: hidden;
+  border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  background-size: cover; background-position: center; margin: 0 auto;
+}
+.field-map-photo-pin .tail {
+  width: 0; height: 0; margin: -2px auto 0;
+  border-left: 6px solid transparent; border-right: 6px solid transparent;
+  border-top: 9px solid #fff;
+}
+.field-map-pending-dot {
+  width: 14px; height: 14px; border-radius: 9999px;
+  background: repeating-conic-gradient(#f59e0b 0deg 90deg, #fff7ed 90deg 180deg);
+  border: 2px dashed #b45309; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+`;
+  document.head.appendChild(style);
+}
+
+function livePulseIcon(color, pulsing) {
+  const key = `pulse-${color}-${pulsing ? "on" : "off"}`;
+  if (COLOR_ICONS[key]) return COLOR_ICONS[key];
+  ensurePulseStyles();
+  const html = `
+    <div class="field-map-live-dot">
+      ${pulsing ? `<div class="ring" style="background:${color}"></div>` : ""}
+      <div class="core" style="background:${color}"></div>
+    </div>`;
+  const icon = L.divIcon({
+    html,
+    className: "",
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10],
+  });
+  COLOR_ICONS[key] = icon;
+  return icon;
+}
+
+function photoPinIcon(photoUrl) {
+  const key = `photo-${photoUrl}`;
+  if (COLOR_ICONS[key]) return COLOR_ICONS[key];
+  ensurePulseStyles();
+  const html = `
+    <div class="field-map-photo-pin">
+      <div class="thumb" style="background-image:url('${photoUrl}')"></div>
+      <div class="tail"></div>
+    </div>`;
+  const icon = L.divIcon({
+    html,
+    className: "",
+    iconSize: [44, 52],
+    iconAnchor: [22, 50],
+    popupAnchor: [0, -48],
+  });
+  COLOR_ICONS[key] = icon;
+  return icon;
+}
+
+function pendingDotIcon() {
+  if (COLOR_ICONS.pending) return COLOR_ICONS.pending;
+  ensurePulseStyles();
+  const icon = L.divIcon({
+    html: `<div class="field-map-pending-dot"></div>`,
+    className: "",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -8],
+  });
+  COLOR_ICONS.pending = icon;
+  return icon;
+}
+
 /**
  * A minimal Leaflet + OpenStreetMap map. No API key, no billing, no
  * "premium map infrastructure" — exactly the "reliable basic map solution"
@@ -117,9 +212,20 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
     }
 
     validMarkers.forEach((marker) => {
-      const icon = marker.type
-        ? coloredIcon(MARKER_COLORS[marker.type] || MARKER_COLORS.visit)
-        : DEFAULT_ICON;
+      let icon;
+      if (marker.type === "photo" && marker.photoUrl) {
+        icon = photoPinIcon(marker.photoUrl);
+      } else if (marker.type === "pending") {
+        icon = pendingDotIcon();
+      } else if (marker.type === "live") {
+        const pulsing = marker.presence !== "offline";
+        const color = marker.presence === "offline" ? "#94a3b8" : MARKER_COLORS.live;
+        icon = livePulseIcon(color, pulsing);
+      } else {
+        icon = marker.type
+          ? coloredIcon(MARKER_COLORS[marker.type] || MARKER_COLORS.visit)
+          : DEFAULT_ICON;
+      }
       const m = L.marker([marker.latitude, marker.longitude], { icon }).addTo(
         layer,
       );
@@ -129,9 +235,17 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
       const timeLine = marker.timestamp
         ? new Date(marker.timestamp).toLocaleString()
         : "";
-      if (marker.label || accuracyLine || timeLine) {
+      const photoLine =
+        marker.type === "photo" && marker.photoUrl
+          ? `<img src="${marker.photoUrl}" style="width:160px;border-radius:8px;margin-top:4px;display:block"/>`
+          : "";
+      const pendingLine =
+        marker.type === "pending"
+          ? "Saved on device — will sync when back online<br/>"
+          : "";
+      if (marker.label || accuracyLine || timeLine || photoLine || pendingLine) {
         m.bindPopup(
-          `<div style="font-size:13px"><strong>${marker.label || ""}</strong><br/>${accuracyLine}${timeLine}</div>`,
+          `<div style="font-size:13px"><strong>${marker.label || ""}</strong><br/>${pendingLine}${accuracyLine}${timeLine}${photoLine}</div>`,
         );
       }
     });

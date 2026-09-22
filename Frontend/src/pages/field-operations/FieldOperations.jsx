@@ -93,6 +93,60 @@ const formatDistance = (meters) => {
     ? `${Math.round(meters)} m`
     : `${(meters / 1000).toFixed(1)} km`;
 };
+const PRESENCE_LIVE_MS = 90 * 1000;
+const PRESENCE_RECENT_MS = 5 * 60 * 1000;
+function getPresence(session, now = Date.now()) {
+  if (!session || session.status === "checked_out")
+    return { state: "offline", label: "Checked out" };
+  const lastSeen = session.lastSeenAt
+    ? new Date(session.lastSeenAt).getTime()
+    : null;
+  if (session.status === "offline" || !lastSeen)
+    return { state: "offline", label: "Offline" };
+  const diff = now - lastSeen;
+  if (diff <= PRESENCE_LIVE_MS) return { state: "online", label: "Live" };
+  if (diff <= PRESENCE_RECENT_MS)
+    return {
+      state: "recent",
+      label: `Last seen ${Math.max(1, Math.round(diff / 60000))}m ago`,
+    };
+  return { state: "offline", label: `Last seen ${formatTime(session.lastSeenAt)}` };
+}
+function PresenceDot({ session, showLabel = true }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
+  const presence = getPresence(session, now);
+  const dotColor =
+    presence.state === "online"
+      ? "#16a34a"
+      : presence.state === "recent"
+        ? "#f59e0b"
+        : "#94a3b8";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="relative inline-flex h-2.5 w-2.5">
+        {presence.state === "online" && (
+          <span
+            className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60"
+            style={{ backgroundColor: dotColor }}
+          />
+        )}
+        <span
+          className="relative inline-flex h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: dotColor }}
+        />
+      </span>
+      {showLabel && (
+        <span className="text-[11px] font-bold text-slate-500">
+          {presence.label}
+        </span>
+      )}
+    </span>
+  );
+}
 const ACTIVITY_TYPES = [
   "customer_visit",
   "meeting",
@@ -264,6 +318,7 @@ function LiveMap({ session, big = false, markers: extraMarkers = [] }) {
       latitude: lat,
       longitude: lon,
       type: "live",
+      presence: getPresence(session).state,
       label:
         session?.employee?.f_name || session?.employee?.l_name
           ? `${session.employee.f_name || ""} ${session.employee.l_name || ""}`.trim()
@@ -427,6 +482,7 @@ function RouteTrail({
   const points = data?.routePoints || gpsPoints;
   const sessions = data?.sessions || [];
   const summary = data?.summary;
+  const dayVisits = data?.visits || [];
 
   // Real device coordinates only — never a derived/normalized shape. The
   // path is every recorded route point in time order. This includes manual
@@ -515,8 +571,22 @@ function RouteTrail({
           label: "Unreliable point (implausible jump) — not trusted",
         });
     });
+    dayVisits.forEach((visit) => {
+      const loc = visit.endLocation || visit.startLocation;
+      if (!loc || !(visit.attachments || []).length) return;
+      visit.attachments.forEach((url, idx) =>
+        list.push({
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          type: "photo",
+          photoUrl: url,
+          label: `${visit.customerName || titleize(visit.activityType)}${visit.attachments.length > 1 ? ` (${idx + 1}/${visit.attachments.length})` : ""}`,
+          timestamp: visit.endedAt || visit.startedAt,
+        }),
+      );
+    });
     return list;
-  }, [points, sessions]);
+  }, [points, sessions, dayVisits]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -913,6 +983,8 @@ function EmployeeDuty({ auth }) {
   const [lastFinishedVisit, setLastFinishedVisit] = useState(null);
   const [checkInMode, setCheckInMode] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingPoints, setPendingPoints] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [now, setNow] = useState(() => Date.now());
   const [visitTick, setVisitTick] = useState(() => Date.now());
   const [deviceTokenMismatch, setDeviceTokenMismatch] = useState(false);
@@ -977,10 +1049,21 @@ function EmployeeDuty({ auth }) {
     }
   }, [session]);
 
-  const refreshPendingCount = useCallback(
-    async () => setPendingCount((await pendingFieldEvents()).length),
-    [],
-  );
+  const refreshPendingCount = useCallback(async () => {
+    const events = await pendingFieldEvents();
+    setPendingCount(events.length);
+    setPendingPoints(
+      events
+        .filter((e) => !e.payload?.type || e.payload.type === "location")
+        .map((e) => ({
+          latitude: e.payload.latitude,
+          longitude: e.payload.longitude,
+          accuracy: e.payload.accuracy,
+          timestamp: e.payload.capturedAt,
+          type: "pending",
+        })),
+    );
+  }, []);
   useEffect(() => {
     refreshPendingCount();
   }, [refreshPendingCount]);
@@ -1044,6 +1127,11 @@ function EmployeeDuty({ auth }) {
             visitId: event.payload.visitId,
             body: { location: event.payload.location, status: event.payload.status },
           });
+        } else if (event.payload?.type === "status_change") {
+          await updateStatus.mutateAsync({
+            sessionId: event.sessionId,
+            status: event.payload.status,
+          });
         } else {
           await sendFieldLocation(event.sessionId, event.payload);
         }
@@ -1057,7 +1145,7 @@ function EmployeeDuty({ auth }) {
       }
     }
     refreshPendingCount();
-  }, [refreshPendingCount, endVisitMut, deviceTokenMismatch]);
+  }, [refreshPendingCount, endVisitMut, updateStatus, deviceTokenMismatch]);
 
   const sendLocation = useCallback(
     async (position) => {
@@ -1065,7 +1153,7 @@ function EmployeeDuty({ auth }) {
       const now = Date.now();
       if (now - lastSent.current < 30000) return;
       lastSent.current = now;
-      const payload = { ...pointFromPosition(position), eventId: newId() };
+      const payload = { ...pointFromPosition(position), type: "location", eventId: newId() };
       try {
         if (!navigator.onLine) throw new Error("offline");
         await sendFieldLocation(session._id, payload);
@@ -1107,10 +1195,18 @@ function EmployeeDuty({ auth }) {
   }, [session?._id, session?.status, sendLocation, deviceTokenMismatch]);
 
   useEffect(() => {
-    const onOnline = () => syncQueue();
+    const onOnline = () => {
+      setIsOnline(true);
+      syncQueue();
+    };
+    const onOffline = () => setIsOnline(false);
     window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     if (navigator.onLine) syncQueue();
-    return () => window.removeEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
   }, [syncQueue]);
 
   const beginDuty = async (selfieBase64 = null) => {
@@ -1181,6 +1277,7 @@ function EmployeeDuty({ auth }) {
 
   const changeStatus = async (status) => {
     try {
+      if (!navigator.onLine) throw new Error("offline");
       await updateStatus.mutateAsync({ sessionId: session._id, status });
       toast.success(
         status === "paused"
@@ -1190,6 +1287,19 @@ function EmployeeDuty({ auth }) {
     } catch (error) {
       if (error?.response?.data?.code === "DUTY_SESSION_ON_ANOTHER_DEVICE") {
         setDeviceTokenMismatch(true);
+        return;
+      }
+      if (error?.message === "offline" || !navigator.onLine) {
+        await queueFieldEvent({
+          id: newId(),
+          sessionId: session._id,
+          payload: { type: "status_change", status },
+          createdAt: Date.now(),
+        });
+        refreshPendingCount();
+        toast.success(
+          `${status === "paused" ? "Pause" : "Resume"} saved — will apply when back online`,
+        );
         return;
       }
       toast.error(error?.response?.data?.message || "Could not update duty");
@@ -1547,19 +1657,24 @@ function EmployeeDuty({ auth }) {
         <div className="rounded-2xl border border-slate-200 bg-white p-3">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
             Your live location
+            {pendingPoints.length > 0 && (
+              <span className="ml-2 normal-case font-medium text-amber-600">
+                · {pendingPoints.length} point{pendingPoints.length === 1 ? "" : "s"} saved offline, syncing soon
+              </span>
+            )}
           </p>
-          <LiveMap session={session} big />
+          <LiveMap session={session} big markers={pendingPoints} />
         </div>
       )}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex gap-3">
           <FiWifiOff
-            className={navigator.onLine ? "text-emerald-600" : "text-amber-600"}
+            className={isOnline ? "text-emerald-600" : "text-amber-600"}
             size={20}
           />
           <div>
             <p className="font-bold text-slate-800">
-              {navigator.onLine ? "Online" : "Offline"} · {pendingCount} update
+              {isOnline ? "Online" : "Offline"} · {pendingCount} update
               {pendingCount === 1 ? "" : "s"} pending
             </p>
             <p className="text-xs text-slate-500">
@@ -3417,16 +3532,35 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
               height={220}
               markers={
                 showAllOnMap
-                  ? live
-                      .filter((s) => s.lastLocation && s._id !== active?._id)
-                      .map((s) => ({
-                        latitude: Number(s.lastLocation.latitude),
-                        longitude: Number(s.lastLocation.longitude),
-                        type: "live",
-                        label: `${s.employee?.f_name} ${s.employee?.l_name}`,
-                        accuracy: Number(s.lastLocation.accuracy),
-                        timestamp: s.lastSeenAt,
-                      }))
+                  ? [
+                      ...live
+                        .filter((s) => s.lastLocation && s._id !== active?._id)
+                        .map((s) => ({
+                          latitude: Number(s.lastLocation.latitude),
+                          longitude: Number(s.lastLocation.longitude),
+                          type: "live",
+                          presence: getPresence(s).state,
+                          label: `${s.employee?.f_name} ${s.employee?.l_name} · ${getPresence(s).label}`,
+                          accuracy: Number(s.lastLocation.accuracy),
+                          timestamp: s.lastSeenAt,
+                        })),
+                      ...(overview.data?.visits || [])
+                        .filter((v) => (v.attachments || []).length)
+                        .flatMap((v) => {
+                          const loc = v.endLocation || v.startLocation;
+                          if (!loc) return [];
+                          return [
+                            {
+                              latitude: Number(loc.latitude),
+                              longitude: Number(loc.longitude),
+                              type: "photo",
+                              photoUrl: v.attachments[v.attachments.length - 1],
+                              label: `${v.customerName || titleize(v.activityType)} — visit photo`,
+                              timestamp: v.endedAt || v.startedAt,
+                            },
+                          ];
+                        }),
+                    ]
                   : []
               }
             />
@@ -3448,6 +3582,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <PresenceDot session={active} />
                   <ShareOnWhatsAppButton session={active} />
                   <StatusPill status={active.status} />
                 </div>
@@ -3487,9 +3622,9 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                           item.employee?.office_location ||
                           "No territory"}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Last seen {formatTime(item.lastSeenAt)}
-                      </p>
+                      <div className="mt-1">
+                        <PresenceDot session={item} />
+                      </div>
                     </div>
                     <StatusPill status={item.status} />
                   </div>

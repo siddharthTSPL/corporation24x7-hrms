@@ -10,10 +10,24 @@ import {
   startFieldDuty,
   updateFieldDutyStatus,
   checkoutFieldDuty,
+  submitFieldCheckIn,
+  takeOverDuty,
+  updateFieldTeam,
+  deleteFieldTeam,
   startFieldVisit,
   endFieldVisit,
   uploadVisitPhoto,
   updateFieldSettings,
+  getFieldAssignments,
+  createIndividualFieldAssignment,
+  removeIndividualFieldAssignment,
+  getMyAssignedActivities,
+  assignFieldActivity,
+  reassignFieldActivity,
+  cancelFieldActivity,
+  getFieldAuditLog,
+  getMyFieldVisits,
+  getAllFieldVisits,
 } from "../../api/fieldOperations/fieldOperations.api";
 
 export const useMyFieldDuty = (enabled) => {
@@ -26,13 +40,14 @@ export const useMyFieldDuty = (enabled) => {
   });
 };
 
-export const useFieldOverview = (enabled) => {
+export const useFieldOverview = (enabled, filters = {}) => {
   return useQuery({
-    queryKey: ["field-overview"],
-    queryFn: getFieldOverview,
+    queryKey: ["field-overview", filters],
+    queryFn: () => getFieldOverview(filters),
     enabled,
     staleTime: 0,
-    refetchInterval: enabled ? 45000 : false,
+    refetchInterval:
+      enabled && !Object.values(filters).some(Boolean) ? 15000 : false,
     refetchOnWindowFocus: false,
   });
 };
@@ -79,6 +94,24 @@ export const useCreateFieldTeam = () => {
   });
 };
 
+export const useUpdatedFieldTeam = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamId, body }) => updateFieldTeam(teamId, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["field-teams"] }),
+  });
+};
+
+export const useDeleteFieldTeam = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId) => deleteFieldTeam(teamId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["field-teams"] }),
+  });
+};
+
 export const useStartFieldDuty = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -110,15 +143,45 @@ export const useCheckoutFieldDuty = () => {
   });
 };
 
+export const useTakeOverDuty = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: takeOverDuty,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-my-duty"] });
+    },
+  });
+};
+
+export const useSubmitFieldCheckIn = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, body }) => submitFieldCheckIn(sessionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-my-duty"] });
+    },
+  });
+};
+
 export const useStartFieldVisit = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionId, body }) => startFieldVisit(sessionId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["field-visits"] });
+    },
   });
 };
 
 export const useEndFieldVisit = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ visitId, body }) => endFieldVisit(visitId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["field-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["field-visits"] });
+    },
   });
 };
 
@@ -140,3 +203,99 @@ export const useUpdateFieldSettings = () => {
     },
   });
 };
+
+export const useFieldAssignments = (enabled) =>
+  useQuery({
+    queryKey: ["field-assignments"],
+    queryFn: getFieldAssignments,
+    enabled,
+    staleTime: 1000 * 30,
+  });
+
+export const useCreateIndividualFieldAssignment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createIndividualFieldAssignment,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["field-assignments"] }),
+  });
+};
+
+export const useRemoveIndividualFieldAssignment = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeIndividualFieldAssignment,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["field-assignments"] }),
+  });
+};
+
+export const useMyFieldVisits = (enabled, filters = {}) =>
+  useQuery({
+    queryKey: ["field-my-visits", filters],
+    queryFn: () => getMyFieldVisits(filters),
+    enabled,
+    staleTime: 1000 * 15,
+  });
+
+export const useMyAssignedActivities = (enabled) =>
+  useQuery({
+    queryKey: ["field-assigned-activities", "mine"],
+    queryFn: getMyAssignedActivities,
+    enabled,
+    staleTime: 0,
+    refetchInterval: enabled ? 45000 : false,
+  });
+
+const invalidateActivities = (queryClient) => {
+  queryClient.invalidateQueries({ queryKey: ["field-overview"] });
+  queryClient.invalidateQueries({ queryKey: ["field-assigned-activities"] });
+  queryClient.invalidateQueries({ queryKey: ["field-visits"] });
+};
+
+export const useAssignFieldActivity = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: assignFieldActivity,
+    onSuccess: () => invalidateActivities(queryClient),
+  });
+};
+
+export const useReassignFieldActivity = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ activityId, body }) => reassignFieldActivity(activityId, body),
+    onSuccess: () => invalidateActivities(queryClient),
+  });
+};
+
+export const useCancelFieldActivity = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ activityId, body }) => cancelFieldActivity(activityId, body),
+    onSuccess: () => invalidateActivities(queryClient),
+  });
+};
+
+export const useFieldAuditLog = (enabled, page = 1, limit = 25) =>
+  useQuery({
+    queryKey: ["field-audit-log", page, limit],
+    queryFn: () => getFieldAuditLog({ page, limit }),
+    enabled,
+    staleTime: 1000 * 15,
+  });
+
+
+export const useAllFieldVisits = (enabled, filters = {}) =>
+  useQuery({
+    queryKey: ["field-visits", filters],
+    queryFn: () => getAllFieldVisits(filters),
+    enabled,
+    staleTime: 1000 * 15,
+    placeholderData: {
+      success: true,
+      visits: [],
+      total: 0,
+      page: 1,
+      limit: 8,
+      totalPages: 0,
+    },
+  });
