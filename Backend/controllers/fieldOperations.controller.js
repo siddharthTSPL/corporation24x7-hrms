@@ -265,6 +265,29 @@ const getMovement = ({ previous, point, speedMps }) => {
   };
 };
 
+// The frontend's "Complete" button used to gate on a single hardcoded
+// 20-minute timer for every activity type, ignoring that most types
+// (service/survey/collection/delivery/installation/follow_up/other) have a
+// 0-minute minimum by default and that an org can override any of these —
+// so employees doing a same-day delivery were forced through a fake
+// 20-minute wait, and an org that raised the minimum for meetings could see
+// employees complete a visit the moment the (wrong, client-side) 20-minute
+// mark passed, only for the backend to correctly reject it. Since the
+// settings endpoint that holds these overrides is admin-only, the employee
+// device can't read them directly — so every visit payload sent back to an
+// employee carries its own resolved minDurationMinutes instead.
+function withMinDuration(visit, orgSettings) {
+  const plain =
+    typeof visit?.toObject === "function" ? visit.toObject() : visit;
+  return {
+    ...plain,
+    minDurationMinutes: resolveMinDurationMinutes(
+      plain.activityType,
+      orgSettings?.min_duration_overrides,
+    ),
+  };
+}
+
 const isInsideGeofence = (point, geofence) => {
   if (
     !geofence ||
@@ -858,6 +881,24 @@ exports.checkoutDuty = async (req, res) => {
   }
   if (session.status === "checked_out")
     return res.json({ success: true, session: withoutDeviceToken(session), idempotent: true });
+  // Nothing previously stopped checking out while a customer visit was
+  // still "in_progress" — the visit was simply left stuck in the database
+  // forever with no endedAt, and the frontend's own openVisit reference to
+  // it was discarded right after checkout succeeded, so nothing surfaced
+  // this to the employee either. The frontend now blocks this in the UI;
+  // this is the server-side backstop for offline-queued checkouts and any
+  // other path that bypasses that UI check.
+  const openVisit = await FieldVisit.findOne({
+    session: session._id,
+    status: "in_progress",
+  })
+    .select("_id")
+    .lean();
+  if (openVisit)
+    throw httpError(
+      "Finish or skip your open visit before checking out of field duty.",
+      409,
+    );
   const endLocation =
     asPoint(req.body.location || req.body, false) || session.lastLocation;
   if (!endLocation)
@@ -934,14 +975,21 @@ exports.startVisit = async (req, res) => {
       employee: actor.id,
       clientEventId,
     });
-    if (existing)
-      return res.json({ success: true, visit: existing, idempotent: true });
+    if (existing) {
+      const orgSettingsForDuration = await assertFieldOperationsEnabled(organisation_id);
+      return res.json({
+        success: true,
+        visit: withMinDuration(existing, orgSettingsForDuration),
+        idempotent: true,
+      });
+    }
   }
 
   const startLocation = asPoint(req.body.location || req.body);
   const activityType = ACTIVITY_TYPES.includes(req.body.activityType)
     ? req.body.activityType
     : "customer_visit";
+  const orgSettingsForDuration = await assertFieldOperationsEnabled(organisation_id);
 
   // ── Starting a pre-assigned activity (spec section 32) ────────────────
   // The employee is executing work a manager/admin already created ahead of
@@ -956,7 +1004,11 @@ exports.startVisit = async (req, res) => {
     });
     if (!assigned) throw httpError("Assigned activity not found", 404);
     if (assigned.status !== "pending")
-      return res.json({ success: true, visit: assigned, idempotent: true });
+      return res.json({
+        success: true,
+        visit: withMinDuration(assigned, orgSettingsForDuration),
+        idempotent: true,
+      });
     const geofenceAtStart = isInsideGeofence(
       startLocation,
       assigned.expectedLocation?.radiusMeters
@@ -991,7 +1043,10 @@ exports.startVisit = async (req, res) => {
       };
     }
     await assigned.save();
-    return res.status(201).json({ success: true, visit: assigned });
+    return res.status(201).json({
+      success: true,
+      visit: withMinDuration(assigned, orgSettingsForDuration),
+    });
   }
 
   // ── Open activity (spec section 3.A) — the employee decides who/what ───
@@ -1015,7 +1070,10 @@ exports.startVisit = async (req, res) => {
     startedAt: new Date(),
     clientEventId,
   });
-  return res.status(201).json({ success: true, visit });
+  return res.status(201).json({
+    success: true,
+    visit: withMinDuration(visit, orgSettingsForDuration),
+  });
 };
 
 exports.endVisit = async (req, res) => {
@@ -1140,7 +1198,16 @@ exports.uploadVisitPhoto = async (req, res) => {
   });
   visit.attachments = [...(visit.attachments || []), uploaded.url];
   await visit.save();
-  return res.status(201).json({ success: true, visit });
+  // The employee app replaces its whole in-memory `openVisit` with this
+  // response (VisitPhotoUploader's onUploaded -> setOpenVisit) every time a
+  // proof photo is added mid-visit — which, without minDurationMinutes
+  // here, would silently wipe the per-type minimum the UI is using for the
+  // "Complete" button gate and fall back to the wrong default the moment
+  // someone adds a photo. See startVisit for the full explanation.
+  const orgSettingsForDuration = await assertFieldOperationsEnabled(organisation_id);
+  return res
+    .status(201)
+    .json({ success: true, visit: withMinDuration(visit, orgSettingsForDuration) });
 };
 
 exports.getOverview = async (req, res) => {
@@ -2305,6 +2372,7 @@ exports.bulkAssignEmployeesFromFile = async (req, res) => {
   const failed = [];
   const teamsToAddMembers = new Map(); // teamId(string) -> Set(employeeId)
   const teamsToCreate = new Map(); // teamName(lowercase) -> { name, territory }
+  const stagedTeamByEmployee = new Map(); // employeeId -> teamName, for rows already accepted in this same upload
   let projectedNewCount = 0;
   const currentTotal =
     allTeams.reduce((sum, t) => sum + t.members.length, 0) +
@@ -2347,7 +2415,17 @@ exports.bulkAssignEmployeesFromFile = async (req, res) => {
       });
       continue;
     }
-    const existingTeamName = teamOwnerByEmployee.get(employeeId);
+    // Checked against DB state (teamOwnerByEmployee) AND against every row
+    // already accepted earlier in this SAME upload (stagedTeamByEmployee).
+    // Without the second check, the same employee listed twice in one sheet
+    // with two different team names would pass both checks (neither map
+    // was updated mid-loop) and end up added as a member of two teams at
+    // once — silently breaking the one-team-per-employee rule the rest of
+    // the app relies on (e.g. assertEmployeeCanUseFieldOperations just
+    // matches whichever team Mongo happens to return first).
+    const existingTeamName =
+      teamOwnerByEmployee.get(employeeId) ||
+      stagedTeamByEmployee.get(employeeId);
     if (
       existingTeamName &&
       existingTeamName.toLowerCase() !== teamName.toLowerCase()
@@ -2401,6 +2479,7 @@ exports.bulkAssignEmployeesFromFile = async (req, res) => {
     if (!teamsToAddMembers.has(teamKey))
       teamsToAddMembers.set(teamKey, new Set());
     teamsToAddMembers.get(teamKey).add(employeeId);
+    stagedTeamByEmployee.set(employeeId, teamName);
     succeeded.push({
       row: row.__rowNumber,
       employeeRef: row.employeeRef,
@@ -2694,7 +2773,7 @@ exports.myAssignedActivities = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
   if (actor.model !== "User")
     return res.json({ success: true, activities: [] });
-  await assertFieldOperationsEnabled(organisation_id);
+  const orgSettings = await assertFieldOperationsEnabled(organisation_id);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -2711,7 +2790,10 @@ exports.myAssignedActivities = async (req, res) => {
   })
     .sort({ priority: -1, scheduledTime: 1, createdAt: 1 })
     .lean();
-  return res.json({ success: true, activities });
+  return res.json({
+    success: true,
+    activities: activities.map((a) => withMinDuration(a, orgSettings)),
+  });
 };
 
 // Every visit the employee has ever started, newest first. Used by the
@@ -2728,7 +2810,7 @@ exports.myVisits = async (req, res) => {
       limit: MY_FIELD_VISIT_PAGE_SIZE,
       totalPages: 0,
     });
-  await assertFieldOperationsEnabled(organisation_id);
+  const orgSettings = await assertFieldOperationsEnabled(organisation_id);
   const requestedPage = Number(req.query.page);
   const requestedLimit = Number(req.query.limit);
   const page =
@@ -2768,7 +2850,7 @@ exports.myVisits = async (req, res) => {
   ]);
   return res.json({
     success: true,
-    visits,
+    visits: visits.map((v) => withMinDuration(v, orgSettings)),
     total,
     page,
     limit,
