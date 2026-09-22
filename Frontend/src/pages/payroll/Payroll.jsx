@@ -1806,6 +1806,7 @@ function getPaidAndBalance(p) {
   return { total, paid, balance };
 }
 
+<<<<<<< HEAD
 function isBulkSelectable(status) {
   return Boolean(BULK_ACTIONS[status]);
 }
