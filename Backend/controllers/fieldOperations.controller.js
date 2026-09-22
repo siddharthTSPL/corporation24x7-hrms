@@ -544,7 +544,44 @@ exports.startDuty = async (req, res) => {
 exports.myDuty = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
   if (actor.model !== "User") return res.json({ success: true, session: null });
-  const settings = await assertFieldOperationsEnabled(organisation_id);
+
+  // Org-level switch. Previously this threw straight out of the route
+  // handler (403), which the frontend never caught — the employee saw the
+  // full Start Duty UI, went through the face-capture flow, and only then
+  // got a toast error. Report the disabled state in the payload instead so
+  // the page can show a clear "not available" screen up front.
+  let settings;
+  try {
+    settings = await assertFieldOperationsEnabled(organisation_id);
+  } catch (error) {
+    return res.json({
+      success: true,
+      session: null,
+      fieldOperationsEnabled: false,
+      isAssigned: false,
+      faceVerificationRequired: false,
+      checkInIntervalMinutes: FIELD_CHECKPOINT_INTERVAL_MINUTES,
+      checkpointGracePeriodMinutes: FIELD_CHECKPOINT_GRACE_PERIOD_MINUTES,
+      checkpointStatus: null,
+      nextCheckInDueAt: null,
+    });
+  }
+
+  // Per-employee assignment (team or individual). Same check
+  // assertEmployeeCanUseFieldOperations uses, but non-throwing — we want to
+  // report "not assigned" as data, not fail the page load, so the frontend
+  // can show a clean message instead of letting the employee attempt to
+  // start duty and only find out from a 403 toast afterwards.
+  const [team, individual] = await Promise.all([
+    FieldTeam.findOne({ organisation_id, members: actor.id, active: true })
+      .select("_id")
+      .lean(),
+    FieldAssignment.findOne({ organisation_id, employee: actor.id, active: true })
+      .select("_id")
+      .lean(),
+  ]);
+  const isAssigned = Boolean(team || individual);
+
   const session = await FieldDutySession.findOne({
     organisation_id,
     employee: actor.id,
@@ -554,6 +591,10 @@ exports.myDuty = async (req, res) => {
   return res.json({
     success: true,
     session: sessionForEmployee(session),
+    fieldOperationsEnabled: true,
+    // An employee who was unassigned after starting a duty session should
+    // still be able to see/end that session — only block starting a new one.
+    isAssigned: isAssigned || Boolean(session),
     faceVerificationRequired: Boolean(settings.require_face_verification),
     checkInIntervalMinutes: FIELD_CHECKPOINT_INTERVAL_MINUTES,
     checkpointGracePeriodMinutes: FIELD_CHECKPOINT_GRACE_PERIOD_MINUTES,
