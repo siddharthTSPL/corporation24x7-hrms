@@ -1151,7 +1151,12 @@ function EmployeeDuty({ auth }) {
     async (position) => {
       if (!session?._id || session.status !== "active" || deviceTokenMismatch) return;
       const now = Date.now();
-      if (now - lastSent.current < 30000) return;
+      // Was 30s, which combined with the overview poll made a manager's
+      // "live" view lag up to ~75s behind the employee's real position —
+      // nowhere near a WhatsApp/Snapchat-style live share. 10s matches the
+      // overview refresh below and reads as live without hammering the
+      // battery or the network.
+      if (now - lastSent.current < 10000) return;
       lastSent.current = now;
       const payload = { ...pointFromPosition(position), type: "location", eventId: newId() };
       try {
@@ -1186,7 +1191,10 @@ function EmployeeDuty({ auth }) {
     watchId.current = navigator.geolocation.watchPosition(
       sendLocation,
       () => {},
-      { enableHighAccuracy: true, maximumAge: 20000, timeout: 20000 },
+      // maximumAge lowered from 20s so a cached (stale) browser fix can't
+      // sit underneath the 10s send throttle above and quietly re-send an
+      // old point as if it were fresh.
+      { enableHighAccuracy: true, maximumAge: 8000, timeout: 20000 },
     );
     return () => {
       if (watchId.current !== null)
@@ -1526,6 +1534,73 @@ function EmployeeDuty({ auth }) {
     return (
       <div className="p-8 text-sm text-slate-500">Loading your field duty…</div>
     );
+
+  // The my-duty request itself failed (network error, server error, etc.) —
+  // previously this fell straight through to the full Start Duty UI with
+  // session treated as null, so the employee could get all the way to the
+  // camera step before anything told them something was wrong.
+  if (myDuty.isError) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+          <FiAlertTriangle className="mx-auto text-amber-500" size={48} />
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Couldn't load Field Operations
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            {myDuty.error?.response?.data?.message ||
+              "Something went wrong. Please check your connection and try again."}
+          </p>
+          <button
+            type="button"
+            onClick={() => myDuty.refetch()}
+            className="mt-5 rounded-lg bg-[#730042] px-4 py-2 text-sm font-bold text-white"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ORG-LEVEL: Field Operations is turned off for this organisation.
+  if (myDuty.data?.fieldOperationsEnabled === false) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+          <FiXCircle className="mx-auto text-slate-400" size={48} />
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Field Operations isn't available
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Your organization has not enabled Field Operations. Contact your
+            administrator if you believe this is a mistake.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // EMPLOYEE-LEVEL: Field Operations is on for the org, but this employee
+  // has never been put on a field team or given an individual assignment
+  // (and has no in-progress/past session either — those employees can
+  // still see and close out their own session further below).
+  if (myDuty.data?.isAssigned === false) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+          <FiUsers className="mx-auto text-slate-400" size={48} />
+          <h2 className="mt-4 text-lg font-bold text-slate-900">
+            Your organization has not enabled this feature for you
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            You're not on a field team or individually assigned to Field
+            Work yet. Contact your administrator to get set up.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // DEVICE LOCK: session is active but this device doesn't hold a matching
   // token. Block everything until the employee verifies their face.
@@ -3447,7 +3522,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             {isRefreshing
               ? "Refreshing live field data…"
               : lastUpdated
-                ? `Last refreshed at ${formatTime(lastUpdated)} · automatic refresh every 45 seconds.`
+                ? `Last refreshed at ${formatTime(lastUpdated)} · automatic refresh every 10 seconds.`
                 : "Loading live field data…"}
           </p>
         </div>
