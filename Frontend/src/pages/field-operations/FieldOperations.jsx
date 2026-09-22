@@ -2266,18 +2266,28 @@ function TeamSetupForm({ team, onClose, onSaved }) {
 
   const busy = createTeam.isPending || updateTeam.isPending;
 
-  const submit = async (event) => {
+  const submit = async (event, force = false) => {
     event.preventDefault();
+    const body = force ? { ...form, force: true } : form;
     try {
       if (isEdit) {
-        await updateTeam.mutateAsync({ teamId: team._id, body: form });
+        await updateTeam.mutateAsync({ teamId: team._id, body });
         toast.success("Field team updated");
       } else {
-        await createTeam.mutateAsync(form);
+        await createTeam.mutateAsync(body);
         toast.success("Field team created");
       }
       onSaved?.();
     } catch (e) {
+      if (
+        e?.response?.data?.code === "INDIVIDUAL_ASSIGNMENT_CONFLICT" &&
+        !force &&
+        window.confirm(
+          `${e.response.data.message} They will be removed from their individual assignment.`,
+        )
+      ) {
+        return submit(event, true);
+      }
       toast.error(e?.response?.data?.message || "Could not save team");
     }
   };
@@ -3851,6 +3861,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
           )}
         </div>
       </section>
+      {canEditTeams && <IndividualAssignmentsPanel />}
       {teamDetail && (
         <TeamDetailModal
           team={teamDetail}

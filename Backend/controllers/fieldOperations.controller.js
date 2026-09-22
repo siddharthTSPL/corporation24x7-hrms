@@ -1677,11 +1677,20 @@ exports.createTeam = async (req, res) => {
     })
       .select("employee")
       .lean();
-    if (individuallyAssigned.length)
-      throw httpError(
-        `${individuallyAssigned.length} of these employees already have an active individual Field Work assignment. Unassign them first.`,
-        409,
+    if (individuallyAssigned.length) {
+      if (!req.body.force) {
+        const conflictError = httpError(
+          `${individuallyAssigned.length} of these employees already have an active individual Field Work assignment. Assign them to this team anyway?`,
+          409,
+        );
+        conflictError.code = "INDIVIDUAL_ASSIGNMENT_CONFLICT";
+        throw conflictError;
+      }
+      await FieldAssignment.updateMany(
+        { _id: { $in: individuallyAssigned.map((a) => a._id) } },
+        { active: false, unassignedAt: new Date(), unassignedBy: actor.id },
       );
+    }
   }
 
   const existingMemberIds = new Set(
@@ -1807,11 +1816,20 @@ exports.updateTeam = async (req, res) => {
     })
       .select("employee")
       .lean();
-    if (individuallyAssigned.length)
-      throw httpError(
-        `${individuallyAssigned.length} of these employees already have an active individual Field Work assignment. Unassign them first.`,
-        409,
+    if (individuallyAssigned.length) {
+      if (!req.body.force) {
+        const conflictError = httpError(
+          `${individuallyAssigned.length} of these employees already have an active individual Field Work assignment. Assign them to this team anyway?`,
+          409,
+        );
+        conflictError.code = "INDIVIDUAL_ASSIGNMENT_CONFLICT";
+        throw conflictError;
+      }
+      await FieldAssignment.updateMany(
+        { _id: { $in: individuallyAssigned.map((a) => a._id) } },
+        { active: false, unassignedAt: new Date(), unassignedBy: actor.id },
       );
+    }
   }
 
   const otherMemberCount = new Set(
@@ -2220,6 +2238,8 @@ exports.bulkAssignEmployees = async (req, res) => {
     individualAssignments.map((a) => String(a.employee)),
   );
   const alreadyOnThisTeam = new Set(team.members.map(String));
+  const force = Boolean(req.body.force);
+  const toUnassign = [];
 
   const succeeded = [];
   const failed = [];
@@ -2244,7 +2264,7 @@ exports.bulkAssignEmployees = async (req, res) => {
       });
       continue;
     }
-    if (individuallyAssignedSet.has(employeeId)) {
+    if (individuallyAssignedSet.has(employeeId) && !force) {
       failed.push({
         employeeId,
         reason:
@@ -2252,6 +2272,7 @@ exports.bulkAssignEmployees = async (req, res) => {
       });
       continue;
     }
+    if (individuallyAssignedSet.has(employeeId)) toUnassign.push(employeeId);
     toAdd.push(employeeId);
   }
 
@@ -2276,6 +2297,15 @@ exports.bulkAssignEmployees = async (req, res) => {
       }),
     );
   } else {
+    if (toUnassign.length)
+      await FieldAssignment.updateMany(
+        {
+          organisation_id,
+          active: true,
+          employee: { $in: toUnassign },
+        },
+        { active: false, unassignedAt: new Date(), unassignedBy: actor.id },
+      );
     team.members = [...new Set([...team.members.map(String), ...toAdd])];
     await team.save();
     toAdd.forEach((employeeId) => succeeded.push(employeeId));
