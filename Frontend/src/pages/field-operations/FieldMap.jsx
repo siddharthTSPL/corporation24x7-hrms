@@ -154,7 +154,7 @@ function pendingDotIcon() {
  * called for in the Field Work spec.
  *
  * @param {Array<{latitude:number, longitude:number, label?:string, type?:string, accuracy?:number, timestamp?:string}>} markers
- * @param {Array<[number, number]>} [path] - optional polyline, e.g. the day's raw GPS trail
+ * @param {Array<{coords: Array<[number, number]>, dashed?: boolean}>} [path] - polyline segments; `dashed: true` renders as an unreliable/unmatched stretch (grey, dashed) instead of a confident road line
  * @param {number} [height=320]
  * @param {boolean} [fitAll=false] - when true, ignore single-point zoom and fit every marker into view
  * @param {boolean} [big=false] - when true, render at ~70vh by default instead of the fixed height
@@ -199,13 +199,18 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
     );
 
     if (pathVisible && showPath && path.length > 0) {
-      const segments = Array.isArray(path[0]) ? path : [path];
-      segments.forEach((segment) => {
-        if (segment.length > 1) {
-          L.polyline(segment, {
-            color: "#7A004B",
+      path.forEach((segment) => {
+        // Accepts either the new { coords, dashed } shape or a bare
+        // [[lat,lng], ...] array for backward compatibility with any other
+        // caller still passing plain polylines.
+        const coords = Array.isArray(segment) ? segment : segment.coords;
+        const dashed = Array.isArray(segment) ? false : segment.dashed;
+        if (coords && coords.length > 1) {
+          L.polyline(coords, {
+            color: dashed ? "#94a3b8" : "#7A004B",
             weight: 3,
-            opacity: 0.7,
+            opacity: dashed ? 0.6 : 0.7,
+            dashArray: dashed ? "6 8" : null,
           }).addTo(layer);
         }
       });
@@ -252,7 +257,7 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
 
     const allPoints = [
       ...validMarkers.map((m) => [m.latitude, m.longitude]),
-      ...path.flat(),
+      ...path.flatMap((segment) => (Array.isArray(segment) ? segment : segment.coords || [])),
     ];
     if (allPoints.length === 1) {
       map.setView(allPoints[0], 15);
@@ -312,7 +317,7 @@ export default function FieldMap({ markers = [], path = [], height = 320, fitAll
           {expanded ? <BsArrowsCollapse size={14} /> : <BsArrowsExpand size={14} />}
           {expanded ? "Exit" : "Full view"}
         </button>
-        {path.length > 1 && (
+        {path.some((segment) => (Array.isArray(segment) ? segment : segment.coords || []).length > 1) && (
           <button
             type="button"
             onClick={togglePath}

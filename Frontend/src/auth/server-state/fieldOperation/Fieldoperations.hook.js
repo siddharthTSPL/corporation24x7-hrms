@@ -46,10 +46,8 @@ export const useFieldOverview = (enabled, filters = {}) => {
     queryFn: () => getFieldOverview(filters),
     enabled,
     staleTime: 0,
-    // Was 45s — far from "live". 10s matches the employee-side location
-    // send interval so the manager's map stays close to real time.
     refetchInterval:
-      enabled && !Object.values(filters).some(Boolean) ? 10000 : false,
+      enabled && !Object.values(filters).some(Boolean) ? 45000 : false,
     refetchOnWindowFocus: false,
   });
 };
@@ -77,25 +75,18 @@ export const useFieldSettings = (enabled) => {
   });
 };
 
-// A past date's route never changes once the day is over, so only poll
-// when looking at "today" (no explicit date, or the current date) — that's
-// the one case where an employee could still be moving and the trail
-// needs to keep drawing itself in like a live tracker.
-const isTodayRoute = (date) => {
-  if (!date) return true;
-  const today = new Date().toISOString().slice(0, 10);
-  return date === today;
-};
-
-export const useFieldRoute = (employeeId, date, enabled) => {
-  const live = isTodayRoute(date);
+export const useFieldRoute = (employeeId, date, enabled, live) => {
   return useQuery({
     queryKey: ["field-route", employeeId, date || "today"],
     queryFn: () => getFieldRoute(employeeId, date),
     enabled: Boolean(employeeId) && enabled !== false,
-    staleTime: live ? 0 : 1000 * 20,
-    refetchInterval: Boolean(employeeId) && enabled !== false && live ? 10000 : false,
-    refetchOnWindowFocus: false,
+    staleTime: 1000 * 20,
+    // "Today's route" for an in-progress day was fetched once and left to
+    // go stale — the live marker above it moves every ~10s but this trail
+    // never caught up, so it looked disconnected from (or behind) the
+    // employee's actual live position. Only worth polling for today's own
+    // route (a past date's trail is finished and won't change).
+    refetchInterval: live ? 15000 : false,
   });
 };
 
@@ -202,7 +193,8 @@ export const useEndFieldVisit = () => {
 
 export const useUploadVisitPhoto = () => {
   return useMutation({
-    mutationFn: ({ visitId, file }) => uploadVisitPhoto(visitId, file),
+    mutationFn: ({ visitId, file, location }) =>
+      uploadVisitPhoto(visitId, file, location),
   });
 };
 

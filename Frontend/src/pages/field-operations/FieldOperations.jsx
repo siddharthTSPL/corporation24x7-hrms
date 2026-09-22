@@ -26,7 +26,7 @@ import {
 } from "react-icons/fi";
 import { FaAngleDown } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import { snapPathToRoads } from "./roadSnap.utils";
+import { createRoadSnapCache, snapPathToRoadsCached } from "./roadSnap.utils";
 import {
   sendFieldLocation,
   exportFieldActivitiesCsvUrl,
@@ -475,7 +475,12 @@ function RouteTrail({
   onDateChange,
   big = false,
 }) {
-  const { data, isLoading } = useFieldRoute(employeeId, date);
+  const { data, isLoading } = useFieldRoute(
+    employeeId,
+    date,
+    undefined,
+    !date,
+  );
   const gpsPoints = data?.points || [];
   // routePoints includes both automatic GPS samples and manual face
   // check-ins, in the exact order they were captured. Fall back to `points`
@@ -496,8 +501,55 @@ function RouteTrail({
   // first point of each cluster and every point that actually moved, so
   // the trail only appears when the employee is genuinely travelling.
   const MIN_MOVE_METERS = 25;
+  // Phone GPS drifts 40-100m indoors/urban-canyon even standing still. A
+  // flat 25m floor treats that drift as a "walk". Two fixes:
+  //  1. Pings whose own accuracy is too poor to trust for a *trail* (as
+  //     opposed to a single marker) are dropped before clustering at all.
+  //  2. The move threshold between two points scales with their combined
+  //     GPS error margin, not just a fixed distance — a jump only counts
+  //     as real movement once it clears both readings' noise floor.
+  const MAX_USABLE_ACCURACY_METERS = 75;
+  // Multipath reflection (very common in dense Indian cities with tall
+  // buildings) can throw a single ping 200-800m away from the phone's real
+  // position while that ping still *reports* a perfectly good accuracy
+  // number — the accuracy filter above has nothing to catch, because the
+  // point doesn't look wrong on its own. The signature is: the ping right
+  // before and the ping right after both sit close together (the phone
+  // never actually moved), but the one in between is far from both. This
+  // removes exactly that shape — a genuine walk never round-trips like
+  // this in a single ping.
+  const SPIKE_NEIGHBOR_METERS = 150; // how close prev/next must stay for it to count as "didn't move"
+  const SPIKE_JUMP_METERS = 250; // how far the middle point must be from a neighbour to count as a spike
+  const metersBetween = (a, b) => {
+    const dLat = (b.lat - a.lat) * 111320;
+    const dLon = (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+    return Math.hypot(dLat, dLon);
+  };
+  const removeSpikes = (segment) => {
+    if (segment.length < 3) return segment;
+    const out = [segment[0]];
+    for (let i = 1; i < segment.length - 1; i++) {
+      const prev = out[out.length - 1];
+      const curr = segment[i];
+      const next = segment[i + 1];
+      const prevNext = metersBetween(prev, next);
+      const prevCurr = metersBetween(prev, curr);
+      const currNext = metersBetween(curr, next);
+      const isSpike =
+        prevNext <= SPIKE_NEIGHBOR_METERS &&
+        (prevCurr >= SPIKE_JUMP_METERS || currNext >= SPIKE_JUMP_METERS);
+      if (!isSpike) out.push(curr);
+    }
+    out.push(segment[segment.length - 1]);
+    return out;
+  };
   const rawPath = useMemo(() => {
-    const trusted = points.filter((p) => !p.isMocked);
+    const trusted = points.filter(
+      (p) =>
+        !p.isMocked &&
+        (!Number.isFinite(p.accuracy) ||
+          p.accuracy <= MAX_USABLE_ACCURACY_METERS),
+    );
     const segments = [];
     let currentSegment = [];
     for (let i = 0; i < trusted.length; i++) {
@@ -509,24 +561,30 @@ function RouteTrail({
         if (currentSegment.length > 0) segments.push(currentSegment);
         currentSegment = [];
       }
-      currentSegment.push([
-        trusted[i].location.coordinates[1],
-        trusted[i].location.coordinates[0],
-      ]);
+      currentSegment.push({
+        lat: trusted[i].location.coordinates[1],
+        lng: trusted[i].location.coordinates[0],
+        accuracy: trusted[i].accuracy,
+      });
     }
     if (currentSegment.length > 0) segments.push(currentSegment);
     const simplifiedSegments = segments.map((segment) => {
-      if (segment.length < 2) return segment;
-      const simplified = [segment[0]];
-      for (let i = 1; i < segment.length; i++) {
-        const prev = simplified[simplified.length - 1];
-        const a = prev;
-        const b = segment[i];
-        const dLat = (b[0] - a[0]) * 111320;
-        const dLon = (b[1] - a[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
-        if (Math.hypot(dLat, dLon) >= MIN_MOVE_METERS) simplified.push(b);
+      const despiked = removeSpikes(segment);
+      if (despiked.length < 2) return despiked.map((p) => [p.lat, p.lng]);
+      const simplified = [despiked[0]];
+      for (let i = 1; i < despiked.length; i++) {
+        const a = simplified[simplified.length - 1];
+        const b = despiked[i];
+        const dLat = (b.lat - a.lat) * 111320;
+        const dLon =
+          (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+        const requiredMoveMeters = Math.max(
+          MIN_MOVE_METERS,
+          (a.accuracy || 0) + (b.accuracy || 0),
+        );
+        if (Math.hypot(dLat, dLon) >= requiredMoveMeters) simplified.push(b);
       }
-      return simplified;
+      return simplified.map((p) => [p.lat, p.lng]);
     });
     return simplifiedSegments.filter((s) => s.length >= 2);
   }, [points]);
@@ -539,7 +597,18 @@ function RouteTrail({
   // never left blank.
   const [roadPath, setRoadPath] = useState(null);
   const [snappingRoads, setSnappingRoads] = useState(false);
+  // Held across polls (and across renders) so a live-refreshing trail only
+  // re-asks OSRM about the newly-added tail of the route, not the whole
+  // day's path every 15s — see roadSnap.utils.js. A different employee or
+  // a different day is a different route, so the cache is reset then.
+  const roadSnapCacheRef = useRef(createRoadSnapCache());
+  const roadSnapKeyRef = useRef(null);
   useEffect(() => {
+    const cacheKey = `${employeeId || ""}:${date || "today"}`;
+    if (roadSnapKeyRef.current !== cacheKey) {
+      roadSnapCacheRef.current = createRoadSnapCache();
+      roadSnapKeyRef.current = cacheKey;
+    }
     if (!rawPath.length) {
       setRoadPath([]);
       return;
@@ -547,7 +616,7 @@ function RouteTrail({
     const controller = new AbortController();
     let cancelled = false;
     setSnappingRoads(true);
-    snapPathToRoads(rawPath, controller.signal)
+    snapPathToRoadsCached(rawPath, roadSnapCacheRef.current, controller.signal)
       .then((snapped) => {
         if (!cancelled) setRoadPath(snapped);
       })
@@ -561,8 +630,13 @@ function RouteTrail({
       cancelled = true;
       controller.abort();
     };
-  }, [rawPath]);
-  const path = roadPath || rawPath;
+  }, [rawPath, employeeId, date]);
+  // Normalize to one shape for FieldMap: an array of { coords, dashed }
+  // polylines. Before road-snapping resolves (or if it's unavailable),
+  // rawPath's straight-line segments are shown the same dashed way a
+  // failed OSRM chunk would be — it's the same "not an actual road match"
+  // situation, so it should look the same on the map, not solid/confident.
+  const path = roadPath || rawPath.map((coords) => ({ coords, dashed: true }));
   const markers = useMemo(() => {
     const list = [];
     sessions.forEach((session, idx) => {
@@ -606,18 +680,31 @@ function RouteTrail({
         });
     });
     dayVisits.forEach((visit) => {
-      const loc = visit.endLocation || visit.startLocation;
-      if (!loc || !(visit.attachments || []).length) return;
-      visit.attachments.forEach((url, idx) =>
+      const fallbackLoc = visit.endLocation || visit.startLocation;
+      if (!(visit.attachments || []).length) return;
+      const locationsByUrl = new Map(
+        (visit.attachmentLocations || []).map((entry) => [entry.url, entry]),
+      );
+      visit.attachments.forEach((url, idx) => {
+        // Pin each photo at the spot it was actually taken. Older photos
+        // uploaded before per-photo location was captured fall back to the
+        // visit's own start/end location so they still show up somewhere.
+        const own = locationsByUrl.get(url);
+        const loc =
+          own && Number.isFinite(own.latitude) && Number.isFinite(own.longitude)
+            ? own
+            : fallbackLoc;
+        if (!loc) return;
         list.push({
           latitude: loc.latitude,
           longitude: loc.longitude,
+          accuracy: own?.accuracy,
           type: "photo",
           photoUrl: url,
           label: `${visit.customerName || titleize(visit.activityType)}${visit.attachments.length > 1 ? ` (${idx + 1}/${visit.attachments.length})` : ""}`,
-          timestamp: visit.endedAt || visit.startedAt,
-        }),
-      );
+          timestamp: own?.capturedAt || visit.endedAt || visit.startedAt,
+        });
+      });
     });
     return list;
   }, [points, sessions, dayVisits]);
@@ -943,9 +1030,14 @@ function VisitPhotoUploader({ visit, onUploaded }) {
     setShowCamera(false);
     if (!visit?._id) return;
     try {
+      // Best-effort — a slow/unavailable GPS must never block the upload.
+      // Without a location the photo still uploads, it just falls back to
+      // pinning at the visit's shared start/end location on the map.
+      const location = await safeCurrentPosition();
       const result = await uploadPhoto.mutateAsync({
         visitId: visit._id,
         file,
+        location,
       });
       onUploaded?.(result.visit);
     } catch (error) {
@@ -1553,9 +1645,11 @@ function EmployeeDuty({ auth }) {
   const handleCompletionPhoto = async (file) => {
     setPendingCompletePhoto(false);
     try {
+      const location = await safeCurrentPosition();
       const result = await uploadCompletionPhoto.mutateAsync({
         visitId: openVisit._id,
         file,
+        location,
       });
       setOpenVisit(result.visit);
       await finishVisit("completed");
@@ -3697,16 +3791,23 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
                       ...(overview.data?.visits || [])
                         .filter((v) => (v.attachments || []).length)
                         .flatMap((v) => {
-                          const loc = v.endLocation || v.startLocation;
+                          const latestUrl = v.attachments[v.attachments.length - 1];
+                          const own = (v.attachmentLocations || []).find(
+                            (entry) => entry.url === latestUrl,
+                          );
+                          const loc =
+                            own && Number.isFinite(own.latitude) && Number.isFinite(own.longitude)
+                              ? own
+                              : v.endLocation || v.startLocation;
                           if (!loc) return [];
                           return [
                             {
                               latitude: Number(loc.latitude),
                               longitude: Number(loc.longitude),
                               type: "photo",
-                              photoUrl: v.attachments[v.attachments.length - 1],
+                              photoUrl: latestUrl,
                               label: `${v.customerName || titleize(v.activityType)} — visit photo`,
-                              timestamp: v.endedAt || v.startedAt,
+                              timestamp: own?.capturedAt || v.endedAt || v.startedAt,
                             },
                           ];
                         }),

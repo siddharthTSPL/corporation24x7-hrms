@@ -75,12 +75,18 @@ export const useFieldSettings = (enabled) => {
   });
 };
 
-export const useFieldRoute = (employeeId, date, enabled) => {
+export const useFieldRoute = (employeeId, date, enabled, live) => {
   return useQuery({
     queryKey: ["field-route", employeeId, date || "today"],
     queryFn: () => getFieldRoute(employeeId, date),
     enabled: Boolean(employeeId) && enabled !== false,
     staleTime: 1000 * 20,
+    // "Today's route" for an in-progress day was fetched once and left to
+    // go stale — the live marker above it moves every ~10s but this trail
+    // never caught up, so it looked disconnected from (or behind) the
+    // employee's actual live position. Only worth polling for today's own
+    // route (a past date's trail is finished and won't change).
+    refetchInterval: live ? 15000 : false,
   });
 };
 
@@ -187,7 +193,8 @@ export const useEndFieldVisit = () => {
 
 export const useUploadVisitPhoto = () => {
   return useMutation({
-    mutationFn: ({ visitId, file }) => uploadVisitPhoto(visitId, file),
+    mutationFn: ({ visitId, file, location }) =>
+      uploadVisitPhoto(visitId, file, location),
   });
 };
 
@@ -299,4 +306,3 @@ export const useAllFieldVisits = (enabled, filters = {}) =>
       totalPages: 0,
     },
   });
-
