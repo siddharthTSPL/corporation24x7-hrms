@@ -1,6 +1,10 @@
 const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
+
+const FieldTeam = require("../Models/fieldTeam.model");
+const FieldAssignment = require("../Models/fieldAssignment.model");
+
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
@@ -44,6 +48,24 @@ const resolveOrganisationId = async (user) => {
   return null;
 };
 
+
+// Spec §10 — a field employee's presence is recorded through Field Duty, not
+// normal attendance. If this person is on an active Field Team or has an
+// active individual assignment, block the normal check-in channel at the
+// backend so the two systems can never create conflicting attendance rows for
+// the same employee/day. (The face kiosk already does an equivalent guard in
+// faceattendance.controller.js; this extends the same rule to the manual/system
+// channel and also covers individually-assigned field workers.) Non-field
+// employees and non-employee roles are unaffected.
+const assertNotFieldEmployee = async (organisation_id, userId) => {
+  if (!organisation_id || !userId) return true;
+  const [onTeam, onIndividual] = await Promise.all([
+    FieldTeam.exists({ organisation_id, members: userId, active: true }),
+    FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+  ]);
+  return !(onTeam || onIndividual);
+};
+
 const displayMinutes = (mins) => Math.round(mins || 0);
 
 // A channel's last-known status stays "valid" for this long after its own
@@ -81,6 +103,20 @@ const checkin = async (req, res) => {
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
+
+
+    // Field employees record presence via Field Duty, not normal attendance.
+    const isAllowedAttendance = await assertNotFieldEmployee(
+      organisation_id,
+      userId,
+    );
+    if (!isAllowedAttendance)
+      return res.status(409).json({
+        message:
+          "This employee is assigned to field work. Open the Field Duty app to record presence — normal attendance is disabled for field employees.",
+        reason: "field_work_assigned",
+      });
+
 
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });

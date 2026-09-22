@@ -7,6 +7,35 @@ const OtpModel = require("../Models/otpbasedlogin.model");
 const generateOTP = require("../automatic/otpgenerator");
 const { sendEmail } = require("../utils/nodemailer.utils");
 const { isSingleSignInActive, evaluateSingleSignIn } = require("../utils/singleSignIn.utils");
+const { logAudit } = require("../utils/auditLog.utils");
+const Session = require("../Models/Session.model");
+const { createBulkNotifications } = require("../utils/Notification.utils");
+
+async function notifyLoginSecurity({ organisation_id, accountId, accountModel, accountName, previousLocation, currentLocation, speedKph, elapsedMinutes }) {
+  try {
+    const [organisation, admins] = await Promise.all([
+      SuperAdminModel.findById(organisation_id).select("field_operations").lean(),
+      AdminModel.find({ organisation_id, working_status: { $nin: ["resigned", "fired", "terminated"] } }).select("_id").lean(),
+    ]);
+    if (organisation?.field_operations?.security_alerts_enabled === false) return;
+    const recipients = [
+      { recipientModel: "SuperAdmin", recipientId: organisation_id },
+      ...admins.map((admin) => ({ recipientModel: "Admin", recipientId: admin._id })),
+    ];
+    await createBulkNotifications({
+      recipients,
+      organisation_id,
+      type: "login_security",
+      priority: "high",
+      title: `Unusual login location — ${accountName || accountModel}`,
+      message: `Login changed from ${previousLocation.city || previousLocation.country || "an earlier location"} to ${currentLocation.city || currentLocation.country || "a new location"} in about ${elapsedMinutes} minutes (${speedKph} km/h).`,
+      link: "/field-operations/login-anomalies",
+      meta: { accountId, accountModel, previousLocation, currentLocation, speedKph, elapsedMinutes },
+    });
+  } catch (err) {
+    console.error("[login-anomaly] notification failed:", err?.stack || err);
+  }
+}
 
 // Shared by every login path (unifiedLogin's 4 blocks + the OTP-login flow
 // in buildLoginToken). Returns { sid } to merge into the JWT payload when
@@ -34,6 +63,87 @@ const applySingleSignInGate = async ({ organisation, role, accountId, req, res }
   }
   return { sid: result.sessionId, handled: false };
 };
+
+async function handleLoginGeoCheck({ accountId, accountModel, accountName, organisation_id, req }) {
+  try {
+    const { getIp, locateIp, checkImpossibleTravel } = require("../utils/loginAnomaly.utils");
+    const clientIp = getIp(req);
+    const currentGeo = locateIp(clientIp);
+    if (!currentGeo || !Number.isFinite(currentGeo.latitude) || !Number.isFinite(currentGeo.longitude))
+      return null;
+    const previousSession = await Session.findOne({
+      account_id: accountId,
+      account_model: accountModel,
+      status: "active",
+    })
+      .sort({ last_seen_at: -1 })
+      .lean();
+    if (!previousSession?.device_info?.geo?.at) return null;
+    if (
+      !Number.isFinite(previousSession.device_info.geo.latitude) ||
+      !Number.isFinite(previousSession.device_info.geo.longitude)
+    ) return null;
+    const plausibility = checkImpossibleTravel(
+      {
+        latitude: previousSession.device_info.geo.latitude,
+        longitude: previousSession.device_info.geo.longitude,
+        at: previousSession.device_info.geo.at,
+      },
+      {
+        latitude: currentGeo.latitude,
+        longitude: currentGeo.longitude,
+        at: currentGeo.at,
+      },
+    );
+    if (!plausibility.isMocked) return null;
+    await logAudit({
+      organisation_id,
+      module: "auth",
+      action: "login_impossible_travel",
+      actor: {
+        id: accountId,
+        model: accountModel,
+        name: previousSession.device_info.label || "",
+      },
+      target: {
+        id: accountId,
+        model: accountModel,
+        name: previousSession.device_info.label || "",
+      },
+      meta: {
+        previousLocation: {
+          latitude: previousSession.device_info.geo.latitude,
+          longitude: previousSession.device_info.geo.longitude,
+          city: previousSession.device_info.geo.city,
+          country: previousSession.device_info.geo.country,
+        },
+        currentLocation: {
+          latitude: currentGeo.latitude,
+          longitude: currentGeo.longitude,
+          city: currentGeo.city,
+          country: currentGeo.country,
+        },
+        speedKph: plausibility.speedKph,
+        distanceMeters: plausibility.distanceMeters,
+        ip: clientIp,
+      },
+    });
+    void notifyLoginSecurity({
+      organisation_id,
+      accountId,
+      accountModel,
+      accountName,
+      previousLocation: previousSession.device_info.geo,
+      currentLocation: currentGeo,
+      speedKph: plausibility.speedKph,
+      elapsedMinutes: Math.max(1, Math.round((currentGeo.at - new Date(previousSession.device_info.geo.at)) / 60000)),
+    });
+    return plausibility;
+  } catch (err) {
+    console.error("[login-anomaly] geo check failed:", err?.stack || err);
+    return null;
+  }
+}
 
 const cookieOpts = () => {
   const isProduction = process.env.NODE_ENV === "production";
@@ -237,6 +347,7 @@ const unifiedLogin = async (req, res, next) => {
     // if (superAdmin.isFirstLogin)
     //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
+    void handleLoginGeoCheck({ accountId: superAdmin._id, accountModel: "SuperAdmin", accountName: superAdmin.name || superAdmin.email, organisation_id: superAdmin._id, req });
     const ssoGate = await applySingleSignInGate({ organisation: superAdmin, role: "superadmin", accountId: superAdmin._id, req, res });
     if (ssoGate.handled) return;
 
@@ -284,6 +395,7 @@ const unifiedLogin = async (req, res, next) => {
         { statusCode: 403, code: "SERVICE_STOPPED" }
       ));
 
+    void handleLoginGeoCheck({ accountId: admin._id, accountModel: "Admin", accountName: `${admin.f_name || ""} ${admin.l_name || ""}`.trim() || admin.work_email, organisation_id: admin.organisation_id, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "admin", accountId: admin._id, req, res });
     if (ssoGate.handled) return;
 
@@ -336,6 +448,7 @@ const unifiedLogin = async (req, res, next) => {
         { statusCode: 403, code: "SERVICE_STOPPED" }
       ));
 
+    void handleLoginGeoCheck({ accountId: manager._id, accountModel: "Manager", accountName: `${manager.f_name || ""} ${manager.l_name || ""}`.trim() || manager.work_email, organisation_id: organisationId, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "manager", accountId: manager._id, req, res });
     if (ssoGate.handled) return;
 
@@ -377,6 +490,7 @@ const unifiedLogin = async (req, res, next) => {
         { statusCode: 403, code: "SERVICE_STOPPED" }
       ));
 
+    void handleLoginGeoCheck({ accountId: user._id, accountModel: "User", accountName: `${user.f_name || ""} ${user.l_name || ""}`.trim() || user.work_email, organisation_id: user.organisation_id, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "employee", accountId: user._id, req, res });
     if (ssoGate.handled) return;
 

@@ -97,16 +97,51 @@ export default function SingleSignInSecurityTab({ onSuccess, onError }) {
     <div className="bg-white rounded-xl border border-[#e8dcd6] p-6">
       <div className="flex items-start justify-between gap-4 mb-1">
         <h3 className="text-base font-semibold text-[#2a1a16]">Single Sign-In</h3>
-        <span className="text-xs font-medium text-[#730042] bg-[#730042]/10 rounded-full px-2.5 py-1 shrink-0">
-          Coming soon
-        </span>
+        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
       </div>
       <p className="text-sm text-[#8a7a75] max-w-md mb-4">
         Restrict every account to one active device at a time, with an approve/deny prompt when someone tries to sign in elsewhere.
       </p>
-      <div className="p-3 bg-[#fdf6f2] border border-[#f0dcd0] rounded-lg text-sm text-[#8a5a3a]">
-        This feature is being finalised and will be available on your plan soon.
-      </div>
+
+      {enabled && (
+        <div className="mb-2">
+          <p className="text-xs font-medium text-[#8a7a75] mb-2">Mode</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => handleModeChange("approval")}
+              className={`flex-1 text-left p-3 rounded-lg border text-sm transition-colors ${
+                mode === "approval"
+                  ? "border-[#730042] bg-[#730042]/5"
+                  : "border-[#e8dcd6] hover:bg-[#f9f8f2]"
+              } disabled:opacity-50`}
+            >
+              <span className="block font-medium text-[#2a1a16]">Approval</span>
+              <span className="block text-xs text-[#8a7a75] mt-0.5">
+                A new sign-in waits for approve/deny from the already-signed-in device.
+              </span>
+            </button>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => handleModeChange("strict")}
+              className={`flex-1 text-left p-3 rounded-lg border text-sm transition-colors ${
+                mode === "strict"
+                  ? "border-[#730042] bg-[#730042]/5"
+                  : "border-[#e8dcd6] hover:bg-[#f9f8f2]"
+              } disabled:opacity-50`}
+            >
+              <span className="block font-medium text-[#2a1a16]">Strict</span>
+              <span className="block text-xs text-[#8a7a75] mt-0.5">
+                A new sign-in is blocked outright while another session is active.
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ActiveSessionsPanel onSuccess={onSuccess} onError={onError} />
     </div>
   );
 }

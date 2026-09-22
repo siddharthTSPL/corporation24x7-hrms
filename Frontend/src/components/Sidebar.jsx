@@ -37,6 +37,10 @@ import HelpTour from "./help/HelpTour";
 import FloatingHelp from "./help/FloatingHelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
 import DocumentationModal from "./help/DocumentationModal";
+import {
+  checkoutFieldDuty,
+  getMyFieldDuty,
+} from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
 
@@ -54,7 +58,7 @@ const superAdminMenu = [
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
-    // { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits." }
+    { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
 ];
 
 const adminMenu = [
@@ -81,7 +85,7 @@ const adminMenu = [
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
-  // { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits." }
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
 ];
 
 const managerMenu = [
@@ -101,11 +105,11 @@ const managerMenu = [
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
-  //  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams." }
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager" },
 ];
 
 const employeeMenu = [
-  // { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits." },
+  { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee" },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
@@ -156,9 +160,33 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showSupport, setShowSupport] = useState(false);
   const [showDocs,    setShowDocs]    = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [activeDutySession, setActiveDutySession] = useState(null);
+  const [checkingOutDuty, setCheckingOutDuty] = useState(false);
+  const [logoutDutyError, setLogoutDutyError] = useState("");
   const [upgradeFeatureName, setUpgradeFeatureName] = useState(null);
 
-  const menu = menuByRole[role] ?? employeeMenu;
+  // Field Operations isn't a plan upsell — it's an org-type toggle. Orgs
+  // that don't do field work should never see it, and within a field org
+  // only the admins who manage it and the employees/managers actually
+  // assigned to a field team should see it. So it's filtered out of the
+  // menu entirely here, rather than shown locked with an "Upgrade" badge
+  // the way review/timesheet/recruitment are.
+
+  //
+  // The master on/off switch lives in the Settings page (Settings nav has
+  // no fieldGate, so it stays visible even when Field Operations is off),
+  // so hiding this menu item when disabled does not cause a lockout.
+
+  const passesFieldGate = (item) => {
+    if (!item.fieldGate) return true;
+    if (!planFeatures?.features?.fieldOperations) return false;
+    if (item.fieldGate === "admin") return true;
+    if (item.fieldGate === "manager") return Boolean(planFeatures?.fieldAssignment?.isManager);
+    if (item.fieldGate === "employee") return Boolean(planFeatures?.fieldAssignment?.isMember);
+    return true;
+  };
+
+  const menu = (menuByRole[role] ?? employeeMenu).filter(passesFieldGate);
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
@@ -222,14 +250,28 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     setShowDocs(true);
   };
 
-  const openLogoutConfirm = () => {
+  const openLogoutConfirm = async () => {
     if (isPending) return;
+    setLogoutDutyError("");
+    setActiveDutySession(null);
+    // This is only a courtesy prompt. If the check cannot run, logout remains
+    // available; the server-side duty device lock remains the security bound.
+    if (role === "employee") {
+      try {
+        const result = await getMyFieldDuty();
+        if (result.session) setActiveDutySession(result.session);
+      } catch {
+        // A field-operations-disabled org or a temporary network failure must
+        // not prevent an employee from logging out.
+      }
+    }
     setShowLogoutConfirm(true);
   };
 
   const closeLogoutConfirm = () => {
     if (isPending) return;
     setShowLogoutConfirm(false);
+    setActiveDutySession(null);
   };
 
   const handleLogout = () => {
@@ -245,6 +287,22 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     else if (role === "admin")    logoutAdmin(undefined, { onSuccess });
     else if (role === "manager")  logoutManager(undefined, { onSuccess });
     else                          logoutEmployee(undefined, { onSuccess });
+  };
+
+  const checkoutThenLogout = async () => {
+    if (!activeDutySession?._id) return handleLogout();
+    setCheckingOutDuty(true);
+    setLogoutDutyError("");
+    try {
+      await checkoutFieldDuty(activeDutySession._id);
+      handleLogout();
+    } catch (error) {
+      setLogoutDutyError(
+        error?.response?.data?.message || "Could not check out your field duty.",
+      );
+    } finally {
+      setCheckingOutDuty(false);
+    }
   };
 
   return (
@@ -412,29 +470,46 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
                 <FaSignOutAlt className="text-[#730042]" size={16} />
               </div>
-              <h3 className="text-center text-[15px] font-semibold text-[#730042]">Are you sure you want to logout?</h3>
+              <h3 className="text-center text-[15px] font-semibold text-[#730042]">
+                {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}
+              </h3>
               <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
-                If you continue, your current session will be closed.
+                {activeDutySession
+                  ? "Logging out won't end it. Check out now, log out anyway, or cancel."
+                  : "If you continue, your current session will be closed."}
               </p>
             </div>
 
+            {logoutDutyError && (
+              <p className="px-6 pt-4 text-center text-[12px] text-rose-600">{logoutDutyError}</p>
+            )}
             <div className="flex gap-3 px-6 py-5">
               <button
                 type="button"
                 onClick={closeLogoutConfirm}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
+              {activeDutySession && (
+                <button
+                  type="button"
+                  onClick={checkoutThenLogout}
+                  disabled={isPending || checkingOutDuty}
+                  className="flex-1 rounded-xl border border-[#730042] py-2.5 text-[12px] font-medium text-[#730042] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {checkingOutDuty ? "Checking out..." : "Check out now"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: "#730042" }}
               >
-                {isPending ? "Logging out..." : "Yes, Logout"}
+                {isPending ? "Logging out..." : activeDutySession ? "Log out anyway" : "Yes, Logout"}
               </button>
             </div>
           </div>

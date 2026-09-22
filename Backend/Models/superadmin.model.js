@@ -67,8 +67,16 @@ const licenseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    // Tracks the last calendar day (Asia/Kolkata) this license's
+    // "expiring soon" reminder email was sent to the org's SuperAdmin —
+    // keeps the daily cron from sending more than one email per day.
+    last_expiry_reminder_sent_at: {
+      type: Date,
+      default: null,
+    },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const superAdminSchema = new mongoose.Schema(
@@ -84,6 +92,24 @@ const superAdminSchema = new mongoose.Schema(
     f_name: String,
 
     l_name: String,
+
+    empid: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    designation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    department: {
+      type: String,
+      trim: true,
+      default: "",
+    },
 
     email: {
       type: String,
@@ -172,13 +198,35 @@ const superAdminSchema = new mongoose.Schema(
     // its limits on the tenant document prevents one organisation's setup
     // from affecting another organisation's field users or GPS records.
     field_operations: {
-      enabled: { type: Boolean, default: true },
+      enabled: { type: Boolean, default: false },
       max_field_employees: { type: Number, default: 50, min: 0 },
       max_managers: { type: Number, default: 10, min: 0 },
       data_retention_days: { type: Number, default: 180, min: 1 },
+      require_face_verification: { type: Boolean, default: false },
+      security_alerts_enabled: { type: Boolean, default: true },
+
+      // OFF: no geofence enforcement. WARNING: distance shown to the user
+      // but never blocks. STRICT: an activity with a known expectedLocation
+      // (radiusMeters set) cannot be started/ended outside the fence.
+      geofence_mode: {
+        type: String,
+        enum: ["off", "warning", "strict"],
+        default: "off",
+      },
+      // Per-activity-type minimum-duration override, in minutes — e.g.
+      // { meeting: 30, delivery: 5 }. Falls back to
+      // DEFAULT_MIN_DURATION_MINUTES in utils/fieldWorkConstants.js for any
+      // type not present here.
+      min_duration_overrides: {
+        type: Map,
+        of: Number,
+        default: {},
+      },
+
     },
 
     licenses: [licenseSchema],
+
 
     // Single Sign-In (one active device/browser per account). Gated to
     // Advance/enterprise plans at the route/UI level — the toggle itself
@@ -191,6 +239,7 @@ const superAdminSchema = new mongoose.Schema(
         default: "approval",
       },
     },
+
 
     plan: {
       type: String,
@@ -261,7 +310,7 @@ const superAdminSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 superAdminSchema.pre("validate", function () {
@@ -301,11 +350,11 @@ superAdminSchema.methods.generateLicense = function (
   plan = "basic",
   users = 0,
   plan_type = "monthly",
-  startDate = new Date()
+  startDate = new Date(),
 ) {
   const activatedAt = new Date(startDate);
   const expiresAt = new Date(
-    activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000
+    activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000,
   );
 
   const existing = this.licenses.find((l) => l.product === product);
@@ -385,7 +434,15 @@ superAdminSchema.statics.forceExpireStaleLicenses = async function () {
   const result = await this.updateMany(
     { "licenses.isActive": true, "licenses.expiresAt": { $lte: now } },
     { $set: { "licenses.$[elem].isActive": false } },
+
+    {
+      arrayFilters: [
+        { "elem.isActive": true, "elem.expiresAt": { $lte: now } },
+      ],
+    },
+
     { arrayFilters: [{ "elem.isActive": true, "elem.expiresAt": { $lte: now } }] }
+
   );
   return {
     matchedDocuments: result.matchedCount,
@@ -395,7 +452,7 @@ superAdminSchema.statics.forceExpireStaleLicenses = async function () {
 
 superAdminSchema.statics.checkDomainAvailable = async function (
   email,
-  organisation_name
+  organisation_name,
 ) {
   const domain = extractDomain(email);
   if (!domain) throw new Error("Invalid email");

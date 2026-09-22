@@ -1790,14 +1790,23 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
+<<<<<<< HEAD
 
 function getPaidAndBalance(p) {
   const total = roundINR(p.netSalary);
+=======
+// Computes what's actually been paid and what's still outstanding for a
+// payroll record. A record only counts as "Paid" once its status is paid;
+// generated/approved/on_hold records are fully outstanding.
+function getPaidAndBalance(p) {
+  const total = Number(p.netSalary) || 0;
+>>>>>>> Ashish
   const paid = p.status === "paid" ? total : 0;
   const balance = total - paid;
   return { total, paid, balance };
 }
 
+<<<<<<< HEAD
 function isBulkSelectable(status) {
   return Boolean(BULK_ACTIONS[status]);
 }
@@ -1811,6 +1820,14 @@ const BULK_ACTIONS = {
   approved: ["paid", "hold"],
 };
 
+=======
+// Builds one export row per payroll record with every earning / deduction /
+// employer-contribution component as its own column. The column set is the
+// union across ALL records, so employees whose components differ still line
+// up correctly (missing components show as blank instead of breaking the
+// sheet). Reuses getPayslipLineItems() so the export never drifts out of
+// sync with what the payslip itself shows.
+>>>>>>> Ashish
 function buildPayrollExportRows(payrolls, directory) {
   const perRecord = payrolls.map((p) => {
     const { earnings, deductions, employerContribution } = getPayslipLineItems(p);
@@ -1823,9 +1840,15 @@ function buildPayrollExportRows(payrolls, directory) {
       employeeId: snap.employeeId || person?.empid || "—",
       department: departmentLabel(snap.department || person?.department || "—"),
       designation: snap.designation || person?.designation || "—",
+<<<<<<< HEAD
       earnMap: Object.fromEntries(earnings.map((e) => [e.label, roundINR(e.amount)])),
       dedMap: Object.fromEntries(deductions.map((d) => [d.label, roundINR(d.amount)])),
       empMap: Object.fromEntries(employerContribution.map((c) => [c.label, roundINR(c.amount)])),
+=======
+      earnMap: Object.fromEntries(earnings.map((e) => [e.label, e.amount])),
+      dedMap: Object.fromEntries(deductions.map((d) => [d.label, d.amount])),
+      empMap: Object.fromEntries(employerContribution.map((c) => [c.label, c.amount])),
+>>>>>>> Ashish
       earnings, deductions, employerContribution,
       total, paid, balance,
     };
@@ -1849,20 +1872,37 @@ function buildPayrollExportRows(payrolls, directory) {
     r.name, r.employeeId, r.department, r.designation,
     MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
     ...earningKeys.map((k) => r.earnMap[k] ?? ""),
+<<<<<<< HEAD
     roundINR(r.p.earnings?.totalEarnings),
     ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
     roundINR(r.p.deductions?.totalDeductions),
+=======
+    r.p.earnings?.totalEarnings ?? "",
+    ...deductionKeys.map((k) => r.dedMap[k] ?? ""),
+    r.p.deductions?.totalDeductions ?? "",
+>>>>>>> Ashish
     ...employerKeys.map((k) => r.empMap[k] ?? ""),
     r.total, r.paid, r.balance,
   ]);
 
+<<<<<<< HEAD
+=======
+  // Grand-total row: sums every amount column across all filtered records.
+  // Only added to the CSV, not shown in the on-screen table.
+>>>>>>> Ashish
   const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
   const totalsRow = [
     "TOTAL", "", "", "", "", "", "",
     ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
+<<<<<<< HEAD
     sumOf((r) => roundINR(r.p.earnings?.totalEarnings)),
     ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
     sumOf((r) => roundINR(r.p.deductions?.totalDeductions)),
+=======
+    sumOf((r) => r.p.earnings?.totalEarnings),
+    ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
+    sumOf((r) => r.p.deductions?.totalDeductions),
+>>>>>>> Ashish
     ...employerKeys.map((k) => sumOf((r) => r.empMap[k])),
     sumOf((r) => r.total), sumOf((r) => r.paid), sumOf((r) => r.balance),
   ];
@@ -1870,16 +1910,31 @@ function buildPayrollExportRows(payrolls, directory) {
   return [header, ...rows, totalsRow];
 }
 
+<<<<<<< HEAD
+=======
+// Escapes one CSV cell: wraps in quotes (and doubles any embedded quotes)
+// only when the value contains a comma, quote, or newline.
+>>>>>>> Ashish
 function csvEscape(val) {
   const s = String(val ?? "");
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
+<<<<<<< HEAD
 function exportPayrollCSV(payrolls, directory) {
   const table = buildPayrollExportRows(payrolls, directory);
   const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
 
+=======
+// Builds the full payroll sheet CSV (every component as its own column)
+// and triggers a browser download. No extra library needed — CSV opens
+// directly in Excel/Google Sheets.
+function exportPayrollCSV(payrolls, directory) {
+  const table = buildPayrollExportRows(payrolls, directory);
+  const csv = table.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  // UTF-8 BOM so Excel renders ₹ / non-ASCII names correctly.
+>>>>>>> Ashish
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1911,6 +1966,7 @@ function RecordsTab({ notify, directory }) {
 
   const payrolls = data?.payrolls || [];
 
+<<<<<<< HEAD
   const selectableIds = useMemo(
     () => payrolls.filter((p) => isBulkSelectable(p.status)).map((p) => p._id),
     [payrolls]
@@ -1956,6 +2012,11 @@ function RecordsTab({ notify, directory }) {
     });
   };
 
+=======
+  // Aggregate Total / Paid / Balance across whatever is currently filtered.
+  // Recomputes automatically whenever `payrolls` changes (i.e. whenever the
+  // filters above change and useListPayrolls refetches).
+>>>>>>> Ashish
   const summary = useMemo(() => {
     return payrolls.reduce(
       (acc, p) => {
@@ -2045,7 +2106,11 @@ function RecordsTab({ notify, directory }) {
             <option value="on_hold">On Hold</option>
           </Select>
           <button
+<<<<<<< HEAD
             className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto sm:ml-auto"
+=======
+           className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto sm:ml-auto"
+>>>>>>> Ashish
             style={{ borderColor: "#085041", color: "#085041", background: "transparent", opacity: payrolls.length === 0 ? 0.5 : 1, cursor: payrolls.length === 0 ? "not-allowed" : "pointer" }}
             onMouseEnter={(e) => { if (payrolls.length === 0) return; e.currentTarget.style.background = "#085041"; e.currentTarget.style.color = "#fff"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#085041"; }}
@@ -2077,6 +2142,7 @@ function RecordsTab({ notify, directory }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
           </div>
         </div>
+<<<<<<< HEAD
         {selectedIds.size > 0 && (
           <div
             className="flex items-center gap-2 flex-wrap"
@@ -2124,6 +2190,10 @@ function RecordsTab({ notify, directory }) {
         )}
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1060 }}>
+=======
+        <div className="overflow-x-auto overscroll-x-contain -mx-1">
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
+>>>>>>> Ashish
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
                 <th style={{ padding: "6px 10px" }}>

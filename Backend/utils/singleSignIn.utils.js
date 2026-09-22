@@ -9,11 +9,17 @@ const ROLE_TO_ACCOUNT_MODEL = {
   employee: "User",
 };
 
-const buildDeviceInfo = (req) => ({
-  userAgent: req.headers["user-agent"] || "",
-  ip: req.ip || req.headers["x-forwarded-for"] || "",
-  label: describeDevice(req.headers["user-agent"] || ""),
-});
+const buildDeviceInfo = (req) => {
+  const { getIp, locateIp } = require("./loginAnomaly.utils");
+  const ip = getIp(req);
+  return {
+    userAgent: req.headers["user-agent"] || "",
+    ip,
+    label: describeDevice(req.headers["user-agent"] || ""),
+    // IP lookup is local/offline and returns null for private or unknown IPs.
+    geo: locateIp(ip),
+  };
+};
 
 // Very small heuristic label — good enough for "which device is this" in a
 // prompt, not meant to be a full UA parser.
@@ -60,11 +66,29 @@ const isSingleSignInActive = (orgSuperAdmin) => {
  */
 const evaluateSingleSignIn = async ({ organisation, role, accountId, req }) => {
   const accountModel = ROLE_TO_ACCOUNT_MODEL[role];
+
+  // .sort(): there should only ever be one "active" row per account, but if
+  // stray duplicates ever exist (e.g. leftover rows from before logout
+  // started revoking sessions), always deterministically treat the most
+  // recently-seen one as "the" active session, and quietly retire the rest
+  // — instead of leaving it up to whatever order Mongo happens to return.
   const existing = await SessionModel.findOne({
     account_id: accountId,
     account_model: accountModel,
     status: "active",
-  });
+  }).sort({ last_seen_at: -1 });
+
+  if (existing) {
+    await SessionModel.updateMany(
+      {
+        account_id: accountId,
+        account_model: accountModel,
+        status: "active",
+        _id: { $ne: existing._id },
+      },
+      { $set: { status: "revoked" } }
+    );
+  }
 
   const deviceInfo = buildDeviceInfo(req);
 
@@ -118,6 +142,35 @@ const isSessionStillActive = async (sessionId) => {
   return !!session && session.status === "active";
 };
 
+// Called on logout, for every role, to release THIS device's session slot.
+//
+// Why this matters: evaluateSingleSignIn()'s whole "is another device
+// already signed in" check is based on whether a Session row for this
+// account still has status:"active". Logout only ever cleared the cookie —
+// it never touched this row. So after logging out, the row was still
+// "active" in the DB, and the very next login attempt (even from the same
+// device/browser) was treated as a second, concurrent sign-in:
+//   - strict mode  -> wrongly rejected ("already signed in elsewhere")
+//   - approval mode -> wrongly raised a pending challenge and parked the
+//     user on the "waiting for approval" screen — with no other logged-in
+//     device left anywhere to show the Approve/Deny banner, since this
+//     device's cookie was just cleared. It could only ever time out.
+//
+// Revoking the session here (not touching the account's own status/
+// working_status field — that's a separate, unrelated concept) closes that
+// gap: logout actually frees up the slot, so the next login on this device
+// is recognized as "no existing active session" and proceeds normally.
+//
+// `sessionId` is undefined/null for tokens minted while the feature was
+// off (no `sid` claim) — a harmless no-op in that case.
+const revokeSession = async (sessionId) => {
+  if (!sessionId) return;
+  await SessionModel.updateOne(
+    { _id: sessionId, status: "active" },
+    { $set: { status: "revoked" } }
+  );
+};
+
 module.exports = {
   CHALLENGE_TTL_MS,
   ROLE_TO_ACCOUNT_MODEL,
@@ -125,4 +178,5 @@ module.exports = {
   isSingleSignInActive,
   evaluateSingleSignIn,
   isSessionStillActive,
+  revokeSession,
 };
