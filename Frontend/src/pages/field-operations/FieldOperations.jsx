@@ -26,6 +26,7 @@ import {
 } from "react-icons/fi";
 import { FaAngleDown } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { snapPathToRoads } from "./roadSnap.utils";
 import {
   sendFieldLocation,
   exportFieldActivitiesCsvUrl,
@@ -495,7 +496,7 @@ function RouteTrail({
   // first point of each cluster and every point that actually moved, so
   // the trail only appears when the employee is genuinely travelling.
   const MIN_MOVE_METERS = 25;
-  const path = useMemo(() => {
+  const rawPath = useMemo(() => {
     const trusted = points.filter((p) => !p.isMocked);
     const segments = [];
     let currentSegment = [];
@@ -529,6 +530,39 @@ function RouteTrail({
     });
     return simplifiedSegments.filter((s) => s.length >= 2);
   }, [points]);
+
+  // rawPath joins consecutive GPS pings with straight lines, which cuts
+  // across buildings whenever two pings are far apart. Snap it onto the
+  // actual road network so the drawn trail follows the street the employee
+  // was on. While snapping is in flight (or if it fails for a stretch) we
+  // fall back to the straight-line points for that stretch so the map is
+  // never left blank.
+  const [roadPath, setRoadPath] = useState(null);
+  const [snappingRoads, setSnappingRoads] = useState(false);
+  useEffect(() => {
+    if (!rawPath.length) {
+      setRoadPath([]);
+      return;
+    }
+    const controller = new AbortController();
+    let cancelled = false;
+    setSnappingRoads(true);
+    snapPathToRoads(rawPath, controller.signal)
+      .then((snapped) => {
+        if (!cancelled) setRoadPath(snapped);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") setRoadPath(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSnappingRoads(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [rawPath]);
+  const path = roadPath || rawPath;
   const markers = useMemo(() => {
     const list = [];
     sessions.forEach((session, idx) => {
@@ -591,7 +625,14 @@ function RouteTrail({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-bold text-slate-900">Today's route</h3>
+        <h3 className="font-bold text-slate-900">
+          Today's route
+          {snappingRoads && (
+            <span className="ml-2 text-xs font-medium text-slate-400">
+              Matching to roads…
+            </span>
+          )}
+        </h3>
         <div className="flex flex-wrap items-center gap-2">
           {showPicker && employees && onEmployeeChange && (
             <SearchableSelect
