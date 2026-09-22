@@ -1,24 +1,17 @@
 import axios from "axios";
 
-// Matches every other API module in this app (notification.api.js,
-// singleSignIn.api.js, etc.): the backend mounts all routers directly
-// off root ("app.use('/field-operations', fieldOperationsRouter)" in
-// app.js), not under "/api". No "/api" suffix here.
-//
-// .env currently sets VITE_API_BASE_URL=http://localhost:5000/api/ (a
-// leftover from an assumed IIS rewrite that doesn't exist in this
-// backend). Rather than depend on that var being fixed everywhere it's
-// used, strip a trailing "/api" here too, so this file is correct
-// regardless of what VITE_API_BASE_URL / VITE_API_URL are set to.
 const resolveApiBaseUrl = () => {
   const configured =
     import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_API_URL ||
-    "http://localhost:5000/";
-  return String(configured)
-    .trim()
-    .replace(/\/+$/, "")
-    .replace(/\/api$/, "");
+    "http://localhost:5000/api";
+  const trimmed = String(configured).trim().replace(/\/+$/, "");
+  // Every field-operations/faceattendance call below is written as
+  // "field-operations/..." with no "api/" prefix, so the base URL itself
+  // must end in "/api" or IIS's "^api/field-operations/..." rewrite rule
+  // never matches and the request falls through to the SPA catch-all,
+  // returning index.html (200) instead of JSON.
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
 const api = axios.create({
