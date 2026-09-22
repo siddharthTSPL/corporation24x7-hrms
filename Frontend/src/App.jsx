@@ -3,6 +3,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
+import Guide from './components/Guide';
 
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
@@ -182,6 +183,11 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/platform-features" element={<PlatformFeaturesPage />} />
           <Route path="/documentation" element={<DocumentationPage />} />
+          {/* Public — same as Documentation. Moved out of the protected
+              admin/manager/employee block below so visitors who click
+              "Guide" in the footer (logged in or not) land here instead
+              of being redirected to /login. */}
+          <Route path="/guide" element={<Guide />} />
           <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -247,7 +253,6 @@ function App() {
             <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
             <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
             <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
-
             <Route
               path="/reimbursement-admin"
               element={<ProtectedRoute><ReimbursementAdmin /></ProtectedRoute>}

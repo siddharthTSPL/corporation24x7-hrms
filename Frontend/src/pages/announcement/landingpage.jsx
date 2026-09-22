@@ -1247,6 +1247,7 @@ export function Footer() {
     ] },
     { title: 'Resources', links: [
       { label: 'Documentation', to: '/documentation' },
+      { label: 'Guide', to: '/guide'},
     ] },
   ]
   const socials = [
