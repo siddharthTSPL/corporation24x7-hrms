@@ -1509,14 +1509,23 @@ function EmployeeDuty({ auth }) {
     }
   };
 
+  // The backend enforces a per-activity-type minimum (0 for
+  // service/delivery/survey/etc., 20 for meeting/customer_visit by default,
+  // and any of those can be overridden per-organisation) — settings the
+  // employee's device can't read directly, so the visit itself carries its
+  // resolved minDurationMinutes. Falling back to the old flat 20 only
+  // covers a backend that hasn't been updated yet.
+  const visitMinMinutes = Number.isFinite(openVisit?.minDurationMinutes)
+    ? openVisit.minDurationMinutes
+    : MIN_VISIT_MINUTES;
   const visitElapsedMinutes = openVisit
     ? (visitTick - new Date(openVisit.startedAt).getTime()) / 60000
     : 0;
-  const visitCanComplete = visitElapsedMinutes >= MIN_VISIT_MINUTES;
+  const visitCanComplete = visitElapsedMinutes >= visitMinMinutes;
   const visitCountdownLabel = (() => {
     const remainingSeconds = Math.max(
       0,
-      Math.round((MIN_VISIT_MINUTES - visitElapsedMinutes) * 60),
+      Math.round((visitMinMinutes - visitElapsedMinutes) * 60),
     );
     const mm = Math.floor(remainingSeconds / 60);
     const ss = String(remainingSeconds % 60).padStart(2, "0");
@@ -1847,10 +1856,11 @@ function EmployeeDuty({ auth }) {
                 </button>
               </div>
               <p className="mt-2 text-[11px] text-blue-600">
-                Visits need at least {MIN_VISIT_MINUTES} minutes before they can
-                be marked complete, and a live camera photo to close it out. Use
-                Skip or Follow up if the customer wasn't available — those are
-                always allowed.
+                {visitMinMinutes > 0
+                  ? `Visits need at least ${visitMinMinutes} minute${visitMinMinutes === 1 ? "" : "s"} before they can be marked complete, and a live camera photo to close it out.`
+                  : "A live camera photo is needed to mark this complete."}{" "}
+                Use Skip or Follow up if the customer wasn't available — those
+                are always allowed.
               </p>
               <GeofenceResult
                 result={openVisit.geofenceStatus?.atStart}
