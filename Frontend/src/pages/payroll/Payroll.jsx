@@ -1790,9 +1790,17 @@ function ConfirmDialog({ open, title, message, confirmLabel = "Delete", onConfir
   );
 }
 
+<<<<<<< HEAD
 
 function getPaidAndBalance(p) {
   const total = roundINR(p.netSalary);
+=======
+// Computes what's actually been paid and what's still outstanding for a
+// payroll record. A record only counts as "Paid" once its status is paid;
+// generated/approved/on_hold records are fully outstanding.
+function getPaidAndBalance(p) {
+  const total = Number(p.netSalary) || 0;
+>>>>>>> Ashish
   const paid = p.status === "paid" ? total : 0;
   const balance = total - paid;
   return { total, paid, balance };
@@ -2133,6 +2141,7 @@ function RecordsTab({ notify, directory }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: summary.balance > 0 ? C.red : C.blue, marginTop: 2 }}>{fmtINR(summary.balance)}</div>
           </div>
         </div>
+<<<<<<< HEAD
         {selectedIds.size > 0 && (
           <div
             className="flex items-center gap-2 flex-wrap"
@@ -2180,6 +2189,10 @@ function RecordsTab({ notify, directory }) {
         )}
         <div className="overflow-x-auto overscroll-x-contain -mx-1">
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1060 }}>
+=======
+        <div className="overflow-x-auto overscroll-x-contain -mx-1">
+          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1020 }}>
+>>>>>>> Ashish
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
                 <th style={{ padding: "6px 10px" }}>
