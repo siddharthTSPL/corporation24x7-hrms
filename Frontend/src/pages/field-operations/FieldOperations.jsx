@@ -26,7 +26,7 @@ import {
 } from "react-icons/fi";
 import { FaAngleDown } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import { snapPathToRoads } from "./roadSnap.utils";
+import { createRoadSnapCache, snapPathToRoadsCached } from "./roadSnap.utils";
 import {
   sendFieldLocation,
   exportFieldActivitiesCsvUrl,
@@ -597,7 +597,18 @@ function RouteTrail({
   // never left blank.
   const [roadPath, setRoadPath] = useState(null);
   const [snappingRoads, setSnappingRoads] = useState(false);
+  // Held across polls (and across renders) so a live-refreshing trail only
+  // re-asks OSRM about the newly-added tail of the route, not the whole
+  // day's path every 15s — see roadSnap.utils.js. A different employee or
+  // a different day is a different route, so the cache is reset then.
+  const roadSnapCacheRef = useRef(createRoadSnapCache());
+  const roadSnapKeyRef = useRef(null);
   useEffect(() => {
+    const cacheKey = `${employeeId || ""}:${date || "today"}`;
+    if (roadSnapKeyRef.current !== cacheKey) {
+      roadSnapCacheRef.current = createRoadSnapCache();
+      roadSnapKeyRef.current = cacheKey;
+    }
     if (!rawPath.length) {
       setRoadPath([]);
       return;
@@ -605,7 +616,7 @@ function RouteTrail({
     const controller = new AbortController();
     let cancelled = false;
     setSnappingRoads(true);
-    snapPathToRoads(rawPath, controller.signal)
+    snapPathToRoadsCached(rawPath, roadSnapCacheRef.current, controller.signal)
       .then((snapped) => {
         if (!cancelled) setRoadPath(snapped);
       })
@@ -619,7 +630,7 @@ function RouteTrail({
       cancelled = true;
       controller.abort();
     };
-  }, [rawPath]);
+  }, [rawPath, employeeId, date]);
   // Normalize to one shape for FieldMap: an array of { coords, dashed }
   // polylines. Before road-snapping resolves (or if it's unavailable),
   // rawPath's straight-line segments are shown the same dashed way a
