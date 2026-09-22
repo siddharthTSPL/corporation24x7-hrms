@@ -1,403 +1,641 @@
-import { useState, useCallback, useEffect } from "react";
-import { useAttendanceTracker } from "../attendance/useattendanctracker";
-import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
-import SelfieCapture from "../attendance/selfietracker";
+import { useMemo, useState } from "react";
+import {
+  FaTimes, FaSearch, FaMapMarkerAlt, FaIdCard, FaEnvelope,
+  FaUserTie, FaBuilding, FaCalendarAlt, FaClock, FaDownload,
+  FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup, FaUsers,
+} from "react-icons/fa";
+import AttendanceHistoryModal from "./AttendanceHistoryModal";
+import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
+import { downloadCsv } from "./exportCsv";
+import { filterActiveOnly } from "../utils/attendance";
 
-const formatTime = (date) =>
-  date ? new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-function ArcGauge({ percent, color }) {
-  const size = 160, sw = 12, r = (size - sw) / 2, circ = 2 * Math.PI * r, cx = size / 2;
-  return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="#F3F4F6" strokeWidth={sw} />
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={sw}
-        strokeDasharray={circ} strokeDashoffset={circ - (circ * percent) / 100}
-        strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
-    </svg>
-  );
+const ROLE_COLOR = {
+  admin: "#4a0029",
+  manager: "#730042",
+  employee: "#a0005c",
+};
+
+// Fixed role list — always shown in full, regardless of who has a record
+// in the currently loaded rows.
+const ROLE_OPTIONS = [
+  { value: "all", label: "All Roles" },
+  { value: "employee", label: "Employee" },
+  { value: "manager", label: "Manager" },
+  { value: "senior_manager", label: "Senior Manager" },
+  { value: "admin", label: "Admin" },
+  { value: "senior_admin", label: "Senior Admin" },
+  { value: "official", label: "Official" },
+];
+
+// Department short-code -> full form mapping.
+const DEPT_FULL_FORMS = {
+  OPR: "Operations",
+  BPO: "Business Process Outsourcing",
+  ENG: "Engineering",
+  HR: "Human Resources",
+  MGMT: "Management",
+};
+
+// Fixed department list — full forms, always shown in full.
+const DEPT_OPTIONS = [
+  { value: "all", label: "All Departments" },
+  ...Object.entries(DEPT_FULL_FORMS).map(([code, label]) => ({ value: code, label })),
+];
+
+function getDeptFullForm(code) {
+  if (!code) return "—";
+  return DEPT_FULL_FORMS[code] || code;
 }
 
-function LiveClock() {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+const fmtTime = (d) =>
+  d ? new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+
+const fmtMinutes = (mins) => {
+  const m = Math.round(mins || 0);
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return h > 0 ? `${h}h ${rem}m` : `${rem}m`;
+};
+
+const STATUS_META = {
+  present: { label: "Present ✓", color: "#16A34A", bg: "#DCFCE7" },
+  on_duty: { label: "On Duty 🟡", color: "#B8760A", bg: "#FEF3C7" },
+  half_day: { label: "Half Day", color: "#B8760A", bg: "#FEF3C7" },
+  absent: { label: "Not Checked In", color: "#DC2626", bg: "#FEE2E2" },
+  // Checked in/out but active time was too low to count as present/half-day.
+  absent_checked_in: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
+};
+
+function Avatar({ name, role }) {
+  const initials =
+    (name || "?").trim().split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+  const color = ROLE_COLOR[role?.toLowerCase()] ?? ROLE_COLOR.employee;
   return (
-    <div className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 sm:px-8 py-4 sm:py-5 text-center">
-      <p className="m-0 text-3xl sm:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-        {time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-      </p>
-      <p className="mt-1 text-[10px] sm:text-[11px] uppercase tracking-widest text-gray-400">
-        {time.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}
-      </p>
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+      style={{ background: color }}
+    >
+      {initials}
     </div>
   );
 }
 
-function StatCard({ icon, label, value, sub, accentColor }) {
+function EmptyState({ text }) {
   return (
-    <div className="bg-white border rounded-2xl p-2.5 sm:p-3 flex flex-col gap-1.5 sm:gap-2" style={{ borderColor: accentColor + "40" }}>
-      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center text-xs sm:text-sm" style={{ background: accentColor + "15", color: accentColor }}>
+    <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
+      <span className="text-3xl">📍</span>
+      <p className="text-[13px] text-gray-400">{text}</p>
+    </div>
+  );
+}
+
+function PersonMeta({ p }) {
+  return (
+    <div className="min-w-0">
+      <p className="m-0 font-semibold text-[13px] text-gray-900 truncate">{p.name || "Unknown"}</p>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 mt-0.5">
+        <span className="flex items-center gap-1 text-[10.5px] text-gray-400">
+          <FaIdCard size={9} /> {p.empid || "—"}
+        </span>
+        <span className="flex items-center gap-1 text-[10.5px] text-gray-400 truncate max-w-[180px]">
+          <FaEnvelope size={9} /> {p.email || "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Resolves which status pill to show for a person's "Today" row.
+// Rule of thumb: "Not Checked In" is reserved ONLY for someone with no
+// checkIn timestamp at all. Anyone with a real checkIn is, by definition,
+// checked in - so from there we branch on checkOut/status instead of ever
+// falling back to "Not Checked In" again.
+function resolveTodayMeta(p) {
+  if (!p.checkIn) return STATUS_META.absent; // truly never checked in
+  if (!p.checkOut) return STATUS_META.on_duty; // checked in, still working
+  const s = (p.status || "").toLowerCase();
+  if (s === "present") return STATUS_META.present;
+  if (s.includes("half")) return STATUS_META.half_day;
+  // Checked in AND checked out, but the work session didn't meet the
+  // present/half-day bar - still "Absent" for payroll purposes, but never
+  // labeled "Not Checked In" since they demonstrably did check in.
+  return STATUS_META.absent_checked_in;
+}
+
+// Same branching as resolveTodayMeta, but returns the STATUS_META *key*
+// instead of the display object — used for the Status filter dropdown.
+function resolveTodayStatusKey(p) {
+  if (!p.checkIn) return "absent";
+  if (!p.checkOut) return "on_duty";
+  const s = (p.status || "").toLowerCase();
+  if (s === "present") return "present";
+  if (s.includes("half")) return "half_day";
+  return "absent_checked_in";
+}
+
+function StatChip({ icon, label, value, color, bg }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[110px]" style={{ background: bg }}>
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] flex-shrink-0" style={{ background: `${color}22`, color }}>
         {icon}
       </div>
-      <div>
-        <p className="m-0 font-bold text-xs sm:text-sm text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{value}</p>
-        <p className="mt-0.5 text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wide">{label}</p>
-        {sub && <p className="mt-0.5 text-[9px] sm:text-[10px] text-gray-400">{sub}</p>}
+      <div className="min-w-0">
+        <p className="m-0 text-[15px] font-bold leading-none" style={{ color }}>{value}</p>
+        <p className="m-0 mt-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-gray-400 truncate">{label}</p>
       </div>
     </div>
   );
 }
 
-function SessionItem({ label, value, accentColor }) {
+function FilterSelect({ value, onChange, options, className = "" }) {
   return (
-    <div className="bg-gray-50 rounded-xl p-2 sm:p-2.5 border border-gray-100">
-      <p className="m-0 text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="mt-1 text-[11px] sm:text-[12px] font-semibold truncate" style={{ color: accentColor ?? "#111827", fontFamily: "'JetBrains Mono', monospace" }}>
-        {value || "—"}
-      </p>
-    </div>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none bg-white ${className}`}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
   );
 }
 
-function AlreadyDoneScreen({ attendance, onClose }) {
-  const statusColor =
-    attendance?.status === "present"  ? "#16A34A" :
-    attendance?.status === "half_day" ? "#D97706" : "#DC2626";
-  const statusLabel =
-    attendance?.status === "present"  ? "Present ✓" :
-    attendance?.status === "half_day" ? "Half Day" : "Absent";
-
-  const active  = attendance?.activeMinutes ?? 0;
-  const idle    = attendance?.idleMinutes   ?? 0;
-  const total   = active + idle;
-  const pct     = total > 0 ? Math.round((active / total) * 100) : 0;
-  const activeH = Math.floor(active / 60);
-  const activeM = active % 60;
-  const activeStr = activeH > 0 ? `${activeH}h ${activeM}m` : `${activeM}m`;
-
+function TodayRow({ p }) {
+  const meta = resolveTodayMeta(p);
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-3 sm:gap-4 shadow-sm text-center">
-      <div className="text-4xl sm:text-5xl">✅</div>
-      <div>
-        <h2 className="m-0 text-lg sm:text-xl font-bold text-gray-900">Attendance Complete</h2>
-        <p className="mt-1.5 text-xs sm:text-[13px] text-gray-500">Your attendance has been recorded for today.</p>
-      </div>
-      {attendance?.status && (
-        <span className="text-xs sm:text-sm font-bold rounded-full px-4 sm:px-6 py-1.5 sm:py-2 border" style={{ background: statusColor + "18", color: statusColor, borderColor: statusColor + "30" }}>
-          {statusLabel}
+    <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
+      <td className="py-2.5 pl-3 pr-2">
+        <div className="flex items-center gap-2.5">
+          <Avatar name={p.name} role={p.role} />
+          <PersonMeta p={p} />
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 capitalize">{p.role}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600">
+        <div className="flex items-center gap-1">
+          <FaUserTie size={9} className="text-gray-300 flex-shrink-0" />
+          <span className="truncate max-w-[140px]">{p.reportingManager || "—"}</span>
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600">
+        <div className="flex items-center gap-1">
+          <FaMapMarkerAlt size={9} className="text-gray-300 flex-shrink-0" />
+          <span className="truncate max-w-[130px]">{p.office_location || "—"}</span>
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono">{fmtTime(p.checkIn)}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono">{fmtTime(p.checkOut)}</td>
+      <td className="py-2.5 px-2">
+        <span
+          className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
+          style={{ color: meta.color, background: meta.bg }}
+        >
+          {meta.label}
         </span>
-      )}
-      {attendance && (
-        <>
-          <div className="flex gap-1.5 justify-center flex-wrap w-full">
-            <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
-              {attendance.source === "face" ? "🤳 Checked in via Face Attendance" : "📍 Checked in via System"}
-              {attendance.checkInGate ? ` · ${attendance.checkInGate}` : ""}
-            </span>
-            {attendance.checkOut && (
-              <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
-                {attendance.autoCheckedOut
-                  ? "⏱️ Auto checked-out (overtime limit reached)"
-                  : attendance.source === "face"
-                    ? "🤳 Checked out via Face Attendance"
-                    : "📍 Checked out via System"}
-                {attendance.checkOutGate ? ` · ${attendance.checkOutGate}` : ""}
-              </span>
-            )}
-            {(attendance.checkoutRemark === "overtime" || attendance.checkoutRemark === "auto_overtime") && attendance.overtimeMinutes > 0 && (
-              <span className="text-[10px] sm:text-[11px] font-semibold rounded-full px-2.5 sm:px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700">
-                ⏰ Overtime · {Math.floor(attendance.overtimeMinutes / 60) > 0 ? `${Math.floor(attendance.overtimeMinutes / 60)}h ` : ""}{attendance.overtimeMinutes % 60}m
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2 sm:gap-2.5 justify-center flex-wrap w-full">
-            <div className="flex items-center gap-2 sm:gap-2.5 bg-green-50 border border-green-200 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
-              <span>🟢</span>
-              <div className="text-left">
-                <p className="m-0 text-xs sm:text-sm font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(attendance.checkIn)}</p>
-                <p className="mt-0.5 text-[9px] sm:text-[10px] text-gray-400">Check-in</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-2.5 bg-red-50 border border-red-200 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
-              <span>🔴</span>
-              <div className="text-left">
-                <p className="m-0 text-xs sm:text-sm font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatTime(attendance.checkOut)}</p>
-                <p className="mt-0.5 text-[9px] sm:text-[10px] text-gray-400">Check-out</p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 sm:gap-2.5 w-full">
-            {[
-              { label: "Active", value: activeStr, color: "#16A34A" },
-              { label: "Idle",   value: `${idle}m`, color: "#9CA3AF" },
-              { label: "Score",  value: `${pct}%`,  color: statusColor },
-            ].map((s) => (
-              <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 sm:p-3 text-center">
-                <p className="m-0 text-base sm:text-lg font-bold" style={{ color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
-                <p className="mt-1 text-[10px] sm:text-[11px] text-gray-400">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      <button
-        onClick={onClose}
-        className="w-full bg-gray-50 text-gray-600 border border-gray-200 rounded-2xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors"
-      >
-        Close
-      </button>
-    </div>
+      </td>
+      <td className="py-2.5 pr-3 pl-2 text-[11px] text-gray-400 whitespace-nowrap">
+        {p.source === "face" ? "🤳 Face" : p.source === "live" ? "📍 System" : "—"}
+      </td>
+    </tr>
   );
 }
 
-export default function AttendanceModal({ user, roleMeta, onClose }) {
-  const { data: todayData } = useTodayAttendance();
-  const tracker = useAttendanceTracker();
-  const {
-    isCheckedIn, checkInTime,
-    activeMinutes, idleMinutes, totalMinutes, activePercent, productivityStatus,
-    activityStatus, elapsedTime,
-    showStillWorking, lastPingResult,
-    isLoading, error,
-    handleCheckin, handleCheckout, confirmStillWorking, clearError,
-  } = tracker;
+function MonthlyRow({ p, onHistoryClick }) {
+  const pct = p.attendancePercent ?? 0;
+  const pctColor = pct >= 90 ? "#16A34A" : pct >= 70 ? "#D97706" : "#DC2626";
+  return (
+    <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
+      <td className="py-2.5 pl-3 pr-2">
+        <div className="flex items-center gap-2.5">
+          <Avatar name={p.name} role={p.role} />
+          <PersonMeta p={p} />
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 capitalize">{p.role}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600">
+        <div className="flex items-center gap-1">
+          <FaUserTie size={9} className="text-gray-300 flex-shrink-0" />
+          <span className="truncate max-w-[140px]">{p.reportingManager || "—"}</span>
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600">
+        <div className="flex items-center gap-1">
+          <FaMapMarkerAlt size={9} className="text-gray-300 flex-shrink-0" />
+          <span className="truncate max-w-[130px]">{p.office_location || "—"}</span>
+        </div>
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-green-700 font-semibold">{p.presentDays}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-amber-700 font-semibold">{p.halfDays}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
+      <td className="py-2.5 px-2">
+        <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
+          {pct}%
+        </span>
+      </td>
+      <td className="py-2.5 pr-3 pl-2">
+        <button
+          type="button"
+          onClick={() => onHistoryClick?.(p)}
+          className="flex items-center gap-1 text-[10.5px] font-semibold rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors"
+          style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+        >
+          <FaClock size={9} /> History
+        </button>
+      </td>
+    </tr>
+  );
+}
 
-  const [showSelfie,      setShowSelfie]      = useState(false);
-  const [checkoutConfirm, setCheckoutConfirm] = useState(false);
-  const [checkoutResult,  setCheckoutResult]  = useState(null);
-  const [locationError,   setLocationError]   = useState("");
+/**
+ * Attendance Details modal - opened from the Live Attendance Map card on
+ * the admin / superadmin dashboards. Two tabs: Today (live check-in status)
+ * and Monthly (rolled-up AttendanceSummary counts for a picked month/year).
+ *
+ * `useOverviewHook` must be the role-specific hook
+ * (useGetAttendanceOverview from adminother.hook.js or suother.hook.js) -
+ * passed in so this component stays shared between both dashboards.
+ */
+export default function AttendanceDetailsModal({ open, onClose, useOverviewHook, useHistoryHook, fetchHistory }) {
+  const [tab, setTab] = useState("today");
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all"); // today tab only
+  const [sourceFilter, setSourceFilter] = useState("all"); // today tab only
+  const [historyModal, setHistoryModal] = useState({ open: false, person: null });
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
 
-  const startCheckin = useCallback(() => {
-    setLocationError("");
-    clearError();
-    if (!navigator.geolocation) { setLocationError("Geolocation not supported."); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        window._pendingLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setShowSelfie(true);
-      },
-      (err) => setLocationError(err.code === 1 ? "Location permission denied." : "Could not get location."),
-      { timeout: 10_000, maximumAge: 60_000 }
-    );
-  }, [clearError]);
+  // Bulk attendance history — opens AttendanceBulkHistoryModal, which pulls
+  // day-wise history (7/15/30/custom range) for every currently filtered
+  // employee at once and lets the admin/manager export it all as one CSV.
+  const [bulkHistoryOpen, setBulkHistoryOpen] = useState(false);
 
-  const onSelfieCapture = useCallback(async (base64) => {
-    setShowSelfie(false);
-    const loc = window._pendingLocation ?? { latitude: 0, longitude: 0 };
-    try { await handleCheckin({ ...loc, selfie: base64 }); } catch (_) {}
-    delete window._pendingLocation;
-  }, [handleCheckin]);
+  const todayQuery = useOverviewHook(
+    { type: "today" },
+    { enabled: open && tab === "today" }
+  );
+  const monthlyQuery = useOverviewHook(
+    { type: "monthly", month, year },
+    { enabled: open && tab === "monthly" }
+  );
 
-  const onSelfieCancel = useCallback(async () => {
-    setShowSelfie(false);
-    const loc = window._pendingLocation ?? { latitude: 0, longitude: 0 };
-    try { await handleCheckin({ ...loc, selfie: null }); } catch (_) {}
-    delete window._pendingLocation;
-  }, [handleCheckin]);
+  const activeQuery = tab === "today" ? todayQuery : monthlyQuery;
+  // Resigned/fired/terminated employees must never show up here - filter
+  // them out before any search/filter/stat logic below even sees them.
+  const rows = filterActiveOnly(activeQuery.data?.data ?? []);
 
-  const doCheckout = useCallback(async () => {
-    setCheckoutConfirm(false);
-    try { const r = await handleCheckout(); setCheckoutResult(r); } catch (_) {}
-  }, [handleCheckout]);
+  const STATUS_FILTER_OPTIONS = [
+    { value: "all", label: "All Status" },
+    { value: "present", label: "Present" },
+    { value: "on_duty", label: "On Duty" },
+    { value: "half_day", label: "Half Day" },
+    { value: "absent_checked_in", label: "Absent (Checked In)" },
+    { value: "absent", label: "Not Checked In" },
+  ];
 
-  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const prodColor = productivityStatus === "High" ? "#16A34A" : productivityStatus === "Medium" ? "#D97706" : "#DC2626";
-  const actColor  = activityStatus === "active" ? "#16A34A" : "#9CA3AF";
+  const SOURCE_FILTER_OPTIONS = [
+    { value: "all", label: "All Sources" },
+    { value: "face", label: "🤳 Face" },
+    { value: "live", label: "📍 System" },
+  ];
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((p) => {
+      if (q) {
+        const matches =
+          p.name?.toLowerCase().includes(q) ||
+          p.empid?.toLowerCase().includes(q) ||
+          p.email?.toLowerCase().includes(q) ||
+          p.office_location?.toLowerCase().includes(q) ||
+          p.reportingManager?.toLowerCase().includes(q);
+        if (!matches) return false;
+      }
+      if (roleFilter !== "all" && p.role !== roleFilter) return false;
+      if (deptFilter !== "all" && p.department !== deptFilter) return false;
+      if (tab === "today") {
+        if (statusFilter !== "all" && resolveTodayStatusKey(p) !== statusFilter) return false;
+        if (sourceFilter !== "all" && p.source !== sourceFilter) return false;
+      }
+      return true;
+    });
+  }, [rows, search, roleFilter, deptFilter, statusFilter, sourceFilter, tab]);
+
+  // Quick counts for the stat strip — always computed off the currently
+  // filtered set so the numbers match what's actually visible below.
+  const todayStats = useMemo(() => {
+    if (tab !== "today") return null;
+    const acc = { present: 0, onDuty: 0, absentCheckedIn: 0, notCheckedIn: 0 };
+    filtered.forEach((p) => {
+      const key = resolveTodayStatusKey(p);
+      if (key === "present" || key === "half_day") acc.present += 1;
+      else if (key === "on_duty") acc.onDuty += 1;
+      else if (key === "absent_checked_in") acc.absentCheckedIn += 1;
+      else acc.notCheckedIn += 1;
+    });
+    return acc;
+  }, [filtered, tab]);
+
+  const monthlyStats = useMemo(() => {
+    if (tab !== "monthly") return null;
+    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalHours: "0h 0m" };
+    const totalPresent = filtered.reduce((s, p) => s + (p.presentDays || 0), 0);
+    const totalAbsent = filtered.reduce((s, p) => s + (p.absentDays || 0), 0);
+    const totalMins = filtered.reduce((s, p) => s + (p.totalWorkingMinutes || 0), 0);
+    const avgPercent = Math.round(filtered.reduce((s, p) => s + (p.attendancePercent || 0), 0) / filtered.length);
+    return { avgPercent, totalPresent, totalAbsent, totalHours: fmtMinutes(totalMins) };
+  }, [filtered, tab]);
+
+  const exportCsv = () => {
+    const stamp = tab === "today" ? new Date().toISOString().slice(0, 10) : `${year}-${String(month).padStart(2, "0")}`;
+    if (tab === "today") {
+      downloadCsv(
+        `attendance-today-${stamp}.csv`,
+        [
+          { key: "name", label: "Employee" },
+          { key: "empid", label: "Emp ID" },
+          { key: "email", label: "Email" },
+          { key: "role", label: "Role" },
+          { key: "department", label: "Department", format: (r) => getDeptFullForm(r.department) },
+          { key: "reportingManager", label: "Reporting Manager" },
+          { key: "office_location", label: "Office Location" },
+          { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+          { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+          { key: "status", label: "Status", format: (r) => resolveTodayMeta(r).label },
+          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "live" ? "System" : "—") },
+          { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+          { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        ],
+        filtered
+      );
+    } else {
+      downloadCsv(
+        `attendance-monthly-${stamp}.csv`,
+        [
+          { key: "name", label: "Employee" },
+          { key: "empid", label: "Emp ID" },
+          { key: "email", label: "Email" },
+          { key: "role", label: "Role" },
+          { key: "department", label: "Department", format: (r) => getDeptFullForm(r.department) },
+          { key: "reportingManager", label: "Reporting Manager" },
+          { key: "office_location", label: "Office Location" },
+          { key: "presentDays", label: "Present Days" },
+          { key: "halfDays", label: "Half Days" },
+          { key: "absentDays", label: "Absent Days" },
+          { key: "weekOffHolidayDays", label: "Weekoff/Holiday Days" },
+          { key: "totalWorkingMinutes", label: "Total Hours", format: (r) => fmtMinutes(r.totalWorkingMinutes) },
+          { key: "attendancePercent", label: "Attendance %", format: (r) => `${r.attendancePercent ?? 0}%` },
+        ],
+        filtered
+      );
+    }
+  };
+
+  if (!open) return null;
+
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <>
+    <div
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-6"
+      style={{ background: "rgba(20,10,15,0.55)" }}
+      onClick={onClose}
+    >
       <div
-        className="bg-[#f9f8f2] w-full max-w-lg rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col my-2 sm:my-0 max-h-[95vh]"
-        style={{ fontFamily: "'Sora', sans-serif" }}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[#ede5e0] flex-shrink-0">
-          <div className="flex items-baseline gap-0">
-            <span className="text-[18px] sm:text-[20px] font-bold text-gray-900 tracking-tight">Torch</span>
-            <span className="text-[18px] sm:text-[20px] font-extrabold text-[#730042] tracking-tight">X</span>
-            <span className="text-[8px] sm:text-[9px] font-semibold text-gray-400 tracking-[2px] sm:tracking-[3px] ml-1.5 self-end pb-0.5">ATTENDANCE</span>
+        <div
+          className="px-4 sm:px-6 py-4 flex items-center justify-between gap-3 text-white flex-shrink-0"
+          style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
+        >
+          <div className="min-w-0">
+            <h2 className="m-0 text-base sm:text-lg font-bold flex items-center gap-2">
+              <FaMapMarkerAlt size={15} /> Attendance Details
+            </h2>
+            <p className="m-0 mt-0.5 text-[11px] sm:text-[12px] text-white/75">
+              Full team check-in status and monthly attendance summary
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 bg-white border border-[#ede5e0] text-gray-500 rounded-lg flex items-center justify-center cursor-pointer text-sm hover:bg-gray-50 transition-colors flex-shrink-0"
+            className="w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/25 transition-colors"
           >
-            ✕
+            <FaTimes size={13} />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-4 sm:px-5 py-4 sm:py-5 flex flex-col gap-3 sm:gap-4">
-
-          {checkoutResult ? (
-            (() => {
-              const sc = checkoutResult.status === "present" ? "#16A34A" : checkoutResult.status === "half_day" ? "#D97706" : "#DC2626";
-              const sl = checkoutResult.status === "present" ? "Present ✓" : checkoutResult.status === "half_day" ? "Half Day" : "Absent";
-              const am = checkoutResult.activeMinutes ?? 0;
-              const im = checkoutResult.idleMinutes ?? 0;
-              const score = am + im > 0 ? Math.round((am / (am + im)) * 100) : 0;
-              return (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-3 sm:gap-4 shadow-sm text-center">
-                  <div className="text-4xl sm:text-5xl">🏁</div>
-                  <h2 className="m-0 text-lg sm:text-xl font-bold text-gray-900">Session Complete</h2>
-                  <p className="m-0 text-xs sm:text-sm text-gray-500">{today}</p>
-                  <span className="text-xs sm:text-sm font-bold rounded-full px-4 sm:px-6 py-1.5 sm:py-2 border" style={{ background: sc + "18", color: sc, borderColor: sc + "30" }}>{sl}</span>
-                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5 w-full">
-                    {[
-                      { label: "Active", value: `${am}m`, color: "#16A34A" },
-                      { label: "Idle",   value: `${im}m`, color: "#9CA3AF" },
-                      { label: "Score",  value: `${score}%`, color: sc },
-                    ].map((s) => (
-                      <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-xl p-2.5 sm:p-3 text-center">
-                        <p className="m-0 text-base sm:text-lg font-bold" style={{ color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p>
-                        <p className="mt-1 text-[10px] sm:text-[11px] text-gray-400">{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={onClose}
-                    className="w-full bg-gray-50 text-gray-600 border border-gray-200 rounded-2xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              );
-            })()
-          ) : todayData?.attendance?.source === "face" && !todayData?.isCheckedOut && !isCheckedIn ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-2.5 sm:gap-3 shadow-sm text-center">
-              <div className="text-4xl sm:text-5xl">🤳</div>
-              <h2 className="m-0 text-lg sm:text-xl font-bold text-gray-900">Already Checked In via Face Attendance</h2>
-              <p className="m-0 text-xs sm:text-sm text-gray-500">
-                You checked in at {formatTime(todayData.attendance.checkIn)}{todayData.attendance.checkInGate ? ` · ${todayData.attendance.checkInGate}` : ""}. Please use the Face Kiosk to check out too — this app can't act on this record.
-              </p>
+        <div className="px-4 sm:px-6 pt-3.5 flex items-center justify-between gap-3 flex-wrap border-b border-gray-100 flex-shrink-0">
+          <div className="flex gap-1.5">
+            {[
+              { key: "today", label: "Today" },
+              { key: "monthly", label: "Monthly" },
+            ].map((t) => (
               <button
-                onClick={onClose}
-                className="w-full bg-gray-50 text-gray-600 border border-gray-200 rounded-2xl py-3 font-semibold text-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="px-4 py-2 text-[13px] font-semibold rounded-t-xl transition-colors"
+                style={
+                  tab === t.key
+                    ? { color: "#730042", borderBottom: "2.5px solid #730042", background: "#fdf2f7" }
+                    : { color: "#9CA3AF", borderBottom: "2.5px solid transparent" }
+                }
               >
-                Close
+                {t.label}
               </button>
-            </div>
-          ) : todayData?.isCheckedOut && !isCheckedIn ? (
-            <AlreadyDoneScreen attendance={todayData?.attendance} onClose={onClose} />
-          ) : (
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 pb-2.5 flex-wrap">
+            {tab === "monthly" && (
+              <>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
+                >
+                  {MONTH_NAMES.map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={!filtered.length}
+              className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: "#fff", background: "#730042" }}
+            >
+              <FaDownload size={10} /> Export CSV
+            </button>
+            {fetchHistory && (
+              <button
+                type="button"
+                onClick={() => setBulkHistoryOpen(true)}
+                disabled={!filtered.length}
+                title="Day-wise check-in/out history for every listed employee, exportable as one CSV"
+                className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+              >
+                <FaUsers size={10} /> Bulk Export
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-0.5">
+            <FaFilter size={9} /> Filters
+          </span>
+          <FilterSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_OPTIONS} />
+          <FilterSelect value={deptFilter} onChange={setDeptFilter} options={DEPT_OPTIONS} />
+          {tab === "today" && (
             <>
-              {(error || locationError) && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-red-600 text-xs sm:text-[13px] flex justify-between items-center gap-2">
-                  <span>⚠ {error || locationError}</span>
-                  <button className="bg-transparent border-none text-red-600 cursor-pointer text-base p-0 flex-shrink-0" onClick={() => { clearError(); setLocationError(""); }}>✕</button>
-                </div>
-              )}
-
-              {showStillWorking && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-amber-800 text-xs sm:text-[13px] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
-                  <span>💤 You've been idle for a while. Still working?</span>
-                  <button className="bg-[#730042] text-white border-none rounded-lg px-3 py-1.5 font-bold text-[12px] cursor-pointer whitespace-nowrap w-full sm:w-auto" onClick={confirmStillWorking}>
-                    Yes, I'm Here
-                  </button>
-                </div>
-              )}
-
-              {!isCheckedIn && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 shadow-sm">
-                  <LiveClock />
-                  <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap">
-                    {["📍 Location", "📸 Selfie", "⏱ Activity tracking"].map((item) => (
-                      <span key={item} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-gray-500">{item}</span>
-                    ))}
-                  </div>
-                  <p className="m-0 text-[11px] sm:text-[12px] text-gray-400 text-center leading-relaxed">
-                    Attendance is tracked via browser activity, tab focus, and mouse/keyboard events. Activity syncs every 60 seconds automatically.
-                  </p>
-                  <button
-                    onClick={startCheckin}
-                    disabled={isLoading}
-                    className="w-full text-white border-none rounded-2xl py-3.5 sm:py-4 font-bold text-sm sm:text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:-translate-y-0.5 active:translate-y-0"
-                    style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)", boxShadow: "0 4px 18px rgba(115,0,66,0.28)" }}
-                  >
-                    {isLoading ? "Checking in…" : "🟢 Check In"}
-                  </button>
-                </div>
-              )}
-
-              {isCheckedIn && (
-                <>
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-2.5 sm:gap-3 shadow-sm">
-                    <div className="relative w-[150px] h-[150px] sm:w-[160px] sm:h-[160px] flex items-center justify-center">
-                      <ArcGauge percent={activePercent} color={prodColor} />
-                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <p className="m-0 text-xl sm:text-2xl font-bold text-gray-900" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{elapsedTime}</p>
-                        <p className="mt-1 text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-400">Session Time</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-[12px] sm:text-[13px] font-semibold border flex-wrap justify-center"
-                      style={{ background: actColor + "15", color: actColor, borderColor: actColor + "30" }}>
-                      <span className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: actColor }} />
-                      {activityStatus === "active" ? "Active" : "Idle"}
-                      {lastPingResult && (
-                        <span className="text-gray-400 font-normal text-[10px] sm:text-[11px]">· last sync {formatTime(lastPingResult.time)}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-                    <StatCard icon="⚡" label="Active"       value={`${activeMinutes}m`} sub={`${activePercent}%`}       accentColor="#16A34A" />
-                    <StatCard icon="💤" label="Idle"         value={`${idleMinutes}m`}   sub={`${100-activePercent}%`}   accentColor="#9CA3AF" />
-                    <StatCard icon="🏆" label="Productivity" value={productivityStatus}  sub={`${totalMinutes}m total`}  accentColor={prodColor} />
-                  </div>
-
-                  <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 shadow-sm">
-                    <p className="m-0 text-[10px] sm:text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Session Details</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <SessionItem label="Checked in"  value={formatTime(checkInTime)}  accentColor="#16A34A" />
-                      <SessionItem label="Active time" value={`${activeMinutes} min`}   accentColor="#16A34A" />
-                      <SessionItem label="Idle time"   value={`${idleMinutes} min`}     accentColor="#9CA3AF" />
-                      <SessionItem label="Department"  value={user?.department} />
-                      <SessionItem label="Location"    value={user?.office_location} />
-                      <SessionItem label="Designation" value={user?.designation} />
-                    </div>
-                    <div className="h-px bg-gray-100" />
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0 animate-pulse" />
-                      <span className="text-[10px] sm:text-[11px] text-gray-400 leading-relaxed">Browser activity tracking · Tab focus monitored · Syncing every 60s</span>
-                    </div>
-                  </div>
-
-                  {!checkoutConfirm ? (
-                    <button
-                      onClick={() => setCheckoutConfirm(true)}
-                      disabled={isLoading}
-                      className="w-full bg-white text-red-600 border border-red-200 rounded-2xl py-3.5 sm:py-4 font-bold text-sm sm:text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:bg-red-50 transition-colors"
-                    >
-                      🔴 Check Out
-                    </button>
-                  ) : (
-                    <div className="bg-white border border-gray-200 rounded-2xl p-3.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 shadow-sm">
-                      <p className="m-0 text-sm sm:text-[15px] font-semibold text-gray-700 text-center">Confirm check out?</p>
-                      <p className="m-0 text-[11px] sm:text-[12px] text-red-600 text-center font-medium">⚠ You cannot check in again today after this.</p>
-                      <div className="flex gap-2 sm:gap-2.5">
-                        <button onClick={() => setCheckoutConfirm(false)}
-                          className="flex-1 bg-gray-50 text-gray-500 border border-gray-200 rounded-2xl py-2.5 sm:py-3 font-semibold text-xs sm:text-sm cursor-pointer hover:bg-gray-100 transition-colors">
-                          Cancel
-                        </button>
-                        <button onClick={doCheckout} disabled={isLoading}
-                          className="flex-1 bg-white text-red-600 border border-red-200 rounded-2xl py-2.5 sm:py-3 font-bold text-xs sm:text-sm cursor-pointer disabled:opacity-50 hover:bg-red-50 transition-colors">
-                          {isLoading ? "Checking out…" : "Yes, Check Out"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+              <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+              <FilterSelect value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS} />
             </>
           )}
+          <div className="relative ml-auto">
+            <FaSearch size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name, empid, email…"
+              className="text-[12px] border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 outline-none w-[190px] focus:border-[#c499b4]"
+            />
+          </div>
+        </div>
+
+        {tab === "today" && todayStats && (
+          <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
+            <StatChip icon={<FaCheckCircle size={11} />} label="Present" value={todayStats.present} color="#16A34A" bg="#DCFCE7" />
+            <StatChip icon={<FaUserClock size={11} />} label="On Duty" value={todayStats.onDuty} color="#B8760A" bg="#FEF3C7" />
+            <StatChip icon={<FaBan size={11} />} label="Absent" value={todayStats.absentCheckedIn} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaLayerGroup size={11} />} label="Not Checked In" value={todayStats.notCheckedIn} color="#6B7280" bg="#F3F4F6" />
+          </div>
+        )}
+
+        {tab === "monthly" && monthlyStats && (
+          <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
+            <StatChip icon={<FaCheckCircle size={11} />} label="Avg Attendance" value={`${monthlyStats.avgPercent}%`} color="#16A34A" bg="#DCFCE7" />
+            <StatChip icon={<FaUserClock size={11} />} label="Total Present Days" value={monthlyStats.totalPresent} color="#0D9E6E" bg="#E8F7F1" />
+            <StatChip icon={<FaBan size={11} />} label="Total Absent Days" value={monthlyStats.totalAbsent} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaClock size={11} />} label="Total Hours" value={monthlyStats.totalHours} color="#730042" bg="#fdf2f7" />
+          </div>
+        )}
+
+        <div className="overflow-auto flex-1">
+          {activeQuery.isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-gray-400">
+              <span className="text-lg">⏳</span> Loading attendance…
+            </div>
+          ) : activeQuery.isError ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-red-500">
+              ⚠ Could not load attendance details.
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState text={rows.length ? "No matches for your filters" : "No team members found"} />
+          ) : (
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#f1f1f1]">
+                <tr>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pl-3 pr-2">Employee</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Role</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Reporting Manager</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Office Location</th>
+                  {tab === "today" ? (
+                    <>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Check-in</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Check-out</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Status</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Via</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Present</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Half Day</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Attendance %</th>
+                      <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Actions</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) =>
+                  tab === "today" ? (
+                    <TodayRow key={p.id} p={p} />
+                  ) : (
+                    <MonthlyRow
+                      key={p.id}
+                      p={p}
+                      onHistoryClick={(person) => setHistoryModal({ open: true, person })}
+                    />
+                  )
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="px-4 sm:px-6 py-2.5 border-t border-gray-100 flex items-center justify-between flex-shrink-0 bg-gray-50/60">
+          <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
+            {tab === "today" ? <FaClock size={9} /> : <FaCalendarAlt size={9} />}
+            {tab === "today"
+              ? "Live check-in status for today"
+              : `Summary for ${MONTH_NAMES[month - 1]} ${year}`}
+          </span>
+          <span className="text-[11px] text-gray-400">
+            <FaBuilding size={9} className="inline mr-1" />
+            {filtered.length} of {rows.length} shown
+          </span>
         </div>
       </div>
-
-      {showSelfie && <SelfieCapture onCapture={onSelfieCapture} onCancel={onSelfieCancel} />}
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@400;500;600;700&display=swap');
-      `}</style>
     </div>
+
+      {useHistoryHook && (
+        <AttendanceHistoryModal
+          open={historyModal.open}
+          onClose={() => setHistoryModal({ open: false, person: null })}
+          employeeId={historyModal.person?.id}
+          employeeName={historyModal.person?.name}
+          useHistoryHook={useHistoryHook}
+          people={filtered}
+          fetchHistory={fetchHistory}
+        />
+      )}
+
+      {fetchHistory && (
+        <AttendanceBulkHistoryModal
+          open={bulkHistoryOpen}
+          onClose={() => setBulkHistoryOpen(false)}
+          people={filtered}
+          fetchHistory={fetchHistory}
+        />
+      )}
+    </>
   );
 }

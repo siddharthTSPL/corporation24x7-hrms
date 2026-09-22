@@ -289,7 +289,14 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   );
 
   const activeQuery = tab === "today" ? todayQuery : monthlyQuery;
-  const rows = activeQuery.data?.data ?? [];
+
+  // Employment status gate — same convention as EmployeeTable.jsx /
+  // sudashboard.jsx (`working_status`: "working" | "resigned" | "fired" |
+  // "terminated", missing/undefined treated as "working"). Anyone whose
+  // working_status isn't "working" must never appear in this directory —
+  // no name, no attendance data — regardless of tab, filters, or search.
+  const isActiveEmployee = (p) => (p?.working_status || "working").toLowerCase() === "working";
+  const rows = (activeQuery.data?.data ?? []).filter(isActiveEmployee);
 
   const STATUS_FILTER_OPTIONS = [
     { value: "all", label: "All Status" },

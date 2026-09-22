@@ -1755,7 +1755,13 @@ function SuperAdminDashboard() {
   const presentToday = checkinData?.total ?? checkins.length;
   const stillOnDuty = checkins.filter((c) => !c.checkedOut).length;
   const admins = Array.isArray(adminsData?.admins) ? adminsData.admins : Array.isArray(adminsData) ? adminsData : [];
-  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  // Same employment-status gate used in EmployeeTable.jsx / the attendance
+  // directory: only currently-active employees (working_status === "working",
+  // missing treated as working) should ever show up here — resigned, fired
+  // or terminated employees must be excluded entirely.
+  const isActiveEmployee = (u) => (u?.working_status || "working").toLowerCase() === "working";
+  const employees = (Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [])
+    .filter(isActiveEmployee);
   const departments = Array.isArray(deptData?.departments) ? deptData.departments : [];
   const totalEmpCount = deptData?.totalEmployees ?? employees.length;
   const announcements = (Array.isArray(annRaw?.announcements) ? annRaw.announcements : Array.isArray(annRaw) ? annRaw : [])

@@ -1962,14 +1962,14 @@ const getAttendanceOverview = async (req, res, next) => {
       [req.superAdmin.f_name, req.superAdmin.l_name].filter(Boolean).join(" ") || "Superadmin";
 
     const [admins, managers, employees] = await Promise.all([
-      AdminModel.find({ organisation_id })
+    AdminModel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image")
         .lean(),
-      Managermodel.find({ organisation_id })
+     Managermodel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
         .populate({ path: "reporting_manager", select: "f_name l_name empid" })
         .lean(),
-      Usermodel.find({ organisation_id })
+     Usermodel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
         .populate({ path: "Under_manager", select: "f_name l_name empid" })
         .lean(),

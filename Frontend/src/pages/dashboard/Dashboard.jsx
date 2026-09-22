@@ -10,7 +10,7 @@ import {
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
-import AttendanceModal from "./AttendanceModal";
+import AttendanceModal from "./Attendancemodal";
 import AttendanceDetailsModal from "./AttendanceDetailsModal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
@@ -846,7 +846,13 @@ export default function Dashboard() {
     };
   }, [calMeta]);
 
-  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  // Same employment-status gate used in EmployeeTable.jsx / the attendance
+  // directory: only currently-active employees (working_status === "working",
+  // missing treated as working) should ever show up here — resigned, fired
+  // or terminated employees must be excluded entirely.
+  const isActiveEmployee = (u) => (u?.working_status || "working").toLowerCase() === "working";
+  const employees = (Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [])
+    .filter(isActiveEmployee);
   const announcements = Array.isArray(annData?.announcements) ? annData.announcements : Array.isArray(annData) ? annData : [];
   const checkins = checkinData?.checkins ?? [];
   const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];

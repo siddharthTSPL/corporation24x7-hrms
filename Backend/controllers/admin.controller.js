@@ -2988,13 +2988,13 @@ const getAttendanceOverview = async (req, res, next) => {
 
     const [managers, employees] = await Promise.all([
       teamManagerIds.length
-        ? Managermodel.find({ organisation_id, _id: { $in: teamManagerIds } })
+  ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
             .populate({ path: "reporting_manager", select: "f_name l_name empid" })
             .lean()
         : [],
-      teamManagerIds.length
-        ? Usermodel.find({ organisation_id, Under_manager: { $in: teamManagerIds } })
+     teamManagerIds.length
+  ? Usermodel.find({ organisation_id, working_status: "working", Under_manager: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
             .populate({ path: "Under_manager", select: "f_name l_name empid" })
             .lean()
