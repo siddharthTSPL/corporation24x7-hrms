@@ -1197,6 +1197,22 @@ exports.uploadVisitPhoto = async (req, res) => {
     useUniqueFileName: true,
   });
   visit.attachments = [...(visit.attachments || []), uploaded.url];
+  const lat = Number(req.body.latitude);
+  const lng = Number(req.body.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    visit.attachmentLocations = [
+      ...(visit.attachmentLocations || []),
+      {
+        url: uploaded.url,
+        latitude: lat,
+        longitude: lng,
+        accuracy: Number.isFinite(Number(req.body.accuracy))
+          ? Number(req.body.accuracy)
+          : null,
+        capturedAt: new Date(),
+      },
+    ];
+  }
   await visit.save();
   // The employee app replaces its whole in-memory `openVisit` with this
   // response (VisitPhotoUploader's onUploaded -> setOpenVisit) every time a
@@ -1382,7 +1398,7 @@ exports.getRoute = async (req, res) => {
     ],
   })
     .select(
-      "activityType customerName purpose status startLocation endLocation attachments startedAt endedAt",
+      "activityType customerName purpose status startLocation endLocation attachments attachmentLocations startedAt endedAt",
     )
     .lean();
 
@@ -1559,22 +1575,28 @@ exports.getRoute = async (req, res) => {
   }
 
   const now = new Date();
-  const totalDistanceMeters = sessions.reduce(
-    (sum, s) => sum + (s.totalDistanceMeters || 0),
-    0,
-  );
+  // The sessions query above deliberately includes sessions that start
+  // before `from` (still open from a previous day) or that are still
+  // running past `to`, so the route line on screen isn't cut off mid-walk.
+  // But the day's SUMMARY numbers must only count the slice of each
+  // session that actually falls inside [from, to) — summing the session's
+  // full lifetime here made an orphaned/multi-day-open session inflate a
+  // single day's duration, and for a still-active session that number kept
+  // growing on every refresh (since it was computed against `now`), which
+  // is exactly what looked "random" in the UI.
   const totalDurationSeconds = sessions.reduce((sum, s) => {
-    if (s.totalDurationSeconds) return sum + s.totalDurationSeconds;
-    if (s.endedAt)
-      return (
-        sum +
-        Math.max(
-          0,
-          Math.round((new Date(s.endedAt) - new Date(s.startedAt)) / 1000),
-        )
-      );
-    return sum + Math.max(0, Math.round((now - new Date(s.startedAt)) / 1000));
+    const sessionStart = new Date(s.startedAt);
+    const sessionEnd = s.endedAt ? new Date(s.endedAt) : now;
+    const clippedStart = sessionStart < from ? from : sessionStart;
+    const clippedEnd = sessionEnd > to ? to : sessionEnd;
+    return sum + Math.max(0, Math.round((clippedEnd - clippedStart) / 1000));
   }, 0);
+  // Same multi-day bleed problem applied to distance (session.totalDistanceMeters
+  // is a lifetime total). Recomputed from the day's own trusted points instead,
+  // which are already scoped to [from, to) by the query above.
+  const totalDistanceMeters = points
+    .filter((p) => !p.isMocked)
+    .reduce((sum, p) => sum + (p.distanceFromPreviousMeters || 0), 0);
   const mockedPoints = points.filter((p) => p.isMocked).length;
 
   return res.json({
