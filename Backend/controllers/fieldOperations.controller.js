@@ -1259,9 +1259,23 @@ exports.getRoute = async (req, res) => {
     $or: [{ endedAt: null }, { endedAt: { $gte: from } }],
   })
     .select(
-      "startedAt endedAt status startLocation endLocation checkIns totalDurationSeconds totalDistanceMeters geofenceExitCount",
+      "startedAt endedAt status startLocation endLocation checkIns totalDurationSeconds totalDistanceMeters geofenceExitCount lastSeenAt",
     )
     .sort({ startedAt: 1 })
+    .lean();
+
+  const visits = await FieldVisit.find({
+    organisation_id,
+    employee: employeeId,
+    attachments: { $exists: true, $not: { $size: 0 } },
+    $or: [
+      { startedAt: { $gte: from, $lt: to } },
+      { endedAt: { $gte: from, $lt: to } },
+    ],
+  })
+    .select(
+      "activityType customerName purpose status startLocation endLocation attachments startedAt endedAt",
+    )
     .lean();
 
   const sameDay = (d1, d2) =>
@@ -1460,6 +1474,7 @@ exports.getRoute = async (req, res) => {
     points,
     routePoints,
     sessions,
+    visits,
     summary: {
       totalDistanceMeters: Math.round(totalDistanceMeters),
       totalDurationSeconds,
