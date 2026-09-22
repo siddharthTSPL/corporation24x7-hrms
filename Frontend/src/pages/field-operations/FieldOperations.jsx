@@ -504,6 +504,40 @@ function RouteTrail({
   //     GPS error margin, not just a fixed distance — a jump only counts
   //     as real movement once it clears both readings' noise floor.
   const MAX_USABLE_ACCURACY_METERS = 75;
+  // Multipath reflection (very common in dense Indian cities with tall
+  // buildings) can throw a single ping 200-800m away from the phone's real
+  // position while that ping still *reports* a perfectly good accuracy
+  // number — the accuracy filter above has nothing to catch, because the
+  // point doesn't look wrong on its own. The signature is: the ping right
+  // before and the ping right after both sit close together (the phone
+  // never actually moved), but the one in between is far from both. This
+  // removes exactly that shape — a genuine walk never round-trips like
+  // this in a single ping.
+  const SPIKE_NEIGHBOR_METERS = 150; // how close prev/next must stay for it to count as "didn't move"
+  const SPIKE_JUMP_METERS = 250; // how far the middle point must be from a neighbour to count as a spike
+  const metersBetween = (a, b) => {
+    const dLat = (b.lat - a.lat) * 111320;
+    const dLon = (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+    return Math.hypot(dLat, dLon);
+  };
+  const removeSpikes = (segment) => {
+    if (segment.length < 3) return segment;
+    const out = [segment[0]];
+    for (let i = 1; i < segment.length - 1; i++) {
+      const prev = out[out.length - 1];
+      const curr = segment[i];
+      const next = segment[i + 1];
+      const prevNext = metersBetween(prev, next);
+      const prevCurr = metersBetween(prev, curr);
+      const currNext = metersBetween(curr, next);
+      const isSpike =
+        prevNext <= SPIKE_NEIGHBOR_METERS &&
+        (prevCurr >= SPIKE_JUMP_METERS || currNext >= SPIKE_JUMP_METERS);
+      if (!isSpike) out.push(curr);
+    }
+    out.push(segment[segment.length - 1]);
+    return out;
+  };
   const rawPath = useMemo(() => {
     const trusted = points.filter(
       (p) =>
@@ -530,11 +564,12 @@ function RouteTrail({
     }
     if (currentSegment.length > 0) segments.push(currentSegment);
     const simplifiedSegments = segments.map((segment) => {
-      if (segment.length < 2) return segment.map((p) => [p.lat, p.lng]);
-      const simplified = [segment[0]];
-      for (let i = 1; i < segment.length; i++) {
+      const despiked = removeSpikes(segment);
+      if (despiked.length < 2) return despiked.map((p) => [p.lat, p.lng]);
+      const simplified = [despiked[0]];
+      for (let i = 1; i < despiked.length; i++) {
         const a = simplified[simplified.length - 1];
-        const b = segment[i];
+        const b = despiked[i];
         const dLat = (b.lat - a.lat) * 111320;
         const dLon =
           (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180);
@@ -580,7 +615,12 @@ function RouteTrail({
       controller.abort();
     };
   }, [rawPath]);
-  const path = roadPath || rawPath;
+  // Normalize to one shape for FieldMap: an array of { coords, dashed }
+  // polylines. Before road-snapping resolves (or if it's unavailable),
+  // rawPath's straight-line segments are shown the same dashed way a
+  // failed OSRM chunk would be — it's the same "not an actual road match"
+  // situation, so it should look the same on the map, not solid/confident.
+  const path = roadPath || rawPath.map((coords) => ({ coords, dashed: true }));
   const markers = useMemo(() => {
     const list = [];
     sessions.forEach((session, idx) => {
