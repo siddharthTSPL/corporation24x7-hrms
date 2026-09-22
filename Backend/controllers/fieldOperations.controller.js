@@ -34,6 +34,7 @@ const {
   FIELD_CHECKPOINT_INTERVAL_MINUTES,
   FIELD_CHECKPOINT_GRACE_PERIOD_MINUTES,
   IMPLAUSIBLE_SPEED_KPH,
+  GPS_NOISE_FLOOR_METERS,
   resolveMinDurationMinutes,
 } = require("../utils/fieldWorkConstants");
 const { checkLocationPlausibility } = require("../utils/locationPlausibility.utils");
@@ -242,10 +243,23 @@ const getMovement = ({ previous, point, speedMps }) => {
       speedKph: null,
       movementStatus: "unknown",
     };
-  const distanceFromPreviousMeters = getDistance(
+  const rawDistanceMeters = getDistance(
     { latitude: previous.latitude, longitude: previous.longitude },
     { latitude: point.latitude, longitude: point.longitude },
   );
+  // A stationary phone still drifts on every fix, and each of the two fixes
+  // carries its own accuracy radius — two adjacent noisy pings can land
+  // (accuracy_a + accuracy_b) metres apart without the phone moving at all.
+  // Only count a fix-to-fix jump as real movement once it clears that
+  // floor; otherwise it was going straight into session.totalDistanceMeters
+  // as if the employee had walked it, which is what made "distance
+  // travelled" climb by hundreds of metres while someone stood still.
+  const noiseFloorMeters = Math.max(
+    GPS_NOISE_FLOOR_METERS,
+    (Number(previous.accuracy) || 0) + (Number(point.accuracy) || 0),
+  );
+  const distanceFromPreviousMeters =
+    rawDistanceMeters >= noiseFloorMeters ? rawDistanceMeters : 0;
   const elapsedSeconds = Math.max(
     1,
     (point.capturedAt - previous.capturedAt) / 1000,

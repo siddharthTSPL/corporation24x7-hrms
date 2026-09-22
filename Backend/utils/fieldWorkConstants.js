@@ -50,6 +50,18 @@ const ACTIVITY_PRIORITIES = ["low", "medium", "high"];
 // of trusting it for the live marker, distance total, or duration.
 const IMPLAUSIBLE_SPEED_KPH = 180;
 
+// ── GPS noise floor for distance accumulation ──────────────────────────────
+// A phone standing perfectly still still reports a new coordinate on every
+// fix — drift of 5-100m even with good signal, occasionally spiking past
+// that indoors/urban-canyon. getMovement() used to add the raw distance
+// between every consecutive pair of fixes straight into
+// session.totalDistanceMeters, so an employee who never moved could watch
+// their "distance travelled" climb by hundreds of metres an hour. This
+// mirrors the frontend's own trail-simplification floor (25m) so the number
+// shown for "distance travelled" agrees with what the drawn trail treats as
+// real movement, instead of the two disagreeing.
+const GPS_NOISE_FLOOR_METERS = 25;
+
 function resolveMinDurationMinutes(activityType, overrides = {}) {
   const key = ACTIVITY_TYPES.includes(activityType) ? activityType : "other";
   const overrideValue = Number(overrides?.[key]);
@@ -69,4 +81,5 @@ module.exports = {
   ACTIVITY_PRIORITIES,
   resolveMinDurationMinutes,
   IMPLAUSIBLE_SPEED_KPH,
+  GPS_NOISE_FLOOR_METERS,
 };

@@ -475,7 +475,12 @@ function RouteTrail({
   onDateChange,
   big = false,
 }) {
-  const { data, isLoading } = useFieldRoute(employeeId, date);
+  const { data, isLoading } = useFieldRoute(
+    employeeId,
+    date,
+    undefined,
+    !date,
+  );
   const gpsPoints = data?.points || [];
   // routePoints includes both automatic GPS samples and manual face
   // check-ins, in the exact order they were captured. Fall back to `points`
