@@ -46,8 +46,10 @@ export const useFieldOverview = (enabled, filters = {}) => {
     queryFn: () => getFieldOverview(filters),
     enabled,
     staleTime: 0,
+    // Was 45s — far from "live". 10s matches the employee-side location
+    // send interval so the manager's map stays close to real time.
     refetchInterval:
-      enabled && !Object.values(filters).some(Boolean) ? 15000 : false,
+      enabled && !Object.values(filters).some(Boolean) ? 10000 : false,
     refetchOnWindowFocus: false,
   });
 };
@@ -75,12 +77,25 @@ export const useFieldSettings = (enabled) => {
   });
 };
 
+// A past date's route never changes once the day is over, so only poll
+// when looking at "today" (no explicit date, or the current date) — that's
+// the one case where an employee could still be moving and the trail
+// needs to keep drawing itself in like a live tracker.
+const isTodayRoute = (date) => {
+  if (!date) return true;
+  const today = new Date().toISOString().slice(0, 10);
+  return date === today;
+};
+
 export const useFieldRoute = (employeeId, date, enabled) => {
+  const live = isTodayRoute(date);
   return useQuery({
     queryKey: ["field-route", employeeId, date || "today"],
     queryFn: () => getFieldRoute(employeeId, date),
     enabled: Boolean(employeeId) && enabled !== false,
-    staleTime: 1000 * 20,
+    staleTime: live ? 0 : 1000 * 20,
+    refetchInterval: Boolean(employeeId) && enabled !== false && live ? 10000 : false,
+    refetchOnWindowFocus: false,
   });
 };
 
