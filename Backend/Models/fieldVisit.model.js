@@ -107,6 +107,24 @@ const fieldVisitSchema = new mongoose.Schema(
     // records/UI. New code should use `activityType` instead.
     visitType: { type: String, trim: true, maxlength: 60, default: "" },
     attachments: [{ type: String, trim: true }],
+    // Parallel array to `attachments` (matched by `url`) holding where each
+    // individual photo was actually captured. Kept separate from
+    // `attachments` itself — rather than turning it into an array of
+    // objects — so every existing reader of `attachments` (frontend +
+    // backend) keeps working unchanged on old records that predate this
+    // field. Before this, the map only had the visit's single shared
+    // start/end location to pin photos at, so every photo of a visit
+    // landed on the same spot instead of where it was actually taken.
+    attachmentLocations: [
+      {
+        _id: false,
+        url: { type: String, trim: true, required: true },
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null },
+        accuracy: { type: Number, default: null },
+        capturedAt: { type: Date, default: Date.now },
+      },
+    ],
     status: {
       type: String,
       enum: [
@@ -164,4 +182,3 @@ fieldVisitSchema.index(
 );
 
 module.exports = mongoose.model("FieldVisit", fieldVisitSchema);
-
