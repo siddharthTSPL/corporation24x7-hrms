@@ -2,6 +2,7 @@ const express = require("express");
 const managerrouter = express.Router();
 const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
+const { requirePolicyAcknowledged } = require("../middleware/auth/policyGate.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
@@ -53,7 +54,10 @@ managerrouter.get("/getattendance", managermiddleware, asyncHandler(managercontr
 managerrouter.get("/userunderme", managermiddleware, asyncHandler(managercontroller.userunderme));
 managerrouter.get("/submanagers", managermiddleware, asyncHandler(managercontroller.getSubManagers));
 
-managerrouter.post("/applyleavem", managermiddleware, asyncHandler(managercontroller.applyleavem));
+// requirePolicyAcknowledged: TorchX Policy access gate — see
+// middleware/auth/policyGate.middleware.js. Add to more write routes the
+// same way if your organisation wants broader enforcement.
+managerrouter.post("/applyleavem", managermiddleware, requirePolicyAcknowledged, asyncHandler(managercontroller.applyleavem));
 managerrouter.put("/editleavem/:id", managermiddleware, asyncHandler(managercontroller.editleavem));
 managerrouter.delete("/deleteleavem/:id", managermiddleware, asyncHandler(managercontroller.deleteleavem));
 managerrouter.get("/getmyleaves", managermiddleware, asyncHandler(managercontroller.getmyleaves));
