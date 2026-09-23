@@ -2,6 +2,7 @@ const express = require("express");
 const userrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const employeemiddleware = require("../middleware/auth/employee.middleware");
+const { requirePolicyAcknowledged } = require("../middleware/auth/policyGate.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
@@ -82,7 +83,11 @@ userrouter.put("/changepassword", employeemiddleware, asyncHandler(changepasswor
 userrouter.get("/getOrgInfo", employeemiddleware, asyncHandler(getOrgInfo));
 userrouter.post("/sendPasswordSetupLink", employeemiddleware, asyncHandler(sendPasswordSetupLink));
 
-userrouter.post("/applyleave", employeemiddleware, asyncHandler(applyleave));
+// requirePolicyAcknowledged: TorchX Policy access gate — blocks this
+// write action until every mandatory policy assigned to this employee has
+// been acknowledged. Add the same middleware to other self-service write
+// routes the same way (see middleware/auth/policyGate.middleware.js).
+userrouter.post("/applyleave", employeemiddleware, requirePolicyAcknowledged, asyncHandler(applyleave));
 userrouter.put("/editleave/:id", employeemiddleware, asyncHandler(editleave));
 userrouter.delete("/deleteleave/:id", employeemiddleware, asyncHandler(deleteleave));
 userrouter.get("/getallleave", employeemiddleware, asyncHandler(getallleave));
