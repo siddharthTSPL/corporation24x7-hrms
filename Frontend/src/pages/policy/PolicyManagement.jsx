@@ -7,6 +7,10 @@ import {
   FaArchive,
   FaTrash,
   FaUsers,
+  FaCheckCircle,
+  FaClock,
+  FaExclamationTriangle,
+  FaLayerGroup,
 } from "react-icons/fa";
 import toast from "react-hot-toast";
 import {
@@ -67,19 +71,19 @@ export default function PolicyManagement() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="rounded-2xl bg-gradient-to-r from-[#730042] to-[#a3005f] p-5 mb-6 flex items-center justify-between flex-wrap gap-3 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#730042]/10 flex items-center justify-center text-[#730042]">
-            <FaFileContract />
+          <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center text-white">
+            <FaFileContract size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-[#1F2937]">Policy Management</h1>
-            <p className="text-sm text-gray-500">TorchX Policy — create, publish, and track acknowledgement.</p>
+            <h1 className="text-xl font-semibold text-white">TorchX Policy</h1>
+            <p className="text-sm text-white/75">Create, publish, and track acknowledgement — all in one place.</p>
           </div>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-sm rounded-lg hover:bg-[#5c0335]"
+          className="flex items-center gap-2 px-4 py-2 bg-white text-[#730042] text-sm font-medium rounded-lg hover:bg-white/90"
         >
           <FaPlus /> Create Policy
         </button>
@@ -88,14 +92,17 @@ export default function PolicyManagement() {
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Total Policies", value: summary.totalPolicies },
-            { label: "Published", value: summary.published },
-            { label: "Pending Acks", value: summary.pendingAcknowledgements },
-            { label: "Overdue", value: summary.overdue },
+            { label: "Total Policies", value: summary.totalPolicies, icon: <FaLayerGroup />, color: "text-[#730042] bg-[#730042]/10" },
+            { label: "Published", value: summary.published, icon: <FaCheckCircle />, color: "text-green-600 bg-green-50" },
+            { label: "Pending Acks", value: summary.pendingAcknowledgements, icon: <FaClock />, color: "text-amber-600 bg-amber-50" },
+            { label: "Overdue", value: summary.overdue, icon: <FaExclamationTriangle />, color: "text-red-600 bg-red-50" },
           ].map((c) => (
-            <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-2xl font-semibold text-[#1F2937]">{c.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{c.label}</p>
+            <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${c.color}`}>{c.icon}</div>
+              <div>
+                <p className="text-2xl font-semibold text-[#1F2937] leading-tight">{c.value}</p>
+                <p className="text-xs text-gray-500">{c.label}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -132,7 +139,16 @@ export default function PolicyManagement() {
               <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Loading policies...</td></tr>
             )}
             {!isLoading && policies.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No policies yet. Create your first one.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                  <FaFileContract className="mx-auto mb-2 text-2xl text-gray-300" />
+                  No policies yet.{" "}
+                  <button onClick={() => setShowCreate(true)} className="text-[#730042] font-medium hover:underline">
+                    Create your first one
+                  </button>
+                  .
+                </td>
+              </tr>
             )}
             {policies.map((p) => {
               const ack = p.ackSummary || {};
@@ -147,10 +163,16 @@ export default function PolicyManagement() {
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[p.status]}`}>{p.status}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
-                    {p.status === "published"
-                      ? `${ack.ACKNOWLEDGED || 0} acknowledged · ${(ack.PENDING || 0) + (ack.VIEWED || 0)} pending`
-                      : "-"}
+                  <td className="px-4 py-3 text-xs">
+                    {p.status === "published" ? (
+                      <span className="text-gray-600">
+                        {ack.ACKNOWLEDGED || 0} acknowledged · {(ack.PENDING || 0) + (ack.VIEWED || 0)} pending
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-amber-600">
+                        <FaExclamationTriangle size={11} /> Publish to enable
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-3 text-gray-500">
@@ -161,8 +183,12 @@ export default function PolicyManagement() {
                       )}
                       {p.status === "draft" && (
                         <>
-                          <button title="Publish" onClick={() => handlePublish(p)} className="hover:text-green-600">
-                            <FaRocket />
+                          <button
+                            title="Publish — required before employees see the Acknowledge option"
+                            onClick={() => handlePublish(p)}
+                            className="flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-700"
+                          >
+                            <FaRocket /> Publish
                           </button>
                           <button title="Delete draft" onClick={() => handleDelete(p)} className="hover:text-red-600">
                             <FaTrash />

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { FaTimes, FaFilePdf, FaImages, FaUpload } from "react-icons/fa";
+import { FaTimes, FaFilePdf, FaImages, FaUpload, FaFileContract, FaBolt, FaInfoCircle } from "react-icons/fa";
 import toast from "react-hot-toast";
-import { useCreatePolicy } from "../../auth/server-state/policy/policy.hook";
+import { useCreatePolicy, usePublishPolicy } from "../../auth/server-state/policy/policy.hook";
 
 const CATEGORY_OPTIONS = [
   "General",
@@ -26,6 +26,13 @@ const ROLE_OPTIONS = [
 
 export default function CreatePolicyModal({ onClose }) {
   const { mutate: createPolicy, isPending } = useCreatePolicy();
+  const { mutate: publishPolicy, isPending: isPublishing } = usePublishPolicy();
+
+  // Every policy is saved as a draft first (so you can double-check it),
+  // but a draft is invisible to employees — nobody sees an "Acknowledge"
+  // option until it's published. Default this ON so the common case
+  // ("I created a policy, why can't anyone acknowledge it?") just works.
+  const [publishNow, setPublishNow] = useState(true);
 
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
@@ -75,8 +82,25 @@ export default function CreatePolicyModal({ onClose }) {
         imageFiles,
       },
       {
-        onSuccess: () => {
-          toast.success("Policy created as draft. Publish it when ready.");
+        onSuccess: (res) => {
+          const newPolicyId = res?.policy?._id;
+          if (publishNow && newPolicyId) {
+            publishPolicy(
+              { id: newPolicyId },
+              {
+                onSuccess: () => {
+                  toast.success(`"${title}" is live — employees can now acknowledge it.`);
+                  onClose();
+                },
+                onError: (err) => {
+                  toast.error(err?.response?.data?.message || "Saved as draft, but publishing failed. Publish it from the list.");
+                  onClose();
+                },
+              }
+            );
+            return;
+          }
+          toast.success('Saved as draft. Click the ⚡ Publish icon in the list for the acknowledge option to appear.');
           onClose();
         },
         onError: (err) => toast.error(err?.response?.data?.message || "Could not create policy"),
@@ -90,8 +114,16 @@ export default function CreatePolicyModal({ onClose }) {
         onSubmit={handleSubmit}
         className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="font-semibold text-[#1F2937]">Create Policy</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#730042] to-[#a3005f] flex items-center justify-center text-white">
+              <FaFileContract size={14} />
+            </div>
+            <div>
+              <h2 className="font-semibold text-[#1F2937] leading-tight">Create TorchX Policy</h2>
+              <p className="text-xs text-gray-400">Fill in the details, attach the document, and publish.</p>
+            </div>
+          </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <FaTimes />
           </button>
@@ -226,42 +258,77 @@ export default function CreatePolicyModal({ onClose }) {
             )}
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-gray-100 p-4">
-            <div>
-              <p className="text-sm font-medium text-[#1F2937]">Require acknowledgement</p>
-              <p className="text-xs text-gray-500">Blocks HRMS access (for mandatory policies) until acknowledged.</p>
+          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[#1F2937]">Require acknowledgement</p>
+                <p className="text-xs text-gray-500">Employees must tick "I have read and understood" before it counts.</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={acknowledgementRequired}
+                onChange={(e) => setAcknowledgementRequired(e.target.checked)}
+                className="accent-[#730042] w-4 h-4"
+              />
             </div>
+
+            {acknowledgementRequired && (
+              <div>
+                <label className="text-sm text-gray-600">Grace period (days, optional)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={deadlineDays}
+                  onChange={(e) => setDeadlineDays(e.target.value)}
+                  className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  placeholder="e.g. 7"
+                />
+              </div>
+            )}
+          </div>
+
+          <div
+            className={`rounded-xl border p-4 flex items-start gap-3 ${
+              publishNow ? "border-green-200 bg-green-50/60" : "border-amber-200 bg-amber-50/60"
+            }`}
+          >
             <input
               type="checkbox"
-              checked={acknowledgementRequired}
-              onChange={(e) => setAcknowledgementRequired(e.target.checked)}
-              className="accent-[#730042] w-4 h-4"
+              checked={publishNow}
+              onChange={(e) => setPublishNow(e.target.checked)}
+              className="accent-[#730042] w-4 h-4 mt-0.5"
             />
+            <div className="flex-1">
+              <label className="text-sm font-medium text-[#1F2937] flex items-center gap-1.5 cursor-pointer" onClick={() => setPublishNow((v) => !v)}>
+                <FaBolt className={publishNow ? "text-green-600" : "text-amber-500"} />
+                Publish immediately
+              </label>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {publishNow
+                  ? "Goes live right away — the assigned audience will see it and can acknowledge it."
+                  : "Saved as a draft only. Nobody sees it or gets an acknowledge option until you publish it from the list."}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm text-gray-600">Grace period (days, optional)</label>
-            <input
-              type="number"
-              min="0"
-              value={deadlineDays}
-              onChange={(e) => setDeadlineDays(e.target.value)}
-              className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              placeholder="e.g. 7"
-            />
-          </div>
+          {!acknowledgementRequired && (
+            <p className="flex items-center gap-2 text-xs text-gray-500">
+              <FaInfoCircle /> With this off, employees can view the document but there's no acknowledge action.
+            </p>
+          )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg">
             Cancel
           </button>
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || isPublishing}
             className="flex items-center gap-2 px-4 py-2 bg-[#730042] text-white text-sm rounded-lg hover:bg-[#5c0335] disabled:opacity-60"
           >
-            <FaUpload /> {isPending ? "Creating..." : "Create as Draft"}
+            <FaUpload />
+            {isPending ? "Creating..." : isPublishing ? "Publishing..." : publishNow ? "Create & Publish" : "Create as Draft"}
           </button>
         </div>
       </form>
