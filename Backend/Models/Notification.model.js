@@ -15,6 +15,7 @@ const NOTIFICATION_TYPES = [
   "ticket",
   "reimbursement",
   "document",
+  "policy",
   "payroll",
   "review",
   "timesheet",
