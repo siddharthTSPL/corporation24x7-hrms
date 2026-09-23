@@ -4,7 +4,7 @@ const policyrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const anyRoleAuth = require("../middleware/auth/Anyrole.middleware");
-const { policyDocumentUpload } = require("../middleware/upload/PolicyDocument.middleware");
+const { policyDocumentUpload } = require("../middleware/auth/PolicyDocument.middleware");
 
 const {
   createPolicy,
