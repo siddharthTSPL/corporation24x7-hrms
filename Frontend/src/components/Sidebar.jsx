@@ -60,7 +60,9 @@ const superAdminMenu = [
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
   { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
+  // No "My Policies" here on purpose — a policy's audience can only be
+  // Employees / Managers / Admins (see CreatePolicyModal's ROLE_OPTIONS),
+  // never super_admin, so this page would always be empty for a superadmin.
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
 ];
 
