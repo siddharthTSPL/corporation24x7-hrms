@@ -19,14 +19,27 @@ import { FiShield, FiUsers, FiUserCheck, FiUser, FiZap, FiArrowRight } from 'rea
 // adjust kar lena (abhi ye Vector.png ke naam se uploads se liya gaya hai).
 import logo from '../assets/Vector.png'
 
-// Screenshots abhi assets me nahi hain — sab null hai, ShotFrame khud placeholder
-// dikha deta hai. Jab daalo, in 4 lines ko uncomment karo aur neeche ki
-// `= null` wali lines hata do — har feature apni screenshot yaha se le lega
-// (feature object me `shot: <variable>` add karke).
-// import searchResultShot from '../assets/guide/search-result.png'
-// import landingPageShot from '../assets/guide/landing-page.png'
-// import signInShot from '../assets/guide/signin-page.png'
-// import dashboardShot from '../assets/guide/superadmin-dashboard.png'
+// "Getting started" onboarding shots — search result se lekar SuperAdmin
+// dashboard tak. Ye seedha src/assets/ folder scan karta hai (koi alag
+// "guide" subfolder zaroori nahi) aur filename me kisi bhi diye gaye naam
+// ka match dhoondh leta hai — case-insensitive, chahe "Sign-in.png" ho ya
+// "signin-page.png".
+//
+// import.meta.glob use kar rahe hain (static `import` ki jagah) taaki agar
+// koi ek file abhi missing bhi ho to poora build/app crash na ho — jo shot
+// nahi milegi uske liye ShotFrame khud placeholder dikha dega.
+const guideShots = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
+const findShot = (...names) => {
+  for (const [path, mod] of Object.entries(guideShots)) {
+    const file = path.split('/').pop().toLowerCase()
+    if (names.some((n) => file.includes(n))) return mod
+  }
+  return undefined
+}
+const searchResultShot = findShot('search-result')
+const landingPageShot = findShot('landing-page', 'landing')
+const signInShot = findShot('signin-page', 'sign-in', 'signin')
+const dashboardShot = findShot('superadmin-dashboard', 'dashboard')
 
 // ── Design tokens ──────────────────────────────────────────────────────
 const INK = '#1B1320'
@@ -39,59 +52,78 @@ const GOLD = '#B8863B'
 const MUTED = '#8A7C85'
 
 // ── Roles + their features ──────────────────────────────────────────────
-// Har feature: id (anchor), title, desc, steps[], shot (optional — screenshot
-// variable, jab assets daalo to yaha wire kar dena, e.g. shot: dashboardShot)
+// Each feature: id (anchor), title, desc, steps[], shot (optional — the
+// screenshot variable, wired up above once the asset exists, e.g.
+// shot: dashboardShot)
 const roles = [
   {
     id: 'superadmin', label: 'SuperAdmin', icon: <FiShield />,
     tagline: 'the organisation\u2019s owner \u2014 everything sits in your hands',
     features: [
-      { id: 'sa-dashboard', title: 'Dashboard overview', desc: 'Total admins, employees, present today aur active users ek jagah dekhna.', steps: ['Sign in karte hi Dashboard automatically khulta hai.', 'Top banner par total employees, present today aur admin leaves ke live numbers dikhte hain.', '"Overview" aur "Analytics" tabs se detailed reports switch kiye ja sakte hain.'] },
-      { id: 'sa-add-admin', title: 'Add a new Admin', desc: 'Naya admin account create karna aur seat limit ke hisaab se allow/restrict karna.', steps: ['Dashboard ke top banner me "+ Add Admin" button par click karo.', 'Admin ki basic details (naam, email, department) bharo.', 'Save karte hi naye admin ko login credentials mil jaate hain \u2014 seat limit khatam hone par button disable ho jaata hai.'] },
-      { id: 'sa-organisations', title: 'Manage Organisation', desc: 'Company profile, departments aur reporting structure set karna.', steps: ['Left sidebar me "Organisations" open karo.', 'Departments, designations aur reporting hierarchy add/edit karo.', 'Changes turant sabhi employees ke org chart me reflect hote hain.'] },
-      { id: 'sa-employees', title: 'Manage all Employees', desc: 'Sabhi employees ko add, edit ya deactivate karna, roles assign karna.', steps: ['Sidebar me employee list section open karo.', 'Naya employee add karte waqt unka role select karo.', 'Kisi bhi employee ko edit ya deactivate karne ke liye row ke actions menu use karo.'] },
-      { id: 'sa-announcements', title: 'Post Announcements', desc: 'Poori company ke liye ek jagah se announcement bhejna.', steps: ['Sidebar me "Announcements" par jao.', '"New Announcement" par click karo, title aur message likho.', 'Publish karte hi sabhi employees ke portal me turant dikh jaata hai.'] },
-      { id: 'sa-reviews', title: 'Set up Performance Reviews', desc: 'Review cycles aur goals define karna, poori organisation ke liye.', steps: ['Sidebar me "Reviews" section open karo.', 'Naya review cycle create karo aur applicable departments select karo.', 'Goals/KPIs set karke cycle ko launch karo.'] },
-      { id: 'sa-assets', title: 'Asset Management', desc: 'Company assets employees ko assign aur track karna.', steps: ['Sidebar me "Asset Management" open karo.', 'Naya asset add karo ya existing asset kisi employee ko assign karo.', 'Return/damage status yahi se update hoti hai.'] },
-      { id: 'sa-settings', title: 'Organisation Settings', desc: 'Company-wide policies, leave rules aur system preferences configure karna.', steps: ['Sidebar me "Settings" open karo.', 'Leave policy, working hours ya notification preferences update karo.', 'Save karte hi changes poori organisation par apply ho jaate hain.'] },
-      { id: 'sa-documents', title: 'Company Documents', desc: 'Company-wide documents upload, organise aur access control set karna.', steps: ['Sidebar me "Documents" open karo.', 'Files upload karo aur jisko dikhana hai unhe select karo.', 'Access permissions kisi bhi waqt update kar sakte ho.'] },
-      { id: 'sa-complaints', title: 'Handle Complaints / Tickets', desc: 'Poori organisation ke complaints/tickets review aur resolve karna.', steps: ['Sidebar me "Complaints" ya "Tickets" open karo.', 'Pending ticket open karo, details padho.', 'Status update karo ya concerned admin/manager ko assign karo.'] },
-      { id: 'sa-timesheet', title: 'Review Timesheets', desc: 'Poori company ke timesheet entries verify karna.', steps: ['Sidebar me "Timesheet" open karo.', 'Department ya employee ke hisaab se filter karo.', 'Discrepancy hone par flag ya comment karo.'] },
-      { id: 'sa-management', title: 'Admin Management', desc: 'Sabhi admins ko manage karna \u2014 permissions, roles aur access control.', steps: ['Sidebar me "Management" open karo.', 'Kisi admin ki permissions ya role edit karo.', 'Zaroorat par admin ko deactivate/reactivate karo.'] },
-      { id: 'sa-payroll', title: 'Company Payroll', desc: 'Poori organisation ka payroll process aur review karna.', steps: ['Sidebar me "Payroll" open karo, month select karo.', 'Sabhi departments ka salary breakdown review karo.', '"Process Payroll" se company-wide payslips generate karo.'] },
-      { id: 'sa-reimbursement', title: 'Reimbursement Approvals', desc: 'Company-wide reimbursement/expense requests approve karna.', steps: ['Sidebar me "Reimbursement" open karo.', 'Pending requests review karo \u2014 receipts/amount check karo.', 'Approve ya reject karo, employee ko update mil jaata hai.'] },
+      { id: 'sa-search', title: 'Find TorchX Talent', desc: 'Search for TorchX Talent on Google (or any search engine) to reach the official website.', steps: ['Type "TorchX Talent" in the search bar and search.', 'The official TorchX Talent website shows up as the top result \u2014 click on it.'], shot: searchResultShot },
+      { id: 'sa-landing', title: 'Open the landing page', desc: 'The official website\u2019s landing page opens \u2014 this is where you start signing in.', steps: ['As soon as the landing page loads, you\u2019ll see TorchX Talent\u2019s features, testimonials, pricing, and about sections.', 'Click "Sign in to your Talent Account" in the top-right corner.'], shot: landingPageShot },
+      { id: 'sa-signin', title: 'Sign in to your account', desc: 'Enter your email and password to sign in to your Talent account.', steps: ['Fill in your registered email address and password.', 'Click the "Sign in" button.', 'On office kiosk/tablet devices, you can also check in without a password using "Live Attendance (Face Check-in)".'], shot: signInShot },
+      {
+        id: 'sa-dashboard', title: 'Dashboard overview',
+        desc: 'As soon as sign-in succeeds, the SuperAdmin Dashboard opens automatically \u2014 this is where all your features begin, with a live snapshot of the whole organisation right at the top.',
+        steps: [
+          'Total Admins \u2014 how many admin accounts exist and how many are currently active.',
+          'Total Employees \u2014 headcount across all departments, with the department count shown alongside.',
+          'Present Today \u2014 how many employees are checked in right now, shown as a percentage plus an on-duty count.',
+          'Admin Leaves \u2014 how many admins are on leave today, so coverage gaps are visible at a glance.',
+          'Announcements \u2014 the number of announcements currently live for the organisation.',
+          'Active Users \u2014 how many people are actively using the platform out of your total seats, with a "near limit" warning as you approach your plan\u2019s user cap.',
+          'Live Attendance Map \u2014 a real-time map of where employees are checking in from, with a link through to full Attendance Details.',
+          'The Announcements panel on the right lets you post a new update straight from the dashboard.',
+          'Switch between the "Overview" and "Analytics" tabs for deeper reports.',
+        ],
+        shot: dashboardShot,
+      },
+      { id: 'sa-add-admin', title: 'Add a new Admin', desc: 'Create a new admin account, controlled against your seat limit.', steps: ['Click "+ Add Admin" in the dashboard\u2019s top banner.', 'Fill in the admin\u2019s basic details (name, email, department).', 'Save to issue login credentials to the new admin \u2014 the button disables once your seat limit is reached.'] },
+      { id: 'sa-organisations', title: 'Manage Organisation', desc: 'Set up the company profile, departments, and reporting structure.', steps: ['Open "Organisations" in the left sidebar.', 'Add or edit departments, designations, and the reporting hierarchy.', 'Changes reflect instantly in every employee\u2019s org chart.'] },
+      { id: 'sa-employees', title: 'Manage all Employees', desc: 'Add, edit, or deactivate any employee, and assign roles.', steps: ['Open the employee list section in the sidebar.', 'Select a role when adding a new employee.', 'Use the row\u2019s actions menu to edit or deactivate any employee.'] },
+      { id: 'sa-announcements', title: 'Post Announcements', desc: 'Send a company-wide announcement from one place.', steps: ['Go to "Announcements" in the sidebar.', 'Click "New Announcement" and write a title and message.', 'Publish, and it shows up instantly on every employee\u2019s portal.'] },
+      { id: 'sa-reviews', title: 'Set up Performance Reviews', desc: 'Define review cycles and goals for the whole organisation.', steps: ['Open the "Reviews" section in the sidebar.', 'Create a new review cycle and select the applicable departments.', 'Set goals/KPIs and launch the cycle.'] },
+      { id: 'sa-assets', title: 'Asset Management', desc: 'Assign and track company assets for employees.', steps: ['Open "Asset Management" in the sidebar.', 'Add a new asset or assign an existing one to an employee.', 'Update return/damage status from the same place.'] },
+      { id: 'sa-settings', title: 'Organisation Settings', desc: 'Configure company-wide policies, leave rules, and system preferences.', steps: ['Open "Settings" in the sidebar.', 'Update leave policy, working hours, or notification preferences.', 'Save, and the changes apply across the whole organisation.'] },
+      { id: 'sa-documents', title: 'Company Documents', desc: 'Upload, organise, and set access control for company-wide documents.', steps: ['Open "Documents" in the sidebar.', 'Upload files and choose who should see them.', 'Update access permissions any time.'] },
+      { id: 'sa-complaints', title: 'Handle Complaints / Tickets', desc: 'Review and resolve complaints/tickets across the organisation.', steps: ['Open "Complaints" or "Tickets" in the sidebar.', 'Open a pending ticket and read the details.', 'Update its status or assign it to the concerned admin/manager.'] },
+      { id: 'sa-timesheet', title: 'Review Timesheets', desc: 'Verify timesheet entries across the company.', steps: ['Open "Timesheet" in the sidebar.', 'Filter by department or employee.', 'Flag or comment on any discrepancy.'] },
+      { id: 'sa-management', title: 'Admin Management', desc: 'Manage all admins \u2014 permissions, roles, and access control.', steps: ['Open "Management" in the sidebar.', 'Edit an admin\u2019s permissions or role.', 'Deactivate/reactivate an admin when needed.'] },
+      { id: 'sa-payroll', title: 'Company Payroll', desc: 'Process and review payroll for the whole organisation.', steps: ['Open "Payroll" in the sidebar and select the month.', 'Review the salary breakdown for every department.', 'Click "Process Payroll" to generate company-wide payslips.'] },
+      { id: 'sa-reimbursement', title: 'Reimbursement Approvals', desc: 'Approve company-wide reimbursement/expense requests.', steps: ['Open "Reimbursement" in the sidebar.', 'Review pending requests \u2014 check receipts and amounts.', 'Approve or reject \u2014 the employee gets notified either way.'] },
     ],
   },
   {
     id: 'admin', label: 'Admin', icon: <FiUsers />,
-    tagline: 'day-to-day operations aur team management',
+    tagline: 'day-to-day operations and team management',
     features: [
-      { id: 'ad-employees', title: 'Manage employees in your scope', desc: 'Assigned department/team ke employees add, edit ya manage karna.', steps: ['Dashboard se "Employees" section open karo.', 'Naye employee ka onboarding form fill karo.', 'Existing employee ki details edit ya update karo.'] },
-      { id: 'ad-attendance', title: 'Monitor attendance', desc: 'Geo-tag aur face attendance ke records ek jagah dekhna.', steps: ['"Attendance" tab open karo.', 'Date/employee filter laga kar records dekho.', 'Discrepancy hone par manual correction request raise karo.'] },
-      { id: 'ad-leaves', title: 'Approve leave requests', desc: 'Apni team ke leave requests review aur approve/reject karna.', steps: ['"Leaves" tab me pending requests ki list dikhti hai.', 'Request open karo, reason aur balance check karo.', 'Approve ya Reject par click karo.'] },
-      { id: 'ad-payroll', title: 'Run payroll', desc: 'Attendance aur leave data se synced payroll process karna.', steps: ['"Payroll" section open karo, applicable month select karo.', 'Auto-calculated salary breakdown review karo.', '"Process Payroll" se payslips generate ho jaate hain.'] },
-      { id: 'ad-docs', title: 'Team documentation', desc: 'Team ke documents upload, organise aur share karna.', steps: ['"Documents" tab open karo.', 'Files upload karo aur relevant employee/team se link karo.', 'Access permissions set karo.'] },
+      { id: 'ad-employees', title: 'Manage employees in your scope', desc: 'Add, edit, or manage employees in your assigned department/team.', steps: ['Open the "Employees" section from the dashboard.', 'Fill in the onboarding form for a new employee.', 'Edit or update an existing employee\u2019s details.'] },
+      { id: 'ad-attendance', title: 'Monitor attendance', desc: 'See geo-tag and face attendance records in one place.', steps: ['Open the "Attendance" tab.', 'Filter records by date or employee.', 'Raise a manual correction request if you spot a discrepancy.'] },
+      { id: 'ad-leaves', title: 'Approve leave requests', desc: 'Review and approve/reject your team\u2019s leave requests.', steps: ['Pending requests appear in the "Leaves" tab.', 'Open a request and check the reason and balance.', 'Click Approve or Reject.'] },
+      { id: 'ad-payroll', title: 'Run payroll', desc: 'Process payroll synced with attendance and leave data.', steps: ['Open the "Payroll" section and select the applicable month.', 'Review the auto-calculated salary breakdown.', 'Click "Process Payroll" to generate payslips.'] },
+      { id: 'ad-docs', title: 'Team documentation', desc: 'Upload, organise, and share your team\u2019s documents.', steps: ['Open the "Documents" tab.', 'Upload files and link them to the relevant employee/team.', 'Set access permissions.'] },
     ],
   },
   {
     id: 'manager', label: 'Manager', icon: <FiUserCheck />,
-    tagline: 'apni direct team ka roz ka kaam',
+    tagline: 'your direct team\u2019s day-to-day work',
     features: [
-      { id: 'mg-team', title: 'View your team', desc: 'Apne direct reports ki list, profile aur status dekhna.', steps: ['Dashboard par "My Team" section open karo.', 'Kisi bhi member ki profile par click karke unki attendance/leave history dekho.'] },
-      { id: 'mg-leave-approve', title: 'Approve team leave & WFH', desc: 'Apni team ke leave aur work-from-home requests approve karna.', steps: ['"Leave & WFH" tab open karo.', 'Pending requests review karo aur remarks ke saath approve/reject karo.'] },
-      { id: 'mg-reviews', title: 'Run performance reviews', desc: 'Team members ke liye review submit karna aur feedback dena.', steps: ['"Reviews" tab me assigned review cycle open karo.', 'Har team member ke liye rating aur written feedback bharo.', 'Submit karte hi SuperAdmin/Admin ko cycle summary dikhti hai.'] },
-      { id: 'mg-timesheet', title: 'Review timesheets', desc: 'Team ke daily/weekly timesheet entries verify karna.', steps: ['"Timesheet" tab open karo.', 'Har member ki logged hours check karo.', 'Discrepancy hone par comment ke saath entry ko flag karo.'] },
+      { id: 'mg-team', title: 'View your team', desc: 'See the list, profile, and status of your direct reports.', steps: ['Open the "My Team" section on the dashboard.', 'Click on a member\u2019s profile to view their attendance/leave history.'] },
+      { id: 'mg-leave-approve', title: 'Approve team leave & WFH', desc: 'Approve your team\u2019s leave and work-from-home requests.', steps: ['Open the "Leave & WFH" tab.', 'Review pending requests and approve/reject with remarks.'] },
+      { id: 'mg-reviews', title: 'Run performance reviews', desc: 'Submit reviews and give feedback for your team members.', steps: ['Open the assigned review cycle in the "Reviews" tab.', 'Fill in a rating and written feedback for each team member.', 'Submit \u2014 the SuperAdmin/Admin then sees the cycle summary.'] },
+      { id: 'mg-timesheet', title: 'Review timesheets', desc: 'Verify your team\u2019s daily/weekly timesheet entries.', steps: ['Open the "Timesheet" tab.', 'Check each member\u2019s logged hours.', 'Flag an entry with a comment if there\u2019s a discrepancy.'] },
     ],
   },
   {
     id: 'employee', label: 'Employee', icon: <FiUser />,
-    tagline: 'self-service \u2014 apna kaam khud manage karna',
+    tagline: 'self-service \u2014 manage your own work',
     features: [
-      { id: 'em-leave-apply', title: 'Apply for leave', desc: 'Kaise ek employee apni leave apply kar sakta hai.', steps: ['Sidebar me "Leave" open karo.', '"Apply Leave" par click karo, leave type aur dates select karo.', 'Reason likh kar submit karo \u2014 reporting manager ko notification chala jaata hai.', '"My Requests" me status track kar sakte ho.'] },
-      { id: 'em-attendance', title: 'Mark attendance', desc: 'Geo-tag ya face check-in se attendance mark karna.', steps: ['Sign in page par "Live Attendance (Face Check-in)" use karo, ya', 'Dashboard se "Check In" button par click karo.', 'Din khatam hone par same button se "Check Out" karo.'] },
-      { id: 'em-profile', title: 'Update your profile', desc: 'Apni personal details, contact info aur documents update karna.', steps: ['Sidebar me "My Profile" open karo.', '"Edit" par click karke details update karo.', 'Zaroori documents upload karo.'] },
-      { id: 'em-docs', title: 'Access your documents', desc: 'Payslips, offer letter aur baaki documents dekhna/download karna.', steps: ['Sidebar me "File" section open karo.', 'Required document par click karke view ya download karo.'] },
-      { id: 'em-announcements', title: 'Read announcements', desc: 'Company ke announcements aur updates dekhna.', steps: ['Sidebar me "Announcement" open karo \u2014 latest updates top par dikhte hain.'] },
+      { id: 'em-leave-apply', title: 'Apply for leave', desc: 'How an employee applies for their own leave.', steps: ['Open "Leave" in the sidebar.', 'Click "Apply Leave" and select the leave type and dates.', 'Write a reason and submit \u2014 your reporting manager gets notified.', 'Track the status in "My Requests".'] },
+      { id: 'em-attendance', title: 'Mark attendance', desc: 'Mark attendance with geo-tag or face check-in.', steps: ['Use "Live Attendance (Face Check-in)" on the sign-in page, or', 'Click "Check In" from the dashboard.', 'Use the same button to "Check Out" at the end of the day.'] },
+      { id: 'em-profile', title: 'Update your profile', desc: 'Update your personal details, contact info, and documents.', steps: ['Open "My Profile" in the sidebar.', 'Click "Edit" to update your details.', 'Upload any required documents.'] },
+      { id: 'em-docs', title: 'Access your documents', desc: 'View or download payslips, your offer letter, and other documents.', steps: ['Open the "File" section in the sidebar.', 'Click on a document to view or download it.'] },
+      { id: 'em-announcements', title: 'Read announcements', desc: 'See the company\u2019s announcements and updates.', steps: ['Open "Announcement" in the sidebar \u2014 the latest updates appear at the top.'] },
     ],
   },
 ]
