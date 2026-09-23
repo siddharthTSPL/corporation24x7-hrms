@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { FaFileContract, FaSignOutAlt, FaChevronRight, FaCheckCircle } from "react-icons/fa";
+import {
+  FaFileContract,
+  FaSignOutAlt,
+  FaChevronRight,
+  FaChevronLeft,
+  FaCheckCircle,
+  FaShieldAlt,
+} from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useLogoutManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
@@ -29,6 +36,10 @@ export default function PolicyGateScreen() {
 
   const { data, isLoading } = useMyPendingPolicies();
   const policies = data?.policies || [];
+  const total = policies.length;
+  const acknowledgedCount = policies.filter((p) => p.acknowledgement?.status === "ACKNOWLEDGED").length;
+  const progressPct = total > 0 ? Math.round((acknowledgedCount / total) * 100) : 0;
+
   const [activeIndex, setActiveIndex] = useState(0);
   const active = policies[activeIndex];
 
@@ -51,71 +62,121 @@ export default function PolicyGateScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-(--background) flex flex-col">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#fdf2f8] via-[#f8fafc] to-[#eef2ff]">
+      {/* Top bar */}
+      <header className="flex items-center justify-between px-6 sm:px-10 py-4 bg-white/80 backdrop-blur-sm border-b border-gray-100">
         <img src={TorchXTalentLogo} alt="TorchX Talent" className="h-8 w-auto object-contain" />
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#730042]"
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#730042] transition-colors"
         >
           <FaSignOutAlt /> Logout
         </button>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
-        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-sm border border-gray-100 max-h-[90vh] overflow-y-auto">
-          <div className="bg-[#730042] text-white px-6 py-5 flex items-start gap-3 sticky top-0 z-10 rounded-t-2xl">
-            <FaFileContract className="text-2xl mt-1 shrink-0" />
-            <div>
-              <h1 className="text-lg font-semibold">Action Required — Policy Acknowledgement</h1>
-              <p className="text-sm text-white/80 mt-1">
-                {policies.length > 1
-                  ? `You have ${policies.length} policies to review before continuing.`
-                  : "Please review and acknowledge this policy before continuing."}
-              </p>
+      <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-10 overflow-y-auto">
+        <div className="w-full max-w-3xl">
+          {/* Intro badge, above the card — sets a calm, official tone */}
+          <div className="flex flex-col items-center text-center mb-5">
+            <div className="w-14 h-14 rounded-2xl bg-white shadow-sm border border-[#730042]/10 flex items-center justify-center text-[#730042] mb-3">
+              <FaShieldAlt size={22} />
             </div>
+            <h1 className="text-2xl font-semibold text-[#1F2937]">Action Required</h1>
+            <p className="text-sm text-gray-500 mt-1 max-w-md">
+              {total > 1
+                ? `Please review and acknowledge ${total} policies before continuing to your dashboard.`
+                : "Please review and acknowledge this policy before continuing to your dashboard."}
+            </p>
           </div>
 
-          {policies.length > 1 && (
-            <div className="flex gap-2 px-6 pt-4 flex-wrap">
-              {policies.map((p, i) => (
-                <span
-                  key={p.policy._id}
-                  className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 ${
-                    i === activeIndex
-                      ? "bg-[#730042] text-white"
-                      : p.acknowledgement?.status === "ACKNOWLEDGED"
-                      ? "bg-green-50 text-green-600"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {p.acknowledgement?.status === "ACKNOWLEDGED" && <FaCheckCircle />}
-                  {p.policy.title}
+          {/* Progress bar, only meaningful with more than one policy */}
+          {total > 1 && (
+            <div className="mb-4 px-1">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                <span>
+                  {acknowledgedCount} of {total} acknowledged
                 </span>
-              ))}
+                <span>{progressPct}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#730042] to-[#a3005f] transition-all duration-500"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
             </div>
           )}
 
-          <div className="p-6">
-            {isLoading && <p className="text-sm text-gray-500">Loading policy...</p>}
-            {!isLoading && active && (
-              <PolicyDocumentViewer entry={active} onAcknowledged={handleAcknowledged} compact />
+          {/* Main card */}
+          <div className="w-full bg-white rounded-2xl shadow-lg shadow-[#730042]/5 border border-gray-100 max-h-[74vh] overflow-y-auto">
+            {total > 1 && (
+              <div className="flex items-center gap-2 px-6 pt-5 pb-1 flex-wrap sticky top-0 bg-white z-10">
+                {policies.map((p, i) => {
+                  const done = p.acknowledgement?.status === "ACKNOWLEDGED";
+                  const isActive = i === activeIndex;
+                  return (
+                    <button
+                      key={p.policy._id}
+                      onClick={() => setActiveIndex(i)}
+                      className={`text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 font-medium transition-colors ${
+                        isActive
+                          ? "bg-[#730042] text-white"
+                          : done
+                          ? "bg-green-50 text-green-600"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      {done && <FaCheckCircle size={11} />}
+                      {p.policy.title}
+                    </button>
+                  );
+                })}
+              </div>
             )}
-            {!isLoading && !active && policies.length === 0 && (
-              <p className="text-sm text-gray-500">Refreshing...</p>
+
+            <div className="p-6">
+              {isLoading && (
+                <div className="py-10 flex flex-col items-center gap-2 text-gray-400">
+                  <div className="w-6 h-6 rounded-full border-2 border-gray-200 border-t-[#730042] animate-spin" />
+                  <p className="text-sm">Loading policy...</p>
+                </div>
+              )}
+              {!isLoading && active && (
+                <PolicyDocumentViewer entry={active} onAcknowledged={handleAcknowledged} compact />
+              )}
+              {!isLoading && !active && policies.length === 0 && (
+                <div className="py-10 flex flex-col items-center gap-2 text-green-600">
+                  <FaCheckCircle size={22} />
+                  <p className="text-sm font-medium">All done — taking you in...</p>
+                </div>
+              )}
+            </div>
+
+            {total > 1 && (
+              <div className="px-6 pb-5 flex items-center justify-between border-t border-gray-50 pt-4">
+                <button
+                  onClick={() => setActiveIndex((i) => Math.max(i - 1, 0))}
+                  disabled={activeIndex === 0}
+                  className="flex items-center gap-1 text-sm text-gray-400 hover:text-[#730042] disabled:opacity-0 disabled:pointer-events-none transition-colors"
+                >
+                  <FaChevronLeft size={12} /> Previous
+                </button>
+                {activeIndex < policies.length - 1 && (
+                  <button
+                    onClick={() => setActiveIndex((i) => Math.min(i + 1, policies.length - 1))}
+                    className="flex items-center gap-1.5 text-sm font-medium text-[#730042] hover:text-[#5c0335] transition-colors"
+                  >
+                    Next policy <FaChevronRight size={12} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
-          {policies.length > 1 && activeIndex < policies.length - 1 && (
-            <div className="px-6 pb-6 flex justify-end">
-              <button
-                onClick={() => setActiveIndex((i) => Math.min(i + 1, policies.length - 1))}
-                className="flex items-center gap-1 text-sm text-[#730042] hover:underline"
-              >
-                Next policy <FaChevronRight />
-              </button>
-            </div>
-          )}
+          <p className="text-center text-xs text-gray-400 mt-5">
+            <FaFileContract className="inline mr-1 -mt-0.5" />
+            Having trouble? Contact your HR admin for help.
+          </p>
         </div>
       </main>
     </div>
