@@ -4031,6 +4031,26 @@ const getAttendanceOverview = async (req, res, next) => {
      teamManagerIds.length
   ? Usermodel.find({ organisation_id, working_status: "working", Under_manager: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
+=======
+        ? Managermodel.find({ organisation_id, _id: { $in: teamManagerIds } })
+            .select(
+              "empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model"
+            )
+            .populate({
+              path: "reporting_manager",
+              select: "f_name l_name empid",
+            })
+            .lean()
+        : [],
+      teamManagerIds.length
+        ? Usermodel.find({
+            organisation_id,
+            Under_manager: { $in: teamManagerIds },
+          })
+            .select(
+              "empid f_name l_name work_email role designation department office_location profile_image Under_manager"
+            )
+>>>>>>> 0c7ecd5754888576d4e9ceb531d9e459b11d66a0
             .populate({ path: "Under_manager", select: "f_name l_name empid" })
             .lean()
         : [],
