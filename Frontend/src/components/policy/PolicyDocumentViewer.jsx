@@ -73,7 +73,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
             src={version.pdfUrl}
             title={policy.title}
             className="w-full"
-            style={{ height: compact ? "min(60vh, 460px)" : "min(70vh, 640px)", border: "none" }}
+            style={{ height: compact ? 380 : 520, border: "none" }}
           />
         </div>
       )}
@@ -93,20 +93,20 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
       )}
 
       {needsAcknowledgement && !alreadyAcknowledged && (
-        <div className="rounded-xl border-2 border-[#730042]/20 bg-[#730042]/[0.04] p-4 space-y-3 sm:sticky sm:bottom-0">
+        <div className="border-t border-gray-100 pt-4 space-y-3">
           <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
             <input
               type="checkbox"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
-              className="mt-1 accent-[#730042] w-4 h-4"
+              className="mt-1 accent-[#730042]"
             />
             I have read and understood this policy.
           </label>
           <button
             onClick={handleAcknowledge}
             disabled={isPending}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-[#730042] text-white text-sm font-medium hover:bg-[#5c0335] disabled:opacity-60"
+            className="px-4 py-2 rounded-lg bg-[#730042] text-white text-sm font-medium hover:bg-[#5c0335] disabled:opacity-60"
           >
             {isPending ? "Submitting..." : "Acknowledge Policy"}
           </button>
@@ -114,8 +114,8 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
       )}
 
       {needsAcknowledgement && alreadyAcknowledged && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 flex items-center justify-between flex-wrap gap-2">
-          <span className="flex items-center gap-2 text-sm text-green-700 font-medium">
+        <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+          <span className="flex items-center gap-2 text-sm text-green-600 font-medium">
             <FaCheckCircle /> Acknowledged on{" "}
             {acknowledgement.acknowledgedAt ? new Date(acknowledgement.acknowledgedAt).toLocaleString("en-IN") : ""}
           </span>
@@ -123,7 +123,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
             href={getCertificateUrl(policy._id)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 text-xs text-[#730042] hover:underline font-medium"
+            className="flex items-center gap-1 text-xs text-[#730042] hover:underline"
           >
             <FaDownload /> Download certificate
           </a>
