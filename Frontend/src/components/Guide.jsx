@@ -5,25 +5,10 @@ import {
   FiSearch, FiMenu, FiX, FiList, FiChevronRight,
 } from 'react-icons/fi'
 
-// ── Fonts ──────────────────────────────────────────────────────────────
-// Self-contained — no tailwind.config.js edits needed. The <style> block
-// at the bottom of this file imports Fraunces (display serif) + Inter
-// (ui/body) from Google Fonts and defines .font-display / .font-ui /
-// .font-body as plain CSS classes scoped to this component.
 
-// TorchX wordmark — path yaha apne project ke assets folder ke hisaab se
-// adjust kar lena (abhi ye Vector.png ke naam se uploads se liya gaya hai).
 import logo from '../assets/Vector.png'
 
-// "Getting started" onboarding shots — search result se lekar SuperAdmin
-// dashboard tak, aur ab har role ke liye bhi. Ye seedha src/assets/ folder
-// scan karta hai (koi alag "guide" subfolder zaroori nahi) aur filename me
-// diye gaye naam ka match dhoondh leta hai — case-insensitive.
-//
-// import.meta.glob use kar rahe hain (static `import` ki jagah) taaki agar
-// koi ek file abhi missing bhi ho to poora build/app crash na ho — jo shot
-// nahi milegi uske liye ShotFrame khud placeholder dikha dega, saath me
-// bata dega ki file ka naam kya hona chahiye.
+
 const guideShots = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 const findShot = (...names) => {
   for (const [path, mod] of Object.entries(guideShots)) {
@@ -33,10 +18,7 @@ const findShot = (...names) => {
   return undefined
 }
 
-// ── Screenshot map ────────────────────────────────────────────────────
-// Every entry below is a filename (any of these substrings) that, if
-// dropped into src/assets/, will automatically slot into that step.
-// Add the real file whenever it's ready — nothing else needs to change.
+
 const shots = {
   saSearch: findShot('search.png'),
 saLanding: findShot('search-result', 'landing-page', 'landing'),
@@ -74,7 +56,7 @@ saLanding: findShot('search-result', 'landing-page', 'landing'),
 // ── Design tokens ──────────────────────────────────────────────────────
 const INK = '#1B1320'
 const PAPER = '#FCFAFB'
-const PLUM = '#730042' // matches --primary in src/index.css
+const PLUM = '#730042' 
 const PLUM_DEEP = '#4D002C'
 const BLUSH = '#F5E7EE'
 const LINE = '#E7DAE1'
