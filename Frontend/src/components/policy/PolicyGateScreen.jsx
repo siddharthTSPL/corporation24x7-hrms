@@ -7,7 +7,7 @@ import { useLogoutUser } from "../../auth/server-state/employee/employeeauth/emp
 import { useLogoutSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import { useMyPendingPolicies } from "../../auth/server-state/policy/policy.hook";
 import PolicyDocumentViewer from "./PolicyDocumentViewer";
-import TechTorchLogo from "../../assets/TechTorchLogo.png";
+import TorchXTalentLogo from "../../assets/Talent.png";
 
 // ─────────────────────────────────────────────────────────────────────────
 // TorchX Policy — Access Gate screen.
@@ -53,7 +53,7 @@ export default function PolicyGateScreen() {
   return (
     <div className="min-h-screen bg-(--background) flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
-        <img src={TechTorchLogo} alt="TorchX" className="h-8" />
+        <img src={TorchXTalentLogo} alt="TorchX Talent" className="h-8 w-auto object-contain" />
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-[#730042]"
@@ -62,9 +62,9 @@ export default function PolicyGateScreen() {
         </button>
       </header>
 
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="bg-[#730042] text-white px-6 py-5 flex items-start gap-3">
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-8 overflow-y-auto">
+        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-sm border border-gray-100 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#730042] text-white px-6 py-5 flex items-start gap-3 sticky top-0 z-10 rounded-t-2xl">
             <FaFileContract className="text-2xl mt-1 shrink-0" />
             <div>
               <h1 className="text-lg font-semibold">Action Required — Policy Acknowledgement</h1>
