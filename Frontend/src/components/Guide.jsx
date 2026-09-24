@@ -5,21 +5,9 @@ import {
   FiSearch, FiMenu, FiX, FiList, FiChevronRight, FiMapPin,
 } from 'react-icons/fi'
 
-// ── Fonts ──────────────────────────────────────────────────────────────
-// Self-contained — no tailwind.config.js edits needed. The <style> block
-// at the bottom of this file imports Fraunces (display serif) + Inter
-// (ui/body) from Google Fonts and defines .font-display / .font-ui /
-// .font-body as plain CSS classes scoped to this component.
 
-// TorchX wordmark — path yaha apne project ke assets folder ke hisaab se
-// adjust kar lena.
 import logo from '../assets/Vector.png'
 
-// Screenshots — seedha src/assets/ folder scan karta hai, koi alag
-// "guide" subfolder zaroori nahi. import.meta.glob ({ eager:true }) use
-// kar rahe hain taaki ek file missing hone par bhi build crash na ho —
-// jo shot nahi milegi uske liye ShotFrame khud placeholder dikha dega,
-// saath me exact expected filename bata dega.
 const guideShots = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 const findShot = (...names) => {
   for (const [path, mod] of Object.entries(guideShots)) {
@@ -29,12 +17,9 @@ const findShot = (...names) => {
   return undefined
 }
 
-// ── Screenshot map ────────────────────────────────────────────────────
-// Every value is a lowercase filename fragment. Drop a file containing
-// that fragment into src/assets/ and it slots in automatically — nothing
-// else in this file needs to change.
+
 const shots = {
-  // getting in (shared across roles — the sign-in screen is identical)
+ 
   saSearch: findShot('start.png'),
   saSearchResult: findShot('search.png'),
   saLanding: findShot('search-result', 'landing.png'),
@@ -120,24 +105,17 @@ const shots = {
 // ── Design tokens ──────────────────────────────────────────────────────
 const INK = '#1B1320'
 const PAPER = '#FCFAFB'
-const PLUM = '#730042' // matches --primary in src/index.css
+const PLUM = '#730042' 
 const PLUM_DEEP = '#4D002C'
 const BLUSH = '#F5E7EE'
 const LINE = '#E7DAE1'
 const GOLD = '#B8863B'
 const MUTED = '#8A7C85'
 
-// Small helper — every feature below carries an optional `badge`:
-//   'plan'      → only visible on plans that include this feature
-//   'condition' → only visible when that gate is enabled for the org/role
 const PLAN_BADGE = { label: 'Plan feature', hint: 'Only shown if your organisation\u2019s plan includes this.' }
 const COND_BADGE = { label: 'Conditional', hint: 'Only shown when this is enabled for your role.' }
 
-// `noShot: true` — feature works exactly the same way across roles, so no
-// screenshot is needed here at all. The content explains it on its own and
-// CenterPanel skips ShotFrame entirely for these (not even a placeholder
-// box shows up). Add this flag to any other feature you want to keep
-// screenshot-free — nothing else needs to change.
+
 
 const SIGNIN_STEPS = [
   { id: 'sa-search', title: 'Search for TorchX Talent', desc: 'Look up TorchX Talent on Google (or any search engine) to reach the official website.', steps: ['Type "TorchX Talent" into the search bar and hit search.'], shotKey: 'saSearch', shotName: 'search.png' },
@@ -394,17 +372,6 @@ function RoleTabs({ activeRoleId, onSelect, orientation }) {
   )
 }
 
-// ── Center panel — one continuous document for the active role ──────────
-// NOTE (fix): the IntersectionObserver-based scroll-sync now lives HERE,
-// inside CenterPanel, instead of in the parent Guide component. CenterPanel
-// is remounted (via the `key={activeRole.id}` on its AnimatePresence wrapper
-// in Guide) every time the role changes, and — because of `mode="wait"` —
-// the new CenterPanel only mounts *after* the old one's exit animation
-// finishes. Guide's own useEffect used to fire immediately on role change,
-// before the new role's <section> refs existed in the DOM, so the observer
-// silently had nothing to observe for every role except the very first one
-// rendered on load. Running this effect inside CenterPanel guarantees it
-// only ever runs once this panel's own sections are actually mounted.
 function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatureChange }) {
   const [progress, setProgress] = useState(0)
 
@@ -439,9 +406,7 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatur
       const max = scrollHeight - clientHeight
       const pct = max > 0 ? Math.min(100, (scrollTop / max) * 100) : 0
       setProgress(pct)
-      // Right at the bottom of the doc, force the last section active —
-      // the shrunk rootMargin can otherwise leave the second-to-last item
-      // highlighted once the final section is short.
+    
       if (pct > 99 && filtered.length > 0) {
         const last = filtered[filtered.length - 1]
         onActiveFeatureChange(last.id)
@@ -454,9 +419,7 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatur
       observer.disconnect()
       root.removeEventListener('scroll', onScroll)
     }
-    // Re-run whenever the visible section list changes (role switch, or a
-    // search query filtering the list) — filtered is stable per render via
-    // useMemo above, so this only re-subscribes when it actually changes.
+   
   }, [filtered, scrollRef, sectionRefs, onActiveFeatureChange])
 
   return (
@@ -533,9 +496,7 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatur
                   ))}
                 </ol>
 
-                {/* Screenshot skipped entirely (no placeholder box either) when
-                    this feature works identically across roles — mark it with
-                    `noShot: true` on the feature object above to opt out. */}
+               
                 {!f.noShot && (
                   <ShotFrame src={shots[f.shotKey]} label={f.title} fileName={f.shotName} />
                 )}
@@ -563,9 +524,6 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatur
   )
 }
 
-// ── Shortcut list — jump straight to a section in the center document ───
-// Auto-scrolls itself so the highlighted item always stays in view while
-// the center document scrolls (including all the way to the last item).
 function ShortcutList({ activeRole, activeFeatureId, onJump }) {
   const listRef = useRef(null)
   const itemRefs = useRef({})
@@ -666,13 +624,7 @@ export default function Guide() {
     }
   }, [activeRoleId, handleJump])
 
-  // NOTE (fix): the old IntersectionObserver / scroll-progress useEffect
-  // that used to live here has been removed. It ran on every role switch
-  // but fired before CenterPanel's new sections existed in the DOM (see the
-  // big comment above CenterPanel), so it never actually tracked scroll for
-  // any role beyond the one active on first mount. That logic now lives
-  // inside CenterPanel itself, which is guaranteed to mount after its own
-  // sections exist. Guide just receives the result via onActiveFeatureChange.
+
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden" style={{ background: PAPER }}>
