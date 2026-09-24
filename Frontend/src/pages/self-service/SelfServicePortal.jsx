@@ -29,33 +29,56 @@ const ROLE_LABEL = { employee: "Employee", manager: "Manager", admin: "Admin", s
 
 function StatCard({ icon, label, value, sub }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-start gap-3">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-start gap-3 min-w-0">
       <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${BRAND}1A`, color: BRAND }}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-xl font-semibold text-gray-800 truncate">{value}</p>
-        {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-500 break-words">{label}</p>
+        <p className="text-lg sm:text-xl font-semibold text-gray-800 leading-snug mt-0.5 break-words">{value}</p>
+        {sub && <p className="text-[11px] text-gray-400 mt-0.5 break-words">{sub}</p>}
       </div>
     </div>
   );
 }
 
-function ActionCard({ icon, title, blurb, onClick }) {
+function ActionCard({ icon, title, blurb, onClick, accent = BRAND }) {
   return (
     <button
       onClick={onClick}
-      className="text-left bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:border-[#730042]/40 hover:shadow-md transition-all group"
+      className="group relative text-left bg-white rounded-2xl border border-gray-100 p-4 sm:p-5
+                 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_rgba(115,0,66,0.08)]
+                 hover:border-transparent transition-all duration-200 overflow-hidden"
     >
-      <div className="flex items-center justify-between">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${BRAND}1A`, color: BRAND }}>
+      {/* subtle accent glow on hover */}
+      <span
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        style={{ background: `linear-gradient(135deg, ${accent}0D 0%, transparent 60%)` }}
+      />
+
+      <div className="relative flex items-start justify-between">
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0
+                     transition-transform duration-200 group-hover:scale-105"
+          style={{ background: `${accent}14`, color: accent }}
+        >
           {icon}
         </div>
-        <FaArrowRight className="text-gray-300 group-hover:text-[#730042] transition-colors" size={12} />
+        <span
+          className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0
+                     bg-gray-50 text-gray-300 group-hover:bg-white group-hover:text-[#730042]
+                     transition-colors duration-200"
+        >
+          <FaArrowRight size={10} />
+        </span>
       </div>
-      <p className="mt-3 text-sm font-semibold text-gray-800">{title}</p>
-      <p className="text-xs text-gray-400 mt-0.5">{blurb}</p>
+
+      <p className="relative mt-3.5 text-sm font-semibold text-gray-800 leading-tight">
+        {title}
+      </p>
+      <p className="relative mt-1 text-xs text-gray-400 leading-snug">
+        {blurb}
+      </p>
     </button>
   );
 }
@@ -257,13 +280,37 @@ export default function SelfServicePortal() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {!isOrgScope && (
-          <ActionCard icon={<FaPlus size={14} />} title="Apply Leave" blurb="Request time off" onClick={() => navigate(paths.leave)} />
+          <ActionCard
+            icon={<FaPlus size={16} />}
+            title="Apply Leave"
+            blurb="Request time off"
+            accent={PALETTE[0]}
+            onClick={() => navigate(paths.leave)}
+          />
         )}
-        <ActionCard icon={<FaFileInvoiceDollar size={14} />} title={isOrgScope ? "Reimbursements" : "Submit Claim"} blurb={isOrgScope ? "Review org claims" : "Raise an expense claim"} onClick={() => navigate(paths.reimbursement)} />
-        <ActionCard icon={<FaFolder size={14} />} title={isOrgScope ? "Documents" : "Upload Document"} blurb={isOrgScope ? "Team documents" : "Add a personal document"} onClick={() => navigate(paths.documents)} />
-        <ActionCard icon={<FaTicketAlt size={14} />} title={isOrgScope ? "TorchX Voice" : "Raise Ticket"} blurb={isOrgScope ? "Support tickets, org-wide" : "Report an issue"} onClick={() => navigate(paths.tickets)} />
+        <ActionCard
+          icon={<FaFileInvoiceDollar size={16} />}
+          title={isOrgScope ? "Reimbursements" : "Submit Claim"}
+          blurb={isOrgScope ? "Review org claims" : "Raise an expense claim"}
+          accent={PALETTE[1]}
+          onClick={() => navigate(paths.reimbursement)}
+        />
+        <ActionCard
+          icon={<FaFolder size={16} />}
+          title={isOrgScope ? "Documents" : "Upload Document"}
+          blurb={isOrgScope ? "Team documents" : "Add a personal document"}
+          accent={PALETTE[3]}
+          onClick={() => navigate(paths.documents)}
+        />
+        <ActionCard
+          icon={<FaTicketAlt size={16} />}
+          title={isOrgScope ? "TorchX Voice" : "Raise Ticket"}
+          blurb={isOrgScope ? "Support tickets, org-wide" : "Report an issue"}
+          accent={PALETTE[4]}
+          onClick={() => navigate(paths.tickets)}
+        />
       </div>
 
       {!isOrgScope ? (

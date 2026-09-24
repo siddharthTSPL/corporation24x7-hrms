@@ -4023,11 +4023,7 @@ const getAttendanceOverview = async (req, res, next) => {
 
     const [managers, employees] = await Promise.all([
       teamManagerIds.length
-<<<<<<< HEAD
 ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
-=======
-  ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
->>>>>>> da59264a504e9d6c78d783419b6e429f0f098ad7
             .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
             .populate({ path: "reporting_manager", select: "f_name l_name empid" })
             .lean()

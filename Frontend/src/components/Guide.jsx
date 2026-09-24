@@ -2,13 +2,24 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FiShield, FiUsers, FiUserCheck, FiUser, FiZap, FiArrowRight,
-  FiSearch, FiMenu, FiX, FiList, FiChevronRight,
+  FiSearch, FiMenu, FiX, FiList, FiChevronRight, FiMapPin,
 } from 'react-icons/fi'
 
+// ── Fonts ──────────────────────────────────────────────────────────────
+// Self-contained — no tailwind.config.js edits needed. The <style> block
+// at the bottom of this file imports Fraunces (display serif) + Inter
+// (ui/body) from Google Fonts and defines .font-display / .font-ui /
+// .font-body as plain CSS classes scoped to this component.
 
+// TorchX wordmark — path yaha apne project ke assets folder ke hisaab se
+// adjust kar lena.
 import logo from '../assets/Vector.png'
 
-
+// Screenshots — seedha src/assets/ folder scan karta hai, koi alag
+// "guide" subfolder zaroori nahi. import.meta.glob ({ eager:true }) use
+// kar rahe hain taaki ek file missing hone par bhi build crash na ho —
+// jo shot nahi milegi uske liye ShotFrame khud placeholder dikha dega,
+// saath me exact expected filename bata dega.
 const guideShots = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
 const findShot = (...names) => {
   for (const [path, mod] of Object.entries(guideShots)) {
@@ -18,121 +29,256 @@ const findShot = (...names) => {
   return undefined
 }
 
-
+// ── Screenshot map ────────────────────────────────────────────────────
+// Every value is a lowercase filename fragment. Drop a file containing
+// that fragment into src/assets/ and it slots in automatically — nothing
+// else in this file needs to change.
 const shots = {
-  saSearch: findShot('search.png'),
-saLanding: findShot('search-result', 'landing-page', 'landing'),
-  saSignin: findShot('signin-page', 'sign-in', 'signin'),
-  saDashboard: findShot('superadmin-dashboard', 'sa-dashboard'),
+  // getting in (shared across roles — the sign-in screen is identical)
+  saSearch: findShot('start.png'),
+  saSearchResult: findShot('search.png'),
+  saLanding: findShot('search-result', 'landing.png'),
+  signin: findShot('sign-in', 'signin'),
+
+  // SuperAdmin
+  saDashboard: findShot('superadmin-dashboard'),
   saAddAdmin: findShot('add-admin'),
-  saOrganisations: findShot('organisations', 'organisation-settings'),
-  saEmployees: findShot('sa-employees', 'manage-employees'),
-  saAnnouncements: findShot('sa-announcements', 'post-announcement'),
-  saReviews: findShot('sa-reviews', 'review-cycle'),
-  saAssets: findShot('sa-assets', 'asset-management'),
-  saSettings: findShot('sa-settings', 'org-settings'),
-  saDocuments: findShot('sa-documents', 'company-documents'),
-  saComplaints: findShot('sa-complaints', 'sa-tickets'),
+  saOrganisations: findShot('organisations'),
+  saSelfService: findShot('sa-self-service', 'sa-selfservice'),
+  saAnnouncements: findShot('sa-announcements'),
+  saLeaves: findShot('sa-leaves'),
+  saReviews: findShot('sa-reviews'),
+  saAssets: findShot('sa-assets'),
+  saDocuments: findShot('sa-documents'),
   saTimesheet: findShot('sa-timesheet'),
-  saManagement: findShot('admin-management'),
-  saPayroll: findShot('sa-payroll', 'company-payroll'),
+  saManagement: findShot('sa-management'),
+  saPayroll: findShot('sa-payroll'),
   saReimbursement: findShot('sa-reimbursement'),
-  adEmployees: findShot('ad-employees', 'admin-employees'),
-  adAttendance: findShot('ad-attendance', 'admin-attendance'),
-  adLeaves: findShot('ad-leaves', 'admin-leaves'),
-  adPayroll: findShot('ad-payroll', 'admin-payroll'),
-  adDocs: findShot('ad-documents', 'admin-documents'),
-  mgTeam: findShot('my-team'),
-  mgLeaveApprove: findShot('leave-wfh', 'mg-leave'),
-  mgReviews: findShot('mg-reviews', 'manager-review'),
-  mgTimesheet: findShot('mg-timesheet', 'manager-timesheet'),
-  emLeaveApply: findShot('apply-leave', 'em-leave'),
-  emAttendance: findShot('em-attendance', 'face-checkin', 'check-in'),
-  emProfile: findShot('my-profile', 'em-profile'),
-  emDocs: findShot('em-file', 'em-documents'),
-  emAnnouncements: findShot('em-announcement'),
+  saVoice: findShot('sa-complaints', 'sa-voice'),
+  saSettings: findShot('sa-settings'),
+  saPolicy: findShot('sa-policy'),
+  saFieldOps: findShot('sa-field-ops', 'sa-field'),
+
+  // Admin
+  adDashboard: findShot('ad-dashboard'),
+  adAttendance: findShot('ad-attendance'),
+  adEmployees: findShot('ad-employees'),
+  adSelfService: findShot('ad-self-service', 'ad-selfservice'),
+  adAnnouncement: findShot('ad-announcement'),
+  adReview: findShot('ad-review'),
+  adLeave: findShot('ad-leaves', 'ad-leave'),
+  adOrganisation: findShot('ad-organisation'),
+  adAsset: findShot('ad-asset'),
+  adFaceAttendance: findShot('ad-face-attendance', 'ad-face-enrollment', 'face-enrollment'),
+  adRecruitment: findShot('ad-recruitment'),
+  adVoice: findShot('ad-voice', 'ad-complaints'),
+  adTimesheet: findShot('ad-timesheet'),
+  adPayroll: findShot('ad-payroll'),
+  adReimbursement: findShot('ad-reimbursement'),
+  adManagement: findShot('ad-management'),
+  adDocument: findShot('ad-document.png'),
+  adTeamDocument: findShot('ad-documents', 'ad-team-document'),
+  adSettings: findShot('ad-settings'),
+  adPolicy: findShot('ad-policy-management', 'ad-policy'),
+  adMyPolicies: findShot('ad-my-policies'),
+  adFieldOps: findShot('ad-field-ops', 'ad-field'),
+
+  // Manager
+  mgDashboard: findShot('mg-dashboard'),
+  mgAttendance: findShot('mg-attendance'),
+  mgSelfService: findShot('mg-self-service', 'mg-selfservice'),
+  mgLeave: findShot('leave-wfh', 'mg-leave'),
+  mgAnnouncement: findShot('mg-announcement'),
+  mgOrganisation: findShot('mg-organisation'),
+  mgReviews: findShot('mg-reviews'),
+  mgTimesheet: findShot('mg-timesheet'),
+  mgReimbursement: findShot('mg-reimbursement'),
+  mgFile: findShot('mg-file'),
+  mgRecruitment: findShot('mg-recruitment'),
+  mgVoice: findShot('mg-voice', 'mg-complaints'),
+  mgSettings: findShot('mg-settings'),
+  mgMyPolicies: findShot('mg-my-policies'),
+  mgFieldOps: findShot('mg-field-ops', 'mg-field'),
+
+  // Employee
+  emDashboard: findShot('em-dashboard'),
+  emAttendance: findShot('em-attendance'),
+  emFieldDuty: findShot('em-field-duty', 'em-field'),
+  emSelfService: findShot('em-self-service', 'em-selfservice'),
+  emLeave: findShot('apply-leave', 'em-leave'),
+  emAnnouncement: findShot('em-announcement'),
+  emOrganisation: findShot('em-organisation'),
+  emReview: findShot('em-review'),
+  emTimesheet: findShot('em-timesheet'),
+  emReimbursement: findShot('em-reimbursement'),
+  emFile: findShot('em-file'),
+  emVoice: findShot('em-voice', 'em-complaints'),
+  emSettings: findShot('my-profile', 'em-settings'),
+  emMyPolicies: findShot('em-my-policies'),
 }
 
 // ── Design tokens ──────────────────────────────────────────────────────
 const INK = '#1B1320'
 const PAPER = '#FCFAFB'
-const PLUM = '#730042' 
+const PLUM = '#730042' // matches --primary in src/index.css
 const PLUM_DEEP = '#4D002C'
 const BLUSH = '#F5E7EE'
 const LINE = '#E7DAE1'
 const GOLD = '#B8863B'
 const MUTED = '#8A7C85'
 
-// ── Roles + their features ──────────────────────────────────────────────
+// Small helper — every feature below carries an optional `badge`:
+//   'plan'      → only visible on plans that include this feature
+//   'condition' → only visible when that gate is enabled for the org/role
+const PLAN_BADGE = { label: 'Plan feature', hint: 'Only shown if your organisation\u2019s plan includes this.' }
+const COND_BADGE = { label: 'Conditional', hint: 'Only shown when this is enabled for your role.' }
+
+const SIGNIN_STEPS = [
+  { id: 'sa-search', title: 'Search for TorchX Talent', desc: 'Look up TorchX Talent on Google (or any search engine) to reach the official website.', steps: ['Type "TorchX Talent" into the search bar and hit search.'], shotKey: 'saSearch', shotName: 'search.png' },
+  { id: 'sa-search-result', title: 'Pick the official result', desc: 'The official TorchX Talent website shows up as the top result.', steps: ['Click the top result to open the official TorchX Talent site.'], shotKey: 'saSearchResult', shotName: 'search-result.png' },
+  { id: 'sa-landing', title: 'Open the landing page', desc: 'The landing page introduces TorchX Talent \u2014 features, pricing, testimonials \u2014 and is where you start signing in.', steps: ['Browse the landing page if you like.', 'Click "Sign in to your Talent Account" in the top-right corner.'], shotKey: 'saLanding', shotName: 'landing-page.png' },
+  { id: 'sa-signin', title: 'Sign in', desc: 'Enter your registered email and password to sign in.', steps: ['Fill in your email address and password, then click "Sign in".', 'On an office kiosk/tablet, you can also check in without a password using "Live Attendance (Face Check-in)".'], shotKey: 'signin', shotName: 'sign-in.png' },
+]
+
 const roles = [
   {
     id: 'superadmin', label: 'SuperAdmin', short: 'SA', icon: <FiShield />,
-    tagline: 'the organisation\u2019s owner \u2014 everything sits in your hands',
+    tagline: 'the platform owner \u2014 every organisation sits in your hands',
     features: [
-      { id: 'sa-search', title: 'Find TorchX Talent', desc: 'Search for TorchX Talent on Google (or any search engine) to reach the official website.', steps: ['Type "TorchX Talent" in the search bar and search.', 'The official TorchX Talent website shows up as the top result \u2014 click on it.'], shotKey: 'saSearch', shotName: 'Search.png' },
-      { id: 'sa-landing', title: 'Open the landing page', desc: 'The official website\u2019s landing page opens \u2014 this is where you start signing in.', steps: ['As soon as the landing page loads, you\u2019ll see TorchX Talent\u2019s features, testimonials, pricing, and about sections.', 'Click "Sign in to your Talent Account" in the top-right corner.'], shotKey: 'saLanding', shotName: 'search-result.png' },
-      { id: 'sa-signin', title: 'Sign in to your account', desc: 'Enter your email and password to sign in to your Talent account.', steps: ['Fill in your registered email address and password.', 'Click the "Sign in" button.', 'On office kiosk/tablet devices, you can also check in without a password using "Live Attendance (Face Check-in)".'], shotKey: 'saSignin', shotName: 'signin-page.png' },
+      ...SIGNIN_STEPS,
       {
         id: 'sa-dashboard', title: 'Dashboard overview',
-        desc: 'As soon as sign-in succeeds, the SuperAdmin Dashboard opens automatically \u2014 this is where all your features begin, with a live snapshot of the whole organisation right at the top.',
+        desc: 'As soon as you sign in, the SuperAdmin Dashboard opens \u2014 a live snapshot of every organisation on the platform, plus quick access to the things you do most.',
         steps: [
-          'Total Admins \u2014 how many admin accounts exist and how many are currently active.',
-          'Total Employees \u2014 headcount across all departments, with the department count shown alongside.',
-          'Present Today \u2014 how many employees are checked in right now, shown as a percentage plus an on-duty count.',
+          'Total Admins \u2014 how many admin accounts exist across organisations, and how many are active.',
+          'Total Employee \u2014 headcount across every organisation and department.',
+          'Present Today \u2014 how many employees are checked in right now, as a percentage plus an on-duty count.',
           'Admin Leaves \u2014 how many admins are on leave today, so coverage gaps are visible at a glance.',
-          'Announcements \u2014 the number of announcements currently live for the organisation.',
-          'Active Users \u2014 how many people are actively using the platform out of your total seats, with a "near limit" warning as you approach your plan\u2019s user cap.',
-          'Live Attendance Map \u2014 a real-time map of where employees are checking in from, with a link through to full Attendance Details.',
-          'The Announcements panel on the right lets you post a new update straight from the dashboard.',
-          'Switch between the "Overview" and "Analytics" tabs for deeper reports.',
+          'Announcements \u2014 how many announcements are currently live across the platform.',
+          'Active Users \u2014 active seats out of your total plan limit, with a "Near limit" / "Limit reached" warning as you approach the cap.',
+          'Live Attendance Map \u2014 a real-time map of where employees are checking in from.',
+          'Employee Overview \u2014 a breakdown of employees by department, designation, and status.',
+          'Switch between "Overview" and "Analytics" tabs (top of the dashboard) for deeper, chart-based reports.',
         ],
         shotKey: 'saDashboard', shotName: 'superadmin-dashboard.png',
+        extras: [
+          { title: 'Add a new Admin', desc: 'Click "Add Admin" on the dashboard (disabled once your seat limit is reached), fill in their name, email, and department, and save to issue login credentials instantly.', shotKey: 'saAddAdmin', shotName: 'add-admin.png' },
+        ],
       },
-      { id: 'sa-add-admin', title: 'Add a new Admin', desc: 'Create a new admin account, controlled against your seat limit.', steps: ['Click "+ Add Admin" in the dashboard\u2019s top banner.', 'Fill in the admin\u2019s basic details (name, email, department).', 'Save to issue login credentials to the new admin \u2014 the button disables once your seat limit is reached.'], shotKey: 'saAddAdmin', shotName: 'add-admin.png' },
-      { id: 'sa-organisations', title: 'Manage Organisation', desc: 'Set up the company profile, departments, and reporting structure.', steps: ['Open "Organisations" in the left sidebar.', 'Add or edit departments, designations, and the reporting hierarchy.', 'Changes reflect instantly in every employee\u2019s org chart.'], shotKey: 'saOrganisations', shotName: 'organisations.png' },
-      { id: 'sa-employees', title: 'Manage all Employees', desc: 'Add, edit, or deactivate any employee, and assign roles.', steps: ['Open the employee list section in the sidebar.', 'Select a role when adding a new employee.', 'Use the row\u2019s actions menu to edit or deactivate any employee.'], shotKey: 'saEmployees', shotName: 'sa-employees.png' },
-      { id: 'sa-announcements', title: 'Post Announcements', desc: 'Send a company-wide announcement from one place.', steps: ['Go to "Announcements" in the sidebar.', 'Click "New Announcement" and write a title and message.', 'Publish, and it shows up instantly on every employee\u2019s portal.'], shotKey: 'saAnnouncements', shotName: 'sa-announcements.png' },
-      { id: 'sa-reviews', title: 'Set up Performance Reviews', desc: 'Define review cycles and goals for the whole organisation.', steps: ['Open the "Reviews" section in the sidebar.', 'Create a new review cycle and select the applicable departments.', 'Set goals/KPIs and launch the cycle.'], shotKey: 'saReviews', shotName: 'sa-reviews.png' },
-      { id: 'sa-assets', title: 'Asset Management', desc: 'Assign and track company assets for employees.', steps: ['Open "Asset Management" in the sidebar.', 'Add a new asset or assign an existing one to an employee.', 'Update return/damage status from the same place.'], shotKey: 'saAssets', shotName: 'sa-assets.png' },
-      { id: 'sa-settings', title: 'Organisation Settings', desc: 'Configure company-wide policies, leave rules, and system preferences.', steps: ['Open "Settings" in the sidebar.', 'Update leave policy, working hours, or notification preferences.', 'Save, and the changes apply across the whole organisation.'], shotKey: 'saSettings', shotName: 'sa-settings.png' },
-      { id: 'sa-documents', title: 'Company Documents', desc: 'Upload, organise, and set access control for company-wide documents.', steps: ['Open "Documents" in the sidebar.', 'Upload files and choose who should see them.', 'Update access permissions any time.'], shotKey: 'saDocuments', shotName: 'sa-documents.png' },
-      { id: 'sa-complaints', title: 'Handle Complaints / Tickets', desc: 'Review and resolve complaints/tickets across the organisation.', steps: ['Open "Complaints" or "Tickets" in the sidebar.', 'Open a pending ticket and read the details.', 'Update its status or assign it to the concerned admin/manager.'], shotKey: 'saComplaints', shotName: 'sa-complaints.png' },
-      { id: 'sa-timesheet', title: 'Review Timesheets', desc: 'Verify timesheet entries across the company.', steps: ['Open "Timesheet" in the sidebar.', 'Filter by department or employee.', 'Flag or comment on any discrepancy.'], shotKey: 'saTimesheet', shotName: 'sa-timesheet.png' },
-      { id: 'sa-management', title: 'Admin Management', desc: 'Manage all admins \u2014 permissions, roles, and access control.', steps: ['Open "Management" in the sidebar.', 'Edit an admin\u2019s permissions or role.', 'Deactivate/reactivate an admin when needed.'], shotKey: 'saManagement', shotName: 'admin-management.png' },
-      { id: 'sa-payroll', title: 'Company Payroll', desc: 'Process and review payroll for the whole organisation.', steps: ['Open "Payroll" in the sidebar and select the month.', 'Review the salary breakdown for every department.', 'Click "Process Payroll" to generate company-wide payslips.'], shotKey: 'saPayroll', shotName: 'sa-payroll.png' },
-      { id: 'sa-reimbursement', title: 'Reimbursement Approvals', desc: 'Approve company-wide reimbursement/expense requests.', steps: ['Open "Reimbursement" in the sidebar.', 'Review pending requests \u2014 check receipts and amounts.', 'Approve or reject \u2014 the employee gets notified either way.'], shotKey: 'saReimbursement', shotName: 'sa-reimbursement.png' },
+      { id: 'sa-organisations', title: 'Organisations', desc: 'Onboard organisations and manage their TorchX Talent access.', steps: ['Open "Organisations" in the sidebar.', 'Add a new organisation, or open an existing one to manage its access and plan.'], shotKey: 'saOrganisations', shotName: 'organisations.png' },
+      { id: 'sa-self-service', title: 'Self Service Portal', desc: 'Org-wide leave, reimbursement, document, and ticket activity, all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch between the Leave, Reimbursement, Document, and Ticket tabs to see activity across every organisation.'], shotKey: 'saSelfService', shotName: 'sa-self-service.png' },
+      { id: 'sa-announcements', title: 'Announcements', desc: 'Broadcast announcements across all organisations.', steps: ['Open "Announcements" in the sidebar.', 'Click "New Announcement", write a title and message, and choose which organisations should see it.', 'Publish \u2014 it shows up instantly on every recipient\u2019s portal.'], shotKey: 'saAnnouncements', shotName: 'sa-announcements.png' },
+      { id: 'sa-leaves', title: 'Leaves', desc: 'See and manage leave requests across every organisation.', steps: ['Open "Leaves" in the sidebar.', 'Filter by organisation, department, or status to review any request.'], shotKey: 'saLeaves', shotName: 'sa-leaves.png' },
+      { id: 'sa-reviews', title: 'Reviews', desc: 'Monitor performance reviews raised across organisations.', steps: ['Open "Reviews" in the sidebar.', 'Track review cycles and completion status per organisation.'], shotKey: 'saReviews', shotName: 'sa-reviews.png', badge: PLAN_BADGE },
+      { id: 'sa-assets', title: 'Asset Management', desc: 'Track company assets \u2014 assign, revoke, and view history.', steps: ['Open "Asset Management" in the sidebar.', 'Add a new asset, or select one to assign/revoke it and view its history.'], shotKey: 'saAssets', shotName: 'sa-assets.png', badge: PLAN_BADGE },
+      { id: 'sa-documents', title: 'Team Documents', desc: 'Access documents uploaded by teams across organisations.', steps: ['Open "Team Documents" in the sidebar.', 'Filter by organisation to browse or download what\u2019s been uploaded.'], shotKey: 'saDocuments', shotName: 'sa-documents.png' },
+      { id: 'sa-timesheet', title: 'Timesheet', desc: 'Review logged hours and timesheets, org-wide.', steps: ['Open "Timesheet" in the sidebar.', 'Filter by organisation or employee, and flag any discrepancy.'], shotKey: 'saTimesheet', shotName: 'sa-timesheet.png', badge: PLAN_BADGE },
+      { id: 'sa-management', title: 'TorchX Management', desc: 'Manage TorchX product access and licensing per organisation.', steps: ['Open "TorchX Management" in the sidebar.', 'Select an organisation to update its product access and licensing.'], shotKey: 'saManagement', shotName: 'sa-management.png' },
+      { id: 'sa-payroll', title: 'Payroll', desc: 'Oversee payroll runs across every organisation.', steps: ['Open "Payroll" in the sidebar and select an organisation and month.', 'Review the salary breakdown and click "Process Payroll" to generate payslips.'], shotKey: 'saPayroll', shotName: 'sa-payroll.png' },
+      { id: 'sa-reimbursement', title: 'Reimbursements', desc: 'Review reimbursement claims raised by admins, and see every claim org-wide.', steps: ['Open "Reimbursements" in the sidebar.', 'Review pending claims \u2014 check receipts and amounts \u2014 then approve or reject.'], shotKey: 'saReimbursement', shotName: 'sa-reimbursement.png' },
+      { id: 'sa-voice', title: 'TorchX Voice', desc: 'Handle support tickets raised by admins, managers, and employees.', steps: ['Open "TorchX Voice" in the sidebar.', 'Open a pending ticket, read the details, and resolve or reassign it.'], shotKey: 'saVoice', shotName: 'sa-voice.png', badge: PLAN_BADGE },
+      { id: 'sa-settings', title: 'Settings', desc: 'Configure platform-wide settings and preferences.', steps: ['Open "Settings" in the sidebar.', 'Update preferences \u2014 changes apply across the whole platform.'], shotKey: 'saSettings', shotName: 'sa-settings.png' },
+      { id: 'sa-policy', title: 'Policy Management', desc: 'Create, publish, and track acknowledgement of company policies.', steps: ['Open "Policy Management" in the sidebar.', 'Create a policy, choose its audience (Employees / Managers / Admins), and publish.', 'Track who has acknowledged it from the same page.'], shotKey: 'saPolicy', shotName: 'sa-policy.png' },
+      { id: 'sa-field-ops', title: 'Field Operations', desc: 'Set up field teams and monitor live duty locations and visits.', steps: ['Open "Field Operations" in the sidebar.', 'Create a field team and monitor live locations and visit logs on the map.'], shotKey: 'saFieldOps', shotName: 'sa-field-ops.png', badge: COND_BADGE },
     ],
   },
   {
     id: 'admin', label: 'Admin', short: 'AD', icon: <FiUsers />,
-    tagline: 'day-to-day operations and team management',
+    tagline: 'day-to-day operations and team management for your organisation',
     features: [
-      { id: 'ad-employees', title: 'Manage employees in your scope', desc: 'Add, edit, or manage employees in your assigned department/team.', steps: ['Open the "Employees" section from the dashboard.', 'Fill in the onboarding form for a new employee.', 'Edit or update an existing employee\u2019s details.'], shotKey: 'adEmployees', shotName: 'ad-employees.png' },
-      { id: 'ad-attendance', title: 'Monitor attendance', desc: 'See geo-tag and face attendance records in one place.', steps: ['Open the "Attendance" tab.', 'Filter records by date or employee.', 'Raise a manual correction request if you spot a discrepancy.'], shotKey: 'adAttendance', shotName: 'ad-attendance.png' },
-      { id: 'ad-leaves', title: 'Approve leave requests', desc: 'Review and approve/reject your team\u2019s leave requests.', steps: ['Pending requests appear in the "Leaves" tab.', 'Open a request and check the reason and balance.', 'Click Approve or Reject.'], shotKey: 'adLeaves', shotName: 'ad-leaves.png' },
-      { id: 'ad-payroll', title: 'Run payroll', desc: 'Process payroll synced with attendance and leave data.', steps: ['Open the "Payroll" section and select the applicable month.', 'Review the auto-calculated salary breakdown.', 'Click "Process Payroll" to generate payslips.'], shotKey: 'adPayroll', shotName: 'ad-payroll.png' },
-      { id: 'ad-docs', title: 'Team documentation', desc: 'Upload, organise, and share your team\u2019s documents.', steps: ['Open the "Documents" tab.', 'Upload files and link them to the relevant employee/team.', 'Set access permissions.'], shotKey: 'adDocs', shotName: 'ad-documents.png' },
+      { id: 'ad-signin', title: 'Sign in', desc: 'Sign in the same way shown for SuperAdmin \u2014 search TorchX Talent, open the landing page, and sign in with your Admin email and password.', steps: ['Enter your registered email and password, then click "Sign in".'], shotKey: 'signin', shotName: 'sign-in.png' },
+      {
+        id: 'ad-dashboard', title: 'Dashboard overview',
+        desc: 'Signing in drops you straight onto your organisation\u2019s Dashboard \u2014 your own check-in status plus a live snapshot of your whole team.',
+        steps: [
+          'Today\u2019s status banner \u2014 shows whether you\u2019re checked in, on leave, or it\u2019s a holiday, with a "Check In" / "Check Out" button for your own attendance.',
+          'Headcount \u2014 total employees in your organisation, alongside how many are present today.',
+          'Notification bell \u2014 real-time alerts for approvals, announcements, and tickets.',
+        ],
+        shotKey: 'adDashboard', shotName: 'ad-dashboard.png',
+      },
+      { id: 'ad-attendance', title: 'Track your team\u2019s attendance', desc: 'A quick stat row \u2014 Present, Absent, Half/Late, Active Now, and Attendance Rate \u2014 plus a colour-coded calendar so you can see the whole month at a glance.', steps: ['On the dashboard, check the stat row for today\u2019s numbers.', 'Use the calendar\u2019s colour legend \u2014 Present, Absent, Half day, Late, Checked in, On leave, WFH, Holiday, Week off \u2014 to read any day.', 'Click a day or an employee to open their full attendance details.'], shotKey: 'adAttendance', shotName: 'ad-attendance.png' },
+      { id: 'ad-onboarding', title: 'Onboarding', desc: 'Add and manage employees and managers.', steps: ['Open "Onboarding" in the sidebar.', 'Click "Add Employee", fill in their details, and select a role.', 'Use the row\u2019s actions menu to edit or deactivate anyone already added.'], shotKey: 'adEmployees', shotName: 'ad-employees.png' },
+      { id: 'ad-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'adSelfService', shotName: 'ad-self-service.png' },
+      { id: 'ad-announcement', title: 'Announcement', desc: 'Create and publish announcements for your organisation.', steps: ['Open "Announcement" in the sidebar.', 'Click "New Announcement" (the highlighted button) and write your update.', 'Publish \u2014 it\u2019s instantly visible to your managers and employees.'] , shotKey: 'adAnnouncement', shotName: 'ad-announcement.png' },
+      { id: 'ad-review', title: 'Review', desc: 'Run and track performance reviews for your team.', steps: ['Open "Review" in the sidebar.', 'Start a new review cycle or continue one already in progress.'], shotKey: 'adReview', shotName: 'ad-review.png', badge: PLAN_BADGE },
+      { id: 'ad-leave', title: 'Leave', desc: 'Approve or reject leave requests from managers and employees.', steps: ['Open "Leave" in the sidebar.', 'Use the tabs to review pending requests, check your own balance, or apply for your own leave/WFH.', 'Approve or reject each request \u2014 the employee is notified either way.'], shotKey: 'adLeave', shotName: 'ad-leave.png' },
+      { id: 'ad-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar.', 'Browse the org chart, or edit departments and reporting lines.'], shotKey: 'adOrganisation', shotName: 'ad-organisation.png' },
+      { id: 'ad-asset', title: 'Asset Management', desc: 'Assign, revoke, and track company assets.', steps: ['Open "Asset Management" in the sidebar.', 'Add a new asset, or assign/revoke one for an employee.'], shotKey: 'adAsset', shotName: 'ad-asset.png', badge: PLAN_BADGE },
+      { id: 'ad-face-attendance', title: 'Face Attendance', desc: 'Enroll employee faces for kiosk-based attendance.', steps: ['Open "Face Attendance" in the sidebar.', 'Select an employee and capture their face for kiosk check-in.'], shotKey: 'adFaceAttendance', shotName: 'ad-face-attendance.png' },
+      { id: 'ad-recruitment', title: 'Recruitment', desc: 'Post hiring requisitions and track candidates.', steps: ['Open "Recruitment" in the sidebar.', 'Click "Add Candidate" or create a hiring requisition, then track its status.'], shotKey: 'adRecruitment', shotName: 'ad-recruitment.png', badge: PLAN_BADGE },
+      { id: 'ad-voice', title: 'TorchX Voice', desc: 'Raise or resolve support tickets.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to track one you\u2019ve raised.'], shotKey: 'adVoice', shotName: 'ad-voice.png', badge: PLAN_BADGE },
+      { id: 'ad-timesheet', title: 'Timesheet', desc: 'Review and approve team timesheets.', steps: ['Open "Timesheet" in the sidebar.', 'Review logged hours per employee and approve or flag entries.'], shotKey: 'adTimesheet', shotName: 'ad-timesheet.png', badge: PLAN_BADGE },
+      { id: 'ad-payroll', title: 'Payroll', desc: 'Run payroll and manage payslips.', steps: ['Open "Payroll" in the sidebar and select the month.', 'Review the auto-calculated salary breakdown.', 'Click "Process Payroll" to generate payslips.'], shotKey: 'adPayroll', shotName: 'ad-payroll.png' },
+      { id: 'ad-reimbursement', title: 'Reimbursements', desc: 'Review claims from employees and managers, and submit your own.', steps: ['Open "Reimbursements" in the sidebar.', 'Review pending claims \u2014 check receipts and amounts \u2014 then approve or reject.', 'Use the same page to submit your own claim.'], shotKey: 'adReimbursement', shotName: 'ad-reimbursement.png' },
+      { id: 'ad-management', title: 'TorchX Management', desc: 'Manage your organisation\u2019s TorchX product access.', steps: ['Open "TorchX Management" in the sidebar.', 'Review or update which TorchX products your organisation has access to.'], shotKey: 'adManagement', shotName: 'ad-management.png' },
+      { id: 'ad-document', title: 'Document', desc: 'Upload and manage your own documents.', steps: ['Open "Document" in the sidebar.', 'Upload a file and organise it into the right folder.'], shotKey: 'adDocument', shotName: 'ad-document.png' },
+      { id: 'ad-team-document', title: 'Team Document', desc: 'View documents uploaded by your team.', steps: ['Open "Team Document" in the sidebar.', 'Browse or download anything your team has uploaded.'], shotKey: 'adTeamDocument', shotName: 'ad-team-document.png' },
+      { id: 'ad-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'adSettings', shotName: 'ad-settings.png' },
+      { id: 'ad-policy-management', title: 'Policy Management', desc: 'Create, publish, and track acknowledgement of company policies.', steps: ['Open "Policy Management" in the sidebar.', 'Create a policy, choose its audience, and publish it.'], shotKey: 'adPolicy', shotName: 'ad-policy-management.png' },
+      { id: 'ad-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'adMyPolicies', shotName: 'ad-my-policies.png' },
+      { id: 'ad-field-ops', title: 'Field Operations', desc: 'Create field teams and monitor live duty locations and visits.', steps: ['Open "Field Operations" in the sidebar.', 'Create a field team and watch live locations and visit logs on the map.'], shotKey: 'adFieldOps', shotName: 'ad-field-ops.png', badge: COND_BADGE },
     ],
   },
   {
     id: 'manager', label: 'Manager', short: 'MG', icon: <FiUserCheck />,
     tagline: 'your direct team\u2019s day-to-day work',
     features: [
-      { id: 'mg-team', title: 'View your team', desc: 'See the list, profile, and status of your direct reports.', steps: ['Open the "My Team" section on the dashboard.', 'Click on a member\u2019s profile to view their attendance/leave history.'], shotKey: 'mgTeam', shotName: 'my-team.png' },
-      { id: 'mg-leave-approve', title: 'Approve team leave & WFH', desc: 'Approve your team\u2019s leave and work-from-home requests.', steps: ['Open the "Leave & WFH" tab.', 'Review pending requests and approve/reject with remarks.'], shotKey: 'mgLeaveApprove', shotName: 'leave-wfh.png' },
-      { id: 'mg-reviews', title: 'Run performance reviews', desc: 'Submit reviews and give feedback for your team members.', steps: ['Open the assigned review cycle in the "Reviews" tab.', 'Fill in a rating and written feedback for each team member.', 'Submit \u2014 the SuperAdmin/Admin then sees the cycle summary.'], shotKey: 'mgReviews', shotName: 'mg-reviews.png' },
-      { id: 'mg-timesheet', title: 'Review timesheets', desc: 'Verify your team\u2019s daily/weekly timesheet entries.', steps: ['Open the "Timesheet" tab.', 'Check each member\u2019s logged hours.', 'Flag an entry with a comment if there\u2019s a discrepancy.'], shotKey: 'mgTimesheet', shotName: 'mg-timesheet.png' },
+      { id: 'mg-signin', title: 'Sign in', desc: 'Sign in the same way shown for SuperAdmin \u2014 search TorchX Talent, open the landing page, and sign in with your Manager email and password.', steps: ['Enter your registered email and password, then click "Sign in".'], shotKey: 'signin', shotName: 'sign-in.png' },
+      {
+        id: 'mg-dashboard', title: 'Dashboard overview',
+        desc: 'Signing in drops you straight onto your team\u2019s Dashboard \u2014 your own check-in status plus a live snapshot of your direct reports.',
+        steps: [
+          'Today\u2019s status banner \u2014 shows whether you\u2019re checked in, on leave, or it\u2019s a holiday, with a "Check In" / "Check Out" button for yourself.',
+          'My leave \u2014 your own leave balance and any pending requests, shown right on the dashboard.',
+          'Pending RM \u2014 requests waiting on you as reporting manager, so nothing slips through.',
+        ],
+        shotKey: 'mgDashboard', shotName: 'mg-dashboard.png',
+      },
+      { id: 'mg-attendance', title: 'Track your team\u2019s attendance', desc: 'See your direct reports\u2019 attendance for today, plus a calendar view for the month.', steps: ['On the dashboard, check today\u2019s present/absent count for your team.', 'Open the calendar to review any earlier day.', 'Click a team member to see their attendance history.'], shotKey: 'mgAttendance', shotName: 'mg-attendance.png' },
+      { id: 'mg-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'mgSelfService', shotName: 'mg-self-service.png' },
+      { id: 'mg-leave', title: 'Leave', desc: 'Approve or forward leave requests from your team.', steps: ['Open "Leave" in the sidebar.', 'Use the tabs to review your team\u2019s requests, check your own balance, or apply for your own leave.', 'Approve or reject with a remark.'], shotKey: 'mgLeave', shotName: 'leave-wfh.png' },
+      { id: 'mg-announcement', title: 'Announcement', desc: 'View and share announcements with your team.', steps: ['Open "Announcement" in the sidebar \u2014 the latest updates from your admin appear first.'], shotKey: 'mgAnnouncement', shotName: 'mg-announcement.png' },
+      { id: 'mg-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to browse the org chart.'], shotKey: 'mgOrganisation', shotName: 'mg-organisation.png' },
+      { id: 'mg-reviews', title: 'Review', desc: 'Run performance reviews for your reportees.', steps: ['Open "Review" in the sidebar.', 'Open an assigned review cycle, rate each team member, and add written feedback.', 'Submit \u2014 the Admin then sees the cycle summary.'], shotKey: 'mgReviews', shotName: 'mg-reviews.png', badge: PLAN_BADGE },
+      { id: 'mg-timesheet', title: 'Timesheet', desc: 'Track and approve your team\u2019s timesheets.', steps: ['Open "Timesheet" in the sidebar.', 'Check each member\u2019s logged hours and approve, or flag a discrepancy with a comment.'], shotKey: 'mgTimesheet', shotName: 'mg-timesheet.png', badge: PLAN_BADGE },
+      { id: 'mg-reimbursement', title: 'Reimbursements', desc: 'Submit and track your reimbursement claims.', steps: ['Open "Reimbursements" in the sidebar.', 'Click "New Claim", attach a receipt, and submit for approval.'], shotKey: 'mgReimbursement', shotName: 'mg-reimbursement.png' },
+      { id: 'mg-file', title: 'File', desc: 'Upload and manage documents.', steps: ['Open "File" in the sidebar.', 'Upload a document and choose who should have access.'], shotKey: 'mgFile', shotName: 'mg-file.png' },
+      { id: 'mg-recruitment', title: 'Recruitment', desc: 'Track hiring requisitions and candidates.', steps: ['Open "Recruitment" in the sidebar.', 'Review open requisitions and update candidate status as they move through the pipeline.'], shotKey: 'mgRecruitment', shotName: 'mg-recruitment.png', badge: PLAN_BADGE },
+      { id: 'mg-voice', title: 'TorchX Voice', desc: 'Raise a support ticket.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to track one you\u2019ve raised.'], shotKey: 'mgVoice', shotName: 'mg-voice.png', badge: PLAN_BADGE },
+      { id: 'mg-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'mgSettings', shotName: 'mg-settings.png' },
+      { id: 'mg-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'mgMyPolicies', shotName: 'mg-my-policies.png' },
+      { id: 'mg-field-ops', title: 'Field Operations', desc: 'Monitor live locations, visits, and progress for your assigned field teams.', steps: ['Open "Field Operations" in the sidebar.', 'Watch live locations and visit logs for your assigned teams on the map.'], shotKey: 'mgFieldOps', shotName: 'mg-field-ops.png', badge: COND_BADGE },
     ],
   },
   {
     id: 'employee', label: 'Employee', short: 'EM', icon: <FiUser />,
     tagline: 'self-service \u2014 manage your own work',
     features: [
-      { id: 'em-leave-apply', title: 'Apply for leave', desc: 'How an employee applies for their own leave.', steps: ['Open "Leave" in the sidebar.', 'Click "Apply Leave" and select the leave type and dates.', 'Write a reason and submit \u2014 your reporting manager gets notified.', 'Track the status in "My Requests".'], shotKey: 'emLeaveApply', shotName: 'apply-leave.png' },
-      { id: 'em-attendance', title: 'Mark attendance', desc: 'Mark attendance with geo-tag or face check-in.', steps: ['Use "Live Attendance (Face Check-in)" on the sign-in page, or', 'Click "Check In" from the dashboard.', 'Use the same button to "Check Out" at the end of the day.'], shotKey: 'emAttendance', shotName: 'em-attendance.png' },
-      { id: 'em-profile', title: 'Update your profile', desc: 'Update your personal details, contact info, and documents.', steps: ['Open "My Profile" in the sidebar.', 'Click "Edit" to update your details.', 'Upload any required documents.'], shotKey: 'emProfile', shotName: 'my-profile.png' },
-      { id: 'em-docs', title: 'Access your documents', desc: 'View or download payslips, your offer letter, and other documents.', steps: ['Open the "File" section in the sidebar.', 'Click on a document to view or download it.'], shotKey: 'emDocs', shotName: 'em-file.png' },
-      { id: 'em-announcements', title: 'Read announcements', desc: 'See the company\u2019s announcements and updates.', steps: ['Open "Announcement" in the sidebar \u2014 the latest updates appear at the top.'], shotKey: 'emAnnouncements', shotName: 'em-announcement.png' },
+      { id: 'em-signin', title: 'Sign in', desc: 'Sign in the same way shown for SuperAdmin \u2014 search TorchX Talent, open the landing page, and sign in with your email and password.', steps: ['Enter your registered email and password, then click "Sign in".', 'On an office kiosk/tablet, you can also check in without a password using "Live Attendance (Face Check-in)".'], shotKey: 'signin', shotName: 'sign-in.png' },
+      {
+        id: 'em-dashboard', title: 'Dashboard overview',
+        desc: 'Signing in drops you straight onto your personal Dashboard \u2014 your own attendance, leave, and the latest company updates.',
+        steps: [
+          'Today\u2019s status banner \u2014 shows whether you\u2019re checked in, on leave, or it\u2019s a holiday, with your shift timing.',
+          'Your attendance streak \u2014 a quick calendar of your recent check-ins.',
+          'Leave balance and any pending requests, at a glance.',
+        ],
+        shotKey: 'emDashboard', shotName: 'em-dashboard.png',
+      },
+      { id: 'em-attendance', title: 'Mark your attendance', desc: 'Mark attendance with geo-tag or face check-in.', steps: ['Click "Check In" on the dashboard (or use "Live Attendance (Face Check-in)" on the sign-in page).', 'Use the same button to "Check Out" at the end of the day.'], shotKey: 'emAttendance', shotName: 'em-attendance.png' },
+      { id: 'em-field-duty', title: 'Field Duty', desc: 'Start field duty, share location during work, and record customer visits.', steps: ['Open "Field Duty" in the sidebar.', 'Start duty to begin sharing your location, and log each customer visit as you go.', 'End duty when you\u2019re done for the day.'], shotKey: 'emFieldDuty', shotName: 'em-field-duty.png', badge: COND_BADGE },
+      { id: 'em-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'emSelfService', shotName: 'em-self-service.png' },
+      { id: 'em-leave', title: 'Leave', desc: 'Apply for leave and track your leave balance.', steps: ['Open "Leave" in the sidebar and open the "Apply Leave" tab.', 'Select the leave type and dates, write a reason, and submit \u2014 your manager gets notified.', 'Track the status in the same tab, and check "Leave Balance" any time.'], shotKey: 'emLeave', shotName: 'apply-leave.png' },
+      { id: 'em-announcement', title: 'Announcement', desc: 'See company announcements.', steps: ['Open "Announcement" in the sidebar \u2014 every update your organisation publishes appears here, newest first.'], shotKey: 'emAnnouncement', shotName: 'em-announcement.png' },
+      { id: 'em-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to see where you sit in the org chart.'], shotKey: 'emOrganisation', shotName: 'em-organisation.png' },
+      { id: 'em-review', title: 'Review', desc: 'See the performance reviews your manager has given you.', steps: ['Open "Review" in the sidebar to see your ratings and written feedback.'], shotKey: 'emReview', shotName: 'em-review.png', badge: PLAN_BADGE },
+      { id: 'em-timesheet', title: 'Timesheet', desc: 'Log your hours and track your timesheet.', steps: ['Open "Timesheet" in the sidebar.', 'Log your hours for the day/week and submit.'], shotKey: 'emTimesheet', shotName: 'em-timesheet.png', badge: PLAN_BADGE },
+      { id: 'em-reimbursement', title: 'Reimbursements', desc: 'Submit and track your reimbursement claims.', steps: ['Open "Reimbursements" in the sidebar.', 'Click "New Claim", attach a receipt, and submit for approval.'], shotKey: 'emReimbursement', shotName: 'em-reimbursement.png' },
+      { id: 'em-file', title: 'File', desc: 'Upload and manage your personal documents.', steps: ['Open "File" in the sidebar.', 'Click a document to view or download it, such as your payslip or offer letter.'], shotKey: 'emFile', shotName: 'em-file.png' },
+      { id: 'em-voice', title: 'TorchX Voice', desc: 'Raise a support ticket for any issue.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to check the status of one you\u2019ve already sent.'], shotKey: 'emVoice', shotName: 'em-voice.png', badge: PLAN_BADGE },
+      { id: 'em-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Click "Edit" to update your details and upload any required documents.', 'Save your changes.'], shotKey: 'emSettings', shotName: 'my-profile.png' },
+      { id: 'em-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'emMyPolicies', shotName: 'em-my-policies.png' },
     ],
   },
 ]
@@ -142,12 +288,25 @@ const searchIndex = roles.flatMap((r) =>
   r.features.map((f) => ({ roleId: r.id, roleLabel: r.label, ...f }))
 )
 
-function ShotFrame({ src, label, fileName }) {
+function Badge({ badge }) {
+  if (!badge) return null
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-ui font-semibold shrink-0"
+      style={{ background: BLUSH, color: PLUM_DEEP, border: `1px solid ${LINE}` }}
+      title={badge.hint}
+    >
+      {badge.label}
+    </span>
+  )
+}
+
+function ShotFrame({ src, label, fileName, compact }) {
   return src ? (
     <img src={src} alt={label} className="w-full rounded-xl border" style={{ borderColor: LINE }} loading="lazy" />
   ) : (
     <div
-      className="w-full aspect-video rounded-xl border border-dashed flex flex-col items-center justify-center gap-2 px-4 text-center"
+      className={`w-full ${compact ? 'aspect-[16/7]' : 'aspect-video'} rounded-xl border border-dashed flex flex-col items-center justify-center gap-2 px-4 text-center`}
       style={{ borderColor: LINE, background: '#FBF6F9' }}
     >
       <span
@@ -172,7 +331,7 @@ function RoleTabs({ activeRoleId, onSelect, orientation }) {
       {vertical && (
         <div
           className="absolute left-1/2 top-[52px] bottom-[52px] w-px -translate-x-1/2"
-          style={{ background: LINE }}
+          style={{ background: `linear-gradient(${LINE}, ${GOLD}22, ${LINE})` }}
           aria-hidden="true"
         />
       )}
@@ -184,7 +343,7 @@ function RoleTabs({ activeRoleId, onSelect, orientation }) {
             onClick={() => onSelect(r.id)}
             className={
               vertical
-                ? 'relative z-10 flex flex-col items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-xl px-2 py-1'
+                ? 'relative z-10 flex flex-col items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-xl px-2 py-1.5 transition-transform duration-150 hover:-translate-y-0.5'
                 : 'shrink-0 flex items-center gap-2 rounded-full px-3.5 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-colors duration-150'
             }
             style={vertical ? { '--tw-ring-color': PLUM } : {
@@ -199,20 +358,24 @@ function RoleTabs({ activeRoleId, onSelect, orientation }) {
             {vertical ? (
               <>
                 <span
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-[15px] transition-colors duration-150"
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-[16px] transition-all duration-150"
                   style={{
-                    background: active ? PLUM : PAPER,
+                    background: active ? `linear-gradient(155deg, ${PLUM}, ${PLUM_DEEP})` : PAPER,
                     color: active ? '#fff' : MUTED,
                     border: `1.5px solid ${active ? PLUM : LINE}`,
+                    boxShadow: active ? `0 4px 14px -4px ${PLUM}66` : 'none',
                   }}
                 >
                   {r.icon}
                 </span>
                 <span
                   className="text-[10px] font-ui leading-none"
-                  style={{ color: active ? PLUM_DEEP : MUTED, fontWeight: active ? 600 : 500 }}
+                  style={{ color: active ? PLUM_DEEP : MUTED, fontWeight: active ? 700 : 500 }}
                 >
                   {r.label}
+                </span>
+                <span className="text-[8.5px] font-ui tabular-nums" style={{ color: active ? GOLD : '#C9BCC3' }}>
+                  {r.features.length} steps
                 </span>
               </>
             ) : (
@@ -262,7 +425,7 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
             </h1>
           </div>
           <p className="font-body text-[14px] sm:text-[14.5px] leading-relaxed mb-10 sm:mb-14 max-w-[480px]" style={{ color: MUTED }}>
-            You are {activeRole.tagline}. Here is everything you can do, walked through step by step.
+            You are {activeRole.tagline}. Here is everything you can do, in the same order it appears in your sidebar. We walked through step by step.
           </p>
 
           {filtered.length === 0 && (
@@ -284,8 +447,11 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
                   <span className="font-display text-[13px] tabular-nums shrink-0 mt-1" style={{ color: GOLD }}>
                     {String(fi + 1).padStart(2, '0')}
                   </span>
-                  <div>
-                    <h2 className="font-display text-[18px] sm:text-[20px] font-semibold text-[#111] mb-1.5">{f.title}</h2>
+                  <div className="min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-1.5">
+                      <h2 className="font-display text-[18px] sm:text-[20px] font-semibold text-[#111] m-0">{f.title}</h2>
+                      <Badge badge={f.badge} />
+                    </div>
                     <p className="font-body text-[13.5px] leading-relaxed m-0" style={{ color: MUTED }}>{f.desc}</p>
                   </div>
                 </div>
@@ -310,6 +476,19 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
                 </ol>
 
                 <ShotFrame src={shots[f.shotKey]} label={f.title} fileName={f.shotName} />
+
+                {f.extras?.map((ex) => (
+                  <div key={ex.title} className="rounded-xl p-4 flex flex-col gap-3" style={{ background: '#FBF6F9', border: `1px solid ${LINE}` }}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: BLUSH, color: PLUM }}>
+                        <FiZap size={10} />
+                      </span>
+                      <span className="font-ui text-[12.5px] font-semibold" style={{ color: PLUM_DEEP }}>{ex.title}</span>
+                    </div>
+                    <p className="font-body text-[12.5px] leading-relaxed m-0" style={{ color: MUTED }}>{ex.desc}</p>
+                    <ShotFrame src={shots[ex.shotKey]} label={ex.title} fileName={ex.shotName} compact />
+                  </div>
+                ))}
               </section>
             ))}
           </div>
@@ -320,16 +499,28 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
 }
 
 // ── Shortcut list — jump straight to a section in the center document ───
+// Auto-scrolls itself so the highlighted item always stays in view while
+// the center document scrolls (including all the way to the last item).
 function ShortcutList({ activeRole, activeFeatureId, onJump }) {
+  const listRef = useRef(null)
+  const itemRefs = useRef({})
+
+  useEffect(() => {
+    const el = itemRefs.current[activeFeatureId]
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [activeFeatureId])
+
   return (
-    <div className="flex-1 overflow-y-auto py-2">
+    <div ref={listRef} className="flex-1 overflow-y-auto py-2">
       {activeRole.features.map((f) => {
         const active = f.id === activeFeatureId
         return (
           <button
             key={f.id}
+            ref={(el) => { itemRefs.current[f.id] = el }}
             onClick={() => onJump(f.id)}
-            className="group w-full text-left flex items-center gap-3 px-6 py-2.5 focus:outline-none focus-visible:bg-[#FBF3F7]"
+            className="group w-full text-left flex items-center gap-3 px-6 py-2.5 focus:outline-none focus-visible:bg-[#FBF3F7] transition-colors duration-150"
+            style={{ background: active ? '#FBF3F7' : 'transparent', borderLeft: `2.5px solid ${active ? PLUM : 'transparent'}` }}
           >
             <span
               className="w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-150"
@@ -337,7 +528,7 @@ function ShortcutList({ activeRole, activeFeatureId, onJump }) {
               aria-hidden="true"
             />
             <span
-              className="font-body text-[12.5px] leading-snug transition-colors duration-150"
+              className="font-body text-[12.5px] leading-snug transition-colors duration-150 truncate"
               style={{ color: active ? PLUM_DEEP : MUTED, fontWeight: active ? 600 : 400 }}
             >
               {f.title}
@@ -384,7 +575,6 @@ export default function Guide() {
     sectionRefs.current[featureId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
-  // Global search across every role.
   useEffect(() => {
     if (!searchOpen) return
     searchInputRef.current?.focus()
@@ -412,6 +602,10 @@ export default function Guide() {
     }
   }, [activeRoleId, handleJump])
 
+  // Keep the right rail's highlight — and the progress bar — in sync while
+  // the person scrolls the center document manually. rootMargin biases
+  // toward the top so the *last* section can still become active once it
+  // scrolls into view, even if it never reaches the exact top edge.
   useEffect(() => {
     const root = scrollRef.current
     if (!root) return
@@ -424,14 +618,22 @@ export default function Guide() {
           setActiveFeatureId(topMost.target.id)
         }
       },
-      { root, rootMargin: '0px 0px -70% 0px', threshold: 0 }
+      { root, rootMargin: '0px 0px -60% 0px', threshold: 0 }
     )
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el))
 
     const onScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = root
       const max = scrollHeight - clientHeight
-      setProgress(max > 0 ? Math.min(100, (scrollTop / max) * 100) : 0)
+      const pct = max > 0 ? Math.min(100, (scrollTop / max) * 100) : 0
+      setProgress(pct)
+      // Right at the bottom of the doc, force the last section active —
+      // IntersectionObserver's shrunk rootMargin can otherwise leave the
+      // second-to-last item highlighted once the final section is short.
+      if (pct > 99) {
+        const last = activeRole.features[activeRole.features.length - 1]
+        if (last) setActiveFeatureId(last.id)
+      }
     }
     root.addEventListener('scroll', onScroll)
     onScroll()
@@ -440,7 +642,7 @@ export default function Guide() {
       observer.disconnect()
       root.removeEventListener('scroll', onScroll)
     }
-  }, [activeRoleId, query])
+  }, [activeRoleId, query, activeRole])
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden" style={{ background: PAPER }}>
@@ -484,7 +686,7 @@ export default function Guide() {
 
       <div className="flex-1 flex min-h-0">
         {/* Desktop left rail */}
-        <div className="hidden lg:flex w-[100px] shrink-0 border-r flex-col h-full" style={{ borderColor: LINE, background: PAPER }}>
+        <div className="hidden lg:flex w-[104px] shrink-0 border-r flex-col h-full" style={{ borderColor: LINE, background: PAPER }}>
           <div className="h-[60px] flex items-center justify-center border-b shrink-0" style={{ borderColor: LINE }}>
             <span className="font-ui font-semibold text-[10.5px] tracking-[2px]" style={{ color: MUTED }}>Role</span>
           </div>
@@ -504,8 +706,9 @@ export default function Guide() {
 
         {/* Desktop right rail */}
         <div className="hidden lg:flex w-[280px] shrink-0 border-l flex-col h-full" style={{ borderColor: LINE, background: PAPER }}>
-          <div className="h-[60px] flex items-center px-6 border-b shrink-0" style={{ borderColor: LINE }}>
+          <div className="h-[60px] flex items-center justify-between px-6 border-b shrink-0" style={{ borderColor: LINE }}>
             <span className="font-display font-semibold text-[14.5px] text-[#111]">On this page</span>
+            <span className="font-ui text-[10.5px] tabular-nums" style={{ color: MUTED }}>{activeRole.features.length}</span>
           </div>
           <AnimatePresence mode="wait">
             <motion.div key={activeRole.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} className="flex-1 min-h-0 flex flex-col">
