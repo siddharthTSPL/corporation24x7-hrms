@@ -133,12 +133,6 @@ const ensureAcknowledgementRecord = async (policy, actor) => {
   });
   if (existing) return existing;
 
-  let deadline = null;
-  if (policy.acknowledgementDeadlineDays) {
-    const base = policy.publishedAt ? new Date(policy.publishedAt) : new Date();
-    deadline = new Date(base.getTime() + policy.acknowledgementDeadlineDays * 24 * 60 * 60 * 1000);
-  }
-
   try {
     return await PolicyAcknowledgement.create({
       organisation_id: policy.organisation_id,
@@ -147,7 +141,6 @@ const ensureAcknowledgementRecord = async (policy, actor) => {
       employee: actor.id,
       employeeModel: actor.model,
       status: "PENDING",
-      deadline,
       employeeSnapshot: {
         name: actor.name || "",
         empid: actor.empid || "",
@@ -178,10 +171,6 @@ const getPolicyStatusListForActor = async (actor) => {
 
   const results = [];
   for (const policy of policies) {
-    if (!policy.acknowledgementRequired || policy.priority === "informational") {
-      results.push({ policy, acknowledgement: null });
-      continue;
-    }
     const ack = await ensureAcknowledgementRecord(policy, actor);
     results.push({ policy, acknowledgement: ack });
   }
@@ -189,15 +178,13 @@ const getPolicyStatusListForActor = async (actor) => {
 };
 
 /**
- * Just the pending, MANDATORY, acknowledgement-required policies — the
+ * Just the pending policies — the
  * set that should block access until cleared.
  */
 const getPendingMandatoryPolicies = async (actor) => {
   const list = await getPolicyStatusListForActor(actor);
   return list.filter(
     (entry) =>
-      entry.policy.priority === "mandatory" &&
-      entry.policy.acknowledgementRequired &&
       entry.acknowledgement &&
       entry.acknowledgement.status !== "ACKNOWLEDGED"
   );
