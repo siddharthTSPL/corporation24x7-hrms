@@ -32,7 +32,10 @@ const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
-const { getOrganisationStorageUsage } = require("../utils/storageUsage.utils");
+const {
+  getOrganisationStorageUsage,
+  getOrganisationStorageFiles,
+} = require("../utils/storageUsage.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -3122,14 +3125,34 @@ const getStorageUsage = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const organisation_id = req.superAdmin._id;
-    const usage = await getOrganisationStorageUsage(organisation_id);
+    const usage = await getOrganisationStorageUsage(req.superAdmin, {
+      force: req.query.refresh === "1",
+    });
 
     return res.status(200).json({
       success: true,
-      generatedAt: new Date(),
       ...usage,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getStorageFiles = async (req, res, next) => {
+  try {
+    if (!req.superAdmin) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { module = "", search = "", page = 1, limit = 10 } = req.query;
+    const result = await getOrganisationStorageFiles(req.superAdmin, {
+      module,
+      search,
+      page,
+      limit,
+    });
+
+    return res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
   }
@@ -3192,4 +3215,5 @@ module.exports = {
   setLeavePolicy,
   getperticularadmin,
   getStorageUsage,
+  getStorageFiles,
 };
