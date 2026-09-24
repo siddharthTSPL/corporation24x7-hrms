@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
@@ -102,8 +102,33 @@ function Divider() {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVBAR FIX — landing page file (landingpage.jsx)
+//
+// STEP 1: import line badlo (useLocation add karna hai)
+//   import { useNavigate, Link, useLocation } from 'react-router-dom'
+//
+// STEP 2: purana `export function Navbar(...) { ... }` delete karke
+//         neeche wala `useSectionNav` + `Navbar` paste karo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Landing page ('/') par normal #hash scroll chalta hai.
+// Kisi aur page (jaise /about) par ho to pehle '/' par jaate hain aur
+// landing page ko bata dete hain ki kis section tak scroll karna hai.
+function useSectionNav() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+
+  return (e, id) => {
+    if (pathname === '/') return // landing page par hi ho -> default anchor scroll
+    e.preventDefault()
+    navigate('/', { state: { scrollTo: id } })
+  }
+}
+
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const navigate = useNavigate()
+  const goToSection = useSectionNav()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -121,6 +146,15 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
     document.body.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleLinkClick = (e, label) => {
+    if (label === 'About') {
+      e.preventDefault()
+      navigate('/about')
+      return
+    }
+    goToSection(e, label.toLowerCase())
+  }
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 w-full z-[9999] bg-white transition-shadow duration-300 ${
@@ -129,31 +163,26 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
     >
       <div className="max-w-[1500px] mx-auto px-5 sm:px-10 lg:px-16 h-[72px] flex items-center justify-between">
         <button
-  type="button"
-  onClick={() => {
-    window.location.href = '/'
-  }}
-  className="bg-transparent border-none p-0 m-0 cursor-pointer"
-  aria-label="Go to home"
->
-  <img
-    src={logo}
-    alt="TorchX Talent logo"
-    className="h-9 sm:h-11 w-auto object-contain block"
-  />
-</button>
+          type="button"
+          onClick={() => {
+            window.location.href = '/'
+          }}
+          className="bg-transparent border-none p-0 m-0 cursor-pointer"
+          aria-label="Go to home"
+        >
+          <img
+            src={logo}
+            alt="TorchX Talent logo"
+            className="h-9 sm:h-11 w-auto object-contain block"
+          />
+        </button>
 
         <div className="hidden lg:flex items-center gap-9">
           {links.map(l => (
             <a
               key={l}
               href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
-              onClick={(e) => {
-                if (l === 'About') {
-                  e.preventDefault()
-                  navigate('/about')
-                }
-              }}
+              onClick={(e) => handleLinkClick(e, l)}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
             >
               {l}
@@ -183,10 +212,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
               key={l}
               href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
               onClick={(e) => {
-                if (l === 'About') {
-                  e.preventDefault()
-                  navigate('/about')
-                }
+                handleLinkClick(e, l)
                 setOpen(false)
               }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
@@ -1342,8 +1368,8 @@ export function Footer() {
       { label: 'Payroll', href: '' },
     ] },
     { title: 'Solutions', links: [
-      { label: 'Features', href: '/features' },
-      { label: 'Pricing', href: '/pricing' },
+      { label: 'Features', href: '#features' },
+      { label: 'Pricing', href: '#pricing' },
     ] },
     { title: 'Resources', links: [
       { label: 'Documentation', to: '/documentation' },
