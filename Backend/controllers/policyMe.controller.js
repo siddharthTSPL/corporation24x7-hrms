@@ -41,7 +41,6 @@ const serializeEntry = (entry) => ({
         assignedAt: entry.acknowledgement.assignedAt,
         viewedAt: entry.acknowledgement.viewedAt,
         acknowledgedAt: entry.acknowledgement.acknowledgedAt,
-        deadline: entry.acknowledgement.deadline,
       }
     : null,
 });
@@ -116,14 +115,11 @@ const viewPolicy = async (req, res) => {
     }).populate("currentVersion");
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
 
-    let acknowledgement = null;
-    if (policy.acknowledgementRequired && policy.priority !== "informational") {
-      acknowledgement = await ensureAcknowledgementRecord(policy, actor);
-      if (acknowledgement && acknowledgement.status === "PENDING") {
-        acknowledgement.status = "VIEWED";
-        acknowledgement.viewedAt = new Date();
-        await acknowledgement.save();
-      }
+    const acknowledgement = await ensureAcknowledgementRecord(policy, actor);
+    if (acknowledgement && acknowledgement.status === "PENDING") {
+      acknowledgement.status = "VIEWED";
+      acknowledgement.viewedAt = new Date();
+      await acknowledgement.save();
     }
 
     return res.status(200).json({ success: true, ...serializeEntry({ policy, acknowledgement }) });
