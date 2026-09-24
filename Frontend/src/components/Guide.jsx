@@ -133,6 +133,12 @@ const MUTED = '#8A7C85'
 const PLAN_BADGE = { label: 'Plan feature', hint: 'Only shown if your organisation\u2019s plan includes this.' }
 const COND_BADGE = { label: 'Conditional', hint: 'Only shown when this is enabled for your role.' }
 
+// `noShot: true` — feature works exactly the same way across roles, so no
+// screenshot is needed here at all. The content explains it on its own and
+// CenterPanel skips ShotFrame entirely for these (not even a placeholder
+// box shows up). Add this flag to any other feature you want to keep
+// screenshot-free — nothing else needs to change.
+
 const SIGNIN_STEPS = [
   { id: 'sa-search', title: 'Search for TorchX Talent', desc: 'Look up TorchX Talent on Google (or any search engine) to reach the official website.', steps: ['Type "TorchX Talent" into the search bar and hit search.'], shotKey: 'saSearch', shotName: 'search.png' },
   { id: 'sa-search-result', title: 'Pick the official result', desc: 'The official TorchX Talent website shows up as the top result.', steps: ['Click the top result to open the official TorchX Talent site.'], shotKey: 'saSearchResult', shotName: 'search-result.png' },
@@ -203,7 +209,7 @@ const roles = [
       { id: 'ad-announcement', title: 'Announcement', desc: 'Create and publish announcements for your organisation.', steps: ['Open "Announcement" in the sidebar.', 'Click "New Announcement" (the highlighted button) and write your update.', 'Publish \u2014 it\u2019s instantly visible to your managers and employees.'] , shotKey: 'adAnnouncement', shotName: 'ad-announcement.png' },
       { id: 'ad-review', title: 'Review', desc: 'Run and track performance reviews for your team.', steps: ['Open "Review" in the sidebar.', 'Start a new review cycle or continue one already in progress.'], shotKey: 'adReview', shotName: 'ad-review.png', badge: PLAN_BADGE },
       { id: 'ad-leave', title: 'Leave', desc: 'Approve or reject leave requests from managers and employees.', steps: ['Open "Leave" in the sidebar.', 'Use the tabs to review pending requests, check your own balance, or apply for your own leave/WFH.', 'Approve or reject each request \u2014 the employee is notified either way.'], shotKey: 'adLeave', shotName: 'ad-leave.png' },
-      { id: 'ad-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar.', 'Browse the org chart, or edit departments and reporting lines.'], shotKey: 'adOrganisation', shotName: 'ad-organisation.png' },
+      { id: 'ad-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar.', 'Browse the org chart, or edit departments and reporting lines.'], shotKey: 'adOrganisation', shotName: 'ad-organisation.png', noShot: true },
       { id: 'ad-asset', title: 'Asset Management', desc: 'Assign, revoke, and track company assets.', steps: ['Open "Asset Management" in the sidebar.', 'Add a new asset, or assign/revoke one for an employee.'], shotKey: 'adAsset', shotName: 'ad-asset.png', badge: PLAN_BADGE },
       { id: 'ad-face-attendance', title: 'Face Attendance', desc: 'Enroll employee faces for kiosk-based attendance.', steps: ['Open "Face Attendance" in the sidebar.', 'Select an employee and capture their face for kiosk check-in.'], shotKey: 'adFaceAttendance', shotName: 'ad-face-attendance.png' },
       { id: 'ad-recruitment', title: 'Recruitment', desc: 'Post hiring requisitions and track candidates.', steps: ['Open "Recruitment" in the sidebar.', 'Click "Add Candidate" or create a hiring requisition, then track its status.'], shotKey: 'adRecruitment', shotName: 'ad-recruitment.png', badge: PLAN_BADGE },
@@ -214,9 +220,9 @@ const roles = [
       { id: 'ad-management', title: 'TorchX Management', desc: 'Manage your organisation\u2019s TorchX product access.', steps: ['Open "TorchX Management" in the sidebar.', 'Review or update which TorchX products your organisation has access to.'], shotKey: 'adManagement', shotName: 'ad-management.png' },
       { id: 'ad-document', title: 'Document', desc: 'Upload and manage your own documents.', steps: ['Open "Document" in the sidebar.', 'Upload a file and organise it into the right folder.'], shotKey: 'adDocument', shotName: 'ad-document.png' },
       { id: 'ad-team-document', title: 'Team Document', desc: 'View documents uploaded by your team.', steps: ['Open "Team Document" in the sidebar.', 'Browse or download anything your team has uploaded.'], shotKey: 'adTeamDocument', shotName: 'ad-team-document.png' },
-      { id: 'ad-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'adSettings', shotName: 'ad-settings.png' },
+      { id: 'ad-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'adSettings', shotName: 'ad-settings.png', noShot: true },
       { id: 'ad-policy-management', title: 'Policy Management', desc: 'Create, publish, and track acknowledgement of company policies.', steps: ['Open "Policy Management" in the sidebar.', 'Create a policy, choose its audience, and publish it.'], shotKey: 'adPolicy', shotName: 'ad-policy-management.png' },
-      { id: 'ad-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'adMyPolicies', shotName: 'ad-my-policies.png' },
+      { id: 'ad-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'adMyPolicies', shotName: 'ad-my-policies.png', noShot: true },
       { id: 'ad-field-ops', title: 'Field Operations', desc: 'Create field teams and monitor live duty locations and visits.', steps: ['Open "Field Operations" in the sidebar.', 'Create a field team and watch live locations and visit logs on the map.'], shotKey: 'adFieldOps', shotName: 'ad-field-ops.png', badge: COND_BADGE },
     ],
   },
@@ -239,15 +245,15 @@ const roles = [
       { id: 'mg-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'mgSelfService', shotName: 'mg-self-service.png' },
       { id: 'mg-leave', title: 'Leave', desc: 'Approve or forward leave requests from your team.', steps: ['Open "Leave" in the sidebar.', 'Use the tabs to review your team\u2019s requests, check your own balance, or apply for your own leave.', 'Approve or reject with a remark.'], shotKey: 'mgLeave', shotName: 'leave-wfh.png' },
       { id: 'mg-announcement', title: 'Announcement', desc: 'View and share announcements with your team.', steps: ['Open "Announcement" in the sidebar \u2014 the latest updates from your admin appear first.'], shotKey: 'mgAnnouncement', shotName: 'mg-announcement.png' },
-      { id: 'mg-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to browse the org chart.'], shotKey: 'mgOrganisation', shotName: 'mg-organisation.png' },
+      { id: 'mg-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to browse the org chart.'], shotKey: 'mgOrganisation', shotName: 'mg-organisation.png', noShot: true },
       { id: 'mg-reviews', title: 'Review', desc: 'Run performance reviews for your reportees.', steps: ['Open "Review" in the sidebar.', 'Open an assigned review cycle, rate each team member, and add written feedback.', 'Submit \u2014 the Admin then sees the cycle summary.'], shotKey: 'mgReviews', shotName: 'mg-reviews.png', badge: PLAN_BADGE },
       { id: 'mg-timesheet', title: 'Timesheet', desc: 'Track and approve your team\u2019s timesheets.', steps: ['Open "Timesheet" in the sidebar.', 'Check each member\u2019s logged hours and approve, or flag a discrepancy with a comment.'], shotKey: 'mgTimesheet', shotName: 'mg-timesheet.png', badge: PLAN_BADGE },
       { id: 'mg-reimbursement', title: 'Reimbursements', desc: 'Submit and track your reimbursement claims.', steps: ['Open "Reimbursements" in the sidebar.', 'Click "New Claim", attach a receipt, and submit for approval.'], shotKey: 'mgReimbursement', shotName: 'mg-reimbursement.png' },
       { id: 'mg-file', title: 'File', desc: 'Upload and manage documents.', steps: ['Open "File" in the sidebar.', 'Upload a document and choose who should have access.'], shotKey: 'mgFile', shotName: 'mg-file.png' },
       { id: 'mg-recruitment', title: 'Recruitment', desc: 'Track hiring requisitions and candidates.', steps: ['Open "Recruitment" in the sidebar.', 'Review open requisitions and update candidate status as they move through the pipeline.'], shotKey: 'mgRecruitment', shotName: 'mg-recruitment.png', badge: PLAN_BADGE },
       { id: 'mg-voice', title: 'TorchX Voice', desc: 'Raise a support ticket.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to track one you\u2019ve raised.'], shotKey: 'mgVoice', shotName: 'mg-voice.png', badge: PLAN_BADGE },
-      { id: 'mg-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'mgSettings', shotName: 'mg-settings.png' },
-      { id: 'mg-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'mgMyPolicies', shotName: 'mg-my-policies.png' },
+      { id: 'mg-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'mgSettings', shotName: 'mg-settings.png', noShot: true },
+      { id: 'mg-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'mgMyPolicies', shotName: 'mg-my-policies.png', noShot: true },
       { id: 'mg-field-ops', title: 'Field Operations', desc: 'Monitor live locations, visits, and progress for your assigned field teams.', steps: ['Open "Field Operations" in the sidebar.', 'Watch live locations and visit logs for your assigned teams on the map.'], shotKey: 'mgFieldOps', shotName: 'mg-field-ops.png', badge: COND_BADGE },
     ],
   },
@@ -271,14 +277,14 @@ const roles = [
       { id: 'em-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'emSelfService', shotName: 'em-self-service.png' },
       { id: 'em-leave', title: 'Leave', desc: 'Apply for leave and track your leave balance.', steps: ['Open "Leave" in the sidebar and open the "Apply Leave" tab.', 'Select the leave type and dates, write a reason, and submit \u2014 your manager gets notified.', 'Track the status in the same tab, and check "Leave Balance" any time.'], shotKey: 'emLeave', shotName: 'apply-leave.png' },
       { id: 'em-announcement', title: 'Announcement', desc: 'See company announcements.', steps: ['Open "Announcement" in the sidebar \u2014 every update your organisation publishes appears here, newest first.'], shotKey: 'emAnnouncement', shotName: 'em-announcement.png' },
-      { id: 'em-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to see where you sit in the org chart.'], shotKey: 'emOrganisation', shotName: 'em-organisation.png' },
+      { id: 'em-organisation', title: 'Organisation', desc: 'View your organisation\u2019s structure and org chart.', steps: ['Open "Organisation" in the sidebar to see where you sit in the org chart.'], shotKey: 'emOrganisation', shotName: 'em-organisation.png', noShot: true },
       { id: 'em-review', title: 'Review', desc: 'See the performance reviews your manager has given you.', steps: ['Open "Review" in the sidebar to see your ratings and written feedback.'], shotKey: 'emReview', shotName: 'em-review.png', badge: PLAN_BADGE },
       { id: 'em-timesheet', title: 'Timesheet', desc: 'Log your hours and track your timesheet.', steps: ['Open "Timesheet" in the sidebar.', 'Log your hours for the day/week and submit.'], shotKey: 'emTimesheet', shotName: 'em-timesheet.png', badge: PLAN_BADGE },
       { id: 'em-reimbursement', title: 'Reimbursements', desc: 'Submit and track your reimbursement claims.', steps: ['Open "Reimbursements" in the sidebar.', 'Click "New Claim", attach a receipt, and submit for approval.'], shotKey: 'emReimbursement', shotName: 'em-reimbursement.png' },
       { id: 'em-file', title: 'File', desc: 'Upload and manage your personal documents.', steps: ['Open "File" in the sidebar.', 'Click a document to view or download it, such as your payslip or offer letter.'], shotKey: 'emFile', shotName: 'em-file.png' },
       { id: 'em-voice', title: 'TorchX Voice', desc: 'Raise a support ticket for any issue.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to check the status of one you\u2019ve already sent.'], shotKey: 'emVoice', shotName: 'em-voice.png', badge: PLAN_BADGE },
       { id: 'em-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Click "Edit" to update your details and upload any required documents.', 'Save your changes.'], shotKey: 'emSettings', shotName: 'my-profile.png' },
-      { id: 'em-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'emMyPolicies', shotName: 'em-my-policies.png' },
+      { id: 'em-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'emMyPolicies', shotName: 'em-my-policies.png', noShot: true },
     ],
   },
 ]
@@ -475,7 +481,12 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
                   ))}
                 </ol>
 
-                <ShotFrame src={shots[f.shotKey]} label={f.title} fileName={f.shotName} />
+                {/* Screenshot skipped entirely (no placeholder box either) when
+                    this feature works identically across roles — mark it with
+                    `noShot: true` on the feature object above to opt out. */}
+                {!f.noShot && (
+                  <ShotFrame src={shots[f.shotKey]} label={f.title} fileName={f.shotName} />
+                )}
 
                 {f.extras?.map((ex) => (
                   <div key={ex.title} className="rounded-xl p-4 flex flex-col gap-3" style={{ background: '#FBF6F9', border: `1px solid ${LINE}` }}>
@@ -486,7 +497,9 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
                       <span className="font-ui text-[12.5px] font-semibold" style={{ color: PLUM_DEEP }}>{ex.title}</span>
                     </div>
                     <p className="font-body text-[12.5px] leading-relaxed m-0" style={{ color: MUTED }}>{ex.desc}</p>
-                    <ShotFrame src={shots[ex.shotKey]} label={ex.title} fileName={ex.shotName} compact />
+                    {!ex.noShot && (
+                      <ShotFrame src={shots[ex.shotKey]} label={ex.title} fileName={ex.shotName} compact />
+                    )}
                   </div>
                 ))}
               </section>
@@ -688,7 +701,17 @@ export default function Guide() {
         {/* Desktop left rail */}
         <div className="hidden lg:flex w-[104px] shrink-0 border-r flex-col h-full" style={{ borderColor: LINE, background: PAPER }}>
           <div className="h-[60px] flex items-center justify-center border-b shrink-0" style={{ borderColor: LINE }}>
-            <span className="font-ui font-semibold text-[10.5px] tracking-[2px]" style={{ color: MUTED }}>Role</span>
+            <span
+              className="font-ui font-bold text-[10px] tracking-[2.5px] uppercase px-2.5 py-1 rounded-full"
+              style={{
+                color: PLUM_DEEP,
+                background: `linear-gradient(135deg, ${BLUSH}, #fff)`,
+                border: `1px solid ${PLUM}33`,
+                boxShadow: `0 1px 4px -1px ${PLUM}22`,
+              }}
+            >
+              Role
+            </span>
           </div>
           <RoleTabs activeRoleId={activeRoleId} onSelect={handleRoleSelect} orientation="vertical" />
         </div>
