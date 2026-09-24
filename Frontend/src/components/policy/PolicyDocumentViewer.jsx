@@ -70,7 +70,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
             src={version.pdfUrl}
             title={policy.title}
             className="w-full"
-            style={{ height: compact ? 380 : 520, border: "none" }}
+            style={{ height: compact ? "55vh" : 520, minHeight: compact ? 380 : undefined, border: "none" }}
           />
         </div>
       )}
