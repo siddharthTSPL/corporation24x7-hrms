@@ -241,7 +241,6 @@ const roles = [
         ],
         shotKey: 'mgDashboard', shotName: 'mg-dashboard.png',
       },
-      { id: 'mg-attendance', title: 'Track your team\u2019s attendance', desc: 'See your direct reports\u2019 attendance for today, plus a calendar view for the month.', steps: ['On the dashboard, check today\u2019s present/absent count for your team.', 'Open the calendar to review any earlier day.', 'Click a team member to see their attendance history.'], shotKey: 'mgAttendance', shotName: 'mg-attendance.png' },
       { id: 'mg-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'mgSelfService', shotName: 'mg-self-service.png' },
       { id: 'mg-leave', title: 'Leave', desc: 'Approve or forward leave requests from your team.', steps: ['Open "Leave" in the sidebar.', 'Use the tabs to review your team\u2019s requests, check your own balance, or apply for your own leave.', 'Approve or reject with a remark.'], shotKey: 'mgLeave', shotName: 'leave-wfh.png' },
       { id: 'mg-announcement', title: 'Announcement', desc: 'View and share announcements with your team.', steps: ['Open "Announcement" in the sidebar \u2014 the latest updates from your admin appear first.'], shotKey: 'mgAnnouncement', shotName: 'mg-announcement.png' },
@@ -254,7 +253,6 @@ const roles = [
       { id: 'mg-voice', title: 'TorchX Voice', desc: 'Raise a support ticket.', steps: ['Open "TorchX Voice" in the sidebar.', 'Switch to "Submit New" to raise a ticket, or "My Tickets" to track one you\u2019ve raised.'], shotKey: 'mgVoice', shotName: 'mg-voice.png', badge: PLAN_BADGE },
       { id: 'mg-settings', title: 'Settings', desc: 'Update your profile and account preferences.', steps: ['Open "Settings" in the sidebar.', 'Update your details or preferences and save.'], shotKey: 'mgSettings', shotName: 'mg-settings.png', noShot: true },
       { id: 'mg-my-policies', title: 'My Policies', desc: 'Read and acknowledge policies assigned to you.', steps: ['Open "My Policies" in the sidebar.', 'Read a policy and click "Acknowledge" to confirm you\u2019ve read it.'], shotKey: 'mgMyPolicies', shotName: 'mg-my-policies.png', noShot: true },
-      { id: 'mg-field-ops', title: 'Field Operations', desc: 'Monitor live locations, visits, and progress for your assigned field teams.', steps: ['Open "Field Operations" in the sidebar.', 'Watch live locations and visit logs for your assigned teams on the map.'], shotKey: 'mgFieldOps', shotName: 'mg-field-ops.png', badge: COND_BADGE },
     ],
   },
   {
