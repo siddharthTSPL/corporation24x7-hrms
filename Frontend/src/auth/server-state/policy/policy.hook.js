@@ -131,6 +131,8 @@ export const useGateStatus = (options = {}) =>
     staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 10000,
     ...options,
   });
 
