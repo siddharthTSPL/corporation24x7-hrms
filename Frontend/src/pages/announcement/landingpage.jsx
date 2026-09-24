@@ -869,18 +869,47 @@ function Features() {
 }
 
 
+// Replace the existing `function Pricing() { ... }` in your landing page file with this.
+// It uses the same imports/helpers that already exist in that file:
+// useState, motion, fadeUp, Wrap, FiCheck, FiX, FiHardDrive, FiShield, FiLink,
+// FiActivity, FiBookOpen, HiOutlineSparkles
+
 function Pricing() {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
 
   const plans = [
+    {
+      name: 'Free Forever',
+      desc: 'Great Start for Startup and microteams.',
+      inherits: null,
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      features: [
+        'Geo Tag Attendance',
+        'Face Attendence',
+        'Monitoring of Employee Active and Idle Time',
+        'Leave management',
+        'Basic payroll',
+        'Analytical and Digital Dashboard',
+        'Announcements',
+        'Team Documentation',
+        'Reimbursement',
+        'Employee Self-Service Portal',
+        'Policy Management',
+        'Custom workflow',
+        'Grievance Management',
+        'Email support (24/7)',
+      ],
+      crossFeatures: []
+    },
     {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Employee Self-Service Portal','Policy Management','Reimbursement','Custom workflow','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Telephonic Support (24/7)'] // features listed here get a cross instead of a tick
     },
     {
       name: 'Advance',
@@ -889,13 +918,13 @@ function Pricing() {
       monthlyPrice: 99,
       yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom workflow','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
       crossFeatures: []
     },
     {
       name: 'Enterprise',
       desc: 'Ultimate power and flexibility',
-      inherits: 'Everything in Advance +', // <- price ke neeche dark/bold highlighted dikhega
+      inherits: 'Everything in Advance +',
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
@@ -909,6 +938,13 @@ function Pricing() {
       ],
       crossFeatures: []
     }
+  ]
+
+  const storage = [
+    { label: 'Free Forever', val: '5 MB' },
+    { label: 'Basic', val: '2 GB' },
+    { label: 'Advance', val: '20 GB' },
+    { label: 'Enterprise', val: '100 GB' },
   ]
 
   const badges = [
@@ -962,17 +998,19 @@ function Pricing() {
             </div>
           </div>
 
-          {/* items-stretch (not items-center) so every card fills the row's full height —
-              combined with h-full below, this keeps Basic / Advance / Enterprise
-              all exactly the same size regardless of how many features each lists. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
+          {/* Responsive plan grid:
+              mobile  (<768px)   -> 1 column
+              tablet  (768-1279) -> 2 x 2
+              desktop (>=1280px) -> 4 in one row
+              items-stretch + h-full on each card keeps all four the same height. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
+                  className={`relative rounded-3xl p-6 sm:p-8 xl:p-6 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
                     p.popular ? 'relative z-[5]' : 'hover:scale-[1.02]'
                   }`}
                 >
@@ -986,12 +1024,14 @@ function Pricing() {
                     <div className="text-xs font-body text-[#999] leading-relaxed">{p.desc}</div>
                   </div>
                   <div>
-                    <span className="text-[38px] font-display font-extrabold text-[#111]">
-                      {price !== null ? `₹${price}` : 'Custom'}
-                    </span>
-                    {price !== null && (
-                      <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
-                    )}
+                    <div className="flex flex-wrap items-baseline gap-x-1">
+                      <span className="text-[34px] sm:text-[38px] xl:text-[34px] font-display font-extrabold text-[#111] leading-tight">
+                        {price !== null ? `₹${price}` : 'Custom'}
+                      </span>
+                      {price !== null && (
+                        <span className="text-sm font-body text-[#999]">{suffix}</span>
+                      )}
+                    </div>
                     {p.inherits && (
                       <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">
                         {p.inherits}
@@ -1021,20 +1061,24 @@ function Pricing() {
             })}
           </div>
 
-          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 mb-6 border-2 border-[#7A004B]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 items-center">
-              <div className="flex items-center gap-2.5">
+          {/* Storage guidance:
+              mobile  -> title on top, 2 x 2 storage tiles
+              tablet  -> title on top, 4 tiles in one row
+              desktop -> title + 4 tiles in one row */}
+          <div className="bg-[#FDF4F8] rounded-[20px] px-5 sm:px-8 py-6 mb-6 border-2 border-[#7A004B]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] gap-x-3 gap-y-6 sm:gap-4 items-center">
+              <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-center gap-2.5">
                 <FiHardDrive className="text-[#7A004B] text-[22px] shrink-0" />
                 <div>
                   <div className="text-[13px] font-display font-bold text-[#111]">Storage Guidance</div>
                   <div className="text-[11px] font-body text-[#aaa] leading-snug">Finance documents, invoices, receipts, ledgers grow fast.</div>
                 </div>
               </div>
-              {[{ label: 'Startup', val: '2 GB' }, { label: 'Business', val: '20 GB' }, { label: 'Enterprise', val: '100 GB' }].map(s => (
+              {storage.map(s => (
                 <div key={s.label} className="text-center">
                   <div className="text-2xl font-display font-extrabold text-[#111]">{s.val}</div>
                   <div className="text-[10px] text-[#aaa] font-body mb-1">Per company</div>
-                  <span className="text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
+                  <span className="inline-block whitespace-nowrap text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -1052,7 +1096,7 @@ function Pricing() {
             ))}
           </div>
 
-          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#EAC7D7]">
+          <div className="bg-[#FDF4F8] rounded-[20px] px-5 sm:px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#EAC7D7]">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 bg-[#7A004B]/[0.09] rounded-full flex items-center justify-center shrink-0">
                 <HiOutlineSparkles className="text-[#7A004B] text-xl" />
@@ -1073,7 +1117,7 @@ function Pricing() {
       </Wrap>
     </section>
   )
-} 
+}
 
 
 
