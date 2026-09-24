@@ -68,9 +68,6 @@ const policySchema = new mongoose.Schema(
     },
 
     effectiveFrom: { type: Date, default: Date.now },
-    // Grace period, in days from the moment a policy/version is published,
-    // after which a pending acknowledgement is flagged "Overdue".
-    acknowledgementDeadlineDays: { type: Number, default: null },
 
     currentVersion: { type: mongoose.Schema.Types.ObjectId, ref: "PolicyVersion", default: null },
     versionCount: { type: Number, default: 0 },
