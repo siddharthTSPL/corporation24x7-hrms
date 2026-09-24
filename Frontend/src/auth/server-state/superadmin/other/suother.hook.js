@@ -8,6 +8,7 @@ import {
   getAttendanceOverview,
   getAttendanceHistory,
   getOrgInfo,
+  getStorageUsage,
   changeSuperAdminPassword,
   forgotPasswordSuperAdmin,
   verifySuperAdminOtp,
@@ -135,6 +136,19 @@ export const useGetOrgInfo = () => {
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchInterval: 1000 * 60 * 1,
+  });
+};
+
+// Powers the "Storage" tab in Settings. Not auto-refetched on an interval —
+// it does a handful of live MongoDB aggregations + an ImageKit API call, so
+// only refetch on demand (mount / manual "Refresh").
+export const useGetStorageUsage = (options = {}) => {
+  return useQuery({
+    queryKey: ["storage-usage"],
+    queryFn: getStorageUsage,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+    ...options,
   });
 };
 

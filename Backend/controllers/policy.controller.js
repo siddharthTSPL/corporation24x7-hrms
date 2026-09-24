@@ -24,13 +24,16 @@ const getManagementActor = (req) => {
   return { account, actorModel };
 };
 
-const uploadBufferToImageKit = async (file, folder) => {
+const uploadBufferToImageKit = async (file, folder, organisationId) => {
   const fileBase64 = file.buffer.toString("base64");
   return imagekit.upload({
     file: fileBase64,
     fileName: file.originalname,
     folder,
     useUniqueFileName: true,
+    // Tags the file with its owning org so /superadmin/storage-usage can
+    // sum real ImageKit storage per organisation via listFiles(tags).
+    tags: organisationId ? [String(organisationId)] : undefined,
   });
 };
 
@@ -168,7 +171,7 @@ const createVersionForPolicy = async (policy, { pdfFile, imageFiles, releaseNote
   const images = [];
 
   if (pdfFile) {
-    const uploaded = await uploadBufferToImageKit(pdfFile, "/policies/documents");
+    const uploaded = await uploadBufferToImageKit(pdfFile, "/policies/documents", policy.organisation_id);
     pdfUrl = uploaded.url;
     pdfFileId = uploaded.fileId;
     pdfFileName = pdfFile.originalname;
@@ -176,7 +179,7 @@ const createVersionForPolicy = async (policy, { pdfFile, imageFiles, releaseNote
   }
 
   for (const img of imageFiles || []) {
-    const uploaded = await uploadBufferToImageKit(img, "/policies/photos");
+    const uploaded = await uploadBufferToImageKit(img, "/policies/photos", policy.organisation_id);
     images.push({ url: uploaded.url, fileId: uploaded.fileId, caption: img.originalname });
   }
 

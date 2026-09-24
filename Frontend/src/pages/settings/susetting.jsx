@@ -8,6 +8,7 @@ import {
   useChangeSuperAdminPassword,
   useKioskPasswordStatus,
   useSetKioskPassword,
+  useGetStorageUsage,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
@@ -68,6 +69,18 @@ function formatDate(dateStr) {
 function formatRole(role) {
   if (!role) return "—";
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "—";
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
+  const value = bytes / Math.pow(1024, i);
+  return `${value < 10 && i > 0 ? value.toFixed(2) : value < 100 && i > 0 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 }
 
 function daysLeft(dateStr) {
@@ -413,6 +426,32 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             width="4"
             height="5"
             rx="1"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "storage",
+      label: "Storage",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <ellipse
+            cx="8"
+            cy="4"
+            rx="6"
+            ry="2.2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 4v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 8v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V8"
             stroke="currentColor"
             strokeWidth="1.4"
           />
@@ -1528,6 +1567,221 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
+// Small horizontal split bar showing what share of total storage each
+// segment takes up. `segments`: [{ label, bytes, color }]
+function StorageSplitBar({ segments, totalBytes }) {
+  const safeTotal = totalBytes || 1;
+  return (
+    <div className="w-full">
+      <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-[#f3ede9]">
+        {segments.map((seg, i) => {
+          const pct = Math.max(0, (seg.bytes / safeTotal) * 100);
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={i}
+              style={{ width: `${pct}%`, background: seg.color }}
+              className="h-full"
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[11px] text-[#8a7570]">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: seg.color }}
+            />
+            {seg.label} · {formatBytes(seg.bytes)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StorageStatCard({ label, value, sublabel, accent }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 relative overflow-hidden">
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px]"
+        style={{ background: accent }}
+      />
+      <div className="text-[11px] text-[#b0948a] font-medium mb-1">{label}</div>
+      <div className="text-xl sm:text-2xl font-semibold text-[#2a1a16]">{value}</div>
+      {sublabel && (
+        <div className="text-[11px] text-[#b0948a] mt-1">{sublabel}</div>
+      )}
+    </div>
+  );
+}
+
+// A simple ranked list row with a proportional mini-bar, used for both the
+// per-collection (MongoDB) and per-folder (ImageKit) breakdowns.
+function StorageBreakdownRow({ label, sublabel, bytes, maxBytes, color }) {
+  const pct = maxBytes > 0 ? Math.max(2, (bytes / maxBytes) * 100) : 0;
+  return (
+    <div className="py-2.5 border-b border-[#f3ede9] last:border-b-0">
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <div className="text-[13px] text-[#2a1a16] font-medium truncate">{label}</div>
+        <div className="text-[13px] text-[#2a1a16] font-semibold whitespace-nowrap">
+          {formatBytes(bytes)}
+        </div>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-[#f3ede9] overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: color }}
+        />
+      </div>
+      {sublabel && (
+        <div className="text-[11px] text-[#b0948a] mt-1">{sublabel}</div>
+      )}
+    </div>
+  );
+}
+
+function StorageTab() {
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useGetStorageUsage();
+
+  const usage = data;
+  const database = usage?.database;
+  const files = usage?.files;
+  const totalBytes = usage?.totalBytes || 0;
+
+  const maxCollectionBytes = database?.collections?.[0]?.bytes || 0;
+  const maxFolderBytes = files?.folders?.[0]?.bytes || 0;
+
+  return (
+    <>
+      <SectionCard
+        title="Storage usage"
+        subtitle="How much MongoDB data and ImageKit file storage your organisation is using right now"
+        accent={C.brand}
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-3 py-6">
+            <Spinner size={20} color={C.brand} />
+            <span className="text-sm text-[#b0948a]">Calculating storage usage...</span>
+          </div>
+        ) : isError ? (
+          <div className="text-sm text-[#E24B4A]">
+            Couldn't load storage usage: {getErrorMessage(error)}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+              <StorageStatCard
+                label="Total storage used"
+                value={formatBytes(totalBytes)}
+                sublabel="Database + files, this organisation only"
+                accent={C.brand}
+              />
+              <StorageStatCard
+                label="Database (MongoDB)"
+                value={formatBytes(database?.totalBytes)}
+                sublabel={`${database?.totalDocuments ?? 0} documents across ${database?.collections?.length ?? 0} collections`}
+                accent={C.blue}
+              />
+              <StorageStatCard
+                label="Files (ImageKit)"
+                value={formatBytes(files?.totalBytes)}
+                sublabel={`${files?.totalFiles ?? 0} files uploaded`}
+                accent={C.amber}
+              />
+            </div>
+
+            <StorageSplitBar
+              totalBytes={totalBytes}
+              segments={[
+                { label: "Database", bytes: database?.totalBytes || 0, color: C.blue },
+                { label: "Files", bytes: files?.totalBytes || 0, color: C.amber },
+              ]}
+            />
+
+            {files?.error && (
+              <div
+                className="mt-4 p-3 rounded-lg text-xs"
+                style={{ background: C.amberBg, color: C.amber }}
+              >
+                {files.error} — the database figures above are still accurate; file
+                storage will show up once ImageKit is reachable again.
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-5">
+              <div className="text-[11px] text-[#b0948a]">
+                {usage?.generatedAt
+                  ? `Calculated just now · ${formatDate(usage.generatedAt)}`
+                  : ""}
+              </div>
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#ede5e0] text-[#730042] hover:bg-[#730042]/5 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isFetching && <Spinner size={12} color={C.brand} />}
+                Refresh
+              </button>
+            </div>
+          </>
+        )}
+      </SectionCard>
+
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <SectionCard
+            title="Largest MongoDB collections"
+            subtitle="Real on-disk size of this organisation's documents, by collection"
+            accent={C.blue}
+          >
+            {database?.collections?.length ? (
+              database.collections.slice(0, 12).map((c) => (
+                <StorageBreakdownRow
+                  key={c.collection}
+                  label={c.model}
+                  sublabel={`${c.documents} document${c.documents === 1 ? "" : "s"}`}
+                  bytes={c.bytes}
+                  maxBytes={maxCollectionBytes}
+                  color={C.blue}
+                />
+              ))
+            ) : (
+              <div className="text-sm text-[#b0948a]">No data stored yet.</div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="ImageKit files by folder"
+            subtitle="Documents, policies, reimbursement receipts and field-visit photos"
+            accent={C.amber}
+          >
+            {files?.folders?.length ? (
+              files.folders.map((f) => (
+                <StorageBreakdownRow
+                  key={f.folder}
+                  label={f.folder}
+                  sublabel={`${f.files} file${f.files === 1 ? "" : "s"}`}
+                  bytes={f.bytes}
+                  maxBytes={maxFolderBytes}
+                  color={C.amber}
+                />
+              ))
+            ) : (
+              <div className="text-sm text-[#b0948a]">
+                No tagged files found yet. Files uploaded before this feature was
+                added will appear here after the one-time backfill script runs.
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function SuperAdminSettingsPage() {
   const [tab, setTab] = useState("overview");
   const [toast, setToast] = useState({ message: "", type: "" });
@@ -1598,6 +1852,7 @@ export default function SuperAdminSettingsPage() {
               onError={showError}
             />
           )}
+          {tab === "storage" && <StorageTab />}
           {tab === "banking" && (
             <BankingTab
               superAdmin={superAdmin}

@@ -59,6 +59,12 @@ export const getOrgInfo = async () => {
   return res.data;
 };
 
+// Powers the "Storage" tab in Settings — MongoDB + ImageKit usage for this org.
+export const getStorageUsage = async () => {
+  const res = await api.get("superadmin/storage-usage");
+  return res.data;
+};
+
 
 
 

@@ -32,6 +32,7 @@ const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
+const { getOrganisationStorageUsage } = require("../utils/storageUsage.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -3112,6 +3113,28 @@ const getperticularadmin = async (req, res, next) => {
   });
 };
 
+// Powers the "Storage" tab in SuperAdmin Settings — how much MongoDB data
+// and ImageKit file storage THIS organisation is using, broken down by
+// collection / folder so nothing is a black box.
+const getStorageUsage = async (req, res, next) => {
+  try {
+    if (!req.superAdmin) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const organisation_id = req.superAdmin._id;
+    const usage = await getOrganisationStorageUsage(organisation_id);
+
+    return res.status(200).json({
+      success: true,
+      generatedAt: new Date(),
+      ...usage,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -3167,5 +3190,6 @@ module.exports = {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
-  getperticularadmin
+  getperticularadmin,
+  getStorageUsage,
 };
