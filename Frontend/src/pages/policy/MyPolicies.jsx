@@ -17,7 +17,7 @@ export default function MyPolicies() {
 
   const policies = data?.policies || [];
   const pending = policies.filter(
-    (p) => p.policy.acknowledgementRequired && p.acknowledgement && p.acknowledgement.status !== "ACKNOWLEDGED"
+    (p) => p.acknowledgement && p.acknowledgement.status !== "ACKNOWLEDGED"
   );
   const acknowledged = policies.filter((p) => p.acknowledgement?.status === "ACKNOWLEDGED");
   const list = tab === "pending" ? pending : tab === "acknowledged" ? acknowledged : policies;
@@ -76,10 +76,8 @@ export default function MyPolicies() {
                   <span className="flex items-center gap-1 text-xs text-green-600">
                     <FaCheckCircle /> Acknowledged
                   </span>
-                ) : entry.policy.acknowledgementRequired ? (
-                  <span className="text-xs text-amber-600 font-medium">Action needed</span>
                 ) : (
-                  <span className="text-xs text-gray-400">Informational</span>
+                  <span className="text-xs text-amber-600 font-medium">Action needed</span>
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
