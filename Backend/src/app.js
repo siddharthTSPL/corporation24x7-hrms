@@ -95,6 +95,7 @@ const planFeatureRouter = require('../routes/planFeature.route');
 const selfServiceRouter = require('../routes/selfService.route');
 const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const singleSignInRouter = require('../routes/SingleSignIn.routes');
+const policyrouter = require('../routes/policy.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -131,6 +132,10 @@ app.use('/field-operations', fieldOperationsRouter);
 app.use('/single-sign-in', singleSignInRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
+// TorchX Policy — Policy Management (create/publish/report for
+// SuperAdmin+Admin under /policy/manage, viewer+acknowledgement for every
+// role under /policy/me). See routes/policy.route.js.
+app.use('/policy', policyrouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

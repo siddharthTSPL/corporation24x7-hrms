@@ -96,6 +96,8 @@ const SuperAdminManagement = lazy(() => import("./pages/torchx-management/supera
 
 const HelpCenter = lazy(() => import("./components/help/Helpcenter"));
 const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
+const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
+const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 
 function PageSkeleton() {
@@ -299,6 +301,17 @@ function App() {
               }
             />
 
+            {/* TorchX Policy — creation/publish/report page, Admin only.
+                SuperAdmin has its own copy at /superadmin-policy-management. */}
+            <Route
+              path="/admin-policy-management"
+              element={
+                <ProtectedRoute allowedRoles={["admin"]}>
+                  <PolicyManagement />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/announcement"
               element={
@@ -455,6 +468,7 @@ function App() {
             <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
             <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
+            <Route path="/superadmin-policy-management"   element={<PolicyManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ProtectedRoute><ReimbursementSuperadmin /></ProtectedRoute>} />
           </Route>
@@ -478,6 +492,7 @@ function App() {
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
             <Route path="/self-service"   element={<ProtectedRoute><SelfServicePortal /></ProtectedRoute>} />
+            <Route path="/my-policies"    element={<MyPolicies />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

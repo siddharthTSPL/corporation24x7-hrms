@@ -9,6 +9,8 @@ import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/
 import WelcomeModal from "../components/WelcomeModal";
 import BirthdayModal from "../components/BirthdayModal";
 import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner";
+import PolicyGateScreen from "../components/policy/PolicyGateScreen";
+import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 
 // True when `dob` (any year) falls on today's month/day.
 function isBirthdayToday(dob) {
@@ -29,6 +31,11 @@ export default function MainLayout() {
   const { mutate: dismissBirthday, isPending: isDismissingBirthday } = useDismissBirthdayWish();
 
   usePermissionsSync();
+
+  // TorchX Policy — Access Gate. While any mandatory policy assigned to
+  // this person is unacknowledged, render ONLY PolicyGateScreen below —
+  // no Sidebar, no Navbar, no route content — until it's cleared.
+  const { data: gateStatus, isLoading: isGateLoading } = useGateStatus();
 
   const roleLabels = {
     superadmin: "Super Admin",
@@ -180,6 +187,16 @@ export default function MainLayout() {
       },
     });
   };
+
+  // Fail-safe like the backend gate: while the very first check is loading
+  // we don't yet know if the person is blocked, so avoid a flash of full
+  // dashboard content — but never hold this longer than one quick request.
+  if (isGateLoading) {
+    return <div className="min-h-screen bg-(--background)" />;
+  }
+  if (gateStatus?.blocked) {
+    return <PolicyGateScreen />;
+  }
 
   return (
     <div className="flex h-screen bg-(--background)">
