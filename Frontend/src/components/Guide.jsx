@@ -271,7 +271,6 @@ const roles = [
         shotKey: 'emDashboard', shotName: 'em-dashboard.png',
       },
       { id: 'em-attendance', title: 'Mark your attendance', desc: 'Mark attendance with geo-tag or face check-in.', steps: ['Click "Check In" on the dashboard (or use "Live Attendance (Face Check-in)" on the sign-in page).', 'Use the same button to "Check Out" at the end of the day.'], shotKey: 'emAttendance', shotName: 'em-attendance.png' },
-      { id: 'em-field-duty', title: 'Field Duty', desc: 'Start field duty, share location during work, and record customer visits.', steps: ['Open "Field Duty" in the sidebar.', 'Start duty to begin sharing your location, and log each customer visit as you go.', 'End duty when you\u2019re done for the day.'], shotKey: 'emFieldDuty', shotName: 'em-field-duty.png', badge: COND_BADGE },
       { id: 'em-self-service', title: 'Self Service Portal', desc: 'Apply leave, submit claims, manage documents, and raise tickets \u2014 all in one place.', steps: ['Open "Self Service Portal" in the sidebar.', 'Switch tabs to apply for leave, submit a reimbursement, upload a document, or raise a ticket.'], shotKey: 'emSelfService', shotName: 'em-self-service.png' },
       { id: 'em-leave', title: 'Leave', desc: 'Apply for leave and track your leave balance.', steps: ['Open "Leave" in the sidebar and open the "Apply Leave" tab.', 'Select the leave type and dates, write a reason, and submit \u2014 your manager gets notified.', 'Track the status in the same tab, and check "Leave Balance" any time.'], shotKey: 'emLeave', shotName: 'apply-leave.png' },
       { id: 'em-announcement', title: 'Announcement', desc: 'See company announcements.', steps: ['Open "Announcement" in the sidebar \u2014 every update your organisation publishes appears here, newest first.'], shotKey: 'emAnnouncement', shotName: 'em-announcement.png' },
@@ -396,7 +395,19 @@ function RoleTabs({ activeRoleId, onSelect, orientation }) {
 }
 
 // ── Center panel — one continuous document for the active role ──────────
-function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
+// NOTE (fix): the IntersectionObserver-based scroll-sync now lives HERE,
+// inside CenterPanel, instead of in the parent Guide component. CenterPanel
+// is remounted (via the `key={activeRole.id}` on its AnimatePresence wrapper
+// in Guide) every time the role changes, and — because of `mode="wait"` —
+// the new CenterPanel only mounts *after* the old one's exit animation
+// finishes. Guide's own useEffect used to fire immediately on role change,
+// before the new role's <section> refs existed in the DOM, so the observer
+// silently had nothing to observe for every role except the very first one
+// rendered on load. Running this effect inside CenterPanel guarantees it
+// only ever runs once this panel's own sections are actually mounted.
+function CenterPanel({ activeRole, scrollRef, sectionRefs, query, onActiveFeatureChange }) {
+  const [progress, setProgress] = useState(0)
+
   const filtered = useMemo(() => {
     if (!query.trim()) return activeRole.features
     const q = query.trim().toLowerCase()
@@ -404,6 +415,49 @@ function CenterPanel({ activeRole, scrollRef, sectionRefs, progress, query }) {
       (f) => f.title.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q)
     )
   }, [activeRole, query])
+
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!root) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting)
+        if (visible.length > 0) {
+          const topMost = visible.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b))
+          onActiveFeatureChange(topMost.target.id)
+        }
+      },
+      { root, rootMargin: '0px 0px -60% 0px', threshold: 0 }
+    )
+
+    const els = filtered.map((f) => sectionRefs.current[f.id]).filter(Boolean)
+    els.forEach((el) => observer.observe(el))
+
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = root
+      const max = scrollHeight - clientHeight
+      const pct = max > 0 ? Math.min(100, (scrollTop / max) * 100) : 0
+      setProgress(pct)
+      // Right at the bottom of the doc, force the last section active —
+      // the shrunk rootMargin can otherwise leave the second-to-last item
+      // highlighted once the final section is short.
+      if (pct > 99 && filtered.length > 0) {
+        const last = filtered[filtered.length - 1]
+        onActiveFeatureChange(last.id)
+      }
+    }
+    root.addEventListener('scroll', onScroll)
+    onScroll()
+
+    return () => {
+      observer.disconnect()
+      root.removeEventListener('scroll', onScroll)
+    }
+    // Re-run whenever the visible section list changes (role switch, or a
+    // search query filtering the list) — filtered is stable per render via
+    // useMemo above, so this only re-subscribes when it actually changes.
+  }, [filtered, scrollRef, sectionRefs, onActiveFeatureChange])
 
   return (
     <div className="flex-1 min-w-0 h-full flex flex-col">
@@ -559,7 +613,6 @@ function ShortcutList({ activeRole, activeFeatureId, onJump }) {
 export default function Guide() {
   const [activeRoleId, setActiveRoleId] = useState('superadmin')
   const [activeFeatureId, setActiveFeatureId] = useState(roles[0].features[0].id)
-  const [progress, setProgress] = useState(0)
   const [query, setQuery] = useState('')
   const [mobileTocOpen, setMobileTocOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -613,47 +666,13 @@ export default function Guide() {
     }
   }, [activeRoleId, handleJump])
 
-  // Keep the right rail's highlight — and the progress bar — in sync while
-  // the person scrolls the center document manually. rootMargin biases
-  // toward the top so the *last* section can still become active once it
-  // scrolls into view, even if it never reaches the exact top edge.
-  useEffect(() => {
-    const root = scrollRef.current
-    if (!root) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting)
-        if (visible.length > 0) {
-          const topMost = visible.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b))
-          setActiveFeatureId(topMost.target.id)
-        }
-      },
-      { root, rootMargin: '0px 0px -60% 0px', threshold: 0 }
-    )
-    Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el))
-
-    const onScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = root
-      const max = scrollHeight - clientHeight
-      const pct = max > 0 ? Math.min(100, (scrollTop / max) * 100) : 0
-      setProgress(pct)
-      // Right at the bottom of the doc, force the last section active —
-      // IntersectionObserver's shrunk rootMargin can otherwise leave the
-      // second-to-last item highlighted once the final section is short.
-      if (pct > 99) {
-        const last = activeRole.features[activeRole.features.length - 1]
-        if (last) setActiveFeatureId(last.id)
-      }
-    }
-    root.addEventListener('scroll', onScroll)
-    onScroll()
-
-    return () => {
-      observer.disconnect()
-      root.removeEventListener('scroll', onScroll)
-    }
-  }, [activeRoleId, query, activeRole])
+  // NOTE (fix): the old IntersectionObserver / scroll-progress useEffect
+  // that used to live here has been removed. It ran on every role switch
+  // but fired before CenterPanel's new sections existed in the DOM (see the
+  // big comment above CenterPanel), so it never actually tracked scroll for
+  // any role beyond the one active on first mount. That logic now lives
+  // inside CenterPanel itself, which is guaranteed to mount after its own
+  // sections exist. Guide just receives the result via onActiveFeatureChange.
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden" style={{ background: PAPER }}>
@@ -721,7 +740,13 @@ export default function Guide() {
             transition={{ duration: 0.15 }}
             className="flex-1 min-w-0 h-full"
           >
-            <CenterPanel activeRole={activeRole} scrollRef={scrollRef} sectionRefs={sectionRefs} progress={progress} query={query} />
+            <CenterPanel
+              activeRole={activeRole}
+              scrollRef={scrollRef}
+              sectionRefs={sectionRefs}
+              query={query}
+              onActiveFeatureChange={setActiveFeatureId}
+            />
           </motion.div>
         </AnimatePresence>
 
