@@ -1,8 +1,4 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import {
@@ -20,6 +16,9 @@ import {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addManager,
   addEmployee,
   getAllManagers,
@@ -29,7 +28,7 @@ import {
   getParticularManager,
   deleteEmployee,
   getNoOfEmployees,
-    getAllPersonalDocumentsSuperAdmin,
+  getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
   updatePermissions,
@@ -43,10 +42,8 @@ import {
   setLeavePolicy,
   getParticularAdmin,
   setAdminHRRole,
-  superAdminAcknowledgeReview
+  superAdminAcknowledgeReview,
 } from "../../../api/superadmin/other/su.other";
-
-
 
 export const useReviewToAdmin = () => {
   return useMutation({
@@ -84,8 +81,6 @@ export const useSuperAdminAcknowledgeReview = () => {
   });
 };
 
-
-
 export const useGetTodayCheckins = () => {
   return useQuery({
     queryKey: ["today-checkins"],
@@ -96,9 +91,17 @@ export const useGetTodayCheckins = () => {
 };
 
 // Attendance Details modal (Today / Monthly tabs).
-export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, options = {}) => {
+export const useGetAttendanceOverview = (
+  { type = "today", month, year } = {},
+  options = {},
+) => {
   return useQuery({
-    queryKey: ["attendanceOverview", type, type === "monthly" ? month : null, type === "monthly" ? year : null],
+    queryKey: [
+      "attendanceOverview",
+      type,
+      type === "monthly" ? month : null,
+      type === "monthly" ? year : null,
+    ],
     queryFn: () => getAttendanceOverview({ type, month, year }),
     staleTime: 30 * 1000,
     ...options,
@@ -106,9 +109,18 @@ export const useGetAttendanceOverview = ({ type = "today", month, year } = {}, o
 };
 
 // "History" button on the Monthly tab — day-wise history for one employee.
-export const useGetAttendanceHistory = (employeeId, { startDate, endDate } = {}, options = {}) => {
+export const useGetAttendanceHistory = (
+  employeeId,
+  { startDate, endDate } = {},
+  options = {},
+) => {
   return useQuery({
-    queryKey: ["attendanceHistory", employeeId, startDate ?? null, endDate ?? null],
+    queryKey: [
+      "attendanceHistory",
+      employeeId,
+      startDate ?? null,
+      endDate ?? null,
+    ],
     queryFn: () => getAttendanceHistory(employeeId, { startDate, endDate }),
     enabled: !!employeeId,
     staleTime: 30 * 1000,
@@ -116,26 +128,21 @@ export const useGetAttendanceHistory = (employeeId, { startDate, endDate } = {},
   });
 };
 
-
 export const useGetOrgInfo = () => {
   return useQuery({
     queryKey: ["org-info"],
     queryFn: getOrgInfo,
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
-    refetchInterval: 1000 * 60 * 1, 
+    refetchInterval: 1000 * 60 * 1,
   });
 };
-
-
 
 export const useChangeSuperAdminPassword = () => {
   return useMutation({
     mutationFn: changeSuperAdminPassword,
   });
 };
-
-
 
 export const useKioskPasswordStatus = () => {
   return useQuery({
@@ -149,7 +156,9 @@ export const useSetKioskPassword = () => {
   return useMutation({
     mutationFn: setKioskPassword,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["superadmin", "kiosk-password-status"] });
+      queryClient.invalidateQueries({
+        queryKey: ["superadmin", "kiosk-password-status"],
+      });
     },
   });
 };
@@ -160,23 +169,17 @@ export const useForgotPasswordSuperAdmin = () => {
   });
 };
 
-
-
 export const useVerifySuperAdminOtp = () => {
   return useMutation({
     mutationFn: verifySuperAdminOtp,
   });
 };
 
-
-
 export const useResetSuperAdminPassword = () => {
   return useMutation({
     mutationFn: resetSuperAdminPassword,
   });
 };
-
-
 
 export const useCreateAdmin = () => {
   const queryClient = useQueryClient();
@@ -204,27 +207,22 @@ export const useCreateAdmin = () => {
     },
 
     onError: (error) => {
-      toast.error(
-        error?.response?.data?.message || "Something went wrong",
-        {
-          position: "top-right",
-          duration: 5000,
-          icon: "❌",
-          style: {
-            background: "#FFFFFF",
-            color:  "#16A34A",
-            borderRadius: "10px",
-            padding: "14px 16px",
-            fontSize: "14px",
-            fontWeight: "500",
-          },
-        }
-      );
+      toast.error(error?.response?.data?.message || "Something went wrong", {
+        position: "top-right",
+        duration: 5000,
+        icon: "❌",
+        style: {
+          background: "#FFFFFF",
+          color: "#16A34A",
+          borderRadius: "10px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
     },
   });
 };
-
-
 
 export const useUpdateAdmin = () => {
   const queryClient = useQueryClient();
@@ -240,8 +238,6 @@ export const useUpdateAdmin = () => {
   });
 };
 
-
-
 export const useDeleteAdmin = () => {
   const queryClient = useQueryClient();
 
@@ -256,8 +252,6 @@ export const useDeleteAdmin = () => {
   });
 };
 
-
-
 export const useGetAllAdmins = (options = {}) => {
   return useQuery({
     queryKey: ["admins"],
@@ -267,8 +261,6 @@ export const useGetAllAdmins = (options = {}) => {
     ...options,
   });
 };
-
-
 
 export const useAddManager = () => {
   const queryClient = useQueryClient();
@@ -284,8 +276,6 @@ export const useAddManager = () => {
   });
 };
 
-
-
 export const useAddEmployee = () => {
   const queryClient = useQueryClient();
 
@@ -300,8 +290,6 @@ export const useAddEmployee = () => {
   });
 };
 
-
-
 export const useGetAllManagers = (options = {}) => {
   return useQuery({
     queryKey: ["managers"],
@@ -312,8 +300,6 @@ export const useGetAllManagers = (options = {}) => {
   });
 };
 
-
-
 export const useGetAllEmployees = (options = {}) => {
   return useQuery({
     queryKey: ["employees"],
@@ -323,8 +309,6 @@ export const useGetAllEmployees = (options = {}) => {
     ...options,
   });
 };
-
-
 
 export const useEditEmployee = () => {
   const queryClient = useQueryClient();
@@ -340,8 +324,6 @@ export const useEditEmployee = () => {
   });
 };
 
-
-
 export const useGetParticularEmployee = (uid) => {
   return useQuery({
     queryKey: ["employee", uid],
@@ -351,8 +333,6 @@ export const useGetParticularEmployee = (uid) => {
   });
 };
 
-
-
 export const useGetParticularManager = (uid) => {
   return useQuery({
     queryKey: ["manager", uid],
@@ -361,8 +341,6 @@ export const useGetParticularManager = (uid) => {
     refetchOnWindowFocus: false,
   });
 };
-
-
 
 export const useDeleteEmployee = () => {
   const queryClient = useQueryClient();
@@ -382,8 +360,6 @@ export const useDeleteEmployee = () => {
   });
 };
 
-
-
 export const useGetNoOfEmployees = () => {
   return useQuery({
     queryKey: ["employee-count"],
@@ -392,8 +368,6 @@ export const useGetNoOfEmployees = () => {
     refetchOnWindowFocus: false,
   });
 };
-
-
 
 export const useGetAllPersonalDocumentsSuperAdmin = () => {
   return useQuery({
@@ -437,11 +411,12 @@ export const useUpdatePermissions = () => {
   return useMutation({
     mutationFn: updatePermissions,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["permissions", variables.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["permissions", variables.id],
+      });
     },
   });
 };
-
 
 export const useSuperAdminInactiveUsers = () => {
   return useQuery({
@@ -453,17 +428,31 @@ export const useSuperAdminInactiveUsers = () => {
 export const useSetAdminWorkingStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, working_status, noticePeriodAllowed, noticePeriodMonths, lastWorkingDay }) => {
+    mutationFn: async ({
+      id,
+      working_status,
+      noticePeriodAllowed,
+      noticePeriodMonths,
+      lastWorkingDay,
+    }) => {
       try {
-        return await setAdminWorkingStatus(id, working_status, { noticePeriodAllowed, noticePeriodMonths, lastWorkingDay });
+        return await setAdminWorkingStatus(id, working_status, {
+          noticePeriodAllowed,
+          noticePeriodMonths,
+          lastWorkingDay,
+        });
       } catch (err) {
         const payload = err?.response?.data || err?.data || err;
         throw payload;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["superadmin", "inactive-users"] });
-      queryClient.invalidateQueries({ queryKey: ["superadmin", "all-employees"] });
+      queryClient.invalidateQueries({
+        queryKey: ["superadmin", "inactive-users"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["superadmin", "all-employees"],
+      });
       queryClient.invalidateQueries({ queryKey: ["superadmin", "all-admins"] });
       queryClient.invalidateQueries({ queryKey: ["admins"] });
     },
@@ -506,30 +495,28 @@ export const useSetLeavePolicy = () => {
         },
       });
 
-      queryClient.invalidateQueries({ queryKey: ["superadmin", "leave-policy"] });
+      queryClient.invalidateQueries({
+        queryKey: ["superadmin", "leave-policy"],
+      });
     },
 
     onError: (error) => {
-      toast.error(
-        error?.response?.data?.message || "Something went wrong",
-        {
-          position: "top-right",
-          duration: 5000,
-          icon: "❌",
-          style: {
-            background: "#FFFFFF",
-            color: "#16A34A",
-            borderRadius: "10px",
-            padding: "14px 16px",
-            fontSize: "14px",
-            fontWeight: "500",
-          },
-        }
-      );
+      toast.error(error?.response?.data?.message || "Something went wrong", {
+        position: "top-right",
+        duration: 5000,
+        icon: "❌",
+        style: {
+          background: "#FFFFFF",
+          color: "#16A34A",
+          borderRadius: "10px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          fontWeight: "500",
+        },
+      });
     },
   });
 };
-
 
 export const useGetParticularAdmin = (uid) => {
   return useQuery({
@@ -537,5 +524,49 @@ export const useGetParticularAdmin = (uid) => {
     queryFn: () => getParticularAdmin(uid),
     enabled: !!uid,
     refetchOnWindowFocus: false,
+  });
+};
+
+export const usePromoteAdminToSuperAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: promoteAdminToSuperAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+      toast.success("Admin promoted to Super Admin successfully");
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to promote admin");
+    },
+  });
+};
+
+export const useDemoteSuperAdminToAdmin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoteSuperAdminToAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+      toast.success("Super Admin demoted to Manager successfully");
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to demote admin");
+    },
+  });
+};
+
+export const useDemoteAdminToManager = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoteAdminToManager,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+      queryClient.invalidateQueries({ queryKey: ["managers"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Admin demoted to Manager successfully");
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to demote admin");
+    },
   });
 };

@@ -151,13 +151,14 @@ const USER_MODEL_MAP = {
   admin: "Admin",
   senior_admin: "Admin",
   official: "Admin",
+  super_admin: "Admin",
   manager: "Manager",
   senior_manager: "Manager",
   employee: "User",
 };
 
 const mergePermissions = (role, overrides) => {
-  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+  const permissionRole = ["admin", "senior_admin", "official", "super_admin"].includes(role)
     ? "admin"
     : ["manager", "senior_manager"].includes(role)
     ? "manager"
@@ -1204,6 +1205,197 @@ const deleteAdmin = async (req, res, next) => {
     .json({ success: true, message: "Admin deleted successfully" });
 };
 
+const promoteAdminToSuperAdmin = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  if (admin.role === "super_admin")
+    return next(
+      Object.assign(new Error("Admin is already a Super Admin"), { statusCode: 400 }),
+    );
+
+  const previousRole = admin.role;
+  admin.role = "super_admin";
+  await admin.save();
+
+  await assignPermissions(admin._id, "super_admin", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been promoted to Super Admin`,
+    admin: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: admin.role,
+      previous_role: previousRole,
+    },
+  });
+};
+
+const demoteSuperAdminToAdmin = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  if (admin.role !== "super_admin")
+    return next(
+      Object.assign(new Error("Admin is not a Super Admin"), { statusCode: 400 }),
+    );
+
+  const previousRole = admin.role;
+  admin.role = "manager";
+  await admin.save();
+
+  await assignPermissions(admin._id, "manager", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been demoted from Super Admin to Manager`,
+    admin: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: admin.role,
+      previous_role: previousRole,
+    },
+  });
+};
+
+const demoteAdminToManager = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id }).lean();
+  if (!admin)
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+  if (admin.role === "super_admin")
+    return next(
+      Object.assign(new Error("Use the demote Super Admin option for Super Admins"), { statusCode: 400 }),
+    );
+
+  if ((admin.working_status || "working") !== "working")
+    return next(
+      Object.assign(new Error("Cannot demote an admin who is not currently working"), { statusCode: 400 }),
+    );
+
+  // Manager collection mein duplicate check (empid global unique, uid/email org ke andar)
+  const clash = await Managermodel.findOne({
+    $or: [
+      { _id: admin._id },
+      { empid: admin.empid },
+      { uid: admin.uid, organisation_id },
+      { work_email: admin.work_email, organisation_id },
+    ],
+  }).lean();
+  if (clash)
+    return next(
+      Object.assign(new Error("A Manager with the same ID, UID or email already exists"), { statusCode: 409 }),
+    );
+
+  const ROLE_MAP = { admin: "manager", senior_admin: "senior_manager", official: "official" };
+  const newRole = ROLE_MAP[admin.role] || "manager";
+
+  // Manager schema ka reporting_manager_model sirf "Admin" ya "Manager" allow karta hai
+  const keepReporting = admin.reporting_manager_model === "Manager" && admin.reporting_manager;
+
+  const managerDoc = {
+    _id: admin._id, // same _id: leaves, attendance, assets ke references na tootein
+    empid: admin.empid,
+    organisation_id,
+    profile_image: admin.profile_image,
+    uid: admin.uid,
+    department: admin.department,
+    f_name: admin.f_name,
+    l_name: admin.l_name,
+    work_email: admin.work_email,
+    password: admin.password, // already hashed, isliye raw insert (pre-save hook double hash karta)
+    gender: admin.gender,
+    marital_status: admin.marital_status,
+    personal_contact: admin.personal_contact,
+    e_contact: admin.e_contact,
+    aadhaar_number: admin.aadhaar_number,
+    pan_number: admin.pan_number,
+    address: admin.address,
+    city: admin.city,
+    state: admin.state,
+    pincode: admin.pincode,
+    country: admin.country,
+    role: newRole,
+    designation: admin.designation,
+    office_location: admin.office_location,
+    shift: admin.shift || null,
+    reporting_manager: keepReporting ? admin.reporting_manager : null,
+    reporting_manager_model: keepReporting ? "Manager" : null,
+    is_fresher: admin.is_fresher,
+    total_experience: admin.total_experience,
+    previous_company: admin.previous_company,
+    previous_designation: admin.previous_designation,
+    bank_name: admin.bank_name,
+    account_holder_name: admin.account_holder_name,
+    account_number: admin.account_number,
+    ifsc_code: admin.ifsc_code,
+    resume: admin.resume,
+    aadhaar_card: admin.aadhaar_card,
+    pan_card: admin.pan_card,
+    experience_letter: admin.experience_letter,
+    status: admin.status === "active" ? "active" : "inactive", // Manager enum mein "suspended" nahi hai
+    working_status: "working",
+    noticePeriod: admin.noticePeriod,
+    isVerified: admin.isVerified,
+    isFirstLogin: admin.isFirstLogin,
+    date_of_joining: admin.date_of_joining,
+    date_of_birth: admin.date_of_birth,
+    lastBirthdayWishYear: admin.lastBirthdayWishYear,
+    createdAt: admin.createdAt,
+    updatedAt: new Date(),
+  };
+
+  // undefined fields hata do
+  Object.keys(managerDoc).forEach((k) => managerDoc[k] === undefined && delete managerDoc[k]);
+
+  // Pehle Manager banao, phir Admin delete. Insert fail hua to Admin safe rahega.
+  await Managermodel.collection.insertOne(managerDoc);
+  await AdminModel.deleteOne({ _id: admin._id, organisation_id });
+
+  // Jo Managers is person ko "Admin" ke roop mein report karte the, unka model update karo
+  await Managermodel.updateMany(
+    { reporting_manager: admin._id, reporting_manager_model: "Admin" },
+    { $set: { reporting_manager_model: "Manager" } },
+  );
+
+  await assignPermissions(admin._id, "manager", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been demoted from Admin to Manager`,
+    manager: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: newRole,
+      previous_role: admin.role,
+    },
+  });
+};
 const getAllAdmins = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
@@ -2937,6 +3129,9 @@ module.exports = {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addmanager,
   addemployee,
   findallmanagers,
@@ -2965,7 +3160,7 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-   updatePermissions,
+  updatePermissions,
   getPermissions,
   setAdminWorkingStatus,
   getInactiveUsers,

@@ -32,6 +32,9 @@ const {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addmanager,
   addemployee,
   findallmanagers,
@@ -136,6 +139,21 @@ superAdminRouter.delete(
   "/admin/delete/:id",
   superAdminAuth,
   asyncHandler(deleteAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/promote/super-admin",
+  superAdminAuth,
+  asyncHandler(promoteAdminToSuperAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/super-admin",
+  superAdminAuth,
+  asyncHandler(demoteSuperAdminToAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/manager",
+  superAdminAuth,
+  asyncHandler(demoteAdminToManager),
 );
 
 superAdminRouter.post("/addmanager", superAdminAuth, asyncHandler(addmanager));

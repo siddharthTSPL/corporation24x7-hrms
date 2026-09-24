@@ -784,6 +784,7 @@ export const helpSections = [
 
 export const ROLE_LABEL = {
   superadmin: "Super Admin",
+  super_admin: "Super Admin",
   admin: "Admin",
   manager: "Manager",
   employee: "Employee",
