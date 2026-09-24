@@ -1296,11 +1296,11 @@ function LocationCombobox({ value, onChange, options }) {
 function UnderManagerSelect({
   value,
   onChange,
-  managersOnly,
+  managersData,
   label = "Under Manager",
   name = "Under_manager",
 }) {
-  const list = managersOnly?.managers ?? [];
+  const list = (managersData?.managers ?? []).filter((m) => !m.isAdmin);
   return (
     <Field label={label}>
       <select
@@ -3468,7 +3468,7 @@ function EmpStepFields({
           <UnderManagerSelect
             value={form.Under_manager}
             onChange={onChange}
-            managersOnly={managersOnly}
+            managersData={managersWithAdmin}
           />
         </div>
         <div className="col-span-1 sm:col-span-2">
@@ -5675,7 +5675,7 @@ export default function EmployeeTable() {
               <UnderManagerSelect
                 value={editForm.Under_manager}
                 onChange={handleEditChange}
-                managersOnly={managersOnly}
+                managersData={managersWithAdmin}
               />
             </div>
           )}
@@ -5880,9 +5880,9 @@ export default function EmployeeTable() {
                   Under_manager: e.target.value,
                 })
               }
-              managersOnly={{
-                managers: (managersOnly?.managers || []).filter(
-                  (m) => m._id !== demoteMgrToEmpTarget._id,
+              managersData={{
+                managers: (managersWithAdmin?.managers || []).filter(
+                  (m) => !m.isAdmin && m._id !== demoteMgrToEmpTarget._id,
                 ),
               }}
               label="Assign Under Manager"
@@ -5980,7 +5980,7 @@ export default function EmployeeTable() {
                   Under_manager: e.target.value,
                 })
               }
-              managersOnly={managersOnly}
+              managersData={managersWithAdmin}
               label="Assign Under Manager"
             />
           </div>

@@ -22,8 +22,8 @@ export const getPolicyDetail = async (id) => {
   return res.data;
 };
 
-// payload: { title, code, category, description, priority, acknowledgementRequired,
-//            effectiveFrom, acknowledgementDeadlineDays, assignment, pdfFile, imageFiles }
+// payload: { title, code, category, description,
+//            effectiveFrom, assignment, pdfFile, imageFiles }
 const buildPolicyFormData = (payload) => {
   const form = new FormData();
   Object.entries(payload).forEach(([key, value]) => {

@@ -24,13 +24,16 @@ const getManagementActor = (req) => {
   return { account, actorModel };
 };
 
-const uploadBufferToImageKit = async (file, folder) => {
+const uploadBufferToImageKit = async (file, folder, organisationId) => {
   const fileBase64 = file.buffer.toString("base64");
   return imagekit.upload({
     file: fileBase64,
     fileName: file.originalname,
     folder,
     useUniqueFileName: true,
+    // Tags the file with its owning org so /superadmin/storage-usage can
+    // sum real ImageKit storage per organisation via listFiles(tags).
+    tags: organisationId ? [String(organisationId)] : undefined,
   });
 };
 
@@ -108,7 +111,7 @@ const createPolicy = async (req, res) => {
     const { account, actorModel } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const { title, code, category, description, priority, acknowledgementRequired, effectiveFrom, acknowledgementDeadlineDays, releaseNotes } = req.body;
+    const { title, code, category, description, effectiveFrom, releaseNotes } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ success: false, message: "Policy title is required" });
@@ -132,11 +135,8 @@ const createPolicy = async (req, res) => {
       code: code && code.trim() ? code.trim().toUpperCase() : null,
       category: category?.trim() || "General",
       description: description?.trim() || "",
-      priority: ["mandatory", "optional", "informational"].includes(priority) ? priority : "mandatory",
-      acknowledgementRequired: acknowledgementRequired === "false" ? false : acknowledgementRequired !== false,
       assignment: parseAssignment(req.body),
       effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
-      acknowledgementDeadlineDays: acknowledgementDeadlineDays ? Number(acknowledgementDeadlineDays) : null,
       createdBy: account._id,
       createdByModel: actorModel,
       status: "draft",
@@ -171,7 +171,7 @@ const createVersionForPolicy = async (policy, { pdfFile, imageFiles, releaseNote
   const images = [];
 
   if (pdfFile) {
-    const uploaded = await uploadBufferToImageKit(pdfFile, "/policies/documents");
+    const uploaded = await uploadBufferToImageKit(pdfFile, "/policies/documents", policy.organisation_id);
     pdfUrl = uploaded.url;
     pdfFileId = uploaded.fileId;
     pdfFileName = pdfFile.originalname;
@@ -179,7 +179,7 @@ const createVersionForPolicy = async (policy, { pdfFile, imageFiles, releaseNote
   }
 
   for (const img of imageFiles || []) {
-    const uploaded = await uploadBufferToImageKit(img, "/policies/photos");
+    const uploaded = await uploadBufferToImageKit(img, "/policies/photos", policy.organisation_id);
     images.push({ url: uploaded.url, fileId: uploaded.fileId, caption: img.originalname });
   }
 
@@ -313,8 +313,8 @@ const publishPolicyVersion = async (req, res) => {
 
 const notifyAudienceOfPublish = async (policy, version, account, actorModel) => {
   const audience = await resolveAudienceForPolicy(policy);
-  const title = policy.priority === "mandatory" ? "Action Required: New Policy" : "New Policy Published";
-  const message = `${policy.title} (v${version.versionNumber}) has been published${policy.acknowledgementRequired ? " and requires your acknowledgement." : "."}`;
+  const title = "Action Required: New Policy";
+  const message = `${policy.title} (v${version.versionNumber}) has been published and requires your acknowledgement.`;
 
   await Promise.allSettled(
     audience.map((person) =>
@@ -325,7 +325,7 @@ const notifyAudienceOfPublish = async (policy, version, account, actorModel) => 
         type: "policy",
         title,
         message,
-        priority: policy.priority === "mandatory" ? "high" : "medium",
+        priority: "high",
         link: "/my-policies",
         createdBy: account._id,
         createdByModel: actorModel,
@@ -405,15 +405,12 @@ const updatePolicyMeta = async (req, res) => {
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
 
-    const { title, category, description, priority, acknowledgementRequired, effectiveFrom, acknowledgementDeadlineDays } = req.body;
+    const { title, category, description, effectiveFrom } = req.body;
 
     if (title !== undefined) policy.title = title.trim();
     if (category !== undefined) policy.category = category.trim();
     if (description !== undefined) policy.description = description.trim();
-    if (priority !== undefined && ["mandatory", "optional", "informational"].includes(priority)) policy.priority = priority;
-    if (acknowledgementRequired !== undefined) policy.acknowledgementRequired = acknowledgementRequired === true || acknowledgementRequired === "true";
     if (effectiveFrom !== undefined) policy.effectiveFrom = new Date(effectiveFrom);
-    if (acknowledgementDeadlineDays !== undefined) policy.acknowledgementDeadlineDays = acknowledgementDeadlineDays ? Number(acknowledgementDeadlineDays) : null;
     if (req.body.assignment !== undefined) policy.assignment = parseAssignment(req.body);
 
     await policy.save();
@@ -511,13 +508,9 @@ const getAcknowledgementReport = async (req, res) => {
     const ackByPerson = {};
     for (const a of acks) ackByPerson[`${a.employeeModel}:${a.employee}`] = a;
 
-    const now = new Date();
     const rows = audience.map((person) => {
       const ack = ackByPerson[`${person.model}:${person._id}`];
-      let status = ack?.status || "PENDING";
-      if (status !== "ACKNOWLEDGED" && ack?.deadline && new Date(ack.deadline) < now) {
-        status = "OVERDUE";
-      }
+      const status = ack?.status || "PENDING";
       return {
         employeeId: person._id,
         employeeModel: person.model,
@@ -537,11 +530,10 @@ const getAcknowledgementReport = async (req, res) => {
       (acc, r) => {
         acc.total += 1;
         if (r.status === "ACKNOWLEDGED") acc.acknowledged += 1;
-        else if (r.status === "OVERDUE") acc.overdue += 1;
         else acc.pending += 1;
         return acc;
       },
-      { total: 0, acknowledged: 0, pending: 0, overdue: 0 }
+      { total: 0, acknowledged: 0, pending: 0 }
     );
     summary.acknowledgementRate = summary.total ? Math.round((summary.acknowledged / summary.total) * 1000) / 10 : 0;
 
@@ -616,13 +608,6 @@ const getDashboardSummary = async (req, res) => {
     const ackCounts = { PENDING: 0, VIEWED: 0, ACKNOWLEDGED: 0 };
     for (const a of ackAgg) ackCounts[a._id] = a.count;
 
-    const now = new Date();
-    const overdue = await PolicyAcknowledgement.countDocuments({
-      organisation_id,
-      status: { $ne: "ACKNOWLEDGED" },
-      deadline: { $ne: null, $lt: now },
-    });
-
     return res.status(200).json({
       success: true,
       summary: {
@@ -632,7 +617,6 @@ const getDashboardSummary = async (req, res) => {
         archived,
         pendingAcknowledgements: ackCounts.PENDING + ackCounts.VIEWED,
         acknowledged: ackCounts.ACKNOWLEDGED,
-        overdue,
       },
     });
   } catch (error) {

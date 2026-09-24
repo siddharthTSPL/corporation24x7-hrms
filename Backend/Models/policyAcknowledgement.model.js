@@ -58,8 +58,6 @@ const policyAcknowledgementSchema = new mongoose.Schema(
     ipAddress: { type: String, default: null },
     userAgent: { type: String, default: null },
 
-    deadline: { type: Date, default: null },
-
     // Snapshot fields — kept even if the person is later renamed/exited,
     // so admin reports don't have to re-join for basic display info.
     employeeSnapshot: {

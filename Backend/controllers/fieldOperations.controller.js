@@ -1209,6 +1209,9 @@ exports.uploadVisitPhoto = async (req, res) => {
     fileName: req.file.originalname,
     folder: "/field-visits",
     useUniqueFileName: true,
+    // Tags the file with its owning org so /superadmin/storage-usage can
+    // sum real ImageKit storage per organisation via listFiles(tags).
+    tags: [String(organisation_id)],
   });
   visit.attachments = [...(visit.attachments || []), uploaded.url];
   const lat = Number(req.body.latitude);

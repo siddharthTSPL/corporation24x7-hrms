@@ -32,6 +32,9 @@ const {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addmanager,
   addemployee,
   findallmanagers,
@@ -67,7 +70,9 @@ const {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
-  getperticularadmin
+  getperticularadmin,
+  getStorageUsage,
+  getStorageFiles,
 
 } = require("../controllers/superadmin.controller");
 
@@ -120,6 +125,8 @@ superAdminRouter.get(
   asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
+superAdminRouter.get("/storage-usage", superAdminAuth, asyncHandler(getStorageUsage));
+superAdminRouter.get("/storage-usage/files", superAdminAuth, asyncHandler(getStorageFiles));
 
 superAdminRouter.post(
   "/admin/create",
@@ -136,6 +143,21 @@ superAdminRouter.delete(
   "/admin/delete/:id",
   superAdminAuth,
   asyncHandler(deleteAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/promote/super-admin",
+  superAdminAuth,
+  asyncHandler(promoteAdminToSuperAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/super-admin",
+  superAdminAuth,
+  asyncHandler(demoteSuperAdminToAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/manager",
+  superAdminAuth,
+  asyncHandler(demoteAdminToManager),
 );
 
 superAdminRouter.post("/addmanager", superAdminAuth, asyncHandler(addmanager));

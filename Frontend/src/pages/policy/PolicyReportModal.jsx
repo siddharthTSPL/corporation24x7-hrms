@@ -1,4 +1,4 @@
-import { FaTimes, FaDownload, FaCheckCircle, FaClock, FaExclamationTriangle } from "react-icons/fa";
+import { FaTimes, FaDownload, FaCheckCircle, FaClock } from "react-icons/fa";
 import { useAcknowledgementReport } from "../../auth/server-state/policy/policy.hook";
 import { exportAcknowledgementReportUrl } from "../../auth/api/policy/policy.api";
 
@@ -6,7 +6,6 @@ const STATUS_STYLES = {
   ACKNOWLEDGED: { icon: <FaCheckCircle />, cls: "text-green-600 bg-green-50" },
   VIEWED: { icon: <FaClock />, cls: "text-blue-600 bg-blue-50" },
   PENDING: { icon: <FaClock />, cls: "text-gray-500 bg-gray-100" },
-  OVERDUE: { icon: <FaExclamationTriangle />, cls: "text-red-600 bg-red-50" },
 };
 
 // Shows, per policy, exactly who has acknowledged and who hasn't — this is
@@ -23,7 +22,7 @@ export default function PolicyReportModal({ policyId, onClose }) {
             {data?.summary && (
               <p className="text-xs text-gray-500 mt-0.5">
                 {data.summary.acknowledged}/{data.summary.total} acknowledged ({data.summary.acknowledgementRate}%) ·{" "}
-                {data.summary.pending} pending · {data.summary.overdue} overdue
+                {data.summary.pending} pending
               </p>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FaTimes, FaFilePdf, FaImages, FaUpload, FaFileContract, FaBolt, FaInfoCircle } from "react-icons/fa";
+import { FaTimes, FaFilePdf, FaImages, FaUpload, FaFileContract, FaBolt } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { useCreatePolicy, usePublishPolicy } from "../../auth/server-state/policy/policy.hook";
 
@@ -38,9 +38,6 @@ export default function CreatePolicyModal({ onClose }) {
   const [code, setCode] = useState("");
   const [category, setCategory] = useState("General");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("mandatory");
-  const [acknowledgementRequired, setAcknowledgementRequired] = useState(true);
-  const [deadlineDays, setDeadlineDays] = useState("");
 
   const [assignmentType, setAssignmentType] = useState("ALL");
   const [roles, setRoles] = useState(["employee", "manager", "admin"]);
@@ -74,9 +71,6 @@ export default function CreatePolicyModal({ onClose }) {
         code,
         category,
         description,
-        priority,
-        acknowledgementRequired,
-        acknowledgementDeadlineDays: deadlineDays || undefined,
         assignment,
         pdfFile,
         imageFiles,
@@ -151,7 +145,7 @@ export default function CreatePolicyModal({ onClose }) {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div>
             <div>
               <label className="text-sm text-gray-600">Category</label>
               <select
@@ -162,18 +156,6 @@ export default function CreatePolicyModal({ onClose }) {
                 {CATEGORY_OPTIONS.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-gray-600">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              >
-                <option value="mandatory">Mandatory (must acknowledge)</option>
-                <option value="optional">Optional (can read, no gate)</option>
-                <option value="informational">Informational (no acknowledgement)</option>
               </select>
             </div>
           </div>
@@ -258,35 +240,6 @@ export default function CreatePolicyModal({ onClose }) {
             )}
           </div>
 
-          <div className="rounded-xl border border-gray-100 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#1F2937]">Require acknowledgement</p>
-                <p className="text-xs text-gray-500">Employees must tick "I have read and understood" before it counts.</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={acknowledgementRequired}
-                onChange={(e) => setAcknowledgementRequired(e.target.checked)}
-                className="accent-[#730042] w-4 h-4"
-              />
-            </div>
-
-            {acknowledgementRequired && (
-              <div>
-                <label className="text-sm text-gray-600">Grace period (days, optional)</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={deadlineDays}
-                  onChange={(e) => setDeadlineDays(e.target.value)}
-                  className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  placeholder="e.g. 7"
-                />
-              </div>
-            )}
-          </div>
-
           <div
             className={`rounded-xl border p-4 flex items-start gap-3 ${
               publishNow ? "border-green-200 bg-green-50/60" : "border-amber-200 bg-amber-50/60"
@@ -310,12 +263,6 @@ export default function CreatePolicyModal({ onClose }) {
               </p>
             </div>
           </div>
-
-          {!acknowledgementRequired && (
-            <p className="flex items-center gap-2 text-xs text-gray-500">
-              <FaInfoCircle /> With this off, employees can view the document but there's no acknowledge action.
-            </p>
-          )}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
@@ -334,4 +281,4 @@ export default function CreatePolicyModal({ onClose }) {
       </form>
     </div>
   );
-}
+}  

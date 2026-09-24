@@ -25,7 +25,7 @@ const ROLE_PATHS = {
   superadmin: { leave: "/superadmin-leaves", reimbursement: "/superadmin-reimbursement", documents: "/superadmin-documents", tickets: "/superadmin-complaints" },
 };
 
-const ROLE_LABEL = { employee: "Employee", manager: "Manager", admin: "Admin", superadmin: "Super Admin" };
+const ROLE_LABEL = { employee: "Employee", manager: "Manager", admin: "Admin", superadmin: "Super Admin", super_admin: "Super Admin" };
 
 function StatCard({ icon, label, value, sub }) {
   return (

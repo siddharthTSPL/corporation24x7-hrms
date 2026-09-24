@@ -90,12 +90,11 @@ export default function PolicyManagement() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           {[
             { label: "Total Policies", value: summary.totalPolicies, icon: <FaLayerGroup />, color: "text-[#730042] bg-[#730042]/10" },
             { label: "Published", value: summary.published, icon: <FaCheckCircle />, color: "text-green-600 bg-green-50" },
             { label: "Pending Acks", value: summary.pendingAcknowledgements, icon: <FaClock />, color: "text-amber-600 bg-amber-50" },
-            { label: "Overdue", value: summary.overdue, icon: <FaExclamationTriangle />, color: "text-red-600 bg-red-50" },
           ].map((c) => (
             <div key={c.label} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${c.color}`}>{c.icon}</div>
@@ -128,7 +127,6 @@ export default function PolicyManagement() {
             <tr>
               <th className="text-left px-4 py-2">Policy</th>
               <th className="text-left px-4 py-2">Category</th>
-              <th className="text-left px-4 py-2">Priority</th>
               <th className="text-left px-4 py-2">Status</th>
               <th className="text-left px-4 py-2">Acknowledgement</th>
               <th className="text-right px-4 py-2">Actions</th>
@@ -136,11 +134,11 @@ export default function PolicyManagement() {
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Loading policies...</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Loading policies...</td></tr>
             )}
             {!isLoading && policies.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
                   <FaFileContract className="mx-auto mb-2 text-2xl text-gray-300" />
                   No policies yet.{" "}
                   <button onClick={() => setShowCreate(true)} className="text-[#730042] font-medium hover:underline">
@@ -159,7 +157,6 @@ export default function PolicyManagement() {
                     <div className="text-xs text-gray-400">{p.code || "-"} · v{p.currentVersion?.versionNumber || "-"}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{p.category}</td>
-                  <td className="px-4 py-3 capitalize text-gray-600">{p.priority}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[p.status]}`}>{p.status}</span>
                   </td>

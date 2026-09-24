@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FaFilePdf, FaCheckCircle, FaExclamationTriangle, FaDownload } from "react-icons/fa";
+import { FaFilePdf, FaCheckCircle, FaDownload } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { useAcknowledgePolicy } from "../../auth/server-state/policy/policy.hook";
 import { getCertificateUrl } from "../../auth/api/policy/policy.api";
@@ -15,7 +15,6 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
   if (!entry) return null;
   const { policy, version, acknowledgement } = entry;
   const alreadyAcknowledged = acknowledgement?.status === "ACKNOWLEDGED";
-  const needsAcknowledgement = policy.acknowledgementRequired && policy.priority !== "informational";
 
   const handleAcknowledge = () => {
     if (!confirmed) {
@@ -39,9 +38,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
       <div>
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-lg font-semibold text-[#1F2937]">{policy.title}</h3>
-          {policy.priority === "mandatory" && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-medium">Mandatory</span>
-          )}
+          <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-medium">Mandatory</span>
           {policy.category && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{policy.category}</span>
           )}
@@ -73,7 +70,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
             src={version.pdfUrl}
             title={policy.title}
             className="w-full"
-            style={{ height: compact ? 380 : 520, border: "none" }}
+            style={{ height: compact ? "55vh" : 520, minHeight: compact ? 380 : undefined, border: "none" }}
           />
         </div>
       )}
@@ -92,7 +89,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
         </div>
       )}
 
-      {needsAcknowledgement && !alreadyAcknowledged && (
+      {!alreadyAcknowledged && (
         <div className="border-t border-gray-100 pt-4 space-y-3">
           <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
             <input
@@ -113,7 +110,7 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
         </div>
       )}
 
-      {needsAcknowledgement && alreadyAcknowledged && (
+      {alreadyAcknowledged && (
         <div className="flex items-center justify-between border-t border-gray-100 pt-4">
           <span className="flex items-center gap-2 text-sm text-green-600 font-medium">
             <FaCheckCircle /> Acknowledged on{" "}
@@ -128,13 +125,6 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
             <FaDownload /> Download certificate
           </a>
         </div>
-      )}
-
-      {!needsAcknowledgement && (
-        <p className="flex items-center gap-2 text-xs text-gray-500 border-t border-gray-100 pt-3">
-          <FaExclamationTriangle className="text-amber-500" /> This policy is informational — no acknowledgement is
-          required.
-        </p>
       )}
     </div>
   );
