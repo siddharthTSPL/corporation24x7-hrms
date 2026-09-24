@@ -281,4 +281,4 @@ export default function CreatePolicyModal({ onClose }) {
       </form>
     </div>
   );
-}
+}  
