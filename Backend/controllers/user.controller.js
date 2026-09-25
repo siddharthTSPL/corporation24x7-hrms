@@ -1,4 +1,5 @@
 const usermodel = require("../Models/user.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Leave = require("../Models/leave.model");
 const LeaveBalance = require("../Models/leavebalance.model");
@@ -144,46 +145,7 @@ const userlogin = async (req, res, next) => {
   if (!superAdmin)
     return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
 
-  const trialValid = superAdmin.isTrialValid();
-
-  const hasTalentLicense = superAdmin.licenses.some(
-    (l) =>
-      l.product === "torchx_talent" &&
-      l.isActive &&
-      new Date(l.expiresAt) > new Date()
-  );
-
-  if (!trialValid && !hasTalentLicense) {
-    return next(
-      Object.assign(
-        new Error(
-          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
-        ),
-        {
-          statusCode: 403,
-          code: "SERVICE_STOPPED",
-        }
-      )
-    );
-  }
-
-const token = jwt.sign(
-  {
-    _id: user._id,          // ← was "userId", now "_id" to match middleware
-    id: user._id,           // ← keep both for compatibility
-    userId: user._id,       // ← keep old one so nothing else breaks
-    work_email: user.work_email,
-    role: user.role,
-    organisation_id: user.organisation_id,
-    department: user.department ?? null,
-    designation: user.designation ?? null,
-    Under_manager: user.Under_manager ?? null,
-  },
-  process.env.JWT_SECRET,
-  {
-    expiresIn: "15d",
-  }
-);
+  await assertOrgAccess(superAdmin, "employee");
 
   const isProduction =
     process.env.NODE_ENV === "production";

@@ -20,6 +20,8 @@ api.interceptors.response.use(
 const LOCKED_FALLBACK = {
   plan: null,
   isTrialActive: false,
+  isFreeTier: false,
+  storage: null,
   features: {
     review: false,
     timesheet: false,

@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const SuperAdminModel = require("../Models/superadmin.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
@@ -221,15 +222,7 @@ const buildLoginToken = async (role, account, req) => {
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "admin");
 
     if (account.status !== "active") {
       await AdminModel.findByIdAndUpdate(account._id, { status: "active" });
@@ -256,15 +249,7 @@ const buildLoginToken = async (role, account, req) => {
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "manager");
 
     await Managermodel.findByIdAndUpdate(account._id, { status: "active", organisation_id: organisationId });
 
@@ -283,15 +268,7 @@ const buildLoginToken = async (role, account, req) => {
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "employee");
 
     employeeGate = await gateSingleSignIn(orgSuperAdmin, account._id);
     if (employeeGate?.challenge) return employeeGate;
@@ -334,15 +311,7 @@ const unifiedLogin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    const trialValid = superAdmin.isTrialValid();
-    const hasTalentLicense = superAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Your trial has expired. Please upgrade your plan at torchxsuite.com to continue."),
-        { statusCode: 403, code: "PLAN_EXPIRED" }
-      ));
+    await assertOrgAccess(superAdmin, "superadmin");
 
     // if (superAdmin.isFirstLogin)
     //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
@@ -385,15 +354,7 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "admin");
 
     void handleLoginGeoCheck({ accountId: admin._id, accountModel: "Admin", accountName: `${admin.f_name || ""} ${admin.l_name || ""}`.trim() || admin.work_email, organisation_id: admin.organisation_id, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "admin", accountId: admin._id, req, res });
@@ -438,15 +399,7 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "manager");
 
     void handleLoginGeoCheck({ accountId: manager._id, accountModel: "Manager", accountName: `${manager.f_name || ""} ${manager.l_name || ""}`.trim() || manager.work_email, organisation_id: organisationId, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "manager", accountId: manager._id, req, res });
@@ -480,15 +433,7 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "employee");
 
     void handleLoginGeoCheck({ accountId: user._id, accountModel: "User", accountName: `${user.f_name || ""} ${user.l_name || ""}`.trim() || user.work_email, organisation_id: user.organisation_id, req });
     const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "employee", accountId: user._id, req, res });

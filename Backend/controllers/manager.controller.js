@@ -1,4 +1,5 @@
 const managermodel = require("../Models/manager.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const usermodel = require("../Models/user.model");
 const Document = require("../Models/document.model");
@@ -91,42 +92,7 @@ const managerlogin = async (req, res, next) => {
     return next(Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 }));
   }
 
-  const trialValid = superAdmin.isTrialValid();
-  const hasTalentLicense = superAdmin.licenses?.some(
-    (license) => license.product === "torchx_talent" && license.isActive && new Date(license.expiresAt) > new Date(),
-  ) || false;
-
-  if (!trialValid && !hasTalentLicense) {
-    return next(Object.assign(
-      new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-      { statusCode: 403, code: "SERVICE_STOPPED" },
-    ));
-  }
-
-  if (manager.isFirstLogin) {
-    const resetToken = jwt.sign({ work_email: manager.work_email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-    const link = `https://corporation24x7-hrms.onrender.com/manager/change-password?token=${resetToken}`;
-
-    await sendEmail({
-      to: manager.work_email,
-      subject: "Set Your Password",
-      html: `
-        <h2>Hello ${manager.f_name}</h2>
-        <p>This is your first login.</p>
-        <p>Please click the link below to set your password:</p>
-        <a href="${link}">Change Password</a>
-        <p>This link expires in 15 minutes.</p>
-      `,
-    });
-
-    return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
-  }
-
-  const token = jwt.sign(
-    { managerid: manager._id, work_email: manager.work_email, role: manager.role, organisation_id: organisationId },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" },
-  );
+  await assertOrgAccess(superAdmin, "manager");
 
   const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
