@@ -3,6 +3,7 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const {
   UNLOCKED_PLANS,
 } = require("../middleware/auth/planFeatureGate.middleware");
+const { getPlanState, peekStorageStatus } = require("../utils/planAccess");
 
 // Features gated by the org's torchx_talent plan tier. Keep this in sync
 // with middleware/auth/planFeatureGate.middleware.js — that middleware is
@@ -49,7 +50,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
     const organisation = req.superAdmin
       ? req.superAdmin
       : await SuperAdminModel.findById(organisationId).select(
-          "licenses is_trial_active trial_expires_at field_operations",
+          "licenses is_trial_active trial_expires_at field_operations storage_used_bytes storage_checked_at organisation_id organisation_name",
         );
 
     if (!organisation)
@@ -105,10 +106,33 @@ const getPlanFeatureAccess = async (req, res, next) => {
       }
     }
 
+    const planState = getPlanState(organisation);
+    const storageStatus = planState.isFreeTier
+      ? peekStorageStatus(organisation)
+      : null;
+    const isAdminRole = !!(req.superAdmin || req.admin);
+    const storage = storageStatus
+      ? {
+          ...storageStatus,
+          limitReached: storageStatus.exceeded,
+          message: storageStatus.exceeded
+            ? isAdminRole
+              ? "Your free trial has ended and your organisation's free storage is full. Please upgrade to the Basic or Advance plan at torchxsuite.com to keep using TorchX Talent."
+              : "Your organisation's free storage is full. Please contact your organization."
+            : null,
+        }
+      : null;
+
     res.status(200).json({
       success: true,
       plan,
       isTrialActive: trialActive,
+      isFreeTier: planState.isFreeTier,
+      // Trial just ended, no paid license yet, storage still under the free
+      // cap: nothing is blocked, but the org is now on limited (Basic-tier)
+      // features. Purely informational — used for the dashboard banner.
+      trialJustEnded: planState.isFreeTier && !storageStatus?.exceeded,
+      storage,
       features,
       fieldAssignment,
     });
