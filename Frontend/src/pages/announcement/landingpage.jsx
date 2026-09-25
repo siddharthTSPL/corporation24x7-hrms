@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
+
   FiMenu, FiX, FiArrowRight, FiCheck,
   FiLinkedin, FiInstagram, FiMail,
   FiShield, FiLink, FiActivity, FiBookOpen,
@@ -10,7 +11,11 @@ import {
   FiUsers, FiStar, FiBarChart2,
   FiLogOut, FiSettings, FiMessageSquare,
   FiMapPin, FiCamera, FiNavigation, FiCalendar, FiDollarSign,
-  FiClipboard, FiCreditCard
+  FiClipboard, FiCreditCard,
+  // new icons used by the Features section
+  FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
+  FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
+  FiKey, FiCode, FiCloud, FiUserCheck, FiGift
 } from 'react-icons/fi'
 import { FaXTwitter, FaYoutube } from "react-icons/fa6";
 import { HiOutlineSparkles } from 'react-icons/hi'
@@ -97,8 +102,33 @@ function Divider() {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVBAR FIX — landing page file (landingpage.jsx)
+//
+// STEP 1: import line badlo (useLocation add karna hai)
+//   import { useNavigate, Link, useLocation } from 'react-router-dom'
+//
+// STEP 2: purana `export function Navbar(...) { ... }` delete karke
+//         neeche wala `useSectionNav` + `Navbar` paste karo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Landing page ('/') par normal #hash scroll chalta hai.
+// Kisi aur page (jaise /about) par ho to pehle '/' par jaate hain aur
+// landing page ko bata dete hain ki kis section tak scroll karna hai.
+function useSectionNav() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+
+  return (e, id) => {
+    if (pathname === '/') return // landing page par hi ho -> default anchor scroll
+    e.preventDefault()
+    navigate('/', { state: { scrollTo: id } })
+  }
+}
+
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const navigate = useNavigate()
+  const goToSection = useSectionNav()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const links = ['Features', 'Testimonials', 'Pricing', 'About']
@@ -116,6 +146,15 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
     document.body.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleLinkClick = (e, label) => {
+    if (label === 'About') {
+      e.preventDefault()
+      navigate('/about')
+      return
+    }
+    goToSection(e, label.toLowerCase())
+  }
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 w-full z-[9999] bg-white transition-shadow duration-300 ${
@@ -124,31 +163,26 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
     >
       <div className="max-w-[1500px] mx-auto px-5 sm:px-10 lg:px-16 h-[72px] flex items-center justify-between">
         <button
-  type="button"
-  onClick={() => {
-    window.location.href = '/'
-  }}
-  className="bg-transparent border-none p-0 m-0 cursor-pointer"
-  aria-label="Go to home"
->
-  <img
-    src={logo}
-    alt="TorchX Talent logo"
-    className="h-9 sm:h-11 w-auto object-contain block"
-  />
-</button>
+          type="button"
+          onClick={() => {
+            window.location.href = '/'
+          }}
+          className="bg-transparent border-none p-0 m-0 cursor-pointer"
+          aria-label="Go to home"
+        >
+          <img
+            src={logo}
+            alt="TorchX Talent logo"
+            className="h-9 sm:h-11 w-auto object-contain block"
+          />
+        </button>
 
         <div className="hidden lg:flex items-center gap-9">
           {links.map(l => (
             <a
               key={l}
               href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
-              onClick={(e) => {
-                if (l === 'About') {
-                  e.preventDefault()
-                  navigate('/about')
-                }
-              }}
+              onClick={(e) => handleLinkClick(e, l)}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
             >
               {l}
@@ -178,10 +212,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
               key={l}
               href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
               onClick={(e) => {
-                if (l === 'About') {
-                  e.preventDefault()
-                  navigate('/about')
-                }
+                handleLinkClick(e, l)
                 setOpen(false)
               }}
               className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
@@ -686,177 +717,229 @@ function PortalPanel() {
   )
 }
 
-// Detailed bento-style grid of TorchX Talent features — pulled from the
-// actual product (dashboard mockup + pricing plans) so nothing is invented.
-// index 0 is marked `featured` and renders as a larger highlighted card.
+// ─────────────────────────────────────────────────────────────────────────────
+// FEATURES SECTION — replacement code
+//
+// 1) Add these icons to your existing 'react-icons/fi' import:
+//      FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
+//      FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
+//      FiKey, FiCode, FiCloud, FiUserCheck, FiGift
+//
+// 2) In your landing page file, delete everything from the comment
+//      "// Detailed bento-style grid of TorchX Talent features ..."
+//    down to the end of `function Features() { ... }`, and paste everything
+//    below in its place.
+//
+// Nothing else changes. `useState`, `motion`, `fadeUp`, `Wrap`, `FiCheck`,
+// `HiOutlineSparkles`, `BsGraphUp` and `BsPersonBadge` are already imported.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const featureCategories = [
+  { key: 'attendance', label: 'Attendance & Tracking' },
+  { key: 'payroll', label: 'Leave & Payroll' },
+  { key: 'hiring', label: 'Hiring & Growth' },
+  { key: 'workplace', label: 'Workplace' },
+  { key: 'insights', label: 'Insights & Security' },
+  { key: 'support', label: 'Support' },
+  { key: 'enterprise', label: 'Enterprise' },
+]
+
+// Every feature listed in the pricing plans + the original feature cards.
+// Only the first item is `featured` (larger highlighted card).
 const featureItems = [
+  // ── Hiring & Growth ──
   {
-    tag: 'Hiring',
-    icon: <HiOutlineSparkles className="text-2xl" />,
+    cat: 'hiring',
+    icon: HiOutlineSparkles,
     title: 'AI Recruitment',
     desc: 'Screen, match, and shortlist candidates automatically — so your hiring team spends less time filtering resumes and more time talking to the right people.',
     highlights: ['AI-powered candidate screening', 'Smart skill-based matching', 'Automated shortlisting workflow'],
     featured: true,
   },
-  {
-    tag: 'Growth',
-    icon: <BsGraphUp className="text-xl" />,
-    title: 'Performance Reviews',
-    desc: 'Run structured, transparent reviews with clear goals and a continuous feedback loop.',
-    highlights: ['Customizable review cycles', 'Goal & KPI tracking'],
-  },
-  {
-    tag: 'Self-Service',
-    icon: <BsPersonBadge className="text-xl" />,
-    title: 'Employee Portal',
-    desc: 'One place for every employee to manage profiles, documents, requests, and company updates.',
-    highlights: ['Centralized document access', 'Request & approval workflows'],
-  },
-  {
-    tag: 'Attendance',
-    icon: <FiMapPin className="text-lg" />,
-    title: 'Geo Tag Attendance',
-    desc: 'Location-verified check-ins keep attendance data accurate across every site and shift.',
-    highlights: ['GPS-based check-in / check-out', 'Site-wise attendance logs'],
-  },
-  {
-    tag: 'Attendance',
-    icon: <FiCamera className="text-lg" />,
-    title: 'Face Attendance',
-    desc: 'Contactless facial recognition makes clocking in fast, hygienic, and tamper-proof.',
-    highlights: ['Biometric-grade accuracy', 'No buddy punching'],
-  },
-  {
-    tag: 'Field Ops',
-    icon: <FiNavigation className="text-lg" />,
-    title: 'Live Map Tracking',
-    desc: 'Track field employees and site visits on a live map for full visibility into on-ground work.',
-    highlights: ['Real-time location tracking', 'Visit history & routes'],
-  },
-  {
-    tag: 'Leave',
-    icon: <FiCalendar className="text-lg" />,
-    title: 'Leave Management',
-    desc: 'Apply, approve, and track leave balances without spreadsheets or back-and-forth emails.',
-    highlights: ['Automated leave accrual', 'One-click approvals'],
-  },
-  {
-    tag: 'Payroll',
-    icon: <FiDollarSign className="text-lg" />,
-    title: 'Integrated Payroll',
-    desc: 'Payroll that runs directly off attendance and leave data, cutting manual reconciliation.',
-    highlights: ['Auto-synced with attendance', 'Payslip generation'],
-  },
-  {
-    tag: 'Insights',
-    icon: <FiBarChart2 className="text-lg" />,
-    title: 'Analytical Dashboard',
-    desc: 'A real-time command center with the workforce metrics that matter most to your business.',
-    highlights: ['Live KPI widgets', 'Exportable reports'],
-  },
-  {
-    tag: 'Lifecycle',
-    icon: <FiClipboard className="text-lg" />,
-    title: 'Onboarding & Offboarding',
-    desc: 'Guided checklists and automated workflows make every employee\u2019s first day — and last day — smooth and paperwork-free.',
-    highlights: ['Automated onboarding checklists', 'Digital document collection'],
-  },
-  {
-    tag: 'Finance',
-    icon: <FiCreditCard className="text-lg" />,
-    title: 'Expense Management',
-    desc: 'Employees submit expenses and managers approve them in a few taps, synced straight to payroll.',
-    highlights: ['Mobile expense submission', 'Approval workflows'],
-  },
+  { cat: 'hiring', icon: FiSearch, title: 'Applicant Tracking', desc: 'Follow every candidate from application to offer.' },
+  { cat: 'hiring', icon: BsGraphUp, title: 'Performance Management', desc: 'Goals, KPIs and continuous feedback in one place.' },
+  { cat: 'hiring', icon: FiUserPlus, title: 'Onboarding & Offboarding', desc: 'Guided checklists for every first day and last day.' },
+
+  // ── Attendance & Tracking ──
+  { cat: 'attendance', icon: FiMapPin, title: 'Geo Tag Attendance', desc: 'GPS-verified check-ins for every site and shift.' },
+  { cat: 'attendance', icon: FiCamera, title: 'Face Attendance', desc: 'Contactless face recognition. No buddy punching.' },
+  { cat: 'attendance', icon: FiNavigation, title: 'Live Map Tracking', desc: 'See field teams and visit routes in real time.' },
+  { cat: 'attendance', icon: FiMonitor, title: 'Active & Idle Time', desc: 'Monitor active and idle time across your team.' },
+  { cat: 'attendance', icon: FiClock, title: 'Timesheet', desc: 'Track working hours accurately for every employee.' },
+
+  // ── Leave & Payroll ──
+  { cat: 'payroll', icon: FiCalendar, title: 'Leave Management', desc: 'Apply, approve and track balances in one click.' },
+  { cat: 'payroll', icon: FiDollarSign, title: 'Basic Payroll', desc: 'Simple payslips and salary runs for small teams.' },
+  { cat: 'payroll', icon: FiCreditCard, title: 'Advanced Payroll', desc: 'Payroll auto-synced with attendance and leave.' },
+  { cat: 'payroll', icon: FiRepeat, title: 'Reimbursement & Expenses', desc: 'Submit expenses and get approvals in a few taps.' },
+
+  // ── Workplace ──
+  { cat: 'workplace', icon: BsPersonBadge, title: 'Employee Self-Service', desc: 'Profiles, documents and requests, all in one place.' },
+  { cat: 'workplace', icon: FiBell, title: 'Announcements', desc: 'Share company news with everyone instantly.' },
+  { cat: 'workplace', icon: FiFolder, title: 'Team Documentation', desc: 'Keep team files and knowledge organised.' },
+  { cat: 'workplace', icon: FiBookOpen, title: 'Policy Management', desc: 'Publish and update company policies centrally.' },
+  { cat: 'workplace', icon: FiGitBranch, title: 'Custom Workflows', desc: 'Build approval flows that match your process.' },
+  { cat: 'workplace', icon: FiAlertCircle, title: 'Grievance Management', desc: 'Raise, track and resolve employee concerns.' },
+
+  // ── Insights & Security ──
+  { cat: 'insights', icon: FiBarChart2, title: 'Analytical Dashboard', desc: 'Live workforce metrics at a glance.' },
+  { cat: 'insights', icon: FiPieChart, title: 'Reports & Analytics', desc: 'Exportable reports for smarter decisions.' },
+  { cat: 'insights', icon: FiLock, title: 'Two-Factor Authentication', desc: 'Extra login protection for every account.' },
+
+  // ── Support ──
+  { cat: 'support', icon: FiMail, title: 'Email Support 24/7', desc: 'Reach our team by email any time.' },
+  { cat: 'support', icon: FiPhoneCall, title: 'Telephonic Support 24/7', desc: 'Talk to an expert whenever you need help.' },
+
+  // ── Enterprise ──
+  { cat: 'enterprise', icon: FiKey, title: 'Single Sign-On', desc: 'One secure login across your company tools.' },
+  { cat: 'enterprise', icon: FiCode, title: 'API Access', desc: 'Connect TorchX Talent to your own systems.' },
+  { cat: 'enterprise', icon: FiLink, title: 'Custom Integrations', desc: 'Integrations built around your tech stack.' },
+  { cat: 'enterprise', icon: FiCloud, title: 'Private Cloud Hosting', desc: 'On-premises or private cloud deployment.' },
+  { cat: 'enterprise', icon: FiUserCheck, title: 'Dedicated Account Manager', desc: 'A single point of contact for your team.' },
+  { cat: 'enterprise', icon: FiGift, title: 'Free Smartphone Gift Hamper', desc: 'A welcome gift that comes with Enterprise.' },
 ]
 
-function FeatureJourney() {
-  return (
-    <motion.div
-      variants={stagger} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.1 }}
-      className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
-    >
-      {featureItems.map((f, i) => (
-        <motion.div
-          key={f.title}
-          variants={cardVariant}
-          className={`group relative overflow-hidden rounded-[20px] sm:rounded-[24px] p-5 sm:p-6 lg:p-7 flex flex-col gap-3 sm:gap-4 transition-all duration-300 hover:-translate-y-1.5 ${
-            f.featured
-              ? 'col-span-2 bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] text-white shadow-[0_20px_50px_rgba(122,0,75,0.30)] hover:shadow-[0_28px_64px_rgba(122,0,75,0.42)]'
-              : 'bg-white border border-[#EAC7D7] shadow-[0_4px_16px_rgba(122,0,75,0.06)] hover:shadow-[0_18px_44px_rgba(122,0,75,0.16)] hover:border-[#c88ba8]'
-          }`}
-        >
-          {/* decorative glow blob on hover */}
-          <div
-            className={`absolute -right-8 -bottom-8 w-32 h-32 rounded-full blur-2xl transition-opacity duration-300 opacity-0 group-hover:opacity-100 pointer-events-none ${
-              f.featured ? 'bg-white/10' : 'bg-[#7A004B]/[0.08]'
-            }`}
-          />
+// light stagger so 30 cards ease in without feeling slow
+const gridVariants = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } }
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
+}
 
-          <div className="relative z-[1] flex items-center gap-2.5 sm:gap-3">
-            <div
-              className={`w-9 h-9 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-colors duration-300 ${
-                f.featured
-                  ? 'bg-white/15 text-white'
-                  : 'bg-[#7A004B]/[0.09] text-[#7A004B] group-hover:bg-[#7A004B] group-hover:text-white'
-              }`}
-            >
-              {f.icon}
+function FeatureCard({ f, tagLabel, showTag }) {
+  const Icon = f.icon
+
+  // Large highlighted card
+  if (f.featured) {
+    return (
+      <motion.div variants={itemVariants} className="sm:col-span-2">
+        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] shadow-[0_20px_50px_rgba(122,0,75,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_64px_rgba(122,0,75,0.40)]">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+              <Icon className="text-[22px]" />
             </div>
-            <span
-              className={`text-[9px] sm:text-[10px] font-ui font-bold uppercase tracking-[1px] px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full ${
-                f.featured ? 'bg-white/15 text-white' : 'bg-[#7A004B]/[0.08] text-[#7A004B]'
-              }`}
-            >
-              {f.tag}
+            <span className="text-[10px] font-ui font-bold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-white/15">
+              {tagLabel}
             </span>
           </div>
-
-          <div className="relative z-[1] flex-1 flex flex-col gap-2 sm:gap-2.5">
-            <h3
-              className={`font-display font-extrabold leading-snug tracking-tight ${
-                f.featured ? 'text-xl sm:text-2xl lg:text-[28px] text-white' : 'text-[17px] sm:text-[19px] lg:text-[21px] text-[#111]'
-              }`}
-            >
-              {f.title}
-            </h3>
-            <p
-              className={`font-body leading-[1.6] ${
-                f.featured ? 'text-[13px] sm:text-[14px] text-white/80' : 'text-[12px] sm:text-[13px] text-[#5C5C5C]'
-              }`}
-            >
-              {f.desc}
-            </p>
-            <ul className="flex flex-col gap-1.5 mt-1">
-              {f.highlights.map(h => (
-                <li
-                  key={h}
-                  className={`flex items-start gap-2 text-[11.5px] sm:text-[12.5px] font-body ${
-                    f.featured ? 'text-white/85' : 'text-[#5C5C5C]'
-                  }`}
-                >
-                  <FiCheck className={`shrink-0 mt-0.5 text-[13px] ${f.featured ? 'text-white' : 'text-[#7A004B]'}`} />
-                  {h}
-                </li>
-              ))}
-            </ul>
+          <div className="relative">
+            <h3 className="font-display font-extrabold text-xl sm:text-2xl leading-snug tracking-tight">{f.title}</h3>
+            <p className="font-body text-[13px] sm:text-[14px] leading-[1.6] text-white/80 mt-2">{f.desc}</p>
           </div>
-        </motion.div>
-      ))}
+          <ul className="relative flex flex-wrap gap-x-5 gap-y-1.5 mt-auto">
+            {f.highlights.map(h => (
+              <li key={h} className="flex items-center gap-2 text-[12px] sm:text-[12.5px] font-body text-white/85">
+                <FiCheck className="shrink-0 text-[13px] text-white" />
+                {h}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </motion.div>
+    )
+  }
+
+  // Compact card: icon beside text on mobile, stacked on sm+
+  return (
+    <motion.div variants={itemVariants}>
+      <div className="group relative h-full overflow-hidden rounded-2xl bg-white border border-[#EAC7D7] p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_2px_10px_rgba(122,0,75,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-[#c88ba8] hover:shadow-[0_14px_34px_rgba(122,0,75,0.14)]">
+        <div className="flex items-center justify-between gap-2 shrink-0 sm:w-full">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#7A004B]/[0.09] text-[#7A004B] flex items-center justify-center shrink-0 transition-colors duration-300 group-hover:bg-[#7A004B] group-hover:text-white">
+            <Icon className="text-[18px] sm:text-[20px]" />
+          </div>
+          {showTag && (
+            <span className="hidden sm:inline-block max-w-[62%] truncate text-[9px] font-ui font-bold uppercase tracking-[0.8px] px-2 py-0.5 rounded-full bg-[#7A004B]/[0.08] text-[#7A004B]">
+              {tagLabel}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-display font-bold text-[15px] sm:text-base leading-snug text-[#111]">{f.title}</h3>
+          <p className="font-body text-[12.5px] sm:text-[13px] leading-relaxed text-[#5C5C5C] mt-1">{f.desc}</p>
+        </div>
+      </div>
     </motion.div>
+  )
+}
+
+function FeatureJourney() {
+  const [active, setActive] = useState('all')
+
+  const counts = featureItems.reduce((acc, f) => {
+    acc[f.cat] = (acc[f.cat] || 0) + 1
+    return acc
+  }, {})
+  const labelOf = Object.fromEntries(featureCategories.map(c => [c.key, c.label]))
+  const chips = [
+    { key: 'all', label: 'All Features', count: featureItems.length },
+    ...featureCategories.map(c => ({ ...c, count: counts[c.key] || 0 })),
+  ]
+  const visible = active === 'all' ? featureItems : featureItems.filter(f => f.cat === active)
+
+  return (
+    <>
+      {/* Category filter — scrolls sideways on mobile, wraps and centers on larger screens */}
+      <div className="flex gap-2 overflow-x-auto sm:flex-wrap sm:justify-center pb-2 mb-8 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {chips.map(c => {
+          const isActive = active === c.key
+          return (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={isActive}
+              onClick={() => setActive(c.key)}
+              className={`shrink-0 whitespace-nowrap inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-ui font-semibold cursor-pointer transition-all duration-200 ${
+                isActive
+                  ? 'bg-[#7A004B] border-[#7A004B] text-white shadow-[0_6px_18px_rgba(122,0,75,0.25)]'
+                  : 'bg-white border-[#EAC7D7] text-[#5C5C5C] hover:border-[#c88ba8] hover:text-[#7A004B]'
+              }`}
+            >
+              {c.label}
+              <span
+                className={`min-w-[20px] rounded-full px-1.5 py-px text-center text-[10px] font-bold ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-[#7A004B]/[0.08] text-[#7A004B]'
+                }`}
+              >
+                {c.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* key={active} remounts the grid so the entrance animation replays on every filter change */}
+      <motion.div
+        key={active}
+        variants={gridVariants}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.05 }}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-3.5 sm:gap-5"
+      >
+        {visible.map(f => (
+          <FeatureCard
+            key={f.title}
+            f={f}
+            tagLabel={labelOf[f.cat]}
+            showTag={active === 'all'}
+          />
+        ))}
+      </motion.div>
+    </>
   )
 }
 
 function Features() {
   return (
-    <section id="features" className="scroll-anchor bg-[#F8F5F7] font-body pt-8 pb-9">
+    <section id="features" className="scroll-anchor bg-[#F8F5F7] font-body pt-8 pb-12">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-12">
             <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
               Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
-            <p className="text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
+            <p className="text-lg sm:text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
               Everything TorchX Talent offers to help you hire smarter, evaluate better, and empower your employees.
             </p>
           </div>
@@ -868,19 +951,46 @@ function Features() {
   )
 }
 
+// Replace the existing `function Pricing() { ... }` in your landing page file with this.
+// It uses the same imports/helpers that already exist in that file:
+// useState, motion, fadeUp, Wrap, FiCheck, FiX, FiHardDrive, FiShield, FiLink,
+// FiActivity, FiBookOpen, HiOutlineSparkles
 
 function Pricing() {
   const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
 
   const plans = [
     {
+      name: 'Free Forever',
+      desc: 'Great Start for Startup and Micro Teams',
+      inherits: null,
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      features: [
+        'Geo Tag Attendance',
+        'Face Attendence',
+        'Monitoring of Employee Active and Idle Time',
+        'Leave management',
+        'Basic payroll',
+        'Analytical and Digital Dashboard',
+        'Announcements',
+        'Team Documentation',
+        'Reimbursement',
+        'Employee Self-Service Portal',
+        'Policy Management',
+        'Grievance Management',
+        'Email support (24/7)',
+      ],
+      crossFeatures: []
+    },
+    {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Reimbursement','Custom policies/workflows','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Employee Self-Service Portal','Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Employee Self-Service Portal','Telephonic Support (24/7)'] // <- yaha jo labels daloge unke aage cross aayega (text as-is rahega)
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Employee Self-Service Portal','Policy Management','Reimbursement','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Custom Workflow','Recruitment Management','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Custom Workflow','Telephonic Support (24/7)'] // features listed here get a cross instead of a tick
     },
     {
       name: 'Advance',
@@ -889,13 +999,13 @@ function Pricing() {
       monthlyPrice: 99,
       yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
       popular: true,
-      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom policies/workflows','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
+      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom workflow','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
       crossFeatures: []
     },
     {
       name: 'Enterprise',
       desc: 'Ultimate power and flexibility',
-      inherits: 'Everything in Advance +', // <- price ke neeche dark/bold highlighted dikhega
+      inherits: 'Everything in Advance +',
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
@@ -909,6 +1019,13 @@ function Pricing() {
       ],
       crossFeatures: []
     }
+  ]
+
+  const storage = [
+    { label: 'Free Forever', val: '5 MB' },
+    { label: 'Basic', val: '2 GB' },
+    { label: 'Advance', val: '20 GB' },
+    { label: 'Enterprise', val: '100 GB' },
   ]
 
   const badges = [
@@ -962,17 +1079,19 @@ function Pricing() {
             </div>
           </div>
 
-          {/* items-stretch (not items-center) so every card fills the row's full height —
-              combined with h-full below, this keeps Basic / Advance / Enterprise
-              all exactly the same size regardless of how many features each lists. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7 items-stretch mb-6 pt-5">
+          {/* Responsive plan grid:
+              mobile  (<768px)   -> 1 column
+              tablet  (768-1279) -> 2 x 2
+              desktop (>=1280px) -> 4 in one row
+              items-stretch + h-full on each card keeps all four the same height. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6 pt-5">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-3xl p-8 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
+                  className={`relative rounded-3xl p-6 sm:p-8 xl:p-6 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
                     p.popular ? 'relative z-[5]' : 'hover:scale-[1.02]'
                   }`}
                 >
@@ -986,12 +1105,14 @@ function Pricing() {
                     <div className="text-xs font-body text-[#999] leading-relaxed">{p.desc}</div>
                   </div>
                   <div>
-                    <span className="text-[38px] font-display font-extrabold text-[#111]">
-                      {price !== null ? `₹${price}` : 'Custom'}
-                    </span>
-                    {price !== null && (
-                      <span className="text-sm font-body text-[#999] ml-1">{suffix}</span>
-                    )}
+                    <div className="flex flex-wrap items-baseline gap-x-1">
+                      <span className="text-[34px] sm:text-[38px] xl:text-[34px] font-display font-extrabold text-[#111] leading-tight">
+                        {price !== null ? `₹${price}` : 'Custom'}
+                      </span>
+                      {price !== null && (
+                        <span className="text-sm font-body text-[#999]">{suffix}</span>
+                      )}
+                    </div>
                     {p.inherits && (
                       <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">
                         {p.inherits}
@@ -1021,20 +1142,24 @@ function Pricing() {
             })}
           </div>
 
-          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 mb-6 border-2 border-[#7A004B]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 items-center">
-              <div className="flex items-center gap-2.5">
+          {/* Storage guidance:
+              mobile  -> title on top, 2 x 2 storage tiles
+              tablet  -> title on top, 4 tiles in one row
+              desktop -> title + 4 tiles in one row */}
+          <div className="bg-[#FDF4F8] rounded-[20px] px-5 sm:px-8 py-6 mb-6 border-2 border-[#7A004B]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] gap-x-3 gap-y-6 sm:gap-4 items-center">
+              <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-center gap-2.5">
                 <FiHardDrive className="text-[#7A004B] text-[22px] shrink-0" />
                 <div>
                   <div className="text-[13px] font-display font-bold text-[#111]">Storage Guidance</div>
                   <div className="text-[11px] font-body text-[#aaa] leading-snug">Finance documents, invoices, receipts, ledgers grow fast.</div>
                 </div>
               </div>
-              {[{ label: 'Startup', val: '2 GB' }, { label: 'Business', val: '20 GB' }, { label: 'Enterprise', val: '100 GB' }].map(s => (
+              {storage.map(s => (
                 <div key={s.label} className="text-center">
                   <div className="text-2xl font-display font-extrabold text-[#111]">{s.val}</div>
                   <div className="text-[10px] text-[#aaa] font-body mb-1">Per company</div>
-                  <span className="text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
+                  <span className="inline-block whitespace-nowrap text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
                 </div>
               ))}
             </div>
@@ -1052,7 +1177,7 @@ function Pricing() {
             ))}
           </div>
 
-          <div className="bg-[#FDF4F8] rounded-[20px] px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#EAC7D7]">
+          <div className="bg-[#FDF4F8] rounded-[20px] px-5 sm:px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-[#EAC7D7]">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 bg-[#7A004B]/[0.09] rounded-full flex items-center justify-center shrink-0">
                 <HiOutlineSparkles className="text-[#7A004B] text-xl" />
@@ -1073,7 +1198,7 @@ function Pricing() {
       </Wrap>
     </section>
   )
-} 
+}
 
 
 

@@ -70,7 +70,9 @@ const {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
-  getperticularadmin
+  getperticularadmin,
+  getStorageUsage,
+  getStorageFiles,
 
 } = require("../controllers/superadmin.controller");
 
@@ -123,6 +125,8 @@ superAdminRouter.get(
   asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
+superAdminRouter.get("/storage-usage", superAdminAuth, asyncHandler(getStorageUsage));
+superAdminRouter.get("/storage-usage/files", superAdminAuth, asyncHandler(getStorageFiles));
 
 superAdminRouter.post(
   "/admin/create",

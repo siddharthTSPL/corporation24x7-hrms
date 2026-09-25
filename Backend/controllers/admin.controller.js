@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus, TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("../utils/planAccess");
 const Adminmodel = require("../Models/Admin.model");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Managermodel = require("../Models/manager.model");
@@ -265,23 +266,7 @@ const adminlogin = async (req, res, next) => {
       )
     );
 
-  const trialValid = superAdmin.isTrialValid();
-  const hasTalentLicense = superAdmin.licenses.some(
-    (l) =>
-      l.product === "torchx_talent" &&
-      l.isActive &&
-      new Date(l.expiresAt) > new Date()
-  );
-
-  if (!trialValid && !hasTalentLicense)
-    return next(
-      Object.assign(
-        new Error(
-          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
-        ),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      )
-    );
+  await assertOrgAccess(superAdmin, "admin");
 
   const isProduction = process.env.NODE_ENV === "production";
   const cookieOpts = {
@@ -5429,7 +5414,7 @@ const getActiveUserCount = async (req, res, next) => {
       new Date() < new Date(superAdmin.trial_expires_at);
 
     const activeCount = superAdmin.active_user_count || 0;
-    const allowedUsers = trialActive ? 4 : license?.users || 0;
+    const allowedUsers = trialActive ? TRIAL_USER_LIMIT : (license?.users || FREE_USER_LIMIT);
     const isLimitReached =
       allowedUsers > 0 ? activeCount >= allowedUsers : false;
 
@@ -5560,7 +5545,3 @@ module.exports = {
   getActiveUserCount,
   getAllAdminsForOrg,
 };
-
-
-
-

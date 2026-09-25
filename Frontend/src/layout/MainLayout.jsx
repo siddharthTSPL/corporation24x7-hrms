@@ -9,6 +9,7 @@ import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/
 import WelcomeModal from "../components/WelcomeModal";
 import BirthdayModal from "../components/BirthdayModal";
 import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner";
+import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 
@@ -205,6 +206,7 @@ export default function MainLayout() {
 
       <div className="flex-1 flex flex-col">
         <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
+        <StorageLimitBanner role={auth?.role} />
         <div className="p-6 overflow-auto flex-1">
   <Outlet />
 </div>

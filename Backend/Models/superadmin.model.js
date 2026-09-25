@@ -281,6 +281,18 @@ const superAdminSchema = new mongoose.Schema(
       default: 1,
     },
 
+    // Cached total (Mongo docs + ImageKit files) from utils/storageUsage.utils,
+    // refreshed on login / getme and used by utils/planAccess to enforce the
+    // free-tier (post-trial, no paid license) storage cap.
+    storage_used_bytes: {
+      type: Number,
+      default: 0,
+    },
+    storage_checked_at: {
+      type: Date,
+      default: null,
+    },
+
     working_status: {
       type: String,
       enum: ["working", "resigned", "fired", "terminated"],

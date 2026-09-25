@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import {
   useGetMeSuperAdmin,
@@ -8,8 +8,26 @@ import {
   useChangeSuperAdminPassword,
   useKioskPasswordStatus,
   useSetKioskPassword,
+  useGetStorageUsage,
+  useRefreshStorageUsage,
+  useGetStorageFiles,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+} from "recharts";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  ExternalLink,
+  Search,
+} from "lucide-react";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 
 const AVATAR_STYLES = [
@@ -68,6 +86,18 @@ function formatDate(dateStr) {
 function formatRole(role) {
   if (!role) return "—";
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "—";
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
+  const value = bytes / Math.pow(1024, i);
+  return `${value < 10 && i > 0 ? value.toFixed(2) : value < 100 && i > 0 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 }
 
 function daysLeft(dateStr) {
@@ -413,6 +443,32 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             width="4"
             height="5"
             rx="1"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "storage",
+      label: "Storage",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <ellipse
+            cx="8"
+            cy="4"
+            rx="6"
+            ry="2.2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 4v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 8v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V8"
             stroke="currentColor"
             strokeWidth="1.4"
           />
@@ -1528,6 +1584,475 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
+// Small horizontal split bar showing what share of total storage each
+// segment takes up. `segments`: [{ label, bytes, color }]
+function StorageSplitBar({ segments, totalBytes }) {
+  const safeTotal = totalBytes || 1;
+  return (
+    <div className="w-full">
+      <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-[#f3ede9]">
+        {segments.map((seg, i) => {
+          const pct = Math.max(0, (seg.bytes / safeTotal) * 100);
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={i}
+              style={{ width: `${pct}%`, background: seg.color }}
+              className="h-full"
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[11px] text-[#8a7570]">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: seg.color }}
+            />
+            {seg.label} · {formatBytes(seg.bytes)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StorageStatCard({ label, value, sublabel, accent }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 relative overflow-hidden">
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px]"
+        style={{ background: accent }}
+      />
+      <div className="text-[11px] text-[#b0948a] font-medium mb-1">{label}</div>
+      <div className="text-xl sm:text-2xl font-semibold text-[#2a1a16]">{value}</div>
+      {sublabel && (
+        <div className="text-[11px] text-[#b0948a] mt-1">{sublabel}</div>
+      )}
+    </div>
+  );
+}
+
+const STORAGE_PALETTE = [
+  "#730042", "#2563EB", "#16A34A", "#B45309", "#7C3AED", "#DB2777",
+  "#0891B2", "#65A30D", "#EA580C", "#4F46E5", "#0D9488", "#BE123C",
+];
+
+function StorageGroupRows({ group, open, onToggle }) {
+  return (
+    <>
+      <tr
+        className="border-t border-[#f3ede9] cursor-pointer hover:bg-[#faf7f5]"
+        onClick={onToggle}
+      >
+        <td className="px-3 py-2.5 text-[13px] font-semibold text-[#2a1a16]">
+          <span className="inline-flex items-center gap-1.5">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {group.label}
+          </span>
+        </td>
+        <td className="px-3 py-2.5 text-[13px] text-right text-[#2a1a16]">
+          {group.docs.toLocaleString("en-IN")}
+        </td>
+        <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+          {group.formatted}
+        </td>
+      </tr>
+      {open &&
+        group.collections.map((c) => (
+          <tr key={c.name} className="border-t border-[#f3ede9]">
+            <td className="pl-9 pr-3 py-2 text-xs font-mono text-[#8a7570]">{c.name}</td>
+            <td className="px-3 py-2 text-xs text-right text-[#8a7570]">
+              {c.docs.toLocaleString("en-IN")}
+            </td>
+            <td className="px-3 py-2 text-xs text-right text-[#8a7570] whitespace-nowrap">
+              {c.formatted}
+            </td>
+          </tr>
+        ))}
+    </>
+  );
+}
+
+function StorageTab() {
+  const { data: usage, isLoading, isError, error } = useGetStorageUsage();
+  const refresh = useRefreshStorageUsage();
+
+  const [openGroups, setOpenGroups] = useState({});
+  const [moduleFilter, setModuleFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const fileParams = useMemo(
+    () => ({ module: moduleFilter, search, page, limit: 10 }),
+    [moduleFilter, search, page],
+  );
+  const { data: filesData, isFetching: filesFetching } = useGetStorageFiles(fileParams);
+
+  const mongo = usage?.mongo;
+  const imagekit = usage?.imagekit;
+
+  const slices = useMemo(() => {
+    if (!usage) return [];
+    return [
+      ...(mongo?.groups || []).map((g) => ({ name: `Database · ${g.label}`, bytes: g.bytes })),
+      ...(imagekit?.modules || []).map((m) => ({ name: `Files · ${m.label}`, bytes: m.bytes })),
+    ].filter((x) => x.bytes > 0);
+  }, [usage, mongo, imagekit]);
+
+  return (
+    <>
+      <SectionCard
+        title="Storage usage"
+        subtitle="Database records (every collection) + files belonging to your organisation"
+        accent={C.brand}
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-3 py-6">
+            <Spinner size={20} color={C.brand} />
+            <span className="text-sm text-[#b0948a]">
+              Calculating storage usage... (the first load may take a few seconds)
+            </span>
+          </div>
+        ) : isError ? (
+          <div className="text-sm text-[#E24B4A]">
+            Couldn't load storage usage: {getErrorMessage(error)}
+          </div>
+        ) : (
+          <>
+            {usage?.imagekitAvailable === false && (
+              <div
+                className="mb-4 p-3 rounded-lg text-xs"
+                style={{ background: C.amberBg, color: C.amber }}
+              >
+                Could not fetch the file list from storage ({usage.imagekitError || "unknown error"}).
+                File sizes are taken from sizes saved in the database and are not verified.
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+              <StorageStatCard
+                label="Total storage used"
+                value={usage.totalFormatted}
+                sublabel="Database + Files"
+                accent={C.brand}
+              />
+              <StorageStatCard
+                label="Database"
+                value={mongo.formatted}
+                sublabel={`${mongo.docs.toLocaleString("en-IN")} documents · ~${mongo.estimatedDiskFormatted} on disk incl. indexes`}
+                accent={C.blue}
+              />
+              <StorageStatCard
+                label="Files"
+                value={imagekit.formatted}
+                sublabel={`${imagekit.files.toLocaleString("en-IN")} files${imagekit.missingFiles ? ` · ${imagekit.missingFiles} missing from storage` : ""}`}
+                accent={C.amber}
+              />
+            </div>
+
+            <StorageSplitBar
+              totalBytes={usage.totalBytes}
+              segments={[
+                { label: "Database", bytes: mongo.bytes, color: C.blue },
+                { label: "Files", bytes: imagekit.bytes, color: C.amber },
+              ]}
+            />
+
+            <div className="flex items-center justify-between mt-5">
+              <div className="text-[11px] text-[#b0948a]">
+                {usage.computedAt
+                  ? `Updated ${new Date(usage.computedAt).toLocaleString("en-IN")}`
+                  : ""}
+              </div>
+              <button
+                onClick={() => refresh.mutate()}
+                disabled={refresh.isPending}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#ede5e0] text-[#730042] hover:bg-[#730042]/5 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {refresh.isPending && <Spinner size={12} color={C.brand} />}
+                {refresh.isPending ? "Recalculating..." : "Refresh"}
+              </button>
+            </div>
+          </>
+        )}
+      </SectionCard>
+
+      {!isLoading && !isError && usage && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <SectionCard
+              title="Storage breakdown"
+              subtitle="Share of each area across the database and file storage"
+              accent={C.blue}
+            >
+              {slices.length === 0 ? (
+                <div className="text-sm text-[#b0948a]">No data stored yet.</div>
+              ) : (
+                <div style={{ height: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={slices}
+                        dataKey="bytes"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {slices.map((e, i) => (
+                          <Cell key={e.name} fill={STORAGE_PALETTE[i % STORAGE_PALETTE.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v, n) => [formatBytes(v), n]}
+                        contentStyle={{ borderRadius: 10, border: "1px solid #ede5e0", fontSize: 13 }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={70}
+                        formatter={(v) => <span style={{ fontSize: 11, color: "#8a7570" }}>{v}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Files by module"
+              subtitle="Documents, policies, receipts, tickets, photos and more"
+              accent={C.amber}
+            >
+              {imagekit.modules.length === 0 ? (
+                <div className="text-sm text-[#b0948a]">
+                  No files in storage for this organisation.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                        <th className="px-3 py-2 text-left font-medium">Module</th>
+                        <th className="px-3 py-2 text-right font-medium">Files</th>
+                        <th className="px-3 py-2 text-right font-medium">Size</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {imagekit.modules.map((m) => (
+                        <tr key={m.key} className="border-t border-[#f3ede9]">
+                          <td className="px-3 py-2.5 text-[13px] text-[#2a1a16]">
+                            {m.label}
+                            {m.missing > 0 && (
+                              <span
+                                className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: C.amberBg, color: C.amber }}
+                              >
+                                {m.missing} missing
+                              </span>
+                            )}
+                            {m.externalLinks > 0 && (
+                              <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#eef3fe] text-[#2563EB]">
+                                {m.externalLinks} external link{m.externalLinks > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-[13px] text-right text-[#2a1a16]">
+                            {m.fileCount.toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+                            {m.formatted}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Database by area & collection"
+            subtitle="Real on-disk size of this organisation's documents. Click an area to expand."
+            accent={C.blue}
+          >
+            {mongo.groups.length === 0 ? (
+              <div className="text-sm text-[#b0948a]">No data stored yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                      <th className="px-3 py-2 text-left font-medium">Area / collection</th>
+                      <th className="px-3 py-2 text-right font-medium">Documents</th>
+                      <th className="px-3 py-2 text-right font-medium">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mongo.groups.map((g) => (
+                      <StorageGroupRows
+                        key={g.key}
+                        group={g}
+                        open={!!openGroups[g.key]}
+                        onToggle={() =>
+                          setOpenGroups((p) => ({ ...p, [g.key]: !p[g.key] }))
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {mongo.inlineFiles.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg text-xs bg-[#f8f6f4] border border-[#ede5e0] text-[#8a7570] leading-relaxed">
+                <strong>Inline images inside the database:</strong>{" "}
+                {mongo.inlineFiles
+                  .map((i) => `${i.label} — ${i.count.toLocaleString("en-IN")} (${i.formatted})`)
+                  .join(" · ")}
+                . These are stored directly inside database documents as base64 instead of a URL and
+                are already included in the database size (not double counted).
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title={`Files${filesData ? ` (${filesData.total.toLocaleString("en-IN")} · ${filesData.totalFormatted})` : ""}`}
+            subtitle="Every file uploaded by your organisation"
+            accent={C.amber}
+          >
+            <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex items-center gap-1.5 border border-[#ede5e0] rounded-lg px-2.5 py-1.5 bg-white">
+                <Search size={13} color="#b0948a" />
+                <input
+                  className="outline-none text-xs w-40 bg-transparent"
+                  placeholder="Search file name..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+              </div>
+              <select
+                className="border border-[#ede5e0] rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                value={moduleFilter}
+                onChange={(e) => {
+                  setModuleFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All modules</option>
+                {imagekit.modules
+                  .filter((m) => m.fileCount > 0)
+                  .map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="overflow-x-auto" style={{ opacity: filesFetching ? 0.6 : 1 }}>
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                    <th className="px-3 py-2 text-left font-medium">File</th>
+                    <th className="px-3 py-2 text-left font-medium">Module</th>
+                    <th className="px-3 py-2 text-right font-medium">Size</th>
+                    <th className="px-3 py-2 text-left font-medium">Uploaded</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {(filesData?.files || []).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-sm text-[#b0948a]">
+                        No files found.
+                      </td>
+                    </tr>
+                  )}
+                  {(filesData?.files || []).map((f) => (
+                    <tr key={`${f.fileId}-${f.url}`} className="border-t border-[#f3ede9] align-top">
+                      <td className="px-3 py-2.5">
+                        <div className="text-[13px] font-medium text-[#2a1a16] break-all">
+                          {f.title || f.name}
+                        </div>
+                        <div className="text-[11px] font-mono text-[#b0948a] break-all">
+                          {f.filePath}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-[#2a1a16]">{f.moduleLabel}</td>
+                      <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+                        {f.formatted}
+                        {!f.verified && (
+                          <span
+                            className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: C.amberBg, color: C.amber }}
+                            title="File not found in storage; size taken from the database record"
+                          >
+                            unverified
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-[#8a7570] whitespace-nowrap">
+                        {formatDate(f.uploadedAt)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {f.url && (
+                          <a
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#730042] inline-flex"
+                            title="Open file"
+                          >
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filesData?.pagination && filesData.pagination.pages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  className="border border-[#ede5e0] rounded-lg p-1.5 disabled:opacity-40"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-[#8a7570]">
+                  Page {filesData.pagination.page} of {filesData.pagination.pages}
+                </span>
+                <button
+                  className="border border-[#ede5e0] rounded-lg p-1.5 disabled:opacity-40"
+                  disabled={page >= filesData.pagination.pages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </SectionCard>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function SuperAdminSettingsPage() {
   const [tab, setTab] = useState("overview");
   const [toast, setToast] = useState({ message: "", type: "" });
@@ -1598,6 +2123,7 @@ export default function SuperAdminSettingsPage() {
               onError={showError}
             />
           )}
+          {tab === "storage" && <StorageTab />}
           {tab === "banking" && (
             <BankingTab
               superAdmin={superAdmin}

@@ -29,7 +29,7 @@ const hasBankDetails = (actor) =>
 
 // Uploads whatever multer put on req.files["receipts"] / req.files["supportingDocuments"]
 // to ImageKit and returns the attachment sub-docs — mirrors uploaddocument.controller.js.
-const uploadAttachments = async (files = []) => {
+const uploadAttachments = async (files = [], organisationId) => {
   const uploaded = [];
   for (const file of files) {
     const fileBase64 = file.buffer.toString("base64");
@@ -38,6 +38,9 @@ const uploadAttachments = async (files = []) => {
       fileName: file.originalname,
       folder: "/reimbursements",
       useUniqueFileName: true,
+      // Tags the file with its owning org so /superadmin/storage-usage can
+      // sum real ImageKit storage per organisation via listFiles(tags).
+      tags: organisationId ? [String(organisationId)] : undefined,
     });
     uploaded.push({
       url: res.url,
@@ -90,8 +93,8 @@ const createClaim = async ({ actor, model, body, files, asDraft }) => {
   if (!asDraft && !hasBankDetails(actor))
     throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
 
-  const receipts = await uploadAttachments(files?.receipts);
-  const supportingDocuments = await uploadAttachments(files?.supportingDocuments);
+  const receipts = await uploadAttachments(files?.receipts, actor.organisation_id);
+  const supportingDocuments = await uploadAttachments(files?.supportingDocuments, actor.organisation_id);
 
   if (!asDraft && receipts.length === 0)
     throw err("At least one receipt/invoice must be attached to submit a claim");
@@ -144,8 +147,8 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
   if (body.reimbursementPolicyAcknowledged !== undefined)
     claim.reimbursementPolicyAcknowledged = !!body.reimbursementPolicyAcknowledged;
 
-  const newReceipts = await uploadAttachments(files?.receipts);
-  const newSupportingDocuments = await uploadAttachments(files?.supportingDocuments);
+  const newReceipts = await uploadAttachments(files?.receipts, claim.organisation_id);
+  const newSupportingDocuments = await uploadAttachments(files?.supportingDocuments, claim.organisation_id);
   if (newReceipts.length) claim.receipts.push(...newReceipts);
   if (newSupportingDocuments.length) claim.supportingDocuments.push(...newSupportingDocuments);
 

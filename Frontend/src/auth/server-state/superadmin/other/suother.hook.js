@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { toast } from "react-hot-toast";
 
 import {
@@ -8,6 +13,8 @@ import {
   getAttendanceOverview,
   getAttendanceHistory,
   getOrgInfo,
+  getStorageUsage,
+  getStorageFiles,
   changeSuperAdminPassword,
   forgotPasswordSuperAdmin,
   verifySuperAdminOtp,
@@ -135,6 +142,40 @@ export const useGetOrgInfo = () => {
     staleTime: 1000 * 60 * 10,
     refetchOnWindowFocus: false,
     refetchInterval: 1000 * 60 * 1,
+  });
+};
+
+// Powers the "Storage" tab in Settings. Not auto-refetched on an interval —
+// it does a handful of live MongoDB aggregations + an ImageKit API call, so
+// only refetch on demand (mount / manual "Refresh").
+export const useGetStorageUsage = (options = {}) => {
+  return useQuery({
+    queryKey: ["storage-usage"],
+    queryFn: () => getStorageUsage(false),
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+    ...options,
+  });
+};
+
+export const useRefreshStorageUsage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => getStorageUsage(true),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["storage-usage"], data);
+      queryClient.invalidateQueries({ queryKey: ["storage-files"] });
+    },
+  });
+};
+
+export const useGetStorageFiles = (params) => {
+  return useQuery({
+    queryKey: ["storage-files", params],
+    queryFn: () => getStorageFiles(params),
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 };
 

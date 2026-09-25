@@ -1,4 +1,5 @@
 const usermodel = require("../Models/user.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Leave = require("../Models/leave.model");
 const LeaveBalance = require("../Models/leavebalance.model");
@@ -185,6 +186,8 @@ const userlogin = async (req, res, next) => {
       expiresIn: "15d",
     },
   );
+
+  await assertOrgAccess(superAdmin, "employee");
 
   const isProduction = process.env.NODE_ENV === "production";
 
