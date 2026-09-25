@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
-  ArrowUpRight,
   BookOpen,
   Calendar,
   Check,
@@ -52,41 +51,44 @@ import talentLogo from "../assets/Vector.png";
 
 const INK = "#1B0F14";
 const MUTED = "#6E5A61";
-const BEETROOT = "#7A004B"; // matches the Talent landing page's primary color
-const TINT = "#FDF4F8"; // matches the Talent landing page's light tint
-const BORDER = "rgba(27,15,20,0.09)";
+const FAINT = "#A79399";
+const BEETROOT = "#7A004B"; // brand accent, matches the Talent landing page
+const TINT = "#FDF4F8";
+const BORDER = "rgba(27,15,20,0.10)";
+const HAIRLINE = "rgba(27,15,20,0.08)";
 const PAPER = "#FFFCFA";
 const DANGER = "#B3261E";
 
 /* ---------------------------------------------------------
-   Category styling — each category gets its own accent color,
-   tint, and a gradient used for card "covers" (no stock photos
-   needed; the gradient + icon reads as a designed cover).
+   Category styling — restrained duotones instead of loud
+   gradients. Each category still gets an identifying color,
+   but it shows up as a thin rule + small mark, not a full
+   saturated block.
 --------------------------------------------------------- */
 const CATEGORY_META = {
   Product: {
     icon: Layers,
     color: "#2451C4",
     tint: "#EEF3FF",
-    gradient: "linear-gradient(135deg, #24316B 0%, #3B5FD9 55%, #7C9CF2 100%)",
+    gradient: "linear-gradient(135deg, #DCE6FF 0%, #A9C2FF 55%, #6E8EF2 100%)",
   },
   Guides: {
     icon: BookOpen,
-    color: "#9A5B00",
+    color: "#B4761A",
     tint: "#FFF6E9",
-    gradient: "linear-gradient(135deg, #6E4400 0%, #B4761A 55%, #EBB25C 100%)",
+    gradient: "linear-gradient(135deg, #FFE7BE 0%, #F6C567 55%, #E29A2E 100%)",
   },
   "Customer stories": {
     icon: Users,
     color: "#1B7A43",
     tint: "#EAFBF1",
-    gradient: "linear-gradient(135deg, #0F4A29 0%, #1F8F51 55%, #63C88C 100%)",
+    gradient: "linear-gradient(135deg, #D3F5E1 0%, #8FDCB2 55%, #3FAE72 100%)",
   },
   Company: {
     icon: Sparkles,
     color: BEETROOT,
     tint: TINT,
-    gradient: `linear-gradient(135deg, #3D0022 0%, ${BEETROOT} 55%, #C2126B 100%)`,
+    gradient: `linear-gradient(135deg, #FBD6EA 0%, #F19BC9 55%, ${BEETROOT} 100%)`,
   },
 };
 const getCategoryMeta = (category) => CATEGORY_META[category] || CATEGORY_META.Company;
@@ -111,7 +113,8 @@ const formatAuthError = (err) => {
   return cleaned || "Something went wrong. Please try again.";
 };
 
-// Where "Back" on the blog sends people — point this at the Talent landing page.
+// Where the blog exits to once there's no more in-app history to step
+// back through — the TorchX Talent landing page.
 const HOME_FOOTER_URL = "/";
 
 const getRelativeTime = (post) => {
@@ -134,100 +137,108 @@ const getRelativeTime = (post) => {
   return jsDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
+/* ---------------------------------------------------------
+   Type system: a quiet editorial serif (Newsreader) carries
+   every heading at regular/medium weight — no bold anywhere —
+   paired with DM Sans for body copy and UI chrome. Size and
+   spacing do the work that weight used to do.
+--------------------------------------------------------- */
 const BLOG_STYLE = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
 
-  .tx-blog{ font-family:'DM Sans',sans-serif; color:${INK}; background:${PAPER}; }
-  .tx-blog .font-display{ font-family:'Sora',sans-serif; }
+  .tx-blog{ font-family:'DM Sans',sans-serif; color:${INK};
+    background-color:${PAPER};
+    background-image:
+      radial-gradient(680px 460px at 8% -6%, rgba(226,154,46,0.14), transparent 60%),
+      radial-gradient(620px 480px at 96% 10%, rgba(122,0,75,0.10), transparent 60%),
+      radial-gradient(700px 520px at 50% 55%, rgba(36,81,196,0.07), transparent 65%),
+      radial-gradient(640px 500px at 90% 95%, rgba(27,122,67,0.09), transparent 60%);
+    background-repeat:no-repeat; background-attachment:fixed; }
+  .tx-blog .font-display{ font-family:'Newsreader',serif; font-weight:400; letter-spacing:-0.01em; }
   .tx-blog-scroll::-webkit-scrollbar{ height:0; width:6px; }
   .tx-blog-scroll::-webkit-scrollbar-thumb{ background:rgba(27,15,20,0.14); border-radius:99px; }
 
-  .tx-header-shadow{ box-shadow:0 10px 30px -24px rgba(27,15,20,0.45); }
+  .tx-header-shadow{ box-shadow:0 1px 0 ${BORDER}; }
 
-  .tx-live-dot{ display:inline-block; width:7px; height:7px; border-radius:999px; background:#22C55E; flex-shrink:0;
+  .tx-live-dot{ display:inline-block; width:6px; height:6px; border-radius:999px; background:#22C55E; flex-shrink:0;
     animation:tx-pulse 2s infinite; }
   @keyframes tx-pulse{
     0%{ box-shadow:0 0 0 0 rgba(34,197,94,.45); }
-    70%{ box-shadow:0 0 0 7px rgba(34,197,94,0); }
+    70%{ box-shadow:0 0 0 6px rgba(34,197,94,0); }
     100%{ box-shadow:0 0 0 0 rgba(34,197,94,0); }
   }
 
   .tx-cat-tab{ position:relative; white-space:nowrap; padding:.5rem .05rem; font-size:13.5px; font-weight:500;
-    color:${MUTED}; border-bottom:2px solid transparent; transition:color .18s ease, border-color .18s ease; cursor:pointer; }
+    color:${MUTED}; border-bottom:1px solid transparent; transition:color .18s ease, border-color .18s ease; cursor:pointer; }
   .tx-cat-tab:hover{ color:${INK}; }
-  .tx-cat-tab.active{ color:${INK}; font-weight:600; border-color:${BEETROOT}; }
+  .tx-cat-tab.active{ color:${INK}; border-color:${INK}; }
 
   .tx-search{ position:relative; display:flex; align-items:center; }
-  .tx-search svg{ position:absolute; left:.95rem; color:${MUTED}; pointer-events:none; }
-  .tx-search input{ width:100%; border:1.5px solid ${BORDER}; border-radius:999px; padding:.68rem 1rem .68rem 2.5rem;
-    font-size:13.5px; outline:none; background:#fff; transition:border-color .15s ease, box-shadow .15s ease; }
-  .tx-search input:focus{ border-color:${BEETROOT}; box-shadow:0 0 0 3px ${TINT}; }
+  .tx-search svg{ position:absolute; left:.9rem; color:${FAINT}; pointer-events:none; }
+  .tx-search input{ width:100%; border:1px solid ${BORDER}; border-radius:8px; padding:.62rem 1rem .62rem 2.35rem;
+    font-size:13.5px; outline:none; background:#fff; transition:border-color .15s ease; }
+  .tx-search input:focus{ border-color:${MUTED}; }
 
-  .tx-cover-dots{ position:absolute; inset:0; opacity:.4; pointer-events:none;
-    background-image:radial-gradient(rgba(255,255,255,0.55) 1px, transparent 1px); background-size:16px 16px; }
+  .tx-post-card{ position:relative; display:flex; flex-direction:column; cursor:pointer; }
+  .tx-cover{ position:relative; aspect-ratio:16/10; overflow:hidden; border-radius:10px;
+    border:1px solid ${HAIRLINE}; transition:transform .3s ease; }
+  .tx-post-card:hover .tx-cover{ transform:translateY(-2px); }
+  .tx-cover-dots{ position:absolute; inset:0; opacity:.5; pointer-events:none;
+    background-image:radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px); background-size:14px 14px; }
+  .tx-cover-mark{ position:absolute; bottom:.9rem; left:1rem; opacity:.95; filter:drop-shadow(0 1px 2px rgba(27,15,20,0.12)); }
 
-  .tx-post-card{ position:relative; display:flex; flex-direction:column; overflow:hidden; border-radius:20px;
-    border:1px solid ${BORDER}; background:#fff; cursor:pointer; transition:box-shadow .25s ease, border-color .25s ease, transform .25s ease; }
-  .tx-post-card:hover{ box-shadow:0 26px 50px -30px rgba(27,15,20,0.3); border-color:rgba(122,0,75,0.18); transform:translateY(-2px); }
-  .tx-cover{ position:relative; aspect-ratio:16/9; overflow:hidden; }
-
-  .tx-new-badge{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.2rem .55rem;
-    font-size:10.5px; font-weight:600; background:#EAFBF1; color:#1B7A43; }
+  .tx-new-badge{ display:inline-flex; align-items:center; gap:.3rem; font-size:11px; font-weight:500; color:#1B7A43; }
 
   .tx-stat-pill{ display:inline-flex; align-items:center; gap:.3rem; }
 
   .tx-auth-btn{ display:flex; align-items:center; justify-content:center; gap:.65rem; width:100%;
-    padding:.8rem 1rem; border-radius:.75rem; font-size:14.5px; font-weight:600; cursor:pointer;
-    transition:transform .15s ease, box-shadow .15s ease; }
-  .tx-auth-btn:active{ transform:scale(0.98); }
+    padding:.78rem 1rem; border-radius:9px; font-size:14px; font-weight:500; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease; }
+  .tx-auth-btn:active{ transform:scale(0.99); }
   .tx-auth-btn:disabled{ cursor:not-allowed; }
-  .tx-field{ width:100%; border:1.5px solid ${BORDER}; border-radius:.7rem; padding:.75rem .95rem;
-    font-size:14.5px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; background:#fff; }
-  .tx-field:focus{ border-color:${BEETROOT}; box-shadow:0 0 0 3px ${TINT}; }
-  .tx-editor-title{ font-family:'Sora',sans-serif; font-size:1.5rem; font-weight:700; line-height:1.3;
+  .tx-field{ width:100%; border:1px solid ${BORDER}; border-radius:9px; padding:.72rem .95rem;
+    font-size:14px; outline:none; transition:border-color .15s ease; background:#fff; }
+  .tx-field:focus{ border-color:${MUTED}; }
+  .tx-editor-title{ font-family:'Newsreader',serif; font-weight:400; font-size:1.65rem; line-height:1.28;
     width:100%; border:none; outline:none; resize:none; background:transparent; color:${INK}; }
-  @media (min-width:640px){ .tx-editor-title{ font-size:1.85rem; line-height:1.27; } }
+  @media (min-width:640px){ .tx-editor-title{ font-size:2rem; line-height:1.24; } }
   .tx-editor-title::placeholder{ color:rgba(27,15,20,0.28); }
-  .tx-editor-body{ font-family:'DM Sans',sans-serif; font-size:15.5px; line-height:1.7; width:100%;
+  .tx-editor-body{ font-family:'DM Sans',sans-serif; font-size:15.5px; line-height:1.75; width:100%;
     border:none; outline:none; resize:none; background:transparent; color:${INK}; min-height:40vh; }
-  @media (min-width:640px){ .tx-editor-body{ font-size:16.5px; line-height:1.75; } }
+  @media (min-width:640px){ .tx-editor-body{ font-size:16.5px; line-height:1.8; } }
   .tx-editor-body::placeholder{ color:rgba(27,15,20,0.32); }
   .tx-toast{ position:fixed; bottom:28px; left:50%; transform:translateX(-50%); z-index:80;
-    background:${INK}; color:#fff; padding:.75rem 1.15rem; border-radius:.75rem; font-size:13.5px;
+    background:${INK}; color:#fff; padding:.72rem 1.1rem; border-radius:8px; font-size:13.5px;
     font-weight:500; display:flex; align-items:center; gap:.55rem; box-shadow:0 16px 34px -12px rgba(0,0,0,0.4); }
   .tx-error{ font-size:12.5px; color:${DANGER}; }
 
-  .tx-card-actions{ position:absolute; top:.65rem; right:.65rem; z-index:5; display:flex; gap:.4rem; }
-  .tx-icon-btn{ display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:999px;
-    border:none; background:rgba(255,255,255,0.92); color:${INK}; cursor:pointer; box-shadow:0 4px 14px -4px rgba(27,15,20,0.35);
-    transition:transform .15s ease, background .15s ease; }
-  .tx-icon-btn:hover{ transform:translateY(-1px); background:#fff; }
-  .tx-icon-btn:disabled{ cursor:not-allowed; opacity:.55; transform:none; }
+  .tx-card-actions{ position:absolute; top:.6rem; right:.6rem; z-index:5; display:flex; gap:.35rem;
+    opacity:0; transition:opacity .15s ease; }
+  .tx-post-card:hover .tx-card-actions{ opacity:1; }
+  .tx-icon-btn{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px;
+    border:1px solid ${BORDER}; background:#fff; color:${INK}; cursor:pointer; transition:border-color .15s ease; }
+  .tx-icon-btn:hover{ border-color:${MUTED}; }
+  .tx-icon-btn:disabled{ cursor:not-allowed; opacity:.55; }
   .tx-icon-btn-danger{ color:${DANGER}; }
-  .tx-icon-btn-danger:hover{ background:#FDECEB; }
+  .tx-icon-btn-danger:hover{ border-color:${DANGER}; }
 
-  .tx-like-btn{ display:inline-flex; align-items:center; gap:.5rem; border-radius:999px; padding:.6rem 1.2rem;
-    font-size:13px; font-weight:600; border:1.5px solid ${BORDER}; background:#fff; cursor:pointer;
-    transition:transform .15s ease, background .15s ease, border-color .15s ease; }
-  .tx-like-btn:hover{ transform:translateY(-1px); border-color:rgba(122,0,75,0.3); }
-  .tx-like-btn.active{ background:${BEETROOT}; border-color:${BEETROOT}; color:#fff; }
-  .tx-like-btn:disabled{ cursor:not-allowed; opacity:.6; transform:none; }
+  .tx-like-btn{ display:inline-flex; align-items:center; gap:.5rem; border-radius:999px; padding:.55rem 1.15rem;
+    font-size:13px; font-weight:500; border:1px solid ${BORDER}; background:#fff; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease; }
+  .tx-like-btn:hover{ border-color:${MUTED}; }
+  .tx-like-btn.active{ background:${INK}; border-color:${INK}; color:#fff; }
+  .tx-like-btn:disabled{ cursor:not-allowed; opacity:.6; }
 
-  .tx-hero-glow{ position:absolute; pointer-events:none; border-radius:999px; filter:blur(70px); opacity:.10; }
+  .tx-eyebrow{ font-size:12px; font-weight:500; letter-spacing:0.01em; }
 
-  .tx-eyebrow{ display:inline-flex; align-items:center; gap:.4rem; border-radius:999px; padding:.35rem .8rem;
-    font-size:12px; font-weight:600; }
+  .tx-hero-glow{ position:absolute; pointer-events:none; z-index:-1; filter:blur(60px); opacity:.55; }
 
   /* OTP boxes for phone verification */
-  .tx-otp-box{ width:clamp(34px,9vw,44px); height:clamp(42px,11vw,52px); text-align:center; font-size:1.15rem; font-weight:600;
-    border:1.5px solid ${BORDER}; border-radius:.6rem; outline:none; background:#fff;
-    transition:border-color .15s ease, box-shadow .15s ease; }
-  .tx-otp-box:focus{ border-color:${BEETROOT}; box-shadow:0 0 0 3px ${TINT}; }
+  .tx-otp-box{ width:clamp(34px,9vw,44px); height:clamp(42px,11vw,52px); text-align:center; font-size:1.1rem; font-weight:500;
+    border:1px solid ${BORDER}; border-radius:8px; outline:none; background:#fff;
+    transition:border-color .15s ease; }
+  .tx-otp-box:focus{ border-color:${MUTED}; }
 
-  /* The invisible reCAPTCHA still runs (Firebase Phone Auth requires the
-     token), but the floating badge Google injects in the corner is hidden.
-     A short text disclosure below the phone form covers Google's required
-     attribution instead — see .tx-recaptcha-note. */
   .grecaptcha-badge{ visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
   .tx-recaptcha-note{ font-size:11px; line-height:1.5; color:${MUTED}; }
   .tx-recaptcha-note a{ color:${MUTED}; text-decoration:underline; text-underline-offset:2px; }
@@ -247,10 +258,10 @@ function GoogleIcon({ className = "h-[18px] w-[18px]" }) {
 const CATEGORIES = ["All", "Product", "Guides", "Customer stories", "Company"];
 
 /* NOTE: There is no local seed/demo data. The feed renders only documents
-   that actually exist in Firestore's postsCollection (talent_blog_posts) —
-   real posts someone published through the "Write" flow. */
+   that actually exist in Firestore's postsCollection — real posts someone
+   published through the "Write" flow. */
 
-function Masthead({ onWriteClick, syncing }) {
+function Masthead({ onWriteClick, onBack, syncing }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -273,24 +284,22 @@ function Masthead({ onWriteClick, syncing }) {
 
         <span className="h-5 w-px shrink-0" style={{ background: BORDER }} />
 
-        <span className="font-display text-[15.5px] font-semibold tracking-tight sm:text-[17px]">
-          Blog
-        </span>
+        <span className="font-display text-[16px] sm:text-[17.5px]">Blog</span>
 
-        {/* Everything on the right — the site "Back" link comes first so it
-           sits furthest from the logo, followed by the live status and the
-           Write button. This is the only "Back" control on the blog: it
-           takes people straight to the TorchX Talent landing page. */}
+        {/* "Back" steps to whatever page the visitor was actually on —
+           another view of the blog, or the landing page if this is the
+           first thing they opened — rather than always leaving the blog. */}
         <div className="ml-auto flex items-center gap-3">
-          <a
-            href={HOME_FOOTER_URL}
+          <button
+            type="button"
+            onClick={onBack}
             className="flex items-center gap-1.5 text-[13.5px] font-medium text-neutral-500 transition-colors hover:text-[--beetroot]"
             style={{ "--beetroot": BEETROOT }}
-            title="Back to TorchX Talent"
+            title="Back"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
-          </a>
+          </button>
 
           <span
             className="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium sm:flex"
@@ -304,10 +313,10 @@ function Masthead({ onWriteClick, syncing }) {
           <button
             type="button"
             onClick={onWriteClick}
-            className="flex items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-semibold text-white transition-transform hover:scale-[1.03]"
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-medium text-white transition-opacity hover:opacity-90"
             style={{ background: BEETROOT }}
           >
-            <PenLine className="h-3.5 w-3.5" strokeWidth={2.2} />
+            <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
             Write
           </button>
         </div>
@@ -346,7 +355,7 @@ function CardOwnerActions({ post, onEdit, onDelete }) {
         title="Edit post"
         aria-label="Edit post"
       >
-        <PenLine className="h-3.5 w-3.5" strokeWidth={2.2} />
+        <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
       </button>
       <button
         type="button"
@@ -356,7 +365,7 @@ function CardOwnerActions({ post, onEdit, onDelete }) {
         title="Delete post"
         aria-label="Delete post"
       >
-        <Trash2 className="h-3.5 w-3.5" strokeWidth={2.2} />
+        <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
       </button>
     </div>
   );
@@ -364,6 +373,7 @@ function CardOwnerActions({ post, onEdit, onDelete }) {
 
 function FeaturedCard({ post, canEdit, onEdit, onDelete, onOpen }) {
   const meta = getCategoryMeta(post.category);
+  const Icon = meta.icon;
 
   return (
     <motion.article
@@ -371,29 +381,28 @@ function FeaturedCard({ post, canEdit, onEdit, onDelete, onOpen }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       onClick={() => onOpen(post)}
-      className="group relative mt-10 cursor-pointer overflow-hidden rounded-[24px]"
-      style={{ background: meta.gradient }}
+      className="tx-post-card group relative mt-10 grid gap-6 border-t pt-8 sm:grid-cols-[1.1fr_1fr] sm:gap-10 sm:pt-10"
+      style={{ borderColor: HAIRLINE }}
     >
       {canEdit && <CardOwnerActions post={post} onEdit={onEdit} onDelete={onDelete} />}
 
-      <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-black/10 blur-3xl" />
-      <div className="tx-cover-dots" />
-
-      <div className="relative p-5 sm:p-8 md:p-11">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11.5px] font-medium text-white/85 backdrop-blur-sm sm:text-[12px]">
-          <Sparkles className="h-3 w-3" strokeWidth={2.2} />
-          Featured story
+      <div className="order-2 flex flex-col justify-center sm:order-1">
+        <span className="tx-eyebrow inline-flex w-fit items-center gap-1.5" style={{ color: meta.color }}>
+          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+          Featured · {post.category}
         </span>
-        <h2 className="font-display mt-4 max-w-2xl text-[1.5rem] font-bold leading-[1.18] tracking-tight text-white sm:mt-5 sm:text-[1.9rem] md:text-[2.15rem]">
+        <h2 className="font-display mt-4 max-w-xl text-[1.7rem] leading-[1.2] tracking-tight sm:text-[2.35rem]">
           {post.title}
         </h2>
-        <p className="mt-3.5 max-w-xl text-[13.5px] leading-relaxed text-white/75 sm:mt-4 sm:text-[15px]">
+        <p className="mt-4 max-w-md text-[14.5px] leading-relaxed" style={{ color: MUTED }}>
           {post.excerpt}
         </p>
-        <div className="mt-7 flex flex-wrap items-center gap-5 text-[12.5px] text-white/70">
-          <span className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">
+        <div className="mt-7 flex flex-wrap items-center gap-5 text-[12.5px]" style={{ color: MUTED }}>
+          <span className="flex items-center gap-2" style={{ color: INK }}>
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-medium text-white"
+              style={{ background: meta.color }}
+            >
               {initials(post.author)}
             </span>
             {post.author}
@@ -410,6 +419,11 @@ function FeaturedCard({ post, canEdit, onEdit, onDelete, onOpen }) {
           </span>
         </div>
       </div>
+
+      <div className="tx-cover order-1 sm:order-2" style={{ background: meta.gradient }}>
+        <div className="tx-cover-dots" />
+        <Icon className="tx-cover-mark h-10 w-10 text-white" strokeWidth={1.25} />
+      </div>
     </motion.article>
   );
 }
@@ -420,30 +434,27 @@ function PostCard({ post, index, canEdit, onEdit, onDelete, onOpen }) {
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: Math.min(index, 6) * 0.05, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.35, delay: Math.min(index, 6) * 0.04, ease: [0.16, 1, 0.3, 1] }}
       onClick={() => onOpen(post)}
       className="tx-post-card"
     >
       <div className="tx-cover" style={{ background: meta.gradient }}>
         {canEdit && <CardOwnerActions post={post} onEdit={onEdit} onDelete={onDelete} />}
         <div className="tx-cover-dots" />
-        <Icon className="absolute bottom-4 right-4 h-9 w-9 text-white/30" strokeWidth={1.5} />
+        <Icon className="tx-cover-mark h-7 w-7 text-white" strokeWidth={1.25} />
       </div>
 
-      <div className="flex flex-1 flex-col p-4 sm:p-5">
+      <div className="flex flex-1 flex-col pt-4">
         <div className="flex items-center justify-between gap-2">
-          <span
-            className="inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold"
-            style={{ background: meta.tint, color: meta.color }}
-          >
+          <span className="text-[11.5px] font-medium" style={{ color: meta.color }}>
             {post.category}
           </span>
           {post.isLive && <span className="tx-new-badge">New</span>}
         </div>
 
-        <h3 className="font-display mt-3.5 text-[1.05rem] font-bold leading-snug tracking-tight sm:text-[1.1rem]">
+        <h3 className="font-display mt-2.5 text-[1.2rem] leading-snug tracking-tight">
           {post.title}
         </h3>
 
@@ -453,11 +464,11 @@ function PostCard({ post, index, canEdit, onEdit, onDelete, onOpen }) {
 
         <div
           className="mt-4 flex items-center justify-between border-t pt-3.5 text-[11.5px]"
-          style={{ borderColor: BORDER, color: MUTED }}
+          style={{ borderColor: HAIRLINE, color: MUTED }}
         >
           <span className="flex items-center gap-2 font-medium" style={{ color: INK }}>
             <span
-              className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold text-white"
+              className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-medium text-white"
               style={{ background: meta.color }}
             >
               {initials(post.author)}
@@ -475,7 +486,7 @@ function PostCard({ post, index, canEdit, onEdit, onDelete, onOpen }) {
 }
 
 /* NewsletterBand — saves each submitted email as its own document in
-   Firestore's "talent_blog_subscribers" collection (see Firebase.js). */
+   Firestore's subscribers collection (see Firebase.js). */
 function NewsletterBand({ onNotify }) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -503,19 +514,22 @@ function NewsletterBand({ onNotify }) {
 
   return (
     <div
-      className="mt-16 overflow-hidden rounded-2xl border p-7 sm:p-9"
-      style={{ borderColor: BORDER, background: `linear-gradient(135deg, ${INK} 0%, #3A1E28 100%)` }}
+      className="relative mt-20 overflow-hidden rounded-2xl p-7 sm:p-9"
+      style={{ background: `linear-gradient(120deg, ${INK} 0%, #3D0022 60%, ${BEETROOT} 130%)` }}
     >
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+      <span
+        className="tx-hero-glow -right-10 -top-16 h-48 w-48 rounded-full"
+        style={{ background: "linear-gradient(135deg, #F6C567, #E29A2E)", opacity: 0.35 }}
+      />
+      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-medium text-white/80">
-            <Send className="h-3 w-3" strokeWidth={2.2} />
+          <span className="tx-eyebrow" style={{ color: "#F5B8D6" }}>
             Stay in the loop
           </span>
-          <h4 className="font-display mt-3 text-[1.25rem] font-bold tracking-tight text-white">
+          <h4 className="font-display mt-2 text-[1.4rem] tracking-tight text-white">
             New posts, straight to your inbox
           </h4>
-          <p className="mt-1.5 max-w-md text-[13.5px] text-white/60">
+          <p className="mt-1.5 max-w-md text-[13.5px] text-white/65">
             One email a month — HR playbooks, product notes, and stories. No spam, unsubscribe anytime.
           </p>
         </div>
@@ -532,8 +546,8 @@ function NewsletterBand({ onNotify }) {
           <button
             type="submit"
             disabled={submitting}
-            className="shrink-0 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-transform hover:scale-[1.03] disabled:opacity-60"
-            style={{ background: BEETROOT }}
+            className="shrink-0 rounded-full px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ background: "#F6C567", color: INK }}
           >
             {submitting ? "Subscribing…" : "Subscribe"}
           </button>
@@ -548,24 +562,16 @@ function NewsletterBand({ onNotify }) {
 function EmptyFeed({ syncing, onWriteClick }) {
   if (syncing) {
     return (
-      <p className="mt-16 border-t py-14 text-center text-[14px]" style={{ borderColor: BORDER, color: MUTED }}>
+      <p className="mt-16 border-t py-14 text-center text-[14px]" style={{ borderColor: HAIRLINE, color: MUTED }}>
         Loading posts…
       </p>
     );
   }
   return (
-    <div
-      className="mt-16 flex flex-col items-center gap-4 rounded-2xl border py-16 text-center"
-      style={{ borderColor: BORDER, background: TINT }}
-    >
-      <div
-        className="flex h-12 w-12 items-center justify-center rounded-full text-white"
-        style={{ background: BEETROOT }}
-      >
-        <PenLine className="h-5 w-5" strokeWidth={2.2} />
-      </div>
+    <div className="mt-16 flex flex-col items-center gap-4 border-t border-b py-16 text-center" style={{ borderColor: HAIRLINE }}>
+      <PenLine className="h-6 w-6" strokeWidth={1.5} style={{ color: BEETROOT }} />
       <div>
-        <h4 className="font-display text-[1.1rem] font-bold tracking-tight">No posts yet</h4>
+        <h4 className="font-display text-[1.3rem] tracking-tight">No posts yet</h4>
         <p className="mt-1 max-w-sm text-[13.5px]" style={{ color: MUTED }}>
           Nothing's been published on the TorchX Talent blog yet. Be the first to write something.
         </p>
@@ -573,10 +579,10 @@ function EmptyFeed({ syncing, onWriteClick }) {
       <button
         type="button"
         onClick={onWriteClick}
-        className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-white transition-transform hover:scale-[1.03]"
+        className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13.5px] font-medium text-white transition-opacity hover:opacity-90"
         style={{ background: BEETROOT }}
       >
-        <PenLine className="h-3.5 w-3.5" strokeWidth={2.2} />
+        <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
         Write the first post
       </button>
     </div>
@@ -609,34 +615,30 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-24 sm:pt-14 lg:px-0">
-      {/* Hero — an editorial masthead for the section, not just a page title.
-          A soft brand-colored glow sits behind the copy; everything else on
-          the page stays quiet so this reads as the one deliberate moment. */}
-      <div className="relative">
-        <div
-          className="tx-hero-glow -left-16 -top-24 h-72 w-72"
-          style={{ background: BEETROOT }}
+      <div className="relative max-w-2xl">
+        <span
+          className="tx-hero-glow -left-10 -top-16 h-56 w-56 rounded-full"
+          style={{ background: "linear-gradient(135deg, #F6C567 0%, #E29A2E 100%)" }}
         />
-        <div className="relative max-w-2xl">
-          <span className="tx-eyebrow" style={{ background: TINT, color: BEETROOT }}>
-            <Sparkles className="h-3 w-3" strokeWidth={2.2} />
-            The TorchX Talent journal
-          </span>
-          <h1 className="font-display mt-5 text-[2.1rem] font-extrabold leading-[1.08] tracking-tight sm:text-[2.75rem] md:text-[3.1rem]">
-            Notes on hiring, HR, and
-            <br className="hidden sm:block" />
-            building great teams
-          </h1>
-          <p className="mt-4 max-w-xl text-[14.5px] leading-relaxed sm:text-[16px]" style={{ color: MUTED }}>
-            Product thinking, HR playbooks, and stories from people teams who've
-            moved their workforce operations onto TorchX Talent.
-          </p>
-          <div className="mt-5 flex items-center gap-2 text-[12.5px] font-medium" style={{ color: MUTED }}>
-            <span className="tx-live-dot" />
-            {syncing
-              ? "Connecting to the live feed…"
-              : `Synced in real time · ${posts.length} ${posts.length === 1 ? "story" : "stories"}`}
-          </div>
+        <span
+          className="tx-hero-glow left-40 top-6 h-44 w-44 rounded-full"
+          style={{ background: `linear-gradient(135deg, #F19BC9 0%, ${BEETROOT} 100%)` }}
+        />
+        <span className="tx-eyebrow relative" style={{ color: BEETROOT }}>
+          The TorchX Talent journal
+        </span>
+        <h1 className="font-display relative mt-4 text-[2.3rem] leading-[1.12] tracking-tight sm:text-[3rem] md:text-[3.4rem]">
+          Notes on hiring, HR, and building great teams
+        </h1>
+        <p className="mt-4 max-w-xl text-[15px] leading-relaxed sm:text-[16px]" style={{ color: MUTED }}>
+          Product thinking, HR playbooks, and stories from people teams who've
+          moved their workforce operations onto TorchX Talent.
+        </p>
+        <div className="mt-5 flex items-center gap-2 text-[12.5px] font-medium" style={{ color: MUTED }}>
+          <span className="tx-live-dot" />
+          {syncing
+            ? "Connecting to the live feed…"
+            : `Synced in real time · ${posts.length} ${posts.length === 1 ? "story" : "stories"}`}
         </div>
       </div>
 
@@ -652,23 +654,28 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
             onOpen={onOpenPost}
           />
 
-          <div className="mt-8 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center sm:justify-between">
-            <div className="tx-blog-scroll flex gap-4 overflow-x-auto pb-1 sm:gap-6">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setActiveCategory(cat)}
-                  className={`tx-cat-tab ${activeCategory === cat ? "active" : ""}`}
-                >
-                  {cat}
-                  <span className="ml-1.5 opacity-60">{categoryCounts[cat]}</span>
-                </button>
-              ))}
+          <div className="mt-12 flex flex-col gap-4 border-t pt-6 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: HAIRLINE }}>
+            <div className="tx-blog-scroll flex gap-5 overflow-x-auto pb-1 sm:gap-7">
+              {CATEGORIES.map((cat) => {
+                const tabColor = cat === "All" ? INK : getCategoryMeta(cat).color;
+                const isActive = activeCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={`tx-cat-tab ${isActive ? "active" : ""}`}
+                    style={isActive ? { color: tabColor, borderColor: tabColor } : undefined}
+                  >
+                    {cat}
+                    <span className="ml-1.5 opacity-60">{categoryCounts[cat]}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <label className="tx-search w-full sm:w-64">
-              <Search className="h-[15px] w-[15px]" strokeWidth={2} />
+              <Search className="h-[15px] w-[15px]" strokeWidth={1.75} />
               <input
                 type="text"
                 value={query}
@@ -682,14 +689,14 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
             {filtered.length === 0 ? (
               <p
                 className="border-t py-14 text-center text-[14px]"
-                style={{ borderColor: BORDER, color: MUTED }}
+                style={{ borderColor: HAIRLINE, color: MUTED }}
               >
                 {query
                   ? `Nothing matches "${query}" — try a different search.`
                   : `Nothing filed under "${activeCategory}" yet — check back soon.`}
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-x-7 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((post, i) => (
                   <PostCard
                     key={post.id}
@@ -710,11 +717,11 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
       <NewsletterBand onNotify={onNotify} />
 
       <div
-        className="mt-10 flex flex-col items-start gap-4 rounded-2xl border p-7 sm:flex-row sm:items-center sm:justify-between"
-        style={{ borderColor: BORDER, background: TINT }}
+        className="mt-10 flex flex-col items-start gap-4 border-t pt-8 sm:flex-row sm:items-center sm:justify-between"
+        style={{ borderColor: HAIRLINE }}
       >
         <div>
-          <h4 className="font-display text-[1.05rem] font-bold tracking-tight">Have something worth sharing?</h4>
+          <h4 className="font-display text-[1.15rem] tracking-tight">Have something worth sharing?</h4>
           <p className="mt-1 text-[13.5px]" style={{ color: MUTED }}>
             Create an account and publish your first post in a few minutes.
           </p>
@@ -722,10 +729,10 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
         <button
           type="button"
           onClick={onWriteClick}
-          className="flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-white transition-transform hover:scale-[1.03]"
+          className="flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-[13.5px] font-medium text-white transition-opacity hover:opacity-90"
           style={{ background: BEETROOT }}
         >
-          <PenLine className="h-3.5 w-3.5" strokeWidth={2.2} />
+          <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
           Start writing
         </button>
       </div>
@@ -771,24 +778,21 @@ function ReaderView({ post, user, onBack, onRequireAuth, onToggleLike }) {
         className="flex items-center gap-1.5 text-[13.5px] font-medium text-neutral-500 hover:text-neutral-800"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Blog
+        Back
       </button>
 
-      <span
-        className="mt-7 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-[11px] font-semibold"
-        style={{ background: meta.tint, color: meta.color }}
-      >
+      <span className="mt-7 block text-[12px] font-medium" style={{ color: meta.color }}>
         {post.category}
       </span>
 
-      <h1 className="font-display mt-4 text-[1.9rem] font-extrabold leading-[1.14] tracking-tight sm:text-[2.5rem]">
+      <h1 className="font-display mt-3 text-[2rem] leading-[1.16] tracking-tight sm:text-[2.7rem]">
         {post.title}
       </h1>
 
-      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-b py-4 text-[12.5px]" style={{ borderColor: BORDER, color: MUTED }}>
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-b py-4 text-[12.5px]" style={{ borderColor: HAIRLINE, color: MUTED }}>
         <span className="flex items-center gap-2 font-medium" style={{ color: INK }}>
           <span
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[10.5px] font-bold text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[10.5px] font-medium text-white"
             style={{ background: meta.color }}
           >
             {initials(post.author)}
@@ -814,13 +818,13 @@ function ReaderView({ post, user, onBack, onRequireAuth, onToggleLike }) {
         {post.body || post.excerpt}
       </div>
 
-      <div className="mt-10 border-t pt-8" style={{ borderColor: BORDER }}>
+      <div className="mt-10 border-t pt-8" style={{ borderColor: HAIRLINE }}>
         <button
           type="button"
           onClick={handleLikeClick}
           className={`tx-like-btn ${liked ? "active" : ""}`}
         >
-          <Heart className="h-4 w-4" strokeWidth={2.2} fill={liked ? "currentColor" : "none"} />
+          <Heart className="h-4 w-4" strokeWidth={2} fill={liked ? "currentColor" : "none"} />
           {post.likedBy?.length || 0} {(post.likedBy?.length || 0) === 1 ? "Like" : "Likes"}
         </button>
       </div>
@@ -1031,22 +1035,22 @@ function AuthView({ onAuthed }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12 lg:px-0">
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-2 grid overflow-hidden rounded-[22px] border shadow-[0_30px_70px_-35px_rgba(122,0,75,0.35)] sm:grid-cols-2"
+        className="mt-2 grid overflow-hidden rounded-2xl border sm:grid-cols-2"
         style={{ borderColor: BORDER }}
       >
         {/* Left panel */}
         <div
           className="hidden flex-col justify-between p-9 text-white sm:flex"
-          style={{ background: `linear-gradient(150deg, ${BEETROOT} 0%, #3D0022 100%)` }}
+          style={{ background: INK }}
         >
-          <span className="font-display text-lg font-semibold">TorchX Talent</span>
-          <p className="font-display text-[1.4rem] font-medium leading-[1.35]">
+          <span className="font-display text-lg">TorchX Talent</span>
+          <p className="font-display text-[1.45rem] leading-[1.4]">
             "Write once. Reach every HR and people team building something better."
           </p>
-          <p className="text-[12.5px] text-white/60">— TorchX Talent Blog contributors</p>
+          <p className="text-[12.5px] text-white/55">— TorchX Talent Blog contributors</p>
         </div>
 
         {/* Right panel */}
@@ -1060,7 +1064,7 @@ function AuthView({ onAuthed }) {
               ? "Check your inbox"
               : "Step 1 of 2 — Sign in to continue"}
           </p>
-          <h2 className="font-display mt-1.5 text-[1.2rem] font-bold tracking-tight sm:text-[1.4rem]">Create your author account</h2>
+          <h2 className="font-display mt-1.5 text-[1.3rem] tracking-tight sm:text-[1.5rem]">Create your author account</h2>
           <p className="mt-1.5 text-[13.5px]" style={{ color: MUTED }}>
             Verified writers get their own byline and post history on the TorchX Talent blog.
           </p>
@@ -1097,7 +1101,7 @@ function AuthView({ onAuthed }) {
                     className="tx-auth-btn border bg-white text-[--ink]"
                     style={{ borderColor: BORDER, "--ink": INK }}
                   >
-                    <Mail className="h-4 w-4" strokeWidth={2} />
+                    <Mail className="h-4 w-4" strokeWidth={1.75} />
                     Continue with email
                   </button>
                 </motion.div>
@@ -1155,10 +1159,10 @@ function AuthView({ onAuthed }) {
                     className="flex h-11 w-11 items-center justify-center rounded-full"
                     style={{ background: TINT, color: BEETROOT }}
                   >
-                    <Mail className="h-5 w-5" strokeWidth={2} />
+                    <Mail className="h-5 w-5" strokeWidth={1.75} />
                   </div>
                   <p className="text-[13.5px]" style={{ color: INK }}>
-                    We sent a sign-in link to <span style={{ fontWeight: 600 }}>{email}</span>.
+                    We sent a sign-in link to <span style={{ fontWeight: 500 }}>{email}</span>.
                   </p>
                   <p className="text-[12.5px]" style={{ color: MUTED }}>
                     Open it on this device to finish creating your account. Didn't get it? Check spam,
@@ -1258,7 +1262,7 @@ function AuthView({ onAuthed }) {
                   className="flex flex-col gap-3"
                 >
                   <p className="text-[13px]" style={{ color: MUTED }}>
-                    Enter the code sent to <span style={{ color: INK, fontWeight: 600 }}>+91 {phone}</span>
+                    Enter the code sent to <span style={{ color: INK, fontWeight: 500 }}>+91 {phone}</span>
                   </p>
                   <div className="flex justify-between gap-2">
                     {otp.map((digit, idx) => (
@@ -1400,7 +1404,7 @@ function EditorView({ user, initialPost, onBack, onSave }) {
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="rounded-full px-5 py-2 text-[13.5px] font-semibold text-white transition-transform hover:scale-[1.03] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full px-5 py-2 text-[13.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: BEETROOT }}
           >
             {saving ? "Saving…" : isEditing ? "Save changes" : "Publish"}
@@ -1478,6 +1482,73 @@ export default function BlogPage() {
   const [editingPost, setEditingPost] = useState(null); // post being edited (null = new post)
   const [readingPostId, setReadingPostId] = useState(null); // id of the post open in ReaderView
 
+  /* ---------------------------------------------------------
+     In-app navigation history. Every view change pushes a real
+     browser history entry carrying enough state to restore that
+     exact screen (which post was open, which post was being
+     edited). That gives us two things for free:
+
+       1. The device/browser Back button — and the "Back" links
+          in the masthead, reader and editor, which now just call
+          window.history.back() — step to whatever screen was
+          actually shown before, one at a time. Reading a post
+          from the feed and pressing Back returns to the feed;
+          it does not jump straight to the landing page.
+       2. Only when there's no more in-app history left (this is
+          the first screen of the blog the visitor opened) does
+          "Back" fall through to the actual site the blog lives
+          on, via HOME_FOOTER_URL.
+
+     depthRef tracks how many blog-internal entries we've pushed
+     since the page mounted, so we know whether a Back press has
+     somewhere in-app to land, or should leave the blog. */
+  const depthRef = useRef(0);
+
+  useEffect(() => {
+    // Mark this initial load so popstate has something to compare against.
+    window.history.replaceState({ txBlog: true, view: "feed" }, "");
+
+    const onPopState = (event) => {
+      const state = event.state;
+      if (state && state.txBlog) {
+        depthRef.current = Math.max(0, depthRef.current - 1);
+        setView(state.view || "feed");
+        setEditingPost(state.editingPost || null);
+        setReadingPostId(state.readingPostId || null);
+      } else {
+        // Ran out of in-app history — let the browser leave the blog
+        // to wherever it was navigating (e.g. the landing page).
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const navigateTo = (nextView, extra = {}) => {
+    const state = {
+      txBlog: true,
+      view: nextView,
+      editingPost: extra.editingPost ?? null,
+      readingPostId: extra.readingPostId ?? null,
+    };
+    depthRef.current += 1;
+    window.history.pushState(state, "");
+    setView(nextView);
+    setEditingPost(state.editingPost);
+    setReadingPostId(state.readingPostId);
+  };
+
+  // Used by every "Back" control (masthead, reader, editor). Steps to
+  // the previous in-app screen when there is one; otherwise leaves the
+  // blog for the page it lives on.
+  const handleBack = () => {
+    if (depthRef.current > 0) {
+      window.history.back();
+    } else {
+      window.location.href = HOME_FOOTER_URL;
+    }
+  };
+
   // Restores the signed-in author across visits/reloads. Firebase keeps
   // the sign-in session in this browser by default, so once someone has
   // signed in once (Google or email link) they stay signed in here —
@@ -1536,15 +1607,8 @@ export default function BlogPage() {
     setTimeout(() => setToast(null), 2600);
   };
 
-  const goToFeed = () => {
-    setView("feed");
-    setEditingPost(null);
-    setReadingPostId(null);
-  };
-
   const handleWriteClick = () => {
-    setEditingPost(null);
-    setView(user ? "editor" : "auth");
+    navigateTo(user ? "editor" : "auth", { editingPost: null });
   };
 
   const handleAuthed = (newUser) => {
@@ -1552,12 +1616,11 @@ export default function BlogPage() {
     flashToast(`Welcome, ${newUser.name.split(" ")[0]} — your account is ready`);
     // If someone was trying to like a post when prompted to sign in,
     // send them back to that post instead of straight to the editor.
-    setView(readingPostId ? "read" : "editor");
+    navigateTo(readingPostId ? "read" : "editor", { readingPostId });
   };
 
   const handleEditPost = (post) => {
-    setEditingPost(post);
-    setView("editor");
+    navigateTo("editor", { editingPost: post });
   };
 
   const handleDeletePost = async (post) => {
@@ -1579,15 +1642,14 @@ export default function BlogPage() {
         await addDoc(postsCollection, { ...payload, createdAt: serverTimestamp() });
         flashToast("Post published to the TorchX Talent blog");
       }
-      goToFeed();
+      handleBack();
     } catch (err) {
       flashToast("Couldn't save — please try again");
     }
   };
 
   const handleOpenPost = (post) => {
-    setReadingPostId(post.id);
-    setView("read");
+    navigateTo("read", { readingPostId: post.id });
   };
 
   const handleToggleLike = async (post, currentlyLiked) => {
@@ -1609,7 +1671,7 @@ export default function BlogPage() {
     <div className="tx-blog" style={{ height: "100vh", overflowY: "auto" }}>
       <style>{BLOG_STYLE}</style>
 
-      <Masthead onWriteClick={handleWriteClick} syncing={syncing} />
+      <Masthead onWriteClick={handleWriteClick} onBack={handleBack} syncing={syncing} />
 
       <AnimatePresence mode="wait">
         {view === "feed" && (
@@ -1631,8 +1693,8 @@ export default function BlogPage() {
             <ReaderView
               post={readingPost}
               user={user}
-              onBack={goToFeed}
-              onRequireAuth={() => setView("auth")}
+              onBack={handleBack}
+              onRequireAuth={() => navigateTo("auth")}
               onToggleLike={handleToggleLike}
             />
           </motion.div>
@@ -1644,7 +1706,7 @@ export default function BlogPage() {
         )}
         {view === "editor" && user && (
           <motion.div key="editor" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <EditorView user={user} initialPost={editingPost} onBack={goToFeed} onSave={handleSavePost} />
+            <EditorView user={user} initialPost={editingPost} onBack={handleBack} onSave={handleSavePost} />
           </motion.div>
         )}
       </AnimatePresence>
