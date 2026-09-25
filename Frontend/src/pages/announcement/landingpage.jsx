@@ -1039,11 +1039,11 @@ function Pricing() {
     <section id="pricing" className="scroll-anchor bg-white pt-8 pb-9">
       <Wrap>
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
-          <div className="text-center mb-10">
-            <h2 className="font-hero font-medium text-[#111] mb-6 text-[clamp(28px,3.2vw,42px)]">
+          <div className="text-center mb-6">
+            <h2 className="font-hero font-medium text-[#111] mb-4 text-[clamp(28px,3.2vw,42px)]">
               Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
             </h2>
-            <p className="text-lg font-body text-[#5C5C5C] max-w-[440px] mx-auto leading-relaxed mb-8">
+            <p className="text-lg font-body text-[#5C5C5C] max-w-[560px] mx-auto leading-relaxed mb-5">
               Choose the perfect TorchX Talent plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
 
@@ -1084,7 +1084,7 @@ function Pricing() {
               tablet  (768-1279) -> 2 x 2
               desktop (>=1280px) -> 4 in one row
               items-stretch + h-full on each card keeps all four the same height. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6 pt-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6">
             {plans.map(p => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
@@ -1199,7 +1199,6 @@ function Pricing() {
     </section>
   )
 }
-
 
 
 
