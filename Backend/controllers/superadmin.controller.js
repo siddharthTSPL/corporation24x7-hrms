@@ -1,4 +1,5 @@
 const SuperAdminModel = require("../Models/superadmin.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus, TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("../utils/planAccess");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
@@ -469,16 +470,7 @@ const loginSuperAdmin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    const trialValid = superAdmin.isTrialValid();
-    const hasTalentLicense = superAdmin.licenses.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date(),
-    );
-
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."),
-        { statusCode: 403, code: "PLAN_EXPIRED" },
-      ));
+    await assertOrgAccess(superAdmin, "superadmin");
 
     const isProduction = process.env.NODE_ENV === "production";
     const cookieOpts = {
@@ -541,9 +533,9 @@ const loginSuperAdmin = async (req, res, next) => {
         organisation_name: superAdmin.organisation_name,
         company_domain: superAdmin.company_domain,
         role: superAdmin.role,
-        is_trial_active: trialValid,
+        is_trial_active: superAdmin.isTrialValid(),
         trial_expires_at: superAdmin.trial_expires_at,
-        has_talent_license: hasTalentLicense,
+        has_talent_license: !!findActiveTalentLicense(superAdmin),
       },
     });
   } catch (err) {
@@ -3019,7 +3011,7 @@ const getActiveUserCount = async (req, res, next) => {
       new Date() < new Date(superAdmin.trial_expires_at);
 
     const activeCount = superAdmin.active_user_count || 0;
-    const allowedUsers = trialActive ? 4 : license?.users || 0;
+    const allowedUsers = trialActive ? TRIAL_USER_LIMIT : (license?.users || FREE_USER_LIMIT);
 
     // false  → activeCount < allowedUsers  (can still add more)
     // true   → activeCount >= allowedUsers (limit reached, cannot add)
