@@ -962,7 +962,7 @@ function Pricing() {
   const plans = [
     {
       name: 'Free Forever',
-      desc: 'Great Start for Startup and Micro Teams',
+      desc: 'Everything a small team needs to get started ── at no cost.',
       inherits: null,
       monthlyPrice: 0,
       yearlyPrice: 0,
