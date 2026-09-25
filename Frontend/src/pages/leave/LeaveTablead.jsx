@@ -265,12 +265,14 @@ const Toast = ({ toast }) => {
   const c = colors[toast.type] || colors.info;
   return (
     <div
-      className="fixed bottom-3 left-3 right-3 xs:left-auto xs:right-4 sm:bottom-7 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-full xs:max-w-[calc(100vw-2rem)] sm:max-w-sm"
+      className="fixed top-3 left-3 right-3 xs:left-auto xs:right-4 sm:top-6 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-full xs:max-w-[calc(100vw-2rem)] sm:max-w-sm"
       style={{
         background: c.bg,
         color: c.color,
         border: `1px solid ${c.border}`,
-        transform: toast.visible ? "translateY(0) scale(1)" : "translateY(24px) scale(0.94)",
+       transform: toast.visible
+  ? "translateY(0) scale(1)"
+  : "translateY(-24px) scale(0.94)",
         opacity: toast.visible ? 1 : 0,
         pointerEvents: toast.visible ? "auto" : "none",
       }}
@@ -487,6 +489,52 @@ const LeaveTimeline = ({ leave }) => {
   );
 };
 
+const SupportingDocumentBox = ({ document }) =>
+  document?.url ? (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginTop: 8,
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: "#EFF6FF",
+        border: "1px solid #BFDBFE",
+        fontFamily: "'DM Sans',sans-serif",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          color: "#1D4ED8",
+          fontWeight: 600,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {document.originalName || "Supporting document"}
+      </span>
+      <a
+        href={document.url}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          marginLeft: "auto",
+          flexShrink: 0,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#1D4ED8",
+          textDecoration: "none",
+        }}
+      >
+        View
+      </a>
+    </div>
+  ) : null;
+
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const person = leave.employee || leave.manager || {};
@@ -597,6 +645,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
           </div>
         )}
+        <SupportingDocumentBox document={leave.supportingDocument} />
 
         {showTimeline && (
           <button
@@ -807,7 +856,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
 };
 
 const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
-  const [form, setForm]     = useState({ leaveType: "el", startDate: "", endDate: "", reason: "" });
+  const [form, setForm]     = useState({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null });
   const [errors, setErrors] = useState({});
   const [editTarget, setEditTarget] = useState(null);
   const [leaveDialog, setLeaveDialog] = useState(null);
@@ -843,6 +892,11 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
     if (!form.endDate)   e.endDate   = "Required";
     if ((form.reason || "").trim().length < 10) e.reason = "Minimum 10 characters";
     if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) e.endDate = "End date cannot precede start date";
+    const selectedDays = daysDiff(form.startDate, form.endDate);
+    const needsDocument = form.leaveType === "sl" && selectedDays > 3;
+    if (needsDocument && !form.supportingDocument && !editTarget?.supportingDocument?.url) {
+      e.supportingDocument = "Supporting document is mandatory for Sick Leave of more than 3 days";
+    }
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -858,7 +912,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         showToast("Leave request submitted", "success");
       }
       setLeaveDialog(null);
-      setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" });
+      setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null });
       setEditTarget(null);
       setErrors({});
       refetch();
@@ -879,6 +933,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
       startDate: new Date(leave.startDate).toISOString().split("T")[0],
       endDate:   new Date(leave.endDate).toISOString().split("T")[0],
       reason:    leave.reason,
+      supportingDocument: null,
     });
     requestAnimationFrame(() => {
       formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -968,10 +1023,26 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
           />
         </FormField>
         <p className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-1 mb-4">{form.reason.length}/500 chars (min 10)</p>
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5">
+        {form.leaveType === "sl" && days > 3 && (
+          <FormField label="Supporting Document" error={errors.supportingDocument}>
+            <div className="rounded-[12px] p-3" style={{ background: "#EFF6FF", border: `1.5px solid ${ib("supportingDocument")}` }}>
+              <input
+                type="file"
+                accept="application/pdf,image/png,image/jpeg"
+                onChange={(e) => set("supportingDocument", e.target.files?.[0] || null)}
+                className="w-full text-[12px] text-[#1C1028]"
+              />
+              <div className="text-[10px] text-[#64748B] mt-1.5">PDF, PNG or JPG · Maximum 2 MB</div>
+              {editTarget?.supportingDocument?.url && !form.supportingDocument && (
+                <div className="text-[11px] text-[#1D4ED8] mt-2">Existing document: {editTarget.supportingDocument.originalName || "Supporting document"}</div>
+              )}
+            </div>
+          </FormField>
+        )}
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5" style={{marginTop:"8px"}}>
           {editTarget && (
             <button
-              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setEditTarget(null); setErrors({}); }}
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null }); setEditTarget(null); setErrors({}); }}
               className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
               style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
             >
@@ -980,7 +1051,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
           )}
           {!editTarget && (
             <button
-              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setErrors({}); }}
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null }); setErrors({}); }}
               className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
               style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
             >
@@ -1063,6 +1134,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                           <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
                         </div>
                       )}
+                      <SupportingDocumentBox document={leave.supportingDocument} />
                       <LeaveTimeline leave={leave} />
                     </div>
                     <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 flex-shrink-0 w-full sm:w-auto">

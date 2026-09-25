@@ -39,6 +39,13 @@ const leaveSchema = new mongoose.Schema({
   // and Reconcileattendancesummaryleaveaware.js.
   lwpDays: { type: Number, default: 0 },
   reason: { type: String, required: true },
+  supportingDocument: {
+    url: { type: String },
+    fileId: { type: String },
+    originalName: { type: String },
+    mimeType: { type: String },
+    sizeKb: { type: Number },
+  },
   status: {
     type: String,
     enum: [

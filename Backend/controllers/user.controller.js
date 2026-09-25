@@ -15,9 +15,13 @@ const Ticket = require("../Models/ticket.model");
 const Adminmodel = require("../Models/Admin.model");
 const SuperAdminModel = require("../Models/superadmin.model");
 const Managermodel = require("../Models/manager.model");
-const { notifyLeaveApplied, notifyWFHApplied } = require("../utils/notify.utils");
+const {
+  notifyLeaveApplied,
+  notifyWFHApplied,
+} = require("../utils/notify.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
+const imagekit = require("../utils/imagekit.utils");
 
 const verifyUserEmail = async (req, res, next) => {
   const { token } = req.params;
@@ -28,7 +32,7 @@ const verifyUserEmail = async (req, res, next) => {
     return res
       .status(400)
       .send(
-        `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:400px;"><h1 style="color:#CD166E;">Link Invalid</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="${process.env.torchxsuite.com/talent}/login" style="margin-top:20px;display:inline-block;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
+        `<!DOCTYPE html><html><body style="margin:0;font-family:Segoe UI;background:#F9F8F2;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.1);max-width:400px;"><h1 style="color:#CD166E;">Link Invalid</h1><p style="color:#555;">This verification link is expired or invalid.</p><a href="${process.env.torchxsuite.com / talent}/login" style="margin-top:20px;display:inline-block;padding:12px 25px;background:#730042;color:white;text-decoration:none;border-radius:8px;">Go to Login</a></div></body></html>`,
       );
   }
 
@@ -61,10 +65,9 @@ const userlogin = async (req, res, next) => {
 
   if (!identifier || !password) {
     return next(
-      Object.assign(
-        new Error("Email and password are required"),
-        { statusCode: 400 }
-      )
+      Object.assign(new Error("Email and password are required"), {
+        statusCode: 400,
+      }),
     );
   }
 
@@ -74,10 +77,7 @@ const userlogin = async (req, res, next) => {
 
   if (!user) {
     return next(
-      Object.assign(
-        new Error("User not found"),
-        { statusCode: 404 }
-      )
+      Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
   }
 
@@ -94,8 +94,8 @@ const userlogin = async (req, res, next) => {
     return next(
       Object.assign(
         new Error("Your account is not active. Please contact administrator."),
-        { statusCode: 403 }
-      )
+        { statusCode: 403 },
+      ),
     );
   }
 
@@ -103,10 +103,7 @@ const userlogin = async (req, res, next) => {
 
   if (!isvalidpassword) {
     return next(
-      Object.assign(
-        new Error("Invalid credentials"),
-        { statusCode: 401 }
-      )
+      Object.assign(new Error("Invalid credentials"), { statusCode: 401 }),
     );
   }
 
@@ -123,11 +120,10 @@ const userlogin = async (req, res, next) => {
       process.env.JWT_SECRET,
       {
         expiresIn: "15m",
-      }
+      },
     );
 
-    passwordSetupLink =
-      `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
+    passwordSetupLink = `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
   }
 
   let superAdmin = user.organisation_id
@@ -142,7 +138,12 @@ const userlogin = async (req, res, next) => {
   }
 
   if (!superAdmin)
-    return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
+    return next(
+      Object.assign(
+        new Error("Organisation not found. Please contact support."),
+        { statusCode: 404 },
+      ),
+    );
 
   const trialValid = superAdmin.isTrialValid();
 
@@ -150,43 +151,42 @@ const userlogin = async (req, res, next) => {
     (l) =>
       l.product === "torchx_talent" &&
       l.isActive &&
-      new Date(l.expiresAt) > new Date()
+      new Date(l.expiresAt) > new Date(),
   );
 
   if (!trialValid && !hasTalentLicense) {
     return next(
       Object.assign(
         new Error(
-          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."
+          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance.",
         ),
         {
           statusCode: 403,
           code: "SERVICE_STOPPED",
-        }
-      )
+        },
+      ),
     );
   }
 
-const token = jwt.sign(
-  {
-    _id: user._id,          // ← was "userId", now "_id" to match middleware
-    id: user._id,           // ← keep both for compatibility
-    userId: user._id,       // ← keep old one so nothing else breaks
-    work_email: user.work_email,
-    role: user.role,
-    organisation_id: user.organisation_id,
-    department: user.department ?? null,
-    designation: user.designation ?? null,
-    Under_manager: user.Under_manager ?? null,
-  },
-  process.env.JWT_SECRET,
-  {
-    expiresIn: "15d",
-  }
-);
+  const token = jwt.sign(
+    {
+      _id: user._id, // ← was "userId", now "_id" to match middleware
+      id: user._id, // ← keep both for compatibility
+      userId: user._id, // ← keep old one so nothing else breaks
+      work_email: user.work_email,
+      role: user.role,
+      organisation_id: user.organisation_id,
+      department: user.department ?? null,
+      designation: user.designation ?? null,
+      Under_manager: user.Under_manager ?? null,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "15d",
+    },
+  );
 
-  const isProduction =
-    process.env.NODE_ENV === "production";
+  const isProduction = process.env.NODE_ENV === "production";
 
   res.cookie("token", token, {
     httpOnly: true,
@@ -196,19 +196,18 @@ const token = jwt.sign(
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 
-  usermodel.findByIdAndUpdate(
-    user._id,
-    {
+  usermodel
+    .findByIdAndUpdate(user._id, {
       status: "active",
       last_login: new Date(),
-    }
-  ).exec();
+    })
+    .exec();
 
   res.status(200).json({
     success: true,
     message: "Login successful",
     role: user.role,
-    token
+    token,
   });
 };
 
@@ -311,10 +310,9 @@ const verifyOtp = async (req, res, next) => {
 
     if (!work_email || !otp) {
       return next(
-        Object.assign(
-          new Error("Email and OTP are required"),
-          { statusCode: 400 }
-        )
+        Object.assign(new Error("Email and OTP are required"), {
+          statusCode: 400,
+        }),
       );
     }
 
@@ -324,10 +322,9 @@ const verifyOtp = async (req, res, next) => {
 
     if (!otpRecord) {
       return next(
-        Object.assign(
-          new Error("OTP not found. Please request a new one"),
-          { statusCode: 404 }
-        )
+        Object.assign(new Error("OTP not found. Please request a new one"), {
+          statusCode: 404,
+        }),
       );
     }
 
@@ -337,20 +334,14 @@ const verifyOtp = async (req, res, next) => {
       });
 
       return next(
-        Object.assign(
-          new Error("OTP has expired. Please request a new one"),
-          { statusCode: 400 }
-        )
+        Object.assign(new Error("OTP has expired. Please request a new one"), {
+          statusCode: 400,
+        }),
       );
     }
 
     if (!otpRecord.compareOtp(String(otp))) {
-      return next(
-        Object.assign(
-          new Error("Invalid OTP"),
-          { statusCode: 400 }
-        )
-      );
+      return next(Object.assign(new Error("Invalid OTP"), { statusCode: 400 }));
     }
 
     const user = await usermodel.findOne({
@@ -359,10 +350,7 @@ const verifyOtp = async (req, res, next) => {
 
     if (!user) {
       return next(
-        Object.assign(
-          new Error("User not found"),
-          { statusCode: 404 }
-        )
+        Object.assign(new Error("User not found"), { statusCode: 404 }),
       );
     }
 
@@ -383,11 +371,10 @@ const verifyOtp = async (req, res, next) => {
         process.env.JWT_SECRET,
         {
           expiresIn: "15m",
-        }
+        },
       );
 
-      passwordSetupLink =
-        `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
+      passwordSetupLink = `https://corporation24x7-hrms.onrender.com/user/change-password?token=${resetToken}`;
     }
 
     const token = jwt.sign(
@@ -400,27 +387,25 @@ const verifyOtp = async (req, res, next) => {
       process.env.JWT_SECRET,
       {
         expiresIn: "7d",
-      }
+      },
     );
 
-    const isProduction =
-      process.env.NODE_ENV === "production";
+    const isProduction = process.env.NODE_ENV === "production";
 
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-    path: "/",
+      path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    usermodel.findByIdAndUpdate(
-      user._id,
-      {
+    usermodel
+      .findByIdAndUpdate(user._id, {
         status: "active",
         last_login: new Date(),
-      }
-    ).exec();
+      })
+      .exec();
 
     return res.status(200).json({
       success: true,
@@ -463,12 +448,27 @@ const resetpassword = async (req, res, next) => {
   user.isFirstLogin = false;
   user.passwordupdatedAt = Date.now();
   await user.save();
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Password reset successfully. You can now login.",
-    });
+  res.status(200).json({
+    success: true,
+    message: "Password reset successfully. You can now login.",
+  });
+};
+
+const uploadLeaveSupportingDocument = async (file) => {
+  if (!file) return null;
+  const uploaded = await imagekit.upload({
+    file: file.buffer.toString("base64"),
+    fileName: file.originalname,
+    folder: "/leave-documents",
+    useUniqueFileName: true,
+  });
+  return {
+    url: uploaded.url,
+    fileId: uploaded.fileId,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    sizeKb: Math.round(uploaded.size / 1024),
+  };
 };
 
 const applyleave = async (req, res, next) => {
@@ -490,7 +490,9 @@ const applyleave = async (req, res, next) => {
     .select("gender marital_status Under_manager f_name l_name work_email")
     .lean();
   if (!user)
-    return next(Object.assign(new Error("User not found"), { statusCode: 404 }));
+    return next(
+      Object.assign(new Error("User not found"), { statusCode: 404 }),
+    );
   if (!user.Under_manager)
     return next(
       Object.assign(
@@ -503,7 +505,9 @@ const applyleave = async (req, res, next) => {
   const end = parseISTDateOnly(endDate);
   if (end < start)
     return next(
-      Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+      Object.assign(new Error("End date cannot be before start date"), {
+        statusCode: 400,
+      }),
     );
   const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -512,21 +516,48 @@ const applyleave = async (req, res, next) => {
     (user.gender !== "female" || user.marital_status !== "married")
   )
     return next(
-      Object.assign(new Error("Not eligible for maternity leave"), { statusCode: 400 }),
+      Object.assign(new Error("Not eligible for maternity leave"), {
+        statusCode: 400,
+      }),
     );
   if (
     leaveType === "pl" &&
     (user.gender !== "male" || user.marital_status !== "married")
   )
     return next(
-      Object.assign(new Error("Not eligible for paternity leave"), { statusCode: 400 }),
+      Object.assign(new Error("Not eligible for paternity leave"), {
+        statusCode: 400,
+      }),
+    );
+
+  const uploadedFile =
+    req.file ||
+    req.files?.supportingDocument?.[0] ||
+    req.files?.document?.[0] ||
+    req.files?.file?.[0] ||
+    null;
+
+  const requiresSupportingDocument = leaveType === "sl" && days > 4;
+
+  if (requiresSupportingDocument && !uploadedFile)
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days",
+        ),
+        { statusCode: 400 },
+      ),
     );
 
   const overlapping = await Leave.findOne({
     employee: req.employee._id,
     organisation_id,
     status: {
-      $nin: ["rejected_manager", "rejected_reporting_manager", "rejected_admin"],
+      $nin: [
+        "rejected_manager",
+        "rejected_reporting_manager",
+        "rejected_admin",
+      ],
     },
     startDate: { $lte: end },
     endDate: { $gte: start },
@@ -535,8 +566,29 @@ const applyleave = async (req, res, next) => {
     .lean();
   if (overlapping)
     return next(
-      Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }),
+      Object.assign(new Error("Leave already applied for these dates"), {
+        statusCode: 400,
+      }),
     );
+
+  let supportingDocument = null;
+
+  if (uploadedFile) {
+    try {
+      supportingDocument = await uploadLeaveSupportingDocument(uploadedFile);
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`,
+          ),
+          {
+            statusCode: 500,
+          },
+        ),
+      );
+    }
+  }
 
   const leave = await Leave.create({
     organisation_id,
@@ -550,6 +602,7 @@ const applyleave = async (req, res, next) => {
     endDate: end,
     days,
     reason,
+    supportingDocument,
     status: "pending_manager",
   });
 
@@ -583,7 +636,9 @@ const editleave = async (req, res, next) => {
     employee: req.employee._id,
   });
   if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
+    );
   if (leave.status !== "pending_manager")
     return next(
       Object.assign(
@@ -593,21 +648,80 @@ const editleave = async (req, res, next) => {
     );
 
   const { leaveType, startDate, endDate, reason } = req.body;
+  let nextStart = leave.startDate;
+  let nextEnd = leave.endDate;
+  let nextLeaveType = leave.leaveType;
+
   if (startDate && endDate) {
     const start = parseISTDateOnly(startDate);
     const end = parseISTDateOnly(endDate);
     if (end < start)
       return next(
-        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+        Object.assign(new Error("End date cannot be before start date"), {
+          statusCode: 400,
+        }),
       );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    nextStart = start;
+    nextEnd = end;
+  }
+  if (leaveType) nextLeaveType = leaveType;
+
+  const nextDays =
+    Math.round((nextEnd - nextStart) / (1000 * 60 * 60 * 24)) + 1;
+
+  const uploadedFile =
+    req.file ||
+    req.files?.supportingDocument?.[0] ||
+    req.files?.document?.[0] ||
+    req.files?.file?.[0] ||
+    null;
+
+  const requiresSupportingDocument = nextLeaveType === "sl" && nextDays > 4;
+
+  if (
+    requiresSupportingDocument &&
+    !uploadedFile &&
+    !leave.supportingDocument?.url
+  )
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days",
+        ),
+        { statusCode: 400 },
+      ),
+    );
+
+  if (startDate && endDate) {
+    leave.startDate = nextStart;
+    leave.endDate = nextEnd;
+    leave.days = nextDays;
   }
   if (leaveType) leave.leaveType = leaveType;
   if (reason) leave.reason = reason;
+
+  if (uploadedFile) {
+    try {
+      leave.supportingDocument =
+        await uploadLeaveSupportingDocument(uploadedFile);
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`,
+          ),
+          {
+            statusCode: 500,
+          },
+        ),
+      );
+    }
+  }
+
   await leave.save();
-  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
+  res
+    .status(200)
+    .json({ success: true, message: "Leave updated successfully", leave });
 };
 
 const deleteleave = async (req, res, next) => {
@@ -622,7 +736,9 @@ const deleteleave = async (req, res, next) => {
     employee: req.employee._id,
   });
   if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 }),
+    );
   if (leave.status !== "pending_manager")
     return next(
       Object.assign(
@@ -632,7 +748,9 @@ const deleteleave = async (req, res, next) => {
     );
 
   await Leave.findByIdAndDelete(req.params.id);
-  res.status(200).json({ success: true, message: "Leave deleted successfully" });
+  res
+    .status(200)
+    .json({ success: true, message: "Leave deleted successfully" });
 };
 
 const getallleave = async (req, res, next) => {
@@ -646,19 +764,29 @@ const getallleave = async (req, res, next) => {
     organisation_id,
   }).lean();
   if (!leaveBalance)
-    return next(Object.assign(new Error("Leave balance not found"), { statusCode: 404 }));
+    return next(
+      Object.assign(new Error("Leave balance not found"), { statusCode: 404 }),
+    );
   res.status(200).json({
     success: true,
     EL: {
       entitled: leaveBalance.EL?.entitled || 0,
       accrued: leaveBalance.EL?.accrued || 0,
       availed: leaveBalance.EL?.availed || 0,
-      available: Number(((leaveBalance.EL?.accrued || 0) - (leaveBalance.EL?.availed || 0)).toFixed(2)),
+      available: Number(
+        (
+          (leaveBalance.EL?.accrued || 0) - (leaveBalance.EL?.availed || 0)
+        ).toFixed(2),
+      ),
     },
     SL: {
       entitled: leaveBalance.SL?.entitled || 0,
       availed: leaveBalance.SL?.availed || 0,
-      available: Number(((leaveBalance.SL?.entitled || 0) - (leaveBalance.SL?.availed || 0)).toFixed(2)),
+      available: Number(
+        (
+          (leaveBalance.SL?.entitled || 0) - (leaveBalance.SL?.availed || 0)
+        ).toFixed(2),
+      ),
     },
     ML: leaveBalance.ML || 0,
     PL: leaveBalance.PL || 0,
@@ -681,8 +809,6 @@ const getallleavehistory = async (req, res, next) => {
     .lean();
   res.status(200).json({ success: true, count: leaves.length, leaves });
 };
-
-
 
 const showannouncements = async (req, res, next) => {
   if (!req.employee)
@@ -742,7 +868,10 @@ const getme = async (req, res, next) => {
       organisation_id,
     })
       .populate({ path: "reviewer", select: "f_name l_name work_email role" })
-      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+      .populate({
+        path: "reviewee",
+        select: "f_name l_name work_email role designation department",
+      })
       .lean(),
   ]);
 
@@ -774,9 +903,22 @@ const editprofile = async (req, res, next) => {
   const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
   const {
-    personal_contact, e_contact, marital_status, profile_image, gender, office_location,
-    resume, aadhaar_card, pan_card, experience_letter,
-    bank_name, account_holder_name, account_number, ifsc_code, date_of_joining, date_of_birth,
+    personal_contact,
+    e_contact,
+    marital_status,
+    profile_image,
+    gender,
+    office_location,
+    resume,
+    aadhaar_card,
+    pan_card,
+    experience_letter,
+    bank_name,
+    account_holder_name,
+    account_number,
+    ifsc_code,
+    date_of_joining,
+    date_of_birth,
   } = req.body;
   let leaveUpdateRequired = false;
 
@@ -786,7 +928,11 @@ const editprofile = async (req, res, next) => {
     } else {
       const parsedDOJ = new Date(date_of_joining);
       if (isNaN(parsedDOJ.getTime()))
-        return next(Object.assign(new Error("Invalid date of joining"), { statusCode: 400 }));
+        return next(
+          Object.assign(new Error("Invalid date of joining"), {
+            statusCode: 400,
+          }),
+        );
       employee.date_of_joining = parsedDOJ;
     }
   }
@@ -797,24 +943,41 @@ const editprofile = async (req, res, next) => {
     } else {
       const parsedDOB = new Date(date_of_birth);
       if (isNaN(parsedDOB.getTime()))
-        return next(Object.assign(new Error("Invalid date of birth"), { statusCode: 400 }));
+        return next(
+          Object.assign(new Error("Invalid date of birth"), {
+            statusCode: 400,
+          }),
+        );
       if (parsedDOB > new Date())
-        return next(Object.assign(new Error("Date of birth cannot be in the future"), { statusCode: 400 }));
+        return next(
+          Object.assign(new Error("Date of birth cannot be in the future"), {
+            statusCode: 400,
+          }),
+        );
       employee.date_of_birth = parsedDOB;
     }
   }
 
   if (personal_contact !== undefined) {
-    if (typeof personal_contact !== "string" || !PHONE_REGEX.test(personal_contact))
+    if (
+      typeof personal_contact !== "string" ||
+      !PHONE_REGEX.test(personal_contact)
+    )
       return next(
-        Object.assign(new Error("Phone number must be a valid 10-digit number"), { statusCode: 400 }),
+        Object.assign(
+          new Error("Phone number must be a valid 10-digit number"),
+          { statusCode: 400 },
+        ),
       );
     employee.personal_contact = personal_contact;
   }
   if (e_contact !== undefined) {
     if (typeof e_contact !== "string" || !PHONE_REGEX.test(e_contact))
       return next(
-        Object.assign(new Error("Emergency contact must be a valid 10-digit number"), { statusCode: 400 }),
+        Object.assign(
+          new Error("Emergency contact must be a valid 10-digit number"),
+          { statusCode: 400 },
+        ),
       );
     employee.e_contact = e_contact;
   }
@@ -838,10 +1001,16 @@ const editprofile = async (req, res, next) => {
       employee.marital_status = marital_status;
     }
   }
- if (office_location !== undefined) {
-    if (typeof office_location !== "string" || !office_location.trim() || office_location.trim().length > 100)
+  if (office_location !== undefined) {
+    if (
+      typeof office_location !== "string" ||
+      !office_location.trim() ||
+      office_location.trim().length > 100
+    )
       return next(
-        Object.assign(new Error("Office location must be a valid"), { statusCode: 400 }),
+        Object.assign(new Error("Office location must be a valid"), {
+          statusCode: 400,
+        }),
       );
     employee.office_location = office_location.trim();
   }
@@ -860,42 +1029,78 @@ const editprofile = async (req, res, next) => {
   }
   if (resume !== undefined) {
     if (typeof resume !== "string")
-      return next(Object.assign(new Error("Resume must be a string"), { statusCode: 400 }));
+      return next(
+        Object.assign(new Error("Resume must be a string"), {
+          statusCode: 400,
+        }),
+      );
     employee.resume = resume;
   }
   if (aadhaar_card !== undefined) {
     if (typeof aadhaar_card !== "string")
-      return next(Object.assign(new Error("Aadhaar card must be a string"), { statusCode: 400 }));
+      return next(
+        Object.assign(new Error("Aadhaar card must be a string"), {
+          statusCode: 400,
+        }),
+      );
     employee.aadhaar_card = aadhaar_card;
   }
   if (pan_card !== undefined) {
     if (typeof pan_card !== "string")
-      return next(Object.assign(new Error("PAN card must be a string"), { statusCode: 400 }));
+      return next(
+        Object.assign(new Error("PAN card must be a string"), {
+          statusCode: 400,
+        }),
+      );
     employee.pan_card = pan_card;
   }
   if (experience_letter !== undefined) {
     if (typeof experience_letter !== "string")
-      return next(Object.assign(new Error("Experience letter must be a string"), { statusCode: 400 }));
+      return next(
+        Object.assign(new Error("Experience letter must be a string"), {
+          statusCode: 400,
+        }),
+      );
     employee.experience_letter = experience_letter;
   }
   if (bank_name !== undefined) {
     if (typeof bank_name !== "string" || bank_name.length > 100)
-      return next(Object.assign(new Error("Invalid bank name"), { statusCode: 400 }));
+      return next(
+        Object.assign(new Error("Invalid bank name"), { statusCode: 400 }),
+      );
     employee.bank_name = bank_name.trim();
   }
   if (account_holder_name !== undefined) {
-    if (typeof account_holder_name !== "string" || !account_holder_name.trim() || account_holder_name.length > 100)
-      return next(Object.assign(new Error("Invalid account holder name"), { statusCode: 400 }));
+    if (
+      typeof account_holder_name !== "string" ||
+      !account_holder_name.trim() ||
+      account_holder_name.length > 100
+    )
+      return next(
+        Object.assign(new Error("Invalid account holder name"), {
+          statusCode: 400,
+        }),
+      );
     employee.account_holder_name = account_holder_name.trim();
   }
   if (account_number !== undefined) {
-    if (typeof account_number !== "string" || !ACCOUNT_REGEX.test(account_number))
-      return next(Object.assign(new Error("Invalid account number"), { statusCode: 400 }));
+    if (
+      typeof account_number !== "string" ||
+      !ACCOUNT_REGEX.test(account_number)
+    )
+      return next(
+        Object.assign(new Error("Invalid account number"), { statusCode: 400 }),
+      );
     employee.account_number = account_number;
   }
   if (ifsc_code !== undefined) {
-    if (typeof ifsc_code !== "string" || !IFSC_REGEX.test(ifsc_code.toUpperCase()))
-      return next(Object.assign(new Error("Invalid IFSC code"), { statusCode: 400 }));
+    if (
+      typeof ifsc_code !== "string" ||
+      !IFSC_REGEX.test(ifsc_code.toUpperCase())
+    )
+      return next(
+        Object.assign(new Error("Invalid IFSC code"), { statusCode: 400 }),
+      );
     employee.ifsc_code = ifsc_code.toUpperCase();
   }
 
@@ -1117,28 +1322,33 @@ const employeeGetTicketDetail = async (req, res, next) => {
   }
 };
 
-
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.employee)
       return res.status(401).json({ success: false, message: "Unauthorized" });
- 
+
     const organisation_id = req.employee.organisation_id;
- 
+
     const superAdmin = await SuperAdminModel.findById(organisation_id)
       .select("f_name l_name email organisation_name profile_image")
       .lean();
- 
-    const admins = await Adminmodel.find({ organisation_id, working_status: "working" })
+
+    const admins = await Adminmodel.find({
+      organisation_id,
+      working_status: "working",
+    })
       .select("f_name l_name work_email designation profile_image")
       .lean();
- 
-    const managers = await Managermodel.find({ organisation_id, working_status: "working" })
+
+    const managers = await Managermodel.find({
+      organisation_id,
+      working_status: "working",
+    })
       .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image"
+        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image",
       )
       .lean();
- 
+
     const employees = managers.length
       ? await usermodel
           .find({
@@ -1147,16 +1357,15 @@ const getOrgInfo = async (req, res, next) => {
             working_status: "working",
           })
           .select(
-            "f_name l_name work_email designation department office_location Under_manager profile_image"
+            "f_name l_name work_email designation department office_location Under_manager profile_image",
           )
           .lean()
       : [];
- 
+
     const topLevelManagers = managers
       .filter(
         (mgr) =>
-          !mgr.reporting_manager ||
-          mgr.reporting_manager_model === "Admin"
+          !mgr.reporting_manager || mgr.reporting_manager_model === "Admin",
       )
       .map((mgr) => ({
         id: mgr._id,
@@ -1176,8 +1385,7 @@ const getOrgInfo = async (req, res, next) => {
             designation: emp.designation,
             department: emp.department,
             profile_image: emp.profile_image || null,
-            isCurrentUser:
-              emp._id.toString() === req.employee._id.toString(),
+            isCurrentUser: emp._id.toString() === req.employee._id.toString(),
           })),
         subManagers: buildManagerTreeWithCurrentFlags(
           managers,
@@ -1185,10 +1393,10 @@ const getOrgInfo = async (req, res, next) => {
           "Manager",
           employees,
           null,
-          req.employee._id
+          req.employee._id,
         ),
       }));
- 
+
     return res.status(200).json({
       success: true,
       organisation_name: superAdmin?.organisation_name || "",
@@ -1222,8 +1430,10 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
   return managers
     .filter((mgr) => {
       if (!mgr.reporting_manager) return false;
-      return mgr.reporting_manager.toString() === parentId.toString() &&
-        mgr.reporting_manager_model === parentModel;
+      return (
+        mgr.reporting_manager.toString() === parentId.toString() &&
+        mgr.reporting_manager_model === parentModel
+      );
     })
     .map((mgr) => ({
       id: mgr._id,
@@ -1248,14 +1458,14 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
     }));
 };
- 
+
 const buildManagerTreeWithCurrentFlags = (
   managers,
   parentId,
   parentModel,
   employees,
   currentManagerId,
-  currentEmployeeId
+  currentEmployeeId,
 ) => {
   return managers
     .filter((mgr) => {
@@ -1280,7 +1490,7 @@ const buildManagerTreeWithCurrentFlags = (
         ? employees.some(
             (e) =>
               e.Under_manager?.toString() === mgr._id.toString() &&
-              e._id.toString() === currentEmployeeId.toString()
+              e._id.toString() === currentEmployeeId.toString(),
           )
         : false,
       employees: employees
@@ -1302,7 +1512,7 @@ const buildManagerTreeWithCurrentFlags = (
         "Manager",
         employees,
         currentManagerId,
-        currentEmployeeId
+        currentEmployeeId,
       ),
     }));
 };
@@ -1348,30 +1558,21 @@ const firstLoginPasswordChange = async (req, res, next) => {
 
     if (!token || !newPassword) {
       return next(
-        Object.assign(
-          new Error("Token and password are required"),
-          {
-            statusCode: 400,
-          }
-        )
+        Object.assign(new Error("Token and password are required"), {
+          statusCode: 400,
+        }),
       );
     }
 
     let decoded;
 
     try {
-      decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET
-      );
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
       return next(
-        Object.assign(
-          new Error("Invalid or expired link"),
-          {
-            statusCode: 400,
-          }
-        )
+        Object.assign(new Error("Invalid or expired link"), {
+          statusCode: 400,
+        }),
       );
     }
 
@@ -1381,12 +1582,9 @@ const firstLoginPasswordChange = async (req, res, next) => {
 
     if (!user) {
       return next(
-        Object.assign(
-          new Error("User not found"),
-          {
-            statusCode: 404,
-          }
-        )
+        Object.assign(new Error("User not found"), {
+          statusCode: 404,
+        }),
       );
     }
 
@@ -1421,7 +1619,7 @@ const sendPasswordSetupLink = async (req, res, next) => {
       return next(
         Object.assign(new Error("User not found"), {
           statusCode: 404,
-        })
+        }),
       );
     }
 
@@ -1432,11 +1630,10 @@ const sendPasswordSetupLink = async (req, res, next) => {
       process.env.JWT_SECRET,
       {
         expiresIn: "15m",
-      }
+      },
     );
 
-    const passwordLink =
-      `${process.env.BASE_URL}talent/api/user/change-password?token=${resetToken}`;
+    const passwordLink = `${process.env.BASE_URL}talent/api/user/change-password?token=${resetToken}`;
 
     await sendEmail({
       to: user.work_email,
@@ -1470,7 +1667,6 @@ const sendPasswordSetupLink = async (req, res, next) => {
     next(error);
   }
 };
-
 
 const Document = require("../Models/document.model");
 
@@ -1519,7 +1715,9 @@ const respondToMyReview = async (req, res, next) => {
 
   const { reviewId, status, comment } = req.body;
   if (!reviewId)
-    return next(Object.assign(new Error("reviewId is required"), { statusCode: 400 }));
+    return next(
+      Object.assign(new Error("reviewId is required"), { statusCode: 400 }),
+    );
 
   try {
     const review = await respondToReviewAsReviewee(Review, {
@@ -1530,7 +1728,9 @@ const respondToMyReview = async (req, res, next) => {
       status,
       comment,
     });
-    res.status(200).json({ success: true, message: "Response recorded", review });
+    res
+      .status(200)
+      .json({ success: true, message: "Response recorded", review });
   } catch (err) {
     next(err);
   }
@@ -1564,5 +1764,5 @@ module.exports = {
   showPasswordPage,
   sendPasswordSetupLink,
   getExpenseDocuments,
-  getPersonalDocuments
+  getPersonalDocuments,
 };

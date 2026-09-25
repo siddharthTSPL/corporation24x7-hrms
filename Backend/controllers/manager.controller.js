@@ -12,6 +12,7 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const Review = require("../Models/review.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = require("../utils/reviewWorkflow.utils");
+const imagekit = require("../utils/imagekit.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
@@ -463,35 +464,83 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
 
 const applyleavem = async (req, res, next) => {
   const { leaveType, startDate, endDate, reason } = req.body;
+
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  if (!startDate || !endDate || !leaveType)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+
+  if (!startDate || !endDate || !leaveType || !reason)
+    return next(
+      Object.assign(
+        new Error("Required fields missing"),
+        { statusCode: 400 }
+      )
+    );
 
   const managerId = req.manager._id;
   const organisation_id = req.manager.organisation_id;
+
   const start = parseISTDateOnly(startDate);
   const end = parseISTDateOnly(endDate);
 
   if (end < start)
-    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error("End date cannot be before start date"),
+        { statusCode: 400 }
+      )
+    );
 
-  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days =
+    Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-  const managerData = await managermodel.findById(managerId)
-    .select("reporting_manager reporting_manager_model").lean();
+  const requiresSupportingDocument =
+    leaveType === "sl" && days > 3;
+
+  if (requiresSupportingDocument && !req.file)
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days"
+        ),
+        { statusCode: 400 }
+      )
+    );
+
+  const managerData = await managermodel
+    .findById(managerId)
+    .select("reporting_manager reporting_manager_model")
+    .lean();
 
   if (!managerData.reporting_manager)
-    return next(Object.assign(new Error("You have no reporting manager assigned. Cannot apply leave."), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error(
+          "You have no reporting manager assigned. Cannot apply leave."
+        ),
+        { statusCode: 400 }
+      )
+    );
 
   if (!["Manager", "Admin"].includes(managerData.reporting_manager_model))
-    return next(Object.assign(new Error("Invalid reporting manager configuration. Contact administrator."), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error(
+          "Invalid reporting manager configuration. Contact administrator."
+        ),
+        { statusCode: 400 }
+      )
+    );
 
   const overlapping = await managerLeaveModel
     .findOne({
       manager: managerId,
       organisation_id,
-      status: { $nin: ["rejected_reporting_manager", "rejected_admin"] },
+      status: {
+        $nin: [
+          "rejected_reporting_manager",
+          "rejected_admin",
+        ],
+      },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
@@ -499,11 +548,47 @@ const applyleavem = async (req, res, next) => {
     .lean();
 
   if (overlapping)
-    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error("Leave already applied for these dates"),
+        { statusCode: 400 }
+      )
+    );
 
-  const initialStatus = managerData.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "pending_reporting_manager";
+  let supportingDocument = null;
+
+  if (req.file) {
+    try {
+      const uploaded = await imagekit.upload({
+        file: req.file.buffer.toString("base64"),
+        fileName: req.file.originalname,
+        folder: "/leave-documents",
+        useUniqueFileName: true,
+      });
+
+      supportingDocument = {
+        url: uploaded.url,
+        fileId: uploaded.fileId,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeKb: Math.round(uploaded.size / 1024),
+      };
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`
+          ),
+          { statusCode: 500 }
+        )
+      );
+    }
+  }
+
+  const initialStatus =
+    managerData.reporting_manager_model === "Admin"
+      ? "pending_admin"
+      : "pending_reporting_manager";
 
   const leave = await managerLeaveModel.create({
     organisation_id,
@@ -516,6 +601,7 @@ const applyleavem = async (req, res, next) => {
     endDate: end,
     days,
     reason,
+    supportingDocument,
     status: initialStatus,
     directed_to: managerData.reporting_manager,
     directed_to_model: managerData.reporting_manager_model,
@@ -532,7 +618,10 @@ const applyleavem = async (req, res, next) => {
     reason,
   });
 
-  res.status(200).json({ message: "Leave request submitted to your reporting manager", leave });
+  res.status(200).json({
+    message: "Leave request submitted to your reporting manager",
+    leave,
+  });
 };
 
 const editleavem = async (req, res, next) => {
@@ -546,32 +635,118 @@ const editleavem = async (req, res, next) => {
     organisation_id,
     manager: req.manager._id,
   });
+
   if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 })
+    );
+
+  if (
+    !["pending_reporting_manager", "pending_admin"].includes(
+      leave.status
+    )
+  )
     return next(
       Object.assign(
-        new Error("Cannot edit leave that is already processed or forwarded"),
-        { statusCode: 400 },
-      ),
+        new Error(
+          "Cannot edit leave that is already processed or forwarded"
+        ),
+        { statusCode: 400 }
+      )
     );
 
   const { leaveType, startDate, endDate, reason } = req.body;
+
+  let nextStart = leave.startDate;
+  let nextEnd = leave.endDate;
+  let nextLeaveType = leave.leaveType;
+
   if (startDate && endDate) {
     const start = parseISTDateOnly(startDate);
     const end = parseISTDateOnly(endDate);
+
     if (end < start)
       return next(
-        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+        Object.assign(
+          new Error("End date cannot be before start date"),
+          { statusCode: 400 }
+        )
       );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    nextStart = start;
+    nextEnd = end;
   }
-  if (leaveType) leave.leaveType = leaveType;
-  if (reason) leave.reason = reason;
+
+  if (leaveType)
+    nextLeaveType = leaveType;
+
+  const nextDays =
+    Math.round((nextEnd - nextStart) / (1000 * 60 * 60 * 24)) + 1;
+
+  const requiresSupportingDocument =
+    nextLeaveType === "sl" && nextDays > 3;
+
+  if (
+    requiresSupportingDocument &&
+    !req.file &&
+    !leave.supportingDocument?.url
+  )
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days"
+        ),
+        { statusCode: 400 }
+      )
+    );
+
+  if (startDate && endDate) {
+    leave.startDate = nextStart;
+    leave.endDate = nextEnd;
+    leave.days = nextDays;
+  }
+
+  if (leaveType)
+    leave.leaveType = leaveType;
+
+  if (reason)
+    leave.reason = reason;
+
+  if (req.file) {
+    try {
+      const uploaded = await imagekit.upload({
+        file: req.file.buffer.toString("base64"),
+        fileName: req.file.originalname,
+        folder: "/leave-documents",
+        useUniqueFileName: true,
+      });
+
+      leave.supportingDocument = {
+        url: uploaded.url,
+        fileId: uploaded.fileId,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeKb: Math.round(uploaded.size / 1024),
+      };
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`
+          ),
+          { statusCode: 500 }
+        )
+      );
+    }
+  }
+
   await leave.save();
-  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
+
+  res.status(200).json({
+    success: true,
+    message: "Leave updated successfully",
+    leave,
+  });
 };
 
 const deleteleavem = async (req, res, next) => {

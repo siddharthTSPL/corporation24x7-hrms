@@ -3,6 +3,7 @@ const Adminmodel = require("../Models/Admin.model");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Managermodel = require("../Models/manager.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
+const imagekit = require("../utils/imagekit.utils");
 
 const announcementmodel = require("../Models/announcement.model");
 const uidmodel = require("../Models/UIDmodel.model");
@@ -2967,123 +2968,288 @@ const rejectLeave = async (req, res, next) => {
 };
 
 const applyleave = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+  try {
+    if (!req.admin) {
+      return next(
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
+        })
+      );
+    }
 
-  const { leaveType, startDate, endDate, reason } = req.body;
-  if (!leaveType || !startDate || !endDate || !reason)
-    return next(
-      Object.assign(
-        new Error("leaveType, startDate, endDate and reason are required"),
-        { statusCode: 400 }
-      )
-    );
+    const { leaveType, startDate, endDate, reason } = req.body;
 
-  const start = parseISTDateOnly(startDate);
-  const end = parseISTDateOnly(endDate);
-  if (end < start)
-    return next(
-      Object.assign(new Error("End date cannot be before start date"), {
-        statusCode: 400,
-      })
-    );
+    if (!leaveType || !startDate || !endDate || !reason) {
+      return next(
+        Object.assign(
+          new Error(
+            "leaveType, startDate, endDate and reason are required"
+          ),
+          { statusCode: 400 }
+        )
+      );
+    }
 
-  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-  const organisation_id = req.admin.organisation_id;
+    const start = parseISTDateOnly(startDate);
+    const end = parseISTDateOnly(endDate);
 
-  const overlapping = await AdminLeave.findOne({
-    admin: req.admin._id,
-    organisation_id,
-    status: { $nin: ["rejected_superadmin"] },
-    startDate: { $lte: end },
-    endDate: { $gte: start },
-  })
-    .select("_id")
-    .lean();
+    if (end < start) {
+      return next(
+        Object.assign(
+          new Error("End date cannot be before start date"),
+          { statusCode: 400 }
+        )
+      );
+    }
 
-  if (overlapping)
-    return next(
-      Object.assign(new Error("Leave already applied for these dates"), {
-        statusCode: 400,
-      })
-    );
+    const days =
+      Math.round(
+        (end - start) / (1000 * 60 * 60 * 24)
+      ) + 1;
 
-  const leave = await AdminLeave.create({
-    organisation_id,
-    admin: req.admin._id,
-    applicantName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
-    applicantEmail: req.admin.work_email,
-    applicantRole: "Admin",
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-    status: "pending_superadmin",
-  });
+    const organisation_id = req.admin.organisation_id;
 
-  notifyLeaveApplied({
-    requesterName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
-    handlerModel: "SuperAdmin",
-    handlerId: organisation_id,
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-  });
+    const normalizedLeaveType = String(leaveType)
+      .trim()
+      .toLowerCase();
 
-  res.status(201).json({
-    success: true,
-    message: "Leave request submitted to super admin",
-    leave,
-  });
+    const requiresSupportingDocument =
+      normalizedLeaveType === "sl" && days > 4;
+
+    if (requiresSupportingDocument && !req.file) {
+      return next(
+        Object.assign(
+          new Error(
+            "Supporting document is mandatory for Sick Leave of more than 3 days"
+          ),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    const overlapping = await AdminLeave.findOne({
+      admin: req.admin._id,
+      organisation_id,
+      status: {
+        $nin: ["rejected_superadmin"],
+      },
+      startDate: {
+        $lte: end,
+      },
+      endDate: {
+        $gte: start,
+      },
+    })
+      .select("_id")
+      .lean();
+
+    if (overlapping) {
+      return next(
+        Object.assign(
+          new Error("Leave already applied for these dates"),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    let supportingDocument = null;
+
+    if (req.file) {
+      try {
+        const uploaded = await imagekit.upload({
+          file: req.file.buffer.toString("base64"),
+          fileName: req.file.originalname,
+          folder: "/leave-documents",
+          useUniqueFileName: true,
+        });
+
+        supportingDocument = {
+          url: uploaded.url,
+          fileId: uploaded.fileId,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          sizeKb: Math.round(uploaded.size / 1024),
+        };
+      } catch (uploadError) {
+        return next(
+          Object.assign(
+            new Error(
+              `Supporting document upload failed: ${uploadError.message}`
+            ),
+            { statusCode: 500 }
+          )
+        );
+      }
+    }
+
+    const leave = await AdminLeave.create({
+      organisation_id,
+      admin: req.admin._id,
+      applicantName:
+        `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+      applicantEmail: req.admin.work_email,
+      applicantRole: "Admin",
+      leaveType: normalizedLeaveType,
+      startDate: start,
+      endDate: end,
+      days,
+      reason: reason.trim(),
+      supportingDocument,
+      status: "pending_superadmin",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Leave applied successfully",
+      leave,
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 const editleaveadmin = async (req, res, next) => {
-  if (!req.admin)
-    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-
-  const organisation_id = req.admin.organisation_id;
-
-  const leave = await AdminLeave.findOne({
-    _id: req.params.id,
-    organisation_id,
-    admin: req.admin._id,
-  });
-  if (!leave)
-    return next(
-      Object.assign(new Error("Leave not found"), { statusCode: 404 })
-    );
-  if (leave.status !== "pending_superadmin")
-    return next(
-      Object.assign(
-        new Error("Cannot edit leave that is already processed or forwarded"),
-        { statusCode: 400 }
-      )
-    );
-
-  const { leaveType, startDate, endDate, reason } = req.body;
-  if (startDate && endDate) {
-    const start = parseISTDateOnly(startDate);
-    const end = parseISTDateOnly(endDate);
-    if (end < start)
+  try {
+    if (!req.admin) {
       return next(
-        Object.assign(new Error("End date cannot be before start date"), {
-          statusCode: 400,
+        Object.assign(new Error("Unauthorized"), {
+          statusCode: 401,
         })
       );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-  }
-  if (leaveType) leave.leaveType = leaveType;
-  if (reason) leave.reason = reason;
+    }
 
-  await leave.save();
-  res
-    .status(200)
-    .json({ success: true, message: "Leave updated successfully", leave });
+    const organisation_id = req.admin.organisation_id;
+
+    const leave = await AdminLeave.findOne({
+      _id: req.params.id,
+      organisation_id,
+      admin: req.admin._id,
+    });
+
+    if (!leave) {
+      return next(
+        Object.assign(new Error("Leave not found"), {
+          statusCode: 404,
+        })
+      );
+    }
+
+    if (leave.status !== "pending_superadmin") {
+      return next(
+        Object.assign(
+          new Error(
+            "Cannot edit leave that is already processed or forwarded"
+          ),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    const { leaveType, startDate, endDate, reason } = req.body;
+
+    let nextStart = leave.startDate;
+    let nextEnd = leave.endDate;
+    let nextLeaveType = leave.leaveType;
+
+    if (startDate && endDate) {
+      const start = parseISTDateOnly(startDate);
+      const end = parseISTDateOnly(endDate);
+
+      if (end < start) {
+        return next(
+          Object.assign(
+            new Error("End date cannot be before start date"),
+            { statusCode: 400 }
+          )
+        );
+      }
+
+      nextStart = start;
+      nextEnd = end;
+    }
+
+    if (leaveType) {
+      nextLeaveType = String(leaveType)
+        .trim()
+        .toLowerCase();
+    }
+
+    const nextDays =
+      Math.round(
+        (nextEnd - nextStart) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    const requiresSupportingDocument =
+      nextLeaveType === "sl" && nextDays > 4;
+
+    if (
+      requiresSupportingDocument &&
+      !req.file &&
+      !leave.supportingDocument?.url
+    ) {
+      return next(
+        Object.assign(
+          new Error(
+            "Supporting document is mandatory for Sick Leave of more than 3 days"
+          ),
+          { statusCode: 400 }
+        )
+      );
+    }
+
+    if (startDate && endDate) {
+      leave.startDate = nextStart;
+      leave.endDate = nextEnd;
+      leave.days = nextDays;
+    }
+
+    if (leaveType) {
+      leave.leaveType = nextLeaveType;
+    }
+
+    if (reason !== undefined) {
+      leave.reason = reason.trim();
+    }
+
+    if (req.file) {
+      try {
+        const uploaded = await imagekit.upload({
+          file: req.file.buffer.toString("base64"),
+          fileName: req.file.originalname,
+          folder: "/leave-documents",
+          useUniqueFileName: true,
+        });
+
+        leave.supportingDocument = {
+          url: uploaded.url,
+          fileId: uploaded.fileId,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          sizeKb: Math.round(uploaded.size / 1024),
+        };
+      } catch (uploadError) {
+        return next(
+          Object.assign(
+            new Error(
+              `Supporting document upload failed: ${uploadError.message}`
+            ),
+            { statusCode: 500 }
+          )
+        );
+      }
+    }
+
+    await leave.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Leave updated successfully",
+      leave,
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 const deleteleaveadmin = async (req, res, next) => {

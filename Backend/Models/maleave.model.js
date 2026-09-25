@@ -7,70 +7,110 @@ const managerLeaveSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+
   manager: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Manager",
     required: true,
   },
+
   applicantName: { type: String },
   applicantEmail: { type: String },
   applicantRole: { type: String, default: "Manager" },
+
   leaveType: {
     type: String,
     enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
     required: true,
   },
+
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },
   days: { type: Number, required: true },
-  // See identical field + comment on Models/leave.model.js — how many of
-  // `days` were auto-converted to LWP for lack of balance, and (by
-  // convention) land on the LAST `lwpDays` days of the range.
+
   lwpDays: { type: Number, default: 0 },
+
   reason: { type: String, required: true },
- status: {
-  type: String,
-  enum: [
-    "pending_reporting_manager",
-    "pending_admin",
-    "approved_reporting_manager",
-    "approved_admin",
-    "rejected_reporting_manager",
-    "rejected_admin",
-  ],
-  default: "pending_reporting_manager",
-},
+
+  supportingDocument: {
+    url: {
+      type: String,
+      default: null,
+    },
+    fileId: {
+      type: String,
+      default: null,
+    },
+    originalName: {
+      type: String,
+      default: null,
+    },
+    mimeType: {
+      type: String,
+      default: null,
+    },
+    sizeKb: {
+      type: Number,
+      default: null,
+    },
+  },
+
+  status: {
+    type: String,
+    enum: [
+      "pending_reporting_manager",
+      "pending_admin",
+      "approved_reporting_manager",
+      "approved_admin",
+      "rejected_reporting_manager",
+      "rejected_admin",
+    ],
+    default: "pending_reporting_manager",
+  },
+
   directed_to: {
     type: mongoose.Schema.Types.ObjectId,
     refPath: "directed_to_model",
     default: null,
   },
+
   directed_to_model: {
     type: String,
     enum: ["Manager", "Admin"],
     default: null,
   },
+
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
     refPath: "approvedByModel",
   },
+
   approvedByModel: {
     type: String,
     enum: ["Manager", "Admin"],
     default: null,
   },
+
   rejectedBy: {
     type: mongoose.Schema.Types.ObjectId,
     refPath: "rejectedByModel",
   },
+
   rejectedByModel: {
     type: String,
     enum: ["Manager", "Admin"],
     default: null,
   },
+
   remarks: { type: String },
+
   createdAt: { type: Date, default: Date.now },
-  deleteAt: { type: Date, default: null, index: { expires: 0 } },
+
+  deleteAt: {
+    type: Date,
+    default: null,
+    index: { expires: 0 },
+  },
 });
 
 managerLeaveSchema.index({ manager: 1, status: 1 });

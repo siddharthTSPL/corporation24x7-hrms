@@ -3,8 +3,11 @@ const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
+const leaveDocumentUpload = require("../middleware/upload/Leavedocument.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
-const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const {
+  restrictPlanFeature,
+} = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
@@ -89,8 +92,7 @@ const {
   getActiveUserCount,
   getAllAdminsForOrg,
   respondToMyReview,
-  hrAcknowledgeReviewHandler
-
+  hrAcknowledgeReviewHandler,
 } = require("../controllers/admin.controller");
 
 const {
@@ -99,7 +101,6 @@ const {
   editDocument,
   deleteDocument,
 } = require("../controllers/uploaddocument.controller");
-
 
 const {
   createAssetAdmin,
@@ -132,9 +133,13 @@ adminrouter.get(
   "/getme",
   adminauthmiddleware,
   cacheRoute(30_000, (req) => `user:${req.admin._id}:${req.originalUrl}`),
-  asyncHandler(getme)
+  asyncHandler(getme),
 );
-adminrouter.get("/getattendance", adminauthmiddleware, asyncHandler(getMyAttendanceHistory));
+adminrouter.get(
+  "/getattendance",
+  adminauthmiddleware,
+  asyncHandler(getMyAttendanceHistory),
+);
 adminrouter.put(
   "/editadminprofile",
   adminauthmiddleware,
@@ -196,11 +201,10 @@ adminrouter.get(
   asyncHandler(findallmanagers),
 );
 
-
 adminrouter.get(
   "/findallemployeesfull",
   adminauthmiddleware,
-  asyncHandler(findallemployeesfull)
+  asyncHandler(findallemployeesfull),
 );
 
 adminrouter.get(
@@ -280,16 +284,18 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(showallleaves),
 );
-adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.post(
+  "/applyleave",
+  adminauthmiddleware,
+  leaveDocumentUpload.single("supportingDocument"),
+  asyncHandler(applyleave)
+);
+
 adminrouter.put(
   "/editleave/:id",
   adminauthmiddleware,
-  asyncHandler(editleaveadmin),
-);
-adminrouter.delete(
-  "/deleteleave/:id",
-  adminauthmiddleware,
-  asyncHandler(deleteleaveadmin),
+  leaveDocumentUpload.single("supportingDocument"),
+  asyncHandler(editleaveadmin)
 );
 adminrouter.get(
   "/getmyleavehistory",
@@ -448,47 +454,100 @@ adminrouter.get(
 adminrouter.get(
   "/all-no-admin",
   adminauthmiddleware,
-  asyncHandler(findallmanagerswoadmin)
+  asyncHandler(findallmanagerswoadmin),
 );
 
 adminrouter.put(
   "/employee/:id/working-status",
   adminauthmiddleware,
-  asyncHandler(setEmployeeWorkingStatus)
+  asyncHandler(setEmployeeWorkingStatus),
 );
 
 adminrouter.put(
   "/manager/:id/working-status",
   adminauthmiddleware,
-  asyncHandler(setManagerWorkingStatus)
+  asyncHandler(setManagerWorkingStatus),
 );
-adminrouter.get("/all-admins", adminOrSuperAdminAuth, asyncHandler(getAllAdminsForOrg));
+adminrouter.get(
+  "/all-admins",
+  adminOrSuperAdminAuth,
+  asyncHandler(getAllAdminsForOrg),
+);
 
-adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
+adminrouter.get(
+  "/inactive-users",
+  adminauthmiddleware,
+  asyncHandler(getInactiveUsers),
+);
 adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
 
 // ── Asset Management (Admin) — plan-gated: locked on Basic ─────────────────────
-adminrouter.post("/assets", adminauthmiddleware, asyncHandler(createAssetAdmin));
-adminrouter.get("/assets", adminauthmiddleware, asyncHandler(getAllAssetsAdmin));
+adminrouter.post(
+  "/assets",
+  adminauthmiddleware,
+  asyncHandler(createAssetAdmin),
+);
+adminrouter.get(
+  "/assets",
+  adminauthmiddleware,
+  asyncHandler(getAllAssetsAdmin),
+);
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-adminrouter.get("/assets/employees", adminauthmiddleware, asyncHandler(getEmployeesWithAssets));
+adminrouter.get(
+  "/assets/employees",
+  adminauthmiddleware,
+  asyncHandler(getEmployeesWithAssets),
+);
 adminrouter.get(
   "/assets/employees/:person_id/:person_model/history",
   adminauthmiddleware,
-  asyncHandler(getEmployeeAssetHistory)
+  asyncHandler(getEmployeeAssetHistory),
 );
-adminrouter.get("/assets/:id", adminauthmiddleware, asyncHandler(getAssetByIdAdmin));
-adminrouter.put("/assets/:id", adminauthmiddleware, asyncHandler(updateAssetAdmin));
-adminrouter.delete("/assets/:id", adminauthmiddleware, asyncHandler(deleteAssetAdmin));
-adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, asyncHandler(assignAssetToEmployee));
-adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, asyncHandler(assignAssetToManager));
-adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, asyncHandler(revokeAssetAdmin));
-adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, asyncHandler(getAssetsOfPerson));
+adminrouter.get(
+  "/assets/:id",
+  adminauthmiddleware,
+  asyncHandler(getAssetByIdAdmin),
+);
+adminrouter.put(
+  "/assets/:id",
+  adminauthmiddleware,
+  asyncHandler(updateAssetAdmin),
+);
+adminrouter.delete(
+  "/assets/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteAssetAdmin),
+);
+adminrouter.patch(
+  "/assets/:id/assign-employee",
+  adminauthmiddleware,
+  asyncHandler(assignAssetToEmployee),
+);
+adminrouter.patch(
+  "/assets/:id/assign-manager",
+  adminauthmiddleware,
+  asyncHandler(assignAssetToManager),
+);
+adminrouter.patch(
+  "/assets/:id/revoke",
+  adminauthmiddleware,
+  asyncHandler(revokeAssetAdmin),
+);
+adminrouter.get(
+  "/assets/person/:person_id/:person_model",
+  adminauthmiddleware,
+  asyncHandler(getAssetsOfPerson),
+);
 
 // Assets assigned to the logged-in admin themself (e.g. by SuperAdmin) — Dashboard / Settings "My Assets" widget
 adminrouter.get("/my-assets", adminauthmiddleware, asyncHandler(getMyAssets));
 
 // Help & Support form — no permission gate, every logged-in admin can reach support.
-adminrouter.post("/contact-support", adminauthmiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
+adminrouter.post(
+  "/contact-support",
+  adminauthmiddleware,
+  supportUpload.array("attachments", 5),
+  asyncHandler(sendSupportRequest),
+);
 
 module.exports = adminrouter;
