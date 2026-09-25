@@ -156,7 +156,7 @@ const buildStorageLimitError = (status, role) => {
   const title = "Storage limit reached";
   const message = canUpgrade
     ? `Your organisation has used ${status.usedFormatted} of the ${status.limitFormatted} free storage. ` +
-      `Please upgrade to the Basic or Advance plan at torchxsuite.com to continue using TorchX Talent.`
+      `Please upgrade to the Basic or Advance plan at torchxsuite.com for unlimited storage and to continue using TorchX Talent.`
     : `Your organisation has reached its free storage limit. Please contact your organization.`;
 
   return Object.assign(new Error(message), {

@@ -117,7 +117,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
           limitReached: storageStatus.exceeded,
           message: storageStatus.exceeded
             ? isAdminRole
-              ? "Your free trial has ended and your organisation's free storage is full. Please upgrade to the Basic or Advance plan at torchxsuite.com to keep using TorchX Talent."
+              ? "Your free trial has ended and your organisation's free storage is full. Please upgrade to the Basic or Advance plan at torchxsuite.com for unlimited storage and to keep using TorchX Talent."
               : "Your organisation's free storage is full. Please contact your organization."
             : null,
         }
