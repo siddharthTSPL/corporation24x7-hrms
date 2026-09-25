@@ -978,7 +978,6 @@ function Pricing() {
         'Reimbursement',
         'Employee Self-Service Portal',
         'Policy Management',
-        'Custom workflow',
         'Grievance Management',
         'Email support (24/7)',
       ],
@@ -990,8 +989,8 @@ function Pricing() {
       inherits: null,
       monthlyPrice: 39,
       yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Employee Self-Service Portal','Policy Management','Reimbursement','Custom workflow','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Recruitment Management','Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Telephonic Support (24/7)'] // features listed here get a cross instead of a tick
+      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Employee Self-Service Portal','Policy Management','Reimbursement','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Custom Workflow','Recruitment Management','Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Custom Workflow','Telephonic Support (24/7)'] // features listed here get a cross instead of a tick
     },
     {
       name: 'Advance',
