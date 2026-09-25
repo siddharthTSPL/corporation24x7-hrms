@@ -28,7 +28,7 @@ export default function StorageLimitBanner({ role }) {
               >
                 Basic or Advance plan
               </a>{" "}
-              to keep using TorchX Talent.
+              for unlimited storage and to keep using TorchX Talent.
             </p>
           ) : (
             <p className="mt-0.5">
@@ -49,19 +49,20 @@ export default function StorageLimitBanner({ role }) {
         <div className="text-sm text-amber-800">
           <p className="font-semibold">Your free trial has expired</p>
           <p className="mt-0.5">
-            You can keep enjoying TorchX Talent with limited (Basic plan) features.
+            You can keep enjoying TorchX Talent with limited (Basic plan) features and{" "}
+            {storage?.limitFormatted || "5 MB"} of free storage.
             {isAdminRole ? (
               <>
-                {" "}Upgrade to{" "}
+                {" "}Upgrade to the{" "}
                 <a
                   href="https://torchxsuite.com"
                   target="_blank"
                   rel="noreferrer"
                   className="font-medium underline"
                 >
-                  Advance
+                  Basic or Advance plan
                 </a>{" "}
-                to unlock everything again.
+                for unlimited storage and to unlock everything again.
               </>
             ) : (
               " Contact your organization if you need more."

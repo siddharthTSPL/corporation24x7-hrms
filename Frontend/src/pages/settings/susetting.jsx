@@ -1705,8 +1705,8 @@ function StorageTab() {
   const slices = useMemo(() => {
     if (!usage) return [];
     return [
-      ...(mongo?.groups || []).map((g) => ({ name: `MongoDB · ${g.label}`, bytes: g.bytes })),
-      ...(imagekit?.modules || []).map((m) => ({ name: `ImageKit · ${m.label}`, bytes: m.bytes })),
+      ...(mongo?.groups || []).map((g) => ({ name: `Database · ${g.label}`, bytes: g.bytes })),
+      ...(imagekit?.modules || []).map((m) => ({ name: `Files · ${m.label}`, bytes: m.bytes })),
     ].filter((x) => x.bytes > 0);
   }, [usage, mongo, imagekit]);
 
@@ -1714,7 +1714,7 @@ function StorageTab() {
     <>
       <SectionCard
         title="Storage usage"
-        subtitle="MongoDB documents (every collection) + ImageKit files belonging to your organisation"
+        subtitle="Database records (every collection) + files belonging to your organisation"
         accent={C.brand}
       >
         {isLoading ? (
@@ -1735,8 +1735,8 @@ function StorageTab() {
                 className="mb-4 p-3 rounded-lg text-xs"
                 style={{ background: C.amberBg, color: C.amber }}
               >
-                Could not fetch the file list from ImageKit ({usage.imagekitError || "unknown error"}).
-                ImageKit sizes are taken from sizes saved in the database and are not verified.
+                Could not fetch the file list from storage ({usage.imagekitError || "unknown error"}).
+                File sizes are taken from sizes saved in the database and are not verified.
               </div>
             )}
 
@@ -1744,19 +1744,19 @@ function StorageTab() {
               <StorageStatCard
                 label="Total storage used"
                 value={usage.totalFormatted}
-                sublabel="MongoDB + ImageKit"
+                sublabel="Database + Files"
                 accent={C.brand}
               />
               <StorageStatCard
-                label="Database (MongoDB)"
+                label="Database"
                 value={mongo.formatted}
                 sublabel={`${mongo.docs.toLocaleString("en-IN")} documents · ~${mongo.estimatedDiskFormatted} on disk incl. indexes`}
                 accent={C.blue}
               />
               <StorageStatCard
-                label="Files (ImageKit)"
+                label="Files"
                 value={imagekit.formatted}
-                sublabel={`${imagekit.files.toLocaleString("en-IN")} files${imagekit.missingFiles ? ` · ${imagekit.missingFiles} missing on ImageKit` : ""}`}
+                sublabel={`${imagekit.files.toLocaleString("en-IN")} files${imagekit.missingFiles ? ` · ${imagekit.missingFiles} missing from storage` : ""}`}
                 accent={C.amber}
               />
             </div>
@@ -1793,7 +1793,7 @@ function StorageTab() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             <SectionCard
               title="Storage breakdown"
-              subtitle="Share of each area across MongoDB and ImageKit"
+              subtitle="Share of each area across the database and file storage"
               accent={C.blue}
             >
               {slices.length === 0 ? (
@@ -1830,13 +1830,13 @@ function StorageTab() {
             </SectionCard>
 
             <SectionCard
-              title="ImageKit files by module"
+              title="Files by module"
               subtitle="Documents, policies, receipts, tickets, photos and more"
               accent={C.amber}
             >
               {imagekit.modules.length === 0 ? (
                 <div className="text-sm text-[#b0948a]">
-                  No files on ImageKit for this organisation.
+                  No files in storage for this organisation.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1883,7 +1883,7 @@ function StorageTab() {
           </div>
 
           <SectionCard
-            title="MongoDB by area & collection"
+            title="Database by area & collection"
             subtitle="Real on-disk size of this organisation's documents. Click an area to expand."
             accent={C.blue}
           >
@@ -1917,18 +1917,18 @@ function StorageTab() {
 
             {mongo.inlineFiles.length > 0 && (
               <div className="mt-4 p-3 rounded-lg text-xs bg-[#f8f6f4] border border-[#ede5e0] text-[#8a7570] leading-relaxed">
-                <strong>Inline images inside MongoDB:</strong>{" "}
+                <strong>Inline images inside the database:</strong>{" "}
                 {mongo.inlineFiles
                   .map((i) => `${i.label} — ${i.count.toLocaleString("en-IN")} (${i.formatted})`)
                   .join(" · ")}
                 . These are stored directly inside database documents as base64 instead of a URL and
-                are already included in the MongoDB size (not double counted).
+                are already included in the database size (not double counted).
               </div>
             )}
           </SectionCard>
 
           <SectionCard
-            title={`ImageKit files${filesData ? ` (${filesData.total.toLocaleString("en-IN")} · ${filesData.totalFormatted})` : ""}`}
+            title={`Files${filesData ? ` (${filesData.total.toLocaleString("en-IN")} · ${filesData.totalFormatted})` : ""}`}
             subtitle="Every file uploaded by your organisation"
             accent={C.amber}
           >
@@ -1997,7 +1997,7 @@ function StorageTab() {
                           <span
                             className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                             style={{ background: C.amberBg, color: C.amber }}
-                            title="File not found in the ImageKit list; size taken from the database record"
+                            title="File not found in storage; size taken from the database record"
                           >
                             unverified
                           </span>
@@ -2013,7 +2013,7 @@ function StorageTab() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[#730042] inline-flex"
-                            title="Open on ImageKit"
+                            title="Open file"
                           >
                             <ExternalLink size={14} />
                           </a>
