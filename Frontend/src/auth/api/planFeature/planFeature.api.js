@@ -29,10 +29,9 @@ const LOCKED_FALLBACK = {
     asset: false,
     tickets: false,
     fieldOperations: false,
+    single_sign_in: false,
   },
   fieldAssignment: { isMember: false, isManager: false },
-  features: { review: false, timesheet: false, recruitment: false, asset: false, tickets: false, single_sign_in: false },
-
 };
 
 export const fetchPlanFeatures = async () => {
