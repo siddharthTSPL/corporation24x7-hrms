@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import {
   useFieldSettings,
   useUpdateFieldSettings,
-} from "../../auth/server-state/fieldOperations/Fieldoperations.hook";
+} from "../../auth/server-state/fieldOperations/fieldOperations.hook";
 
 // Field Work org-level settings card.
 // Rendered inside TorchX Management for Super Admins and Admins so the on/off
