@@ -35,9 +35,9 @@ import { usePermissionStore } from "../auth/store/permission/permissionStore";
 import { usePlanFeatures } from "../auth/server-state/planFeature/planFeature.hook";
 import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
-import FloatingHelp from "./help/FloatingHelp";
+import FloatingHelp from "./help/Floatinghelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
-import DocumentationModal from "./help/DocumentationModal";
+import DocumentationModal from "./help/Documentationmodal";
 import {
   checkoutFieldDuty,
   getMyFieldDuty,
