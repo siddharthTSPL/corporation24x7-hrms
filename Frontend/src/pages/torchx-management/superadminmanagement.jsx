@@ -29,7 +29,7 @@ import {
   useGetShiftHistorySuperAdmin,
   useEditShiftAssignmentSuperAdmin,
   useDeleteShiftAssignmentSuperAdmin,
-} from '../../auth/server-state/superadmin/shift/sushift.hook';
+} from '../../auth/server-state/superadmin/shift/Sushift.hook';
 import {
   useGetPolicySuperAdmin,
   useSetPolicySuperAdmin,
@@ -46,7 +46,7 @@ import {
   useListHolidaysSuperAdmin,
   useSetEmployeeOverrideSuperAdmin,
   useRemoveEmployeeOverrideSuperAdmin,
-} from '../../auth/server-state/superadmin/holidaypolicy/suholidaypolicy.hook';
+} from '../../auth/server-state/superadmin/holidaypolicy/Suholidaypolicy.hook';
 import {
   useGetAllEmployees,
   useGetAllManagers,

@@ -7,7 +7,7 @@ import {
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
