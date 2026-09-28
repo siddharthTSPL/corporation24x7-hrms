@@ -523,9 +523,9 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden bg-[#2a000f] pt-28 pb-0 lg:pt-24"
+      className="relative overflow-hidden bg-white pt-28 pb-0 lg:pt-24"
     >
-      <SectionBackdrop />
+      {/* SectionBackdrop hata diya - white background */}
 
       <Wrap className="relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12 lg:gap-10">
@@ -537,7 +537,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
               className="mb-7"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-gradient-to-r from-white via-white to-[#fff4f9] px-4 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#EAC7D7] bg-[#FDF4F8] px-4 py-2 shadow-[0_8px_30px_rgba(122,0,75,0.08)]">
                 <span className="h-2 w-2 rounded-full bg-[#730042] shadow-[0_0_12px_rgba(115,0,66,0.5)]" />
                 <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[#730042]">
                   TorchX Talent
@@ -551,19 +551,19 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
               initial={{ opacity: 0, y: 22 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="relative max-w-[560px] font-hero font-medium leading-[1.15] tracking-[-1.5px] text-white text-[clamp(2rem,5vw,3.4rem)]"
+              className="relative max-w-[560px] font-hero font-medium leading-[1.15] tracking-[-1.5px] text-[#2A1120] text-[clamp(2rem,5vw,3.4rem)]"
             >
               Manage Your Workforce With
               <br />
               Smart HR{' '}
-              <span className="italic text-[#ffb0d0]">Solutions</span>
+              <span className="italic text-[#7A004B]">Solutions</span>
             </motion.h1>
 
             <motion.p
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-6 max-w-[500px] font-hero text-[15px] leading-[1.75] text-white/70 sm:text-[16px] lg:text-[17px]"
+              className="mt-6 max-w-[500px] font-hero text-[15px] leading-[1.75] text-[#5C5C5C] sm:text-[16px] lg:text-[17px]"
             >
               TorchX Talent is a complete Human Resource Management System (HRMS) that helps you optimize every stage of the employee lifecycle — from hiring to performance to payroll — with a robust and reliable platform.
             </motion.p>
@@ -576,7 +576,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             >
               <a
                 href="https://torchxsuite.com/signup"
-                className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#7A004B] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#93005c] hover:shadow-[0_12px_40px_rgba(122,0,75,0.5)]"
+                className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#7A004B] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgba(122,0,75,0.3)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#93005c] hover:shadow-[0_12px_40px_rgba(122,0,75,0.45)]"
               >
                 Start Free Trial
                 <FiArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
@@ -584,10 +584,10 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
 
               <a
                 href="tel:+917454098820"
-                className="group inline-flex items-center justify-center gap-2.5 rounded-xl border border-white/20 bg-white/[0.07] px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:bg-white/[0.12]"
+                className="group inline-flex items-center justify-center gap-2.5 rounded-xl border-2 border-[#7A004B] bg-transparent px-7 py-3.5 text-sm font-semibold text-[#7A004B] transition-all duration-300 hover:-translate-y-1 hover:bg-[#FDF4F8]"
               >
                 Talk To Expert
-                <FiArrowRight className="text-white/50 transition-transform duration-300 group-hover:translate-x-1" />
+                <FiArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
               </a>
             </motion.div>
 
@@ -598,7 +598,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.6 }}
-                className="group mt-5 flex items-center justify-center gap-2 rounded-full border border-[#ffb0d0]/25 bg-[#ffb0d0]/[0.08] px-4 py-2 text-[12px] font-medium text-[#ffb0d0] transition-all duration-300 hover:border-[#ffb0d0]/45 hover:bg-[#ffb0d0]/[0.15]"
+                className="group mt-5 flex items-center justify-center gap-2 rounded-full border border-[#7A004B]/25 bg-[#7A004B]/[0.06] px-4 py-2 text-[12px] font-medium text-[#7A004B] transition-all duration-300 hover:border-[#7A004B]/45 hover:bg-[#7A004B]/[0.12]"
               >
                 Calculate Your Plan
                 <FiArrowRight size={14} className="transition-transform duration-300 group-hover:translate-x-1" />
@@ -647,14 +647,14 @@ function Stats() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: i * 0.08 }}
           viewport={{ once: true }}
-          className="bg-gradient-to-br from-white/[0.17] via-white/[0.10] to-white/[0.06] backdrop-blur-xl rounded-[18px] p-6 border border-white/25 shadow-[0_10px_30px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.25)] flex items-center gap-4 transition-all duration-300 hover:from-white/[0.24] hover:via-white/[0.14] hover:to-white/[0.08] hover:border-white/40 hover:-translate-y-1"
+          className="bg-white rounded-[18px] p-6 border border-[#EAC7D7] shadow-[0_10px_30px_rgba(122,0,75,0.08)] flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(122,0,75,0.15)]"
         >
           <div className="w-13 h-13 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0 text-white shadow-[0_6px_16px_rgba(122,0,75,0.45)]">
             {s.icon}
           </div>
           <div>
-            <div className="text-[28px] font-display font-extrabold text-[#ffb0d0] leading-[1.1]">{s.num}</div>
-            <div className="text-[13px] font-body font-semibold text-white leading-[1.4] mt-0.5">{s.label}</div>
+            <div className="text-[28px] font-display font-extrabold text-[#7A004B] leading-[1.1]">{s.num}</div>
+            <div className="text-[13px] font-body font-semibold text-[#5C5C5C] leading-[1.4] mt-0.5">{s.label}</div>
           </div>
         </motion.div>
       ))}
@@ -976,18 +976,18 @@ function Pricing() {
     { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
   ]
 
-  return (
-    <section id="pricing" className="scroll-anchor relative overflow-hidden pt-10 pb-28">
-      <SectionBackdrop />
+   return (
+    <section id="pricing" className="scroll-anchor relative overflow-hidden bg-white pt-10 pb-28">
+      {/* <SectionBackdrop />  ← hata diya, ab white background */}
       <Wrap className="relative z-10">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-6">
-            <h2 className="font-hero font-medium text-white mb-4 text-[clamp(28px,3.2vw,42px)]">
-              Simple, Transparent <span className="text-[#ffb0d0]">Pricing</span>
+            <h2 className="font-hero font-medium text-[#2A1120] mb-4 text-[clamp(28px,3.2vw,42px)]">
+              Simple, Transparent <span className="text-[#7A004B]">Pricing</span>
               <br />
               That Grows With You
             </h2>
-            <p className="text-lg font-body text-white/60 max-w-[560px] mx-auto leading-relaxed mb-5">
+            <p className="text-lg font-body text-[#5C5C5C] max-w-[560px] mx-auto leading-relaxed mb-5">
               Choose the perfect TorchX Talent plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
 
@@ -1027,8 +1027,10 @@ function Pricing() {
               return (
                 <div
                   key={p.name}
-                  className={`relative rounded-3xl p-6 sm:p-8 xl:p-6 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-transform duration-300 ${
-                    p.popular ? 'relative z-[5]' : 'hover:scale-[1.02]'
+                  className={`relative rounded-3xl p-6 sm:p-8 xl:p-6 flex flex-col gap-5 bg-white border-2 border-[#7A004B] h-full transition-all duration-300 shadow-[0_10px_30px_rgba(122,0,75,0.08)] ${
+                    p.popular
+                      ? 'relative z-[5] shadow-[0_20px_50px_rgba(122,0,75,0.2)]'
+                      : 'hover:scale-[1.02] hover:shadow-[0_16px_40px_rgba(122,0,75,0.15)]'
                   }`}
                 >
                   {p.popular && (
@@ -1057,10 +1059,8 @@ function Pricing() {
                     {p.features.map((f) => (
                       <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
                         {p.crossFeatures?.includes(f) ? (
-                          /* RED cross — not included in this plan */
                           <FiX strokeWidth={3} className="text-red-500 shrink-0 mt-0.5" />
                         ) : (
-                          /* GREEN tick — included in this plan */
                           <FiCheck strokeWidth={3} className="text-green-600 shrink-0 mt-0.5" />
                         )}
                         {f}
