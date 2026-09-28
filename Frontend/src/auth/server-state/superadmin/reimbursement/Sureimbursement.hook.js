@@ -4,7 +4,7 @@ import {
   rejectReimbursement,
   markReimbursementPaid,
   getAllReimbursements,
-} from "../../../api/superadmin/reimbursement/sureimbursement.api";
+} from "../../../api/superadmin/reimbursement/Sureimbursement.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // ---- Reviewing Admin claims ----
