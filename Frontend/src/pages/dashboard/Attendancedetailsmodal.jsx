@@ -4,9 +4,9 @@ import {
   FaUserTie, FaBuilding, FaCalendarAlt, FaClock, FaDownload,
   FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup, FaUsers,
 } from "react-icons/fa";
-import AttendanceHistoryModal from "./AttendanceHistoryModal";
-import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
-import { downloadCsv } from "./exportCsv";
+import AttendanceHistoryModal from "./Attendancehistorymodal";
+import AttendanceBulkHistoryModal from "./Attendancebulkhistorymodal";
+import { downloadCsv } from "./Exportcsv";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
