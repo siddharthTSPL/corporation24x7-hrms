@@ -11,7 +11,7 @@ const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
-const Signup = lazy(() => import("./pages/auth/Signup"));
+const Signup = lazy(() => import("./pages/auth/signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
 const TalentPricingCalculator = lazy(() => import("./components/marketing/TalentPricingCalculator"));
 const FieldOperations = lazy(() => import("./pages/field-operations/FieldOperations"));

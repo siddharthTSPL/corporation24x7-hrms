@@ -7,7 +7,7 @@ import { Outlet } from "react-router-dom";
 import { useAuth, usePermissionsSync } from "../auth/store/getmeauth/getmeauth";
 import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/unifiedauth/Unifiedauth.hook";
 import WelcomeModal from "../components/WelcomeModal";
-import BirthdayModal from "../components/BirthdayModal";
+import BirthdayModal from "../components/Birthdaymodal";
 import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner";
 import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";

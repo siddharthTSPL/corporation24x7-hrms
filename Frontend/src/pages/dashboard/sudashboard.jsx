@@ -78,7 +78,7 @@ import {
   usePromoteAdminToSuperAdmin,
   useDemoteAdminToManager, // FIX: Admin -> Manager demote hook (was useDemoteSuperAdminToAdmin)
 } from "../../auth/server-state/superadmin/other/suother.hook";
-import AttendanceDetailsModal from "./AttendanceDetailsModal";
+import AttendanceDetailsModal from "./Attendancedetailsmodal";
 import { getAttendanceHistory as fetchEmployeeAttendanceHistory } from "../../auth/api/superadmin/other/su.other";
 import NotificationBell from "../../components/notifications/NotificationBell";
 import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";

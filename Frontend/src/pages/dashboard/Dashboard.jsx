@@ -11,10 +11,10 @@ import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
 import AttendanceModal from "./Attendancemodal";
-import AttendanceDetailsModal from "./AttendanceDetailsModal";
+import AttendanceDetailsModal from "./Attendancedetailsmodal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 import AnalyticsDashboard from "./AnalyticsDashboard";
 import { FaChartBar, FaHome } from "react-icons/fa";

@@ -6,7 +6,7 @@ import { useGetAttendance } from "../../auth/server-state/employee/employeeother
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
