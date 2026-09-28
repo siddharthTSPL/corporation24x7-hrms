@@ -67,7 +67,7 @@ import {
 } from "../../auth/server-state/adminother/adminother.hook";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useGetAllDepartments } from "../../auth/server-state/department/department.hook";
-import { useFieldTeams } from "../../auth/server-state/fieldOperations/Fieldoperations.hook";
+import { useFieldTeams } from "../../auth/server-state/fieldOperations/fieldOperations.hook";
 import axios from "axios";
 
 import * as XLSX from "xlsx";
@@ -3303,6 +3303,7 @@ function EmpStepFields({
   onChange,
   errors,
   managersOnly,
+  managersWithAdmin,   // ← add this
   perms,
   onPermChange,
 }) {
@@ -5557,6 +5558,7 @@ export default function EmployeeTable() {
             onChange={handleEmpChange}
             errors={empErrors}
             managersOnly={managersOnly}
+            managersWithAdmin={managersWithAdmin}
             perms={empPerms}
             onPermChange={handleEmpPermChange}
           />

@@ -1,94 +1,148 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import gsap from 'gsap'
 import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
-
   FiMenu, FiX, FiArrowRight, FiCheck,
   FiLinkedin, FiInstagram, FiMail,
   FiShield, FiLink, FiActivity, FiBookOpen,
-  FiUser, FiFileText, FiBell, FiHardDrive,
-  FiUsers, FiStar, FiBarChart2,
-  FiLogOut, FiSettings, FiMessageSquare,
+  FiHardDrive, FiUsers, FiStar, FiBarChart2,
   FiMapPin, FiCamera, FiNavigation, FiCalendar, FiDollarSign,
-  FiClipboard, FiCreditCard,
-  // new icons used by the Features section
-  FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
+  FiCreditCard, FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
   FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
-  FiKey, FiCode, FiCloud, FiUserCheck, FiGift
+  FiKey, FiCode, FiCloud, FiUserCheck, FiGift, FiBell,
 } from 'react-icons/fi'
-import { FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
-import {
-  RadarChart as RechartsRadar, Radar, PolarGrid, PolarAngleAxis,
-  ResponsiveContainer
-} from 'recharts'
 import logo from '../../assets/TorchX.svg'
-import PlantImage from '../../assets/plant.png'
 import { useAuth } from '../../auth/store/getmeauth/getmeauth'
+import { fadeUp, fontStyles } from './animations'
 
-const radarData = [
-  { metric: 'Leadership', value: 85 },
-  { metric: 'Teamwork', value: 72 },
-  { metric: 'Quality', value: 90 },
-  { metric: 'Problem Solving', value: 68 },
-  { metric: 'Communication', value: 80 },
-]
+export { fontStyles }
 
-export const fadeUp = {
-  hidden: { opacity: 0, y: 36 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } }
+/* ==========================================================================
+   SMOOTH SCROLL (GSAP) + SECTION NAVIGATION
+   The page scrolls inside a custom container (height:100vh, overflow:auto),
+   so smoothing and anchor jumps are driven on that container with GSAP.
+========================================================================== */
+
+const NAV_OFFSET = 72 // fixed navbar height
+
+let scrollRoot = null // set by LandingPage
+const scrollState = { tween: null, target: 0, animating: false }
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+function smoothScrollTo(el, y, duration = 1.2) {
+  if (!el) return
+  const max = Math.max(0, el.scrollHeight - el.clientHeight)
+  const to = Math.max(0, Math.min(y, max))
+
+  scrollState.tween?.kill()
+  scrollState.target = to
+
+  if (prefersReducedMotion()) {
+    scrollState.animating = false
+    el.scrollTop = to
+    return
+  }
+
+  const proxy = { y: el.scrollTop }
+  scrollState.animating = true
+  scrollState.tween = gsap.to(proxy, {
+    y: to,
+    duration,
+    ease: 'power3.out',
+    overwrite: true,
+    onUpdate: () => {
+      el.scrollTop = proxy.y
+    },
+    onComplete: () => {
+      scrollState.animating = false
+    },
+  })
 }
-export const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
-export const cardVariant = {
-  hidden: { opacity: 0, y: 40 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
+
+function scrollToSection(id, duration = 1.3) {
+  const node = document.getElementById(id)
+  if (!node) return
+  if (scrollRoot) {
+    const y =
+      node.getBoundingClientRect().top -
+      scrollRoot.getBoundingClientRect().top +
+      scrollRoot.scrollTop -
+      NAV_OFFSET
+    smoothScrollTo(scrollRoot, y, duration)
+  } else {
+    window.scrollTo({
+      top: node.getBoundingClientRect().top + window.scrollY - NAV_OFFSET,
+      behavior: 'smooth',
+    })
+  }
 }
 
-export const fontStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+function useSmoothScroll(ref) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    scrollRoot = el
 
-  .font-display { font-family: 'Sora', sans-serif; }
-  .font-body { font-family: 'DM Sans', sans-serif; }
-  .font-ui { font-family: 'Instrument Sans', sans-serif; }
-  .font-hero { font-family: 'Roboto', sans-serif; }
+    const stop = () => {
+      scrollState.tween?.kill()
+      scrollState.animating = false
+    }
 
-  html { scroll-behavior: smooth; overflow-x: hidden; }
-  body { -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-  .scroll-anchor { scroll-margin-top: 72px; }
+    const onWheel = (e) => {
+      if (prefersReducedMotion() || e.ctrlKey || e.defaultPrevented) return
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      if (e.target instanceof Element && e.target.closest('[data-no-smooth]')) return
 
-  @keyframes menuDrop {
-    from { opacity: 0; transform: translateY(-8px); max-height: 0; }
-    to   { opacity: 1; transform: translateY(0);    max-height: 360px; }
-  }
-  .nav-mobile-menu { overflow: hidden; animation: menuDrop .24s ease both; }
+      e.preventDefault()
+      let delta = e.deltaY
+      if (e.deltaMode === 1) delta *= 32
+      else if (e.deltaMode === 2) delta *= el.clientHeight
 
-  @keyframes testimonialScroll {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
+      const base = scrollState.animating ? scrollState.target : el.scrollTop
+      smoothScrollTo(el, base + delta, 1.1)
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('mousedown', stop)
+    el.addEventListener('touchstart', stop, { passive: true })
+    window.addEventListener('keydown', stop)
+
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('mousedown', stop)
+      el.removeEventListener('touchstart', stop)
+      window.removeEventListener('keydown', stop)
+      stop()
+      if (scrollRoot === el) scrollRoot = null
+    }
+  }, [ref])
+}
+
+function useSectionNav() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+
+  return (e, id) => {
+    e?.preventDefault()
+    if (pathname === '/') {
+      scrollToSection(id)
+    } else {
+      navigate('/', { state: { scrollTo: id } })
+    }
   }
-   .testimonial-marquee {
-    overflow: hidden;
-    padding: 26px 0;
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
-    mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
-  }
-  .testimonial-track {
-    display: flex;
-    width: max-content;
-    gap: 28px;
-    animation: testimonialScroll 50s linear infinite;
-  }
-  .testimonial-marquee:hover .testimonial-track,
-  .testimonial-marquee:active .testimonial-track {
-    animation-play-state: paused;
-  }
-  .testi-card-m { flex: 0 0 auto; }
-  @media (max-width: 640px) {
-    .testimonial-track { animation-duration: 24s; gap: 16px; }
-  }
-`
+}
+
+/* ==========================================================================
+   LAYOUT HELPERS + BACKGROUNDS
+========================================================================== */
 
 export const Wrap = ({ children, className = '' }) => (
   <div className={`max-w-[1500px] mx-auto w-full px-5 sm:px-10 lg:px-16 ${className}`}>
@@ -98,53 +152,99 @@ export const Wrap = ({ children, className = '' }) => (
 
 function Divider() {
   return (
-    <div className="h-px w-full bg-gradient-to-r from-transparent via-[#EAC7D7] to-transparent" />
+    <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NAVBAR FIX — landing page file (landingpage.jsx)
-//
-// STEP 1: import line badlo (useLocation add karna hai)
-//   import { useNavigate, Link, useLocation } from 'react-router-dom'
-//
-// STEP 2: purana `export function Navbar(...) { ... }` delete karke
-//         neeche wala `useSectionNav` + `Navbar` paste karo.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Landing page ('/') par normal #hash scroll chalta hai.
-// Kisi aur page (jaise /about) par ho to pehle '/' par jaate hain aur
-// landing page ko bata dete hain ki kis section tak scroll karna hai.
-function useSectionNav() {
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
-
-  return (e, id) => {
-    if (pathname === '/') return // landing page par hi ho -> default anchor scroll
-    e.preventDefault()
-    navigate('/', { state: { scrollTo: id } })
-  }
+function PageBackground() {
+  return <div className="pointer-events-none fixed inset-0 -z-10 bg-[#2a000f]" />
 }
 
+// Reference-image look: crimson spotlight on top, dark band in the middle,
+// red "floor" glow at the bottom and a soft vignette. Pixel based, so it
+// looks the same on short (hero) and tall (features / pricing) sections.
+function SectionBackdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      style={{
+        background:
+          'linear-gradient(to bottom, #3f0819 0%, #34051a 45%, #260009 80%, #2b000e 100%)',
+      }}
+    >
+      {/* 1. top spotlight */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 58% 520px at 50% 230px, rgba(146,26,54,0.95) 0%, rgba(120,20,44,0.75) 30%, rgba(80,10,30,0.4) 62%, transparent 100%)',
+        }}
+      />
+      {/* 2. dark band */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[440px]"
+        style={{
+          background:
+            'linear-gradient(to top, transparent 0px, rgba(28,0,8,0.6) 120px, rgba(28,0,8,0.95) 240px, rgba(28,0,8,0.6) 330px, transparent 440px)',
+        }}
+      />
+      {/* 3. floor glow */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[220px]"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 90px at 50% 130px, rgba(156,30,58,0.95) 0%, rgba(110,16,42,0.55) 50%, transparent 100%)',
+        }}
+      />
+      {/* 4. vignette */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 40%, transparent 45%, rgba(18,0,6,0.55) 100%)',
+        }}
+      />
+    </div>
+  )
+}
+
+/* ==========================================================================
+   NAVBAR
+========================================================================== */
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const navigate = useNavigate()
   const goToSection = useSectionNav()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const links = ['Features', 'Testimonials', 'Pricing', 'About']
+  const [active, setActive] = useState(null)
+  const links = ['Features', 'Testimonials', 'Pricing', 'About', 'Calculator']
 
+  const BEET = '#8B1E4D' // beetroot
+
+  // The page scrolls inside a container (not window), so listen there.
+  // Scroll ke saath active link bhi update hota hai.
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 10)
-    window.addEventListener('scroll', fn)
-    return () => window.removeEventListener('scroll', fn)
-  }, [])
+    const target = scrollContainerRef?.current || window
+    const sectionIds = ['features', 'testimonials', 'pricing']
 
-  const scrollToTop = () => {
-    scrollContainerRef?.current?.scrollTo({ top: 0, behavior: 'smooth' })
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
-    document.body.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    const read = () => {
+      const top = target === window ? window.scrollY : target.scrollTop
+      setScrolled(top > 10)
+
+      const rootTop = target === window ? 0 : target.getBoundingClientRect().top
+      let current = null
+      sectionIds.forEach((id) => {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top - rootTop <= 140) current = id
+      })
+      setActive(current)
+    }
+
+    read()
+    target.addEventListener('scroll', read, { passive: true })
+    return () => target.removeEventListener('scroll', read)
+  }, [scrollContainerRef])
 
   const handleLinkClick = (e, label) => {
     if (label === 'About') {
@@ -152,8 +252,16 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
       navigate('/about')
       return
     }
+    if (label === 'Calculator') {
+      e.preventDefault()
+      navigate('/pricing-calculator')
+      return
+    }
+    setActive(label.toLowerCase())
     goToSection(e, label.toLowerCase())
   }
+
+  const hrefFor = (l) => (l === 'About' || l === 'Calculator' ? '#' : `#${l.toLowerCase()}`)
 
   return (
     <nav
@@ -170,27 +278,34 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
           className="bg-transparent border-none p-0 m-0 cursor-pointer"
           aria-label="Go to home"
         >
-          <img
-            src={logo}
-            alt="TorchX Talent logo"
-            className="h-9 sm:h-11 w-auto object-contain block"
-          />
+          <img src={logo} alt="TorchX Talent logo" className="h-9 sm:h-11 w-auto object-contain block" />
         </button>
 
-        <div className="hidden lg:flex items-center gap-9">
-          {links.map(l => (
-            <a
-              key={l}
-              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
-              onClick={(e) => handleLinkClick(e, l)}
-              className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline transition-colors hover:text-[#7A004B]"
-            >
-              {l}
-            </a>
-          ))}
+        <div className="hidden lg:flex items-center h-full gap-2">
+          {links.map((l) => {
+            const isActive = active === l.toLowerCase()
+            return (
+              <a
+                key={l}
+                href={hrefFor(l)}
+                onClick={(e) => handleLinkClick(e, l)}
+                className="group relative flex h-full items-center px-5 text-[15px] font-ui font-medium no-underline transition-colors duration-300"
+                style={{ color: isActive ? BEET : '#5C5C5C' }}
+              >
+                <span className="transition-colors duration-300 group-hover:text-[#8B1E4D]">{l}</span>
+                {/* bottom bar - navbar ke edge par baithta hai */}
+                <span
+                  className={`pointer-events-none absolute bottom-0 left-1/2 h-[4px] w-[46px] -translate-x-1/2 rounded-t-full origin-center transition-transform duration-300 ease-out ${
+                    isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50'
+                  }`}
+                  style={{ background: BEET, boxShadow: `0 0 10px ${BEET}66` }}
+                />
+              </a>
+            )
+          })}
           <button
             onClick={onAccountClick}
-            className="bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full border-none cursor-pointer whitespace-nowrap shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
+            className="ml-4 bg-[#7A004B] text-white text-sm font-ui font-semibold px-7 py-2.5 rounded-full border-none cursor-pointer whitespace-nowrap shadow-[0_4px_18px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
           >
             {accountLabel}
           </button>
@@ -207,21 +322,28 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
 
       {open && (
         <div className="nav-mobile-menu bg-white border-t border-[#EAC7D7] px-5 sm:px-10 lg:px-16 py-5 flex flex-col gap-4.5">
-          {links.map(l => (
-            <a
-              key={l}
-              href={l === 'About' ? '#' : `#${l.toLowerCase()}`}
-              onClick={(e) => {
-                handleLinkClick(e, l)
-                setOpen(false)
-              }}
-              className="text-[15px] font-ui font-medium text-[#5C5C5C] no-underline"
-            >
-              {l}
-            </a>
-          ))}
+          {links.map((l) => {
+            const isActive = active === l.toLowerCase()
+            return (
+              <a
+                key={l}
+                href={hrefFor(l)}
+                onClick={(e) => {
+                  handleLinkClick(e, l)
+                  setOpen(false)
+                }}
+                className="text-[17px] font-ui font-medium no-underline"
+                style={{ color: isActive ? BEET : '#5C5C5C' }}
+              >
+                {l}
+              </a>
+            )
+          })}
           <button
-            onClick={() => { setOpen(false); onAccountClick() }}
+            onClick={() => {
+              setOpen(false)
+              onAccountClick()
+            }}
             className="bg-[#7A004B] text-white text-sm font-ui font-semibold py-3 rounded-full border-none cursor-pointer text-center"
           >
             {accountLabel}
@@ -232,329 +354,271 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   )
 }
 
-function AnalyticsCard() {
-  const P = '#7A004B'
+/* ==========================================================================
+   HERO
+========================================================================== */
+
+const freeForeverFeatures = [
+  { text: 'Geo Tag Attendance' },
+  { text: 'Face Attendance' },
+  { text: 'Monitoring of Employee Active & Idle Time' },
+  { text: 'Leave management' },
+  { text: 'Basic payroll' },
+  { text: 'Analytical and Digital Dashboard' },
+  { text: 'Announcements' },
+  { text: 'Team Documentation' },
+  { text: 'Reimbursement' },
+  { text: 'Employee Self-Service Portal' },
+  { text: 'Policy Management' },
+  { text: 'Grievance Management' },
+  { text: 'Email support (24/7)' },
+]
+
+// Shortest names first, longest last — long ones take the full row.
+const sortedFreeForeverFeatures = [...freeForeverFeatures].sort(
+  (a, b) => a.text.length - b.text.length
+)
+
+function PricingFeatureRow({ text, span }) {
   return (
-    <div className="bg-white rounded-2xl shadow-[0_12px_40px_rgba(115,0,66,0.18)] w-[clamp(140px,18vw,200px)] border-[1.5px] border-[#e0c8d8] flex flex-row overflow-hidden">
-      <div className="w-3 shrink-0" style={{ background: P }} />
-      <div className="flex-1 px-2.5 py-2.5 flex flex-col gap-1.5">
-        <div className="text-[8px] font-bold text-[#999] tracking-[1.5px] uppercase font-ui">Analytics</div>
-        <div className="border border-[#e0c8d8] rounded-[7px] px-[5px] pt-[5px] pb-[3px] bg-white">
-          <svg width="100%" height="44" viewBox="0 0 120 44">
-            <line x1="10" y1="2" x2="10" y2="38" stroke="#e0c8d8" strokeWidth="0.8" />
-            <line x1="10" y1="38" x2="118" y2="38" stroke="#e0c8d8" strokeWidth="0.8" />
-            <polyline points="10,34 22,28 32,30 42,18 52,24 62,12 72,18 82,10 92,14 102,7 112,11" fill="none" stroke="#f0d0e4" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-            <polyline points="10,34 22,28 32,30 42,18 52,24 62,12 72,18 82,10 92,14 102,7 112,11" fill="none" stroke={P} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-            <circle cx="102" cy="7" r="2.5" fill={P} />
-          </svg>
-        </div>
-        <div className="flex gap-1.5 items-stretch">
-          <div className="border border-[#e0c8d8] rounded-[7px] p-[5px] bg-white flex items-center justify-center shrink-0">
-            <svg width="34" height="34" viewBox="0 0 34 34">
-              <circle cx="17" cy="17" r="15" fill="#f0dcea" />
-              <path d="M17,17 L17,2 A15,15 0 1,1 4.5,24.5 Z" fill={P} />
-              <circle cx="17" cy="17" r="6" fill="white" />
-            </svg>
-          </div>
-          <div className="flex-1 border border-[#e0c8d8] rounded-[7px] px-[5px] py-1 bg-white">
-            <svg width="100%" height="34" viewBox="0 0 80 34">
-              <rect x="1" y="22" width="8" height="10" rx="2" fill="#f0dcea" />
-              <rect x="12" y="18" width="8" height="14" rx="2" fill="#f0dcea" />
-              <rect x="23" y="12" width="8" height="20" rx="2" fill={P} opacity=".6" />
-              <rect x="34" y="6" width="8" height="26" rx="2" fill={P} />
-              <rect x="45" y="10" width="8" height="22" rx="2" fill="#CD166E" />
-              <rect x="56" y="14" width="8" height="18" rx="2" fill={P} opacity=".8" />
-              <rect x="67" y="20" width="8" height="12" rx="2" fill="#f0dcea" />
-            </svg>
-          </div>
-        </div>
-        <div className="rounded-[6px] h-3.5 flex items-center px-2 gap-1" style={{ background: P }}>
-          {[55, 36, 22].map((w, i) => (
-            <div key={i} className="h-[3px] rounded-sm bg-white/25" style={{ width: `${w}px` }} />
-          ))}
-        </div>
-      </div>
+    <div className={`flex items-start gap-2 ${span ? 'sm:col-span-2' : ''}`}>
+      {/* GREEN tick — included feature */}
+      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600 shadow-[0_2px_6px_rgba(22,163,74,0.35)]">
+        <FiCheck strokeWidth={3} className="text-[9px] text-white" />
+      </span>
+      <span className="text-[13px] font-medium leading-snug text-[#4a2a3a]">{text}</span>
     </div>
   )
 }
 
-function TalkToExpertButton({ phone = '+917017415604', className }) {
-  const [copied, setCopied] = useState(false)
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-  const handleClick = (e) => {
-    if (!isMobile) {
-      e.preventDefault()
-      navigator.clipboard.writeText(phone)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
+function PricingHeroCard({ cardRef }) {
   return (
-     <a
-      href={`tel:${phone}`}
-      onClick={handleClick}
-      className={className}
-    >
-      {copied ? `Copied: ${phone}` : 'Talk To Expert'}
-    </a>
-  )
-}
+    <div ref={cardRef} className="relative mx-auto w-full max-w-[440px] lg:mx-0">
+      {/* OUTER SPOTLIGHT GLOW */}
+      <div className="pointer-events-none absolute -inset-3 z-0 rounded-[36px] bg-gradient-to-br from-[#ff9ec7]/50 via-[#c9184a]/35 to-[#ff7a45]/40 blur-2xl animate-pulse" />
 
-function DashboardMockup() {
-  const P = '#7A004B'
-  return (
-    <div className="bg-white relative overflow-visible">
-      <div className="relative px-3 pt-6 pb-6 sm:px-5 sm:pt-8 sm:pb-8 lg:px-6 lg:pt-10 lg:pb-14 flex items-center justify-center">
-        <div
-          className="absolute top-[10%] right-[8%] w-[62vw] h-[70vw] max-w-[420px] max-h-[480px] z-0"
-          style={{
-            background: 'radial-gradient(ellipse at 60% 40%, #f5d6e8 0%, #fdf0f7 60%, transparent 100%)',
-            borderRadius: '60% 40% 55% 45% / 50% 55% 45% 50%',
-          }}
-        />
-        <div className="relative z-[2] w-full max-w-full">
-          <div className="absolute -bottom-2.5 -left-2.5 scale-[0.62] sm:-bottom-4 sm:-left-4 sm:scale-[0.8] lg:-bottom-7 lg:-left-9 lg:scale-100 origin-bottom-left z-20">
-            <AnalyticsCard />
+      {/* MAIN CARD */}
+      <div className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-white bg-gradient-to-br from-white via-[#fffafc] to-[#fdeef5] px-6 py-7 sm:px-8 sm:py-8 shadow-[0_30px_90px_rgba(255,158,199,0.25),0_20px_60px_rgba(0,0,0,0.5)]">
+        {/* TOP PREMIUM EDGE */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px] bg-gradient-to-r from-[#ff7a45] via-[#c9184a] to-[#7A004B]" />
+
+        {/* AMBIENT CORNER GLOW */}
+        <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/25 blur-3xl" />
+
+        {/* OFFER RIBBON — TOP LEFT "NEW PACK" */}
+        <style>{`
+          @keyframes ribbonShine {
+            0%   { transform: translateX(-200%) skewX(-20deg); }
+            55%, 100% { transform: translateX(600%) skewX(-20deg); }
+          }
+          @keyframes ribbonTwinkle {
+            0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
+            50%      { opacity: .55; transform: scale(.75) rotate(20deg); }
+          }
+        `}</style>
+
+        <div className="pointer-events-none absolute left-0 top-0 z-30 h-[140px] w-[140px] overflow-hidden rounded-tl-[28px]">
+          <div className="absolute -left-[52px] top-[30px] w-[200px] -rotate-45 overflow-hidden border-y border-[#ffe3a3]/80 bg-gradient-to-r from-[#ff9a3c] via-[#ff4f7b] to-[#b8005f] py-[7px] shadow-[0_8px_18px_rgba(201,24,74,0.55),inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_0_rgba(0,0,0,0.15)]">
+            <span
+              className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-transparent via-white/70 to-transparent"
+              style={{ animation: 'ribbonShine 3s ease-in-out infinite' }}
+            />
+            <div className="relative flex items-center justify-center gap-1.5">
+              <HiOutlineSparkles
+                className="text-[13px] text-[#fff3c4]"
+                style={{ animation: 'ribbonTwinkle 1.6s ease-in-out infinite' }}
+              />
+              <span className="font-ui text-[12px] font-black uppercase tracking-[2px] text-[#730042] [text-shadow:0_1px_2px_rgba(90,0,51,0.2)]">
+  New Pack
+</span>
+              <HiOutlineSparkles
+                className="text-[13px] text-[#fff3c4]"
+                style={{ animation: 'ribbonTwinkle 1.6s ease-in-out infinite .8s' }}
+              />
+            </div>
           </div>
-          <svg viewBox="0 0 960 660" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"
-            className="w-full max-w-full h-auto rounded-[18px] block mx-auto overflow-hidden"
-            style={{ filter: 'drop-shadow(0 24px 64px rgba(115,0,66,0.20))' }}>
-            <rect width="960" height="660" rx="18" fill="#eef2f8"/>
-            <rect x="0" y="0" width="210" height="660" rx="18" fill="#ffffff"/>
-            <rect x="10" y="0" width="200" height="660" fill="#ffffff"/>
-            <image href={logo} x="22" y="20" width="118" height="40" preserveAspectRatio="xMidYMid meet"/>
-            <line x1="16" y1="70" x2="194" y2="70" stroke="#f0e8f0" strokeWidth="1"/>
-            <rect x="14" y="78" width="13" height="13" rx="2" fill={P} opacity="0.18"/>
-            <rect x="16" y="81" width="9" height="2" rx="1" fill={P}/>
-            <rect x="16" y="85" width="7" height="2" rx="1" fill={P}/>
-            <text x="33" y="90" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="600" fill="#111">Talent</text>
-            <polyline points="182,82 186,86 190,82" fill="none" stroke={P} strokeWidth="1.5" strokeLinecap="round"/>
-            <rect x="8" y="98" width="194" height="34" rx="8" fill={P}/>
-            <path d="M22,118 L27,113 L32,118 L32,125 L29,125 L29,121 L25,121 L25,125 L22,125 Z" fill="none" stroke="white" strokeWidth="1.4" strokeLinejoin="round"/>
-            <text x="40" y="120" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="600" fill="white">Dashboard</text>
-            <rect x="20" y="144" width="13" height="13" rx="2" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <rect x="23" y="141" width="2" height="5" rx="1" fill="#888"/><rect x="28.5" y="141" width="2" height="5" rx="1" fill="#888"/>
-            <line x1="23" y1="150" x2="31" y2="150" stroke="#888" strokeWidth="1"/>
-            <text x="40" y="155" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Leave</text>
-            <path d="M20,168 Q20,164 24,164 L31,164 Q35,164 35,168 L35,175 Q35,179 31,179 L26,179 L23,182 L23,179 Q20,179 20,175 Z" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <text x="40" y="176" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Announcement</text>
-            <rect x="20" y="190" width="13" height="13" rx="2" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <rect x="23" y="193" width="7" height="2" rx="1" fill="#888"/><rect x="23" y="198" width="5" height="2" rx="1" fill="#888"/>
-            <text x="40" y="201" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Organisation</text>
-            <path d="M21,213 L21,226 Q21,227.5 22.5,227.5 L32.5,227.5 Q34,227.5 34,226 L34,217.5 L30,213 Z" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <polyline points="30,213 30,217.5 34,217.5" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <text x="40" y="224" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">File</text>
-            <circle cx="27" cy="243" r="5" fill="none" stroke="#888" strokeWidth="1.5"/>
-            <circle cx="27" cy="243" r="2" fill="#888"/>
-            <text x="40" y="248" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="400" fill="#555">Settings</text>
-            <line x1="20"  y1="266"  x2="34" y2="266" stroke="#888" strokeWidth="1.5" strokeLinecap="round"/>
-            <polyline points="30,262 34,266 30,270" fill="none" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <text x="40" y="270" fontFamily="Instrument Sans,sans-serif"  fontSize="13" fontWeight="400" fill="#555" > Logout </text>
-
-            <text x="16" y="648" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="#ccc">Powered by TechTorch | © 2026</text>
-            <rect x="210" y="0" width="750" height="660" fill="#eef2f8"/>
-            <rect x="210" y="0" width="750" height="68" fill="#ffffff"/>
-            <text x="228" y="28" fontFamily="Sora,sans-serif" fontSize="19" fontWeight="700" fill="#111">Dashboard</text>
-            <text x="228" y="46" fontFamily="Instrument Sans,sans-serif" fontSize="11" fill="#888">Welcome back, Ashish · ENG01</text>
-            <rect x="790" y="14" width="70" height="26" rx="13" fill="#f4eef8"/>
-            <circle cx="803" cy="27" r="4" fill="none" stroke={P} strokeWidth="1.5"/>
-            <circle cx="803" cy="26" r="1.5" fill={P}/>
-            <path d="M803,30 L803,33" stroke={P} strokeWidth="1.5" strokeLinecap="round"/>
-            <text x="812" y="31" fontFamily="Instrument Sans,sans-serif" fontSize="9.5" fill="#555">Bareilly</text>
-            <path d="M868,18 Q868,13 873,13 Q878,13 878,18 L878,24 L881,27 L865,27 L868,24 Z" fill="none" stroke="#555" strokeWidth="1.5"/>
-            <path d="M871,27 Q871,30 873,30 Q875,30 875,27" fill="none" stroke="#555" strokeWidth="1.5"/>
-            <circle cx="879" cy="15" r="3" fill="#CD166E"/>
-            <circle cx="910" cy="27" r="18" fill={P}/>
-            <text x="910" y="32" fontFamily="Sora,sans-serif" fontSize="11" fontWeight="700" fill="white" textAnchor="middle">AG</text>
-            <line x1="210" y1="68" x2="960" y2="68" stroke="#e8e2ee" strokeWidth="1"/>
-            <rect x="224" y="80" width="712" height="58" rx="10" fill={P}/>
-            <circle cx="880" cy="82" r="55" fill="rgba(255,255,255,0.04)"/>
-            <circle cx="910" cy="118" r="42" fill="rgba(255,255,255,0.04)"/>
-            <text x="242" y="102" fontFamily="Instrument Sans,sans-serif" fontSize="9" fontWeight="600" fill="rgba(255,255,255,0.6)" letterSpacing="1.5">THURSDAY</text>
-            <text x="242" y="124" fontFamily="Sora,sans-serif" fontSize="22" fontWeight="700" fill="white">7 May 2026</text>
-            <rect x="856" y="92" width="68" height="30" rx="15" fill="white"/>
-            <text x="890" y="112" fontFamily="Instrument Sans,sans-serif" fontSize="10.5" fontWeight="600" fill={P} textAnchor="middle">Check In</text>
-            <rect x="224" y="149" width="196" height="3" rx="1.5" fill={P}/>
-            <rect x="224" y="152" width="196" height="156" rx="10" fill="white" stroke="#ede5f0" strokeWidth="1"/>
-            <text x="236" y="170" fontFamily="Instrument Sans,sans-serif" fontSize="9" fontWeight="600" fill="#999" letterSpacing="0.5">Employee</text>
-            <rect x="236" y="178" width="28" height="28" rx="7" fill={P}/>
-            <text x="250" y="197" fontFamily="Sora,sans-serif" fontSize="10" fontWeight="700" fill="white" textAnchor="middle">AG</text>
-            <text x="272" y="193" fontFamily="Sora,sans-serif" fontSize="12" fontWeight="700" fill="#111">Ashish gangwar</text>
-            <text x="272" y="206" fontFamily="Instrument Sans,sans-serif" fontSize="10" fill="#888">Sde</text>
-            <rect x="236" y="216" width="38" height="16" rx="8" fill="#f0e8f0"/>
-            <text x="255" y="228" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fontWeight="600" fill={P} textAnchor="middle">ENG01</text>
-            <rect x="280" y="216" width="36" height="16" rx="8" fill="#d4f5e9"/>
-            <text x="298" y="228" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fontWeight="600" fill="#1a7a4a" textAnchor="middle">Active</text>
-            <rect x="322" y="216" width="28" height="16" rx="8" fill="#e8f0ff"/>
-            <text x="336" y="228" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fontWeight="600" fill="#2a5fc4" textAnchor="middle">ENG</text>
-            <circle cx="240" cy="248" r="4" fill="#f0e8f0"/>
-            <text x="248" y="252" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#555">ashishgangwar009@gmail.com</text>
-            <circle cx="240" cy="264" r="4" fill="#f0e8f0"/>
-            <text x="248" y="268" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#555">+917017415604</text>
-            <rect x="236" y="278" width="80" height="14" rx="4" fill="#f9f0f5"/>
-            <text x="276" y="288" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fill={P} textAnchor="middle">View Profile →</text>
-            <rect x="428" y="149" width="162" height="3" rx="1.5" fill="#4a90d9"/>
-            <rect x="428" y="152" width="162" height="156" rx="10" fill="white" stroke="#ede5f0" strokeWidth="1"/>
-            <text x="440" y="170" fontFamily="Instrument Sans,sans-serif" fontSize="9" fontWeight="600" fill="#999" letterSpacing="0.5">Date of joining</text>
-            <circle cx="509" cy="213" r="30" fill="none" stroke="#f0e8f0" strokeWidth="4"/>
-            <circle cx="509" cy="213" r="30" fill="none" stroke={P} strokeWidth="4" strokeDasharray="6 182" strokeLinecap="round" transform="rotate(-90 509 213)"/>
-            <text x="509" y="210" fontFamily="Sora,sans-serif" fontSize="15" fontWeight="800" fill={P} textAnchor="middle">0.0</text>
-            <text x="509" y="224" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#aaa" textAnchor="middle">yrs</text>
-            <circle cx="479" cy="213" r="2.5" fill={P} opacity="0.3"/>
-            <circle cx="509" cy="183" r="2.5" fill="#4a90d9"/>
-            <text x="440" y="258" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#aaa" letterSpacing="0.5">JOINED ON</text>
-            <text x="440" y="270" fontFamily="Sora,sans-serif" fontSize="10.5" fontWeight="700" fill="#111">6 May 2026</text>
-            <text x="440" y="283" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#aaa" letterSpacing="0.5">EXPERIENCE</text>
-            <text x="440" y="294" fontFamily="Sora,sans-serif" fontSize="10" fontWeight="600" fill="#111">0 yrs 0 mo</text>
-            <text x="508" y="270" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fill="#aaa">NEXT MILESTONE</text>
-            <text x="508" y="284" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fontWeight="600" fill="#4a90d9">1yr — May 2027</text>
-            <rect x="440" y="298" width="134" height="3" rx="2" fill="#f0e8f0"/>
-            <rect x="440" y="298" width="3" height="3" rx="2" fill={P}/>
-            <rect x="598" y="149" width="168" height="3" rx="1.5" fill="#2ec27e"/>
-            <rect x="598" y="152" width="168" height="156" rx="10" fill="white" stroke="#ede5f0" strokeWidth="1"/>
-            <text x="610" y="170" fontFamily="Instrument Sans,sans-serif" fontSize="9" fontWeight="600" fill="#999" letterSpacing="0.5">Leave overview</text>
-            <text x="605" y="194" fontFamily="Sora,sans-serif" fontSize="20" fontWeight="800" fill="#2ec27e">15</text>
-            <text x="643" y="192" fontFamily="Instrument Sans,sans-serif" fontSize="10" fill="#555">EL remaining</text>
-            <text x="610" y="213" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="#888">Accrued this month:</text>
-            <text x="610" y="225" fontFamily="Sora,sans-serif" fontSize="9.5" fontWeight="700" fill="#111">1.25 days</text>
-            <rect x="610" y="235" width="56" height="4.5" rx="2.5" fill={P}/>
-            <rect x="671" y="235" width="44" height="4.5" rx="2.5" fill="#4a90d9"/>
-            <rect x="720" y="235" width="34" height="4.5" rx="2.5" fill="#f0a030"/>
-            <rect x="610" y="247" width="6" height="6" rx="1.5" fill={P}/>
-            <text x="620" y="254" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fill="#555">EL (15 left)</text>
-            <rect x="658" y="247" width="6" height="6" rx="1.5" fill="#4a90d9"/>
-            <text x="668" y="254" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fill="#555">SL (12 left)</text>
-            <rect x="720" y="247" width="6" height="6" rx="1.5" fill="#f0a030"/>
-            <text x="730" y="254" fontFamily="Instrument Sans,sans-serif" fontSize="7.5" fill="#555">PL (0)</text>
-            <line x1="610" y1="263" x2="756" y2="263" stroke="#f0e8f0" strokeWidth="1"/>
-            <text x="610" y="277" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#888">Balance as of today</text>
-            <text x="756" y="277" fontFamily="Sora,sans-serif" fontSize="10" fontWeight="700" fill={P} textAnchor="end">15.0</text>
-            <text x="610" y="292" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="#aaa">0 taken · 15 remaining</text>
-            <rect x="774" y="152" width="162" height="156" rx="10" fill={P}/>
-            <circle cx="890" cy="158" r="52" fill="rgba(255,255,255,0.05)"/>
-            <circle cx="920" cy="285" r="44" fill="rgba(255,255,255,0.04)"/>
-            <text x="786" y="170" fontFamily="Instrument Sans,sans-serif" fontSize="9" fontWeight="600" fill="rgba(255,255,255,0.6)" letterSpacing="0.5">Reporting manager</text>
-            <line x1="774" y1="176" x2="936" y2="176" stroke="rgba(255,255,255,0.15)" strokeWidth="1"/>
-            <circle cx="800" cy="203" r="15" fill="rgba(255,255,255,0.18)"/>
-            <text x="800" y="208" fontFamily="Sora,sans-serif" fontSize="10" fontWeight="700" fill="white" textAnchor="middle">AG</text>
-            <text x="820" y="199" fontFamily="Sora,sans-serif" fontSize="12" fontWeight="700" fill="white">Ashish gangwar</text>
-            <text x="820" y="213" fontFamily="Instrument Sans,sans-serif" fontSize="9.5" fill="rgba(255,255,255,0.6)">manager</text>
-            <line x1="786" y1="226" x2="928" y2="226" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-            <text x="786" y="240" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="rgba(255,255,255,0.5)">Manager ID</text>
-            <text x="928" y="240" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="rgba(255,255,255,0.4)" textAnchor="end">—</text>
-            <text x="786" y="254" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="rgba(255,255,255,0.5)">Work email</text>
-            <text x="786" y="266" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="rgba(255,255,255,0.85)">ashishgangwar009@gmail.com</text>
-            <text x="786" y="280" fontFamily="Instrument Sans,sans-serif" fontSize="8" fill="rgba(255,255,255,0.5)">Work phone</text>
-            <text x="786" y="294" fontFamily="Instrument Sans,sans-serif" fontSize="8.5" fill="rgba(255,255,255,0.85)">—</text>
-            <rect x="224" y="318" width="496" height="330" rx="10" fill="white" stroke="#ede5f0" strokeWidth="1"/>
-            <text x="240" y="340" fontFamily="Sora,sans-serif" fontSize="14" fontWeight="700" fill="#111">Attendance</text>
-            <rect x="618" y="327" width="64" height="26" rx="6" fill="#f4eef8"/>
-            <text x="636" y="344" fontFamily="Instrument Sans,sans-serif" fontSize="10" fill={P}>May</text>
-            <polyline points="651,337 655,342 659,337" fill="none" stroke={P} strokeWidth="1.5"/>
-            {['S','M','T','W','T','F','S'].map((d,i) => (
-              <text key={i} x={252+i*64} y="368" fontFamily="Instrument Sans,sans-serif" fontSize="10" fontWeight="600" fill="#ccc" textAnchor="middle">{d}</text>
-            ))}
-            <line x1="232" y1="374" x2="710" y2="374" stroke="#f5f0f5" strokeWidth="1"/>
-            {[{col:4,day:1},{col:5,day:2}].map(({col,day}) => (
-              <g key={day}>
-                <rect x={220+col*64} y="382" width="54" height="46" rx="8" fill="#fce8f0"/>
-                <text x={247+col*64} y="408" fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight="500" fill={P} textAnchor="middle">{day}</text>
-              </g>
-            ))}
-            {[3,4,5,6,7,8,9].map((day,i) => {
-              const isToday = day===7; const marked = [3,4,5,6].includes(day)
-              return (
-                <g key={day}>
-                  <rect x={220+i*64} y={436} width="54" height="46" rx="8" fill={marked?'#fce8f0':isToday?'#fffbe6':'white'} stroke={isToday?'#e6c030':'none'} strokeWidth={isToday?'2':'0'}/>
-                  <text x={247+i*64} y={462} fontFamily="Instrument Sans,sans-serif" fontSize="13" fontWeight={isToday?'700':'400'} fill={marked?P:isToday?'#b8860b':'#ccc'} textAnchor="middle">{day}</text>
-                </g>
-              )
-            })}
-            {[10,11,12,13,14,15,16].map((day,i) => (
-              <g key={day}><rect x={220+i*64} y={490} width="54" height="46" rx="8" fill="white"/><text x={247+i*64} y={516} fontFamily="Instrument Sans,sans-serif" fontSize="13" fill="#ccc" textAnchor="middle">{day}</text></g>
-            ))}
-            {[17,18,19,20,21,22,23].map((day,i) => (
-              <g key={day}><rect x={220+i*64} y={544} width="54" height="46" rx="8" fill="white"/><text x={247+i*64} y={570} fontFamily="Instrument Sans,sans-serif" fontSize="13" fill="#ccc" textAnchor="middle">{day}</text></g>
-            ))}
-            {[24,25,26,27,28,29,30].map((day,i) => (
-              <g key={day}><rect x={220+i*64} y={596} width="54" height="42" rx="8" fill="white"/><text x={247+i*64} y={621} fontFamily="Instrument Sans,sans-serif" fontSize="13" fill="#ccc" textAnchor="middle">{day}</text></g>
-            ))}
-            <rect x="728" y="318" width="208" height="330" rx="10" fill="white" stroke="#ede5f0" strokeWidth="1"/>
-            <text x="744" y="340" fontFamily="Sora,sans-serif" fontSize="14" fontWeight="700" fill="#111">Announcements</text>
-            <rect x="890" y="328" width="28" height="20" rx="5" fill="#fff3e0"/>
-            <text x="904" y="342" fontFamily="Sora,sans-serif" fontSize="11" fontWeight="700" fill="#f0a030" textAnchor="middle">0</text>
-            <line x1="728" y1="352" x2="936" y2="352" stroke="#f0e8f0" strokeWidth="1"/>
-            <text x="832" y="450" fontFamily="Instrument Sans,sans-serif" fontSize="11" fill="#ccc" textAnchor="middle">No announcements</text>
-            <image href={PlantImage} x="750" y="440" width="150" height="275" preserveAspectRatio="xMidYMid meet"/>
-          </svg>
         </div>
-      </div>
-    </div>
-  )
-}
 
-function Hero({ onOpenCalculator }) {
-  return (
-    <section className="bg-white overflow-hidden pt-20 pb-[72px]">
-      <Wrap>
-        <div className="grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] items-center gap-10 lg:gap-[52px] mt-5 lg:mt-0">
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-            className="max-w-[520px]"
-          >
-            <p className="font-ui font-semibold text-[#7A004B] tracking-[1px] uppercase text-[13px] mb-3">
-              TorchX Talent — HRMS Software
-            </p>
+        {/* CARD CONTENT */}
+        <div className="relative z-10">
+          <div className="relative flex items-center justify-end">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
+              ⚡ Free Forever
+            </span>
+          </div>
 
-            <h1 className="font-hero font-medium text-[#111] leading-[1.08] mb-5 text-[clamp(1.8rem,5vw,4rem)] tracking-[-1px]">
-              Manage Your Workforce
-              <br />
-              With Smart <span className="text-[#7A004B]">HR Solutions</span>
-            </h1>
+          <h3 className="relative mt-8 font-display text-[19px] font-bold leading-snug text-[#2A1120] sm:text-[21px]">
+            Great Start for Startup and Micro Teams
+          </h3>
 
-            <p className="font-hero font-normal text-[#555] leading-[1.75] mb-8 text-[clamp(0.9rem,1.8vw,1.1rem)] max-w-[480px]">
-              TorchX Talent is a complete Human Resource Management System (HRMS) that helps you optimize every stage of the employee lifecycle — from hiring to performance to payroll — with a robust and reliable platform.
-            </p>
+          <p className="relative mt-1.5 text-[13px] leading-relaxed text-[#8a6a7a]">
+            Everything a small team needs to get started ── at no cost.
+          </p>
 
-            <div className="flex flex-wrap gap-3.5">
-              <a
-                href="https://torchxsuite.com/signup"
-                className="inline-flex items-center gap-2 bg-[#7A004B] text-white text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full border-none cursor-pointer shadow-[0_8px_24px_rgba(122,0,75,0.25)] transition-all hover:bg-[#5a0033] hover:-translate-y-0.5"
-              >
-                Sign Up for Talent Account <FiArrowRight />
-              </a>
-              <a
-                href="tel:+917454098820"
-  className="inline-flex items-center gap-2 border-2 border-[#7A004B] text-[#7A004B] bg-transparent text-[15px] font-ui font-semibold px-7 py-3.5 rounded-full no-underline transition-all hover:bg-[#FDF4F8] hover:-translate-y-0.5"
->
-  Talk To Expert
-</a>
- <button
-              type="button"
-              onClick={onOpenCalculator}
-             className="inline-flex items-center gap-2 rounded-2xl border border-[#EAC7D7] bg-[#FDF4F8] px-4 py-3 text-left shadow-[0_5px_18px_rgba(122,0,75,.07)] transition hover:-translate-y-0.5 hover:border-[#c88ba8]"
-            >
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-[#7A004B] text-sm font-display font-extrabold text-white">₹</span>
-              <span>
-                <span className="block font-ui text-sm font-bold text-[#3c162a]">Calculate Your Plan</span>
-                <span className="block font-body text-xs text-[#7c6270]">Get an instant estimate for your team</span>
-              </span>
-              <FiArrowRight className="ml-2 text-[#7A004B]" />
-            </button>
+          {/* PRICE */}
+          <div className="relative mt-5 flex items-center justify-between">
+            <div className="flex items-baseline gap-1">
+              <span className="font-display text-[34px] font-extrabold text-[#7A004B]">₹0</span>
+              <span className="font-body text-[12px] text-[#a08494]">/user/month</span>
             </div>
 
-           
-          </motion.div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <FiLock size={11} />
+              100% Free Forever
+            </span>
+          </div>
 
-          <motion.div
-            variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-            transition={{ delay: 0.15 }}
-            className="w-full pb-2 sm:pb-3 lg:pb-9 overflow-visible"
+          {/* DIVIDER */}
+          <div className="relative my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7A004B]/25 to-transparent" />
+
+          {/* FEATURES */}
+          <div className="relative grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
+            {sortedFreeForeverFeatures.map((f) => (
+              <PricingFeatureRow key={f.text} text={f.text} span={f.text.length > 28} />
+            ))}
+          </div>
+
+          {/* CTA */}
+          <a
+            href="https://torchxsuite.com/signup"
+            className="relative mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#7A004B] to-[#A60062] py-3.5 font-ui text-sm font-bold text-white shadow-[0_10px_26px_rgba(122,0,75,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(122,0,75,0.5)]"
           >
-            <DashboardMockup />
+            Get Started Free <FiArrowRight />
+          </a>
+
+          <p className="relative mt-3 text-center text-[11px] text-[#a08494]">
+            ✓ No credit card required • Instant automated onboarding
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Hero({ onOpenCalculator, scrollContainerRef }) {
+  const reduceMotion = prefersReducedMotion()
+  const cardRef = useRef(null)
+  const sectionRef = useRef(null)
+
+  // Scroll-linked parallax on the card (uses the app's own scroll container)
+  useEffect(() => {
+    if (reduceMotion) return
+    const scroller = scrollContainerRef?.current
+    const section = sectionRef.current
+    const card = cardRef.current
+    if (!scroller || !section || !card) return
+
+    const onScroll = () => {
+      const rect = section.getBoundingClientRect()
+      const scrollerRect = scroller.getBoundingClientRect()
+      const progress = (scrollerRect.top - rect.top) / rect.height
+      const clamped = Math.max(-1, Math.min(1, progress))
+      gsap.to(card, { y: clamped * 40, duration: 0.6, ease: 'power3.out', overwrite: 'auto' })
+    }
+
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => scroller.removeEventListener('scroll', onScroll)
+  }, [reduceMotion, scrollContainerRef])
+
+  return (
+    <section
+      ref={sectionRef}
+      className="relative overflow-hidden bg-[#2a000f] pt-28 pb-0 lg:pt-24"
+    >
+      <SectionBackdrop />
+
+      <Wrap className="relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12 lg:gap-10">
+          {/* LEFT: copy */}
+          <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-7"
+            >
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-gradient-to-r from-white via-white to-[#fff4f9] px-4 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+                <span className="h-2 w-2 rounded-full bg-[#730042] shadow-[0_0_12px_rgba(115,0,66,0.5)]" />
+                <span className="text-[11px] font-semibold uppercase tracking-[1.5px] text-[#730042]">
+                  TorchX Talent
+                  <span className="mx-1.5 text-[#730042]/40">—</span>
+                  HRMS Software
+                </span>
+              </div>
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 22 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              className="relative max-w-[560px] font-hero font-medium leading-[1.15] tracking-[-1.5px] text-white text-[clamp(2rem,5vw,3.4rem)]"
+            >
+              Manage Your Workforce With
+              <br />
+              Smart HR{' '}
+              <span className="italic text-[#ffb0d0]">Solutions</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-6 max-w-[500px] font-hero text-[15px] leading-[1.75] text-white/70 sm:text-[16px] lg:text-[17px]"
+            >
+              TorchX Talent is a complete Human Resource Management System (HRMS) that helps you optimize every stage of the employee lifecycle — from hiring to performance to payroll — with a robust and reliable platform.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start"
+            >
+              <a
+                href="https://torchxsuite.com/signup"
+                className="group inline-flex items-center justify-center gap-2.5 rounded-xl bg-[#7A004B] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#93005c] hover:shadow-[0_12px_40px_rgba(122,0,75,0.5)]"
+              >
+                Start Free Trial
+                <FiArrowRight className="transition-transform duration-300 group-hover:translate-x-1" />
+              </a>
+
+              <a
+                href="tel:+917454098820"
+                className="group inline-flex items-center justify-center gap-2.5 rounded-xl border border-white/20 bg-white/[0.07] px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:bg-white/[0.12]"
+              >
+                Talk To Expert
+                <FiArrowRight className="text-white/50 transition-transform duration-300 group-hover:translate-x-1" />
+              </a>
+            </motion.div>
+
+            {onOpenCalculator && (
+              <motion.button
+                type="button"
+                onClick={onOpenCalculator}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.6 }}
+                className="group mt-5 flex items-center justify-center gap-2 rounded-full border border-[#ffb0d0]/25 bg-[#ffb0d0]/[0.08] px-4 py-2 text-[12px] font-medium text-[#ffb0d0] transition-all duration-300 hover:border-[#ffb0d0]/45 hover:bg-[#ffb0d0]/[0.15]"
+              >
+                Calculate Your Plan
+                <FiArrowRight size={14} className="transition-transform duration-300 group-hover:translate-x-1" />
+              </motion.button>
+            )}
+          </div>
+
+          {/* RIGHT: card */}
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <PricingHeroCard cardRef={cardRef} />
           </motion.div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="mt-16 lg:mt-20">
+          <Stats />
         </div>
       </Wrap>
     </section>
@@ -569,170 +633,38 @@ function Stats() {
     { icon: <FiStar size={22} />, num: '98%', label: 'Customer satisfaction' },
   ]
   return (
-    <section className="bg-white pt-0 pb-12">
-      <Wrap>
+    <motion.div
+      variants={fadeUp}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true }}
+      className="grid grid-cols-1 max-[480px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pb-16 lg:pb-20"
+    >
+      {stats.map((s, i) => (
         <motion.div
-          variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}
-          className="grid grid-cols-1 max-[480px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+          key={s.num}
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: i * 0.08 }}
+          viewport={{ once: true }}
+          className="bg-gradient-to-br from-white/[0.17] via-white/[0.10] to-white/[0.06] backdrop-blur-xl rounded-[18px] p-6 border border-white/25 shadow-[0_10px_30px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.25)] flex items-center gap-4 transition-all duration-300 hover:from-white/[0.24] hover:via-white/[0.14] hover:to-white/[0.08] hover:border-white/40 hover:-translate-y-1"
         >
-          {stats.map((s, i) => (
-            <motion.div
-              key={s.num}
-              initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: i * 0.08 }} viewport={{ once: true }}
-              className="bg-white rounded-[18px] p-6 border border-[#EAC7D7] shadow-[0_2px_12px_rgba(122,0,75,.06)] flex items-center gap-4 transition-all hover:shadow-[0_10px_32px_rgba(122,0,75,0.10)] hover:-translate-y-1"
-            >
-              <div className="w-13 h-13 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0 text-white">
-                {s.icon}
-              </div>
-              <div>
-                <div className="text-[28px] font-display font-extrabold text-[#7A004B] leading-[1.1]">{s.num}</div>
-                <div className="text-[13px] font-body font-semibold text-[#111] leading-[1.4] mt-0.5">{s.label}</div>
-              </div>
-            </motion.div>
-          ))}
+          <div className="w-13 h-13 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0 text-white shadow-[0_6px_16px_rgba(122,0,75,0.45)]">
+            {s.icon}
+          </div>
+          <div>
+            <div className="text-[28px] font-display font-extrabold text-[#ffb0d0] leading-[1.1]">{s.num}</div>
+            <div className="text-[13px] font-body font-semibold text-white leading-[1.4] mt-0.5">{s.label}</div>
+          </div>
         </motion.div>
-      </Wrap>
-    </section>
-  )
-}
-
-function MiniSidebar() {
-  const icons = [FiUser, FiMessageSquare, FiUsers, FiSettings, FiLogOut]
-  return (
-    <div className="w-11 bg-[#7A004B] rounded-l-xl flex flex-col items-center py-3.5 gap-4.5 shrink-0">
-      {icons.map((Icon, i) => (
-        <Icon key={i} className={i === 0 ? 'text-white text-[15px]' : 'text-white/45 text-[15px]'} />
       ))}
-    </div>
+    </motion.div>
   )
 }
 
-function CandidateList() {
-  const candidates = [
-    { name: 'Baibhav Gangwar', role: 'UI/UX Designer', pct: 96 },
-    { name: 'Ashish Gangwar', role: 'Full Stack Developer', pct: 92 },
-    { name: 'Pawan Kumar', role: 'Frontend Developer', pct: 89 },
-  ]
-  return (
-    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 overflow-hidden flex">
-      <MiniSidebar />
-      <div className="flex-1 px-3 pt-3.5 pb-4">
-        <div className="text-[9px] font-ui font-bold text-[#b98ba3] uppercase tracking-[0.8px] mb-2.5">
-          Top Matched Candidates
-        </div>
-        {candidates.map(c => (
-          <div key={c.name} className="flex items-center gap-2 mb-2 bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
-            <div className="w-7 h-7 rounded-full bg-[#7A004B]/[0.09] flex items-center justify-center shrink-0">
-              <FiUser className="text-[#7A004B] text-xs" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-ui font-bold text-[#111] whitespace-nowrap overflow-hidden text-ellipsis">{c.name}</div>
-              <div className="text-[8px] text-[#bbb] font-body">{c.role}</div>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="w-[42px] h-1 bg-[#e8e0ec] rounded overflow-hidden">
-                <div className="h-full bg-[#00b050] rounded" style={{ width: `${c.pct}%` }} />
-              </div>
-              <span className="text-[9px] font-bold text-[#00b050] font-ui">{c.pct}%</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PerformancePanel() {
-  const P = '#7A004B'
-  return (
-    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 px-3.5 pt-3.5 pb-3">
-      <div className="flex items-center gap-1.5 mb-3">
-        <div className="min-w-[80px]">
-          <div className="text-[9px] text-[#b98ba3] font-body mb-0.5">Avg Rating</div>
-          <div className="text-[30px] font-display font-extrabold text-[#111] leading-none mb-0.5">4.6</div>
-          <div className="text-[#7A004B] text-[13px] tracking-widest">★★★★★</div>
-        </div>
-        <div className="flex-1 h-[110px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <RechartsRadar data={radarData} margin={{ top: 6, right: 10, bottom: 6, left: 10 }}>
-              <PolarGrid stroke="#e8d0de" strokeWidth={0.8} />
-              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 7, fill: '#b98ba3', fontFamily: 'DM Sans, sans-serif' }} />
-              <Radar dataKey="value" name="Score" stroke={P} fill={P} fillOpacity={0.15} strokeWidth={1.8} dot={{ r: 3, fill: P, strokeWidth: 1.5, stroke: '#fff' }} />
-            </RechartsRadar>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="bg-white rounded-[10px] px-2.5 py-2 border border-[#EAC7D7]">
-        <div className="flex justify-between mb-1.5">
-          <span className="text-[10px] font-body text-[#5C5C5C] font-semibold">Goals Achieved</span>
-          <span className="text-[10px] font-ui font-bold text-[#7A004B]">82%</span>
-        </div>
-        <div className="w-full h-1.5 bg-[#e8d8e8] rounded-md">
-          <div className="w-[82%] h-full bg-[#7A004B] rounded-md" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PortalPanel() {
-  const quickActions = [
-    { icon: <FiUser />, label: 'My\nProfile' },
-    { icon: <FiBell />, label: 'Company\nNews' },
-    { icon: <FiFileText />, label: 'My\nDocs' },
-    { icon: <FiUsers />, label: 'Leave\nReqs' },
-  ]
-  return (
-    <div className="rounded-2xl bg-[#FAF6F8] border border-[#EAC7D7]/70 overflow-hidden flex">
-      <MiniSidebar />
-      <div className="flex-1 px-2.5 pt-3 pb-3.5">
-        <div className="text-[11px] font-display font-bold text-[#111] mb-2.5">Welcome back, Baibhav!</div>
-        <div className="grid grid-cols-2 gap-1.5 mb-2">
-          {quickActions.map(item => (
-            <div key={item.label} className="bg-white rounded-[10px] py-1.5 px-1.5 text-center flex flex-col items-center gap-1 border border-[#EAC7D7]">
-              <div className="text-[#7A004B] text-[15px]">{item.icon}</div>
-              <div className="text-[8px] font-ui text-[#7A004B] leading-[1.3] font-semibold whitespace-pre-line">{item.label}</div>
-            </div>
-          ))}
-        </div>
-        <div className="bg-white rounded-[10px] px-2.5 py-1.5 mb-1.5 border border-[#EAC7D7]">
-          <div className="text-[8px] text-[#b98ba3] font-body font-semibold mb-0.5">Upcoming Leave</div>
-          <div className="text-[10px] font-display font-bold text-[#111]">15 – 18 May 2024</div>
-        </div>
-        <div className="bg-white rounded-[10px] px-2.5 py-1.5 border border-[#EAC7D7]">
-          <div className="text-[8px] text-[#b98ba3] font-body font-semibold mb-1.5">Team Birthday 🎂</div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-6 rounded-full bg-[#7A004B] flex items-center justify-center shrink-0">
-              <FiUser className="text-white text-[11px]" />
-            </div>
-            <div>
-              <div className="text-[9px] font-display font-bold text-[#111]">Baibhav Gangwar</div>
-              <div className="text-[7.5px] text-[#bbb] font-body">May 05</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// FEATURES SECTION — replacement code
-//
-// 1) Add these icons to your existing 'react-icons/fi' import:
-//      FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
-//      FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
-//      FiKey, FiCode, FiCloud, FiUserCheck, FiGift
-//
-// 2) In your landing page file, delete everything from the comment
-//      "// Detailed bento-style grid of TorchX Talent features ..."
-//    down to the end of `function Features() { ... }`, and paste everything
-//    below in its place.
-//
-// Nothing else changes. `useState`, `motion`, `fadeUp`, `Wrap`, `FiCheck`,
-// `HiOutlineSparkles`, `BsGraphUp` and `BsPersonBadge` are already imported.
-// ─────────────────────────────────────────────────────────────────────────────
+/* ==========================================================================
+   FEATURES
+========================================================================== */
 
 const featureCategories = [
   { key: 'attendance', label: 'Attendance & Tracking' },
@@ -744,10 +676,7 @@ const featureCategories = [
   { key: 'enterprise', label: 'Enterprise' },
 ]
 
-// Every feature listed in the pricing plans + the original feature cards.
-// Only the first item is `featured` (larger highlighted card).
 const featureItems = [
-  // ── Hiring & Growth ──
   {
     cat: 'hiring',
     icon: HiOutlineSparkles,
@@ -759,38 +688,26 @@ const featureItems = [
   { cat: 'hiring', icon: FiSearch, title: 'Applicant Tracking', desc: 'Follow every candidate from application to offer.' },
   { cat: 'hiring', icon: BsGraphUp, title: 'Performance Management', desc: 'Goals, KPIs and continuous feedback in one place.' },
   { cat: 'hiring', icon: FiUserPlus, title: 'Onboarding & Offboarding', desc: 'Guided checklists for every first day and last day.' },
-
-  // ── Attendance & Tracking ──
   { cat: 'attendance', icon: FiMapPin, title: 'Geo Tag Attendance', desc: 'GPS-verified check-ins for every site and shift.' },
   { cat: 'attendance', icon: FiCamera, title: 'Face Attendance', desc: 'Contactless face recognition. No buddy punching.' },
   { cat: 'attendance', icon: FiNavigation, title: 'Live Map Tracking', desc: 'See field teams and visit routes in real time.' },
   { cat: 'attendance', icon: FiMonitor, title: 'Active & Idle Time', desc: 'Monitor active and idle time across your team.' },
   { cat: 'attendance', icon: FiClock, title: 'Timesheet', desc: 'Track working hours accurately for every employee.' },
-
-  // ── Leave & Payroll ──
   { cat: 'payroll', icon: FiCalendar, title: 'Leave Management', desc: 'Apply, approve and track balances in one click.' },
   { cat: 'payroll', icon: FiDollarSign, title: 'Basic Payroll', desc: 'Simple payslips and salary runs for small teams.' },
   { cat: 'payroll', icon: FiCreditCard, title: 'Advanced Payroll', desc: 'Payroll auto-synced with attendance and leave.' },
   { cat: 'payroll', icon: FiRepeat, title: 'Reimbursement & Expenses', desc: 'Submit expenses and get approvals in a few taps.' },
-
-  // ── Workplace ──
   { cat: 'workplace', icon: BsPersonBadge, title: 'Employee Self-Service', desc: 'Profiles, documents and requests, all in one place.' },
   { cat: 'workplace', icon: FiBell, title: 'Announcements', desc: 'Share company news with everyone instantly.' },
   { cat: 'workplace', icon: FiFolder, title: 'Team Documentation', desc: 'Keep team files and knowledge organised.' },
   { cat: 'workplace', icon: FiBookOpen, title: 'Policy Management', desc: 'Publish and update company policies centrally.' },
   { cat: 'workplace', icon: FiGitBranch, title: 'Custom Workflows', desc: 'Build approval flows that match your process.' },
   { cat: 'workplace', icon: FiAlertCircle, title: 'Grievance Management', desc: 'Raise, track and resolve employee concerns.' },
-
-  // ── Insights & Security ──
   { cat: 'insights', icon: FiBarChart2, title: 'Analytical Dashboard', desc: 'Live workforce metrics at a glance.' },
   { cat: 'insights', icon: FiPieChart, title: 'Reports & Analytics', desc: 'Exportable reports for smarter decisions.' },
   { cat: 'insights', icon: FiLock, title: 'Two-Factor Authentication', desc: 'Extra login protection for every account.' },
-
-  // ── Support ──
   { cat: 'support', icon: FiMail, title: 'Email Support 24/7', desc: 'Reach our team by email any time.' },
   { cat: 'support', icon: FiPhoneCall, title: 'Telephonic Support 24/7', desc: 'Talk to an expert whenever you need help.' },
-
-  // ── Enterprise ──
   { cat: 'enterprise', icon: FiKey, title: 'Single Sign-On', desc: 'One secure login across your company tools.' },
   { cat: 'enterprise', icon: FiCode, title: 'API Access', desc: 'Connect TorchX Talent to your own systems.' },
   { cat: 'enterprise', icon: FiLink, title: 'Custom Integrations', desc: 'Integrations built around your tech stack.' },
@@ -799,7 +716,6 @@ const featureItems = [
   { cat: 'enterprise', icon: FiGift, title: 'Free Smartphone Gift Hamper', desc: 'A welcome gift that comes with Enterprise.' },
 ]
 
-// light stagger so 30 cards ease in without feeling slow
 const gridVariants = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } }
 const itemVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -809,28 +725,47 @@ const itemVariants = {
 function FeatureCard({ f, tagLabel, showTag }) {
   const Icon = f.icon
 
-  // Large highlighted card
   if (f.featured) {
     return (
       <motion.div variants={itemVariants} className="sm:col-span-2">
-        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B] via-[#5a0033] to-[#3d0022] shadow-[0_20px_50px_rgba(122,0,75,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_64px_rgba(122,0,75,0.40)]">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B]/70 via-[#5a0033]/60 to-[#3d0022]/70 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] transition-all duration-500 ease-out hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_28px_70px_rgba(122,0,75,0.30),0_20px_60px_rgba(0,0,0,0.35)]">
+          {/* hover atmosphere */}
+          <div className="pointer-events-none absolute inset-0 z-0 rounded-[20px] bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_58%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+          {/* glass highlight */}
+          <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[19px] bg-gradient-to-br from-white/[0.10] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+          {/* light sweep */}
+          <div className="pointer-events-none absolute -left-[120%] top-0 z-20 h-full w-[70%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent blur-[10px] transition-transform duration-[900ms] ease-out group-hover:translate-x-[330%]" />
+          {/* top edge */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70 transition-all duration-500 group-hover:via-white/80" />
+          {/* corner glow */}
+          <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/10 blur-3xl opacity-70 transition-all duration-700 group-hover:bg-[#ffb0d0]/20 group-hover:scale-125" />
+
+          <div className="relative z-30 flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/50 group-hover:shadow-[0_6px_22px_rgba(255,255,255,0.20)]">
               <Icon className="text-[22px]" />
             </div>
-            <span className="text-[10px] font-ui font-bold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-white/15">
+            <span className="text-[10px] font-ui font-bold uppercase tracking-[1px] px-2.5 py-1 rounded-full bg-white/15 border border-white/10 transition-all duration-500 group-hover:bg-white/15 group-hover:border-white/25 group-hover:text-white">
               {tagLabel}
             </span>
           </div>
-          <div className="relative">
-            <h3 className="font-display font-extrabold text-xl sm:text-2xl leading-snug tracking-tight">{f.title}</h3>
-            <p className="font-body text-[13px] sm:text-[14px] leading-[1.6] text-white/80 mt-2">{f.desc}</p>
+
+          <div className="relative z-30">
+            <h3 className="font-display font-extrabold text-xl sm:text-2xl leading-snug tracking-tight transition-transform duration-500 group-hover:translate-x-[2px]">
+              {f.title}
+            </h3>
+            <p className="font-body text-[13px] sm:text-[14px] leading-[1.6] text-white/80 mt-2 transition-colors duration-500 group-hover:text-white/90">
+              {f.desc}
+            </p>
           </div>
-          <ul className="relative flex flex-wrap gap-x-5 gap-y-1.5 mt-auto">
-            {f.highlights.map(h => (
-              <li key={h} className="flex items-center gap-2 text-[12px] sm:text-[12.5px] font-body text-white/85">
-                <FiCheck className="shrink-0 text-[13px] text-white" />
+
+          <ul className="relative z-30 flex flex-wrap gap-x-5 gap-y-1.5 mt-auto">
+            {f.highlights.map((h) => (
+              <li
+                key={h}
+                className="flex items-center gap-2 text-[12px] sm:text-[12.5px] font-body text-white/85 transition-all duration-500 group-hover:text-white"
+              >
+                {/* GREEN tick — dark background, so green-400 */}
+                <FiCheck strokeWidth={3} className="shrink-0 text-[13px] text-green-400 transition-transform duration-500 group-hover:scale-110" />
                 {h}
               </li>
             ))}
@@ -840,23 +775,34 @@ function FeatureCard({ f, tagLabel, showTag }) {
     )
   }
 
-  // Compact card: icon beside text on mobile, stacked on sm+
   return (
     <motion.div variants={itemVariants}>
-      <div className="group relative h-full overflow-hidden rounded-2xl bg-white border border-[#EAC7D7] p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_2px_10px_rgba(122,0,75,0.05)] transition-all duration-300 hover:-translate-y-1 hover:border-[#c88ba8] hover:shadow-[0_14px_34px_rgba(122,0,75,0.14)]">
-        <div className="flex items-center justify-between gap-2 shrink-0 sm:w-full">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#7A004B]/[0.09] text-[#7A004B] flex items-center justify-center shrink-0 transition-colors duration-300 group-hover:bg-[#7A004B] group-hover:text-white">
+      <div className="group relative h-full overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.15] via-white/[0.09] to-white/[0.05] backdrop-blur-xl border border-white/20 p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_8px_24px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.22)] transition-all duration-500 ease-out hover:-translate-y-1 hover:from-white/[0.22] hover:via-white/[0.13] hover:to-white/[0.07] hover:border-white/35 hover:shadow-[0_20px_48px_rgba(122,0,75,0.25),0_12px_35px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]">
+        <div className="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_65%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[15px] bg-gradient-to-br from-[#ffb0d0]/[0.07] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute -left-[130%] top-0 z-20 h-full w-[75%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.13] to-transparent blur-[9px] transition-transform duration-[850ms] ease-out group-hover:translate-x-[330%]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent transition-all duration-500 group-hover:via-white/80" />
+        <div className="pointer-events-none absolute -right-12 -top-12 z-0 h-32 w-32 rounded-full bg-[#ff9ec7]/[0.06] blur-3xl opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
+
+        <div className="relative z-30 flex items-center justify-between gap-2 shrink-0 sm:w-full">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.18] text-white flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/40 group-hover:shadow-[0_6px_20px_rgba(255,255,255,0.18)]">
             <Icon className="text-[18px] sm:text-[20px]" />
           </div>
+
           {showTag && (
-            <span className="hidden sm:inline-block max-w-[62%] truncate text-[9px] font-ui font-bold uppercase tracking-[0.8px] px-2 py-0.5 rounded-full bg-[#7A004B]/[0.08] text-[#7A004B]">
+            <span className="hidden sm:inline-block max-w-[62%] truncate text-[9px] font-ui font-bold uppercase tracking-[0.8px] px-2 py-0.5 rounded-full bg-white/10 text-white/70 border border-white/5 transition-all duration-500 group-hover:bg-white/15 group-hover:text-white group-hover:border-white/20">
               {tagLabel}
             </span>
           )}
         </div>
-        <div className="min-w-0">
-          <h3 className="font-display font-bold text-[15px] sm:text-base leading-snug text-[#111]">{f.title}</h3>
-          <p className="font-body text-[12.5px] sm:text-[13px] leading-relaxed text-[#5C5C5C] mt-1">{f.desc}</p>
+
+        <div className="relative z-30 min-w-0">
+          <h3 className="font-display font-bold text-[15px] sm:text-base leading-snug text-white transition-transform duration-500 group-hover:translate-x-[2px]">
+            {f.title}
+          </h3>
+          <p className="font-body text-[12.5px] sm:text-[13px] leading-relaxed text-white/70 mt-1 transition-colors duration-500 group-hover:text-white/85">
+            {f.desc}
+          </p>
         </div>
       </div>
     </motion.div>
@@ -870,18 +816,17 @@ function FeatureJourney() {
     acc[f.cat] = (acc[f.cat] || 0) + 1
     return acc
   }, {})
-  const labelOf = Object.fromEntries(featureCategories.map(c => [c.key, c.label]))
+  const labelOf = Object.fromEntries(featureCategories.map((c) => [c.key, c.label]))
   const chips = [
     { key: 'all', label: 'All Features', count: featureItems.length },
-    ...featureCategories.map(c => ({ ...c, count: counts[c.key] || 0 })),
+    ...featureCategories.map((c) => ({ ...c, count: counts[c.key] || 0 })),
   ]
-  const visible = active === 'all' ? featureItems : featureItems.filter(f => f.cat === active)
+  const visible = active === 'all' ? featureItems : featureItems.filter((f) => f.cat === active)
 
   return (
     <>
-      {/* Category filter — scrolls sideways on mobile, wraps and centers on larger screens */}
       <div className="flex gap-2 overflow-x-auto sm:flex-wrap sm:justify-center pb-2 mb-8 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {chips.map(c => {
+        {chips.map((c) => {
           const isActive = active === c.key
           return (
             <button
@@ -908,7 +853,6 @@ function FeatureJourney() {
         })}
       </div>
 
-      {/* key={active} remounts the grid so the entrance animation replays on every filter change */}
       <motion.div
         key={active}
         variants={gridVariants}
@@ -917,13 +861,8 @@ function FeatureJourney() {
         viewport={{ once: true, amount: 0.05 }}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-3.5 sm:gap-5"
       >
-        {visible.map(f => (
-          <FeatureCard
-            key={f.title}
-            f={f}
-            tagLabel={labelOf[f.cat]}
-            showTag={active === 'all'}
-          />
+        {visible.map((f) => (
+          <FeatureCard key={f.title} f={f} tagLabel={labelOf[f.cat]} showTag={active === 'all'} />
         ))}
       </motion.div>
     </>
@@ -932,14 +871,17 @@ function FeatureJourney() {
 
 function Features() {
   return (
-    <section id="features" className="scroll-anchor bg-[#F8F5F7] font-body pt-8 pb-12">
-      <Wrap>
+    <section id="features" className="scroll-anchor relative overflow-hidden font-body pt-10 pb-28">
+      <SectionBackdrop />
+      <Wrap className="relative z-10">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-10 sm:mb-12">
-            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
-              Powerful <span className="text-[#7A004B]">Features</span><br />Built for <span className="text-[#7A004B]">Modern</span> Teams
+            <h2 className="font-hero font-medium text-white leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
+              Powerful <span className="text-[#ffb0d0]">Features</span>
+              <br />
+              Built for <span className="text-[#ffb0d0]">Modern</span> Teams
             </h2>
-            <p className="text-lg sm:text-xl text-[#555] leading-relaxed max-w-[700px] mx-auto font-body">
+            <p className="text-lg sm:text-xl text-white/60 leading-relaxed max-w-[700px] mx-auto font-body">
               Everything TorchX Talent offers to help you hire smarter, evaluate better, and empower your employees.
             </p>
           </div>
@@ -951,13 +893,12 @@ function Features() {
   )
 }
 
-// Replace the existing `function Pricing() { ... }` in your landing page file with this.
-// It uses the same imports/helpers that already exist in that file:
-// useState, motion, fadeUp, Wrap, FiCheck, FiX, FiHardDrive, FiShield, FiLink,
-// FiActivity, FiBookOpen, HiOutlineSparkles
+/* ==========================================================================
+   PRICING
+========================================================================== */
 
 function Pricing() {
-  const [billing, setBilling] = useState('monthly') // 'monthly' | 'yearly'
+  const [billing, setBilling] = useState('monthly')
 
   const plans = [
     {
@@ -968,7 +909,7 @@ function Pricing() {
       yearlyPrice: 0,
       features: [
         'Geo Tag Attendance',
-        'Face Attendence',
+        'Face Attendance',
         'Monitoring of Employee Active and Idle Time',
         'Leave management',
         'Basic payroll',
@@ -981,26 +922,26 @@ function Pricing() {
         'Grievance Management',
         'Email support (24/7)',
       ],
-      crossFeatures: []
+      crossFeatures: [],
     },
     {
       name: 'Basic',
       desc: 'Perfect for small teams getting started',
       inherits: null,
       monthlyPrice: 39,
-      yearlyPrice: Math.round(39 * 12 * 0.83), // 17% off on annual total
-      features: ['Geo Tag Attendance','Face Attendence', 'Monitoring of Employee Active and Idle Time','Leave management','Basic payroll','Analytical and Digital Dashboard','Announcements','Team Documentation','Employee Self-Service Portal','Policy Management','Reimbursement','Grievance Management','Email support (24/7)', 'Live Map Tracking','Performance Management','Timesheet','Custom Workflow','Recruitment Management','Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking','Performance Management','Recruitment Management','Timesheet','Custom Workflow','Telephonic Support (24/7)'] // features listed here get a cross instead of a tick
+      yearlyPrice: Math.round(39 * 12 * 0.83),
+      features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management', 'Telephonic Support (24/7)'],
+      crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
     },
     {
       name: 'Advance',
       desc: 'For growing businesses that need more',
       inherits: 'Everything in Basic +',
       monthlyPrice: 99,
-      yearlyPrice: Math.round(99 * 12 * 0.83), // 17% off on annual total
+      yearlyPrice: Math.round(99 * 12 * 0.83),
       popular: true,
-      features: ['Live Map Tracking','Recruitment / Applicant tracking','Face Attendence','Performance management','Integrated Advanced Payroll','Timesheet','Two-factor authentication','Custom workflow','Reports & analytics','Employee Self-Service Portal','Telephonic support (24/7)'],
-      crossFeatures: []
+      features: ['Live Map Tracking', 'Recruitment / Applicant tracking', 'Face Attendance', 'Performance management', 'Integrated Advanced Payroll', 'Timesheet', 'Two-factor authentication', 'Custom workflow', 'Reports & analytics', 'Employee Self-Service Portal', 'Telephonic support (24/7)'],
+      crossFeatures: [],
     },
     {
       name: 'Enterprise',
@@ -1009,16 +950,16 @@ function Pricing() {
       monthlyPrice: null,
       yearlyPrice: null,
       features: [
-        'Free Smartphone gifthamper',
-        'Face Attendence',
+        'Free Smartphone gift hamper',
+        'Face Attendance',
         'Custom Integrations',
         'Single Sign-On',
         'API access',
         'On-premises/ Private cloud hosting',
         'Dedicated account manager',
       ],
-      crossFeatures: []
-    }
+      crossFeatures: [],
+    },
   ]
 
   const storage = [
@@ -1036,18 +977,20 @@ function Pricing() {
   ]
 
   return (
-    <section id="pricing" className="scroll-anchor bg-white pt-8 pb-9">
-      <Wrap>
+    <section id="pricing" className="scroll-anchor relative overflow-hidden pt-10 pb-28">
+      <SectionBackdrop />
+      <Wrap className="relative z-10">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-6">
-            <h2 className="font-hero font-medium text-[#111] mb-4 text-[clamp(28px,3.2vw,42px)]">
-              Simple, Transparent <span className="text-[#7A004B]">Pricing</span><br />That Grows With You
+            <h2 className="font-hero font-medium text-white mb-4 text-[clamp(28px,3.2vw,42px)]">
+              Simple, Transparent <span className="text-[#ffb0d0]">Pricing</span>
+              <br />
+              That Grows With You
             </h2>
-            <p className="text-lg font-body text-[#5C5C5C] max-w-[560px] mx-auto leading-relaxed mb-5">
+            <p className="text-lg font-body text-white/60 max-w-[560px] mx-auto leading-relaxed mb-5">
               Choose the perfect TorchX Talent plan for your team. Upgrade or downgrade anytime as your needs change.
             </p>
 
-            {/* Monthly / Yearly Toggle */}
             <div className="inline-flex items-center gap-3 bg-[#FDF4F8] border border-[#EAC7D7] rounded-full px-3 py-2">
               <span className={`text-sm font-ui font-semibold px-2 ${billing === 'monthly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
                 Monthly
@@ -1067,10 +1010,8 @@ function Pricing() {
               <span className={`text-sm font-ui font-semibold px-2 flex items-center gap-1.5 ${billing === 'yearly' ? 'text-[#111]' : 'text-[#aaa]'}`}>
                 Yearly
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-opacity duration-300 ${
-                    billing === 'yearly'
-                      ? 'bg-[#7A004B] text-white opacity-100'
-                      : 'bg-[#7A004B] text-white opacity-40'
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-opacity duration-300 bg-[#7A004B] text-white ${
+                    billing === 'yearly' ? 'opacity-100' : 'opacity-40'
                   }`}
                 >
                   Save 17%
@@ -1079,13 +1020,8 @@ function Pricing() {
             </div>
           </div>
 
-          {/* Responsive plan grid:
-              mobile  (<768px)   -> 1 column
-              tablet  (768-1279) -> 2 x 2
-              desktop (>=1280px) -> 4 in one row
-              items-stretch + h-full on each card keeps all four the same height. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6">
-            {plans.map(p => {
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-5 items-stretch mb-6 pt-4">
+            {plans.map((p) => {
               const price = billing === 'yearly' ? p.yearlyPrice : p.monthlyPrice
               const suffix = billing === 'yearly' ? '/user/year' : '/user/month'
               return (
@@ -1097,7 +1033,9 @@ function Pricing() {
                 >
                   {p.popular && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[2]">
-                      <span className="bg-[#7A004B] text-white text-[11px] font-ui font-bold px-5 py-1.5 rounded-full whitespace-nowrap tracking-wide">Most Popular</span>
+                      <span className="bg-[#7A004B] text-white text-[11px] font-ui font-bold px-5 py-1.5 rounded-full whitespace-nowrap tracking-wide">
+                        Most Popular
+                      </span>
                     </div>
                   )}
                   <div>
@@ -1109,23 +1047,21 @@ function Pricing() {
                       <span className="text-[34px] sm:text-[38px] xl:text-[34px] font-display font-extrabold text-[#111] leading-tight">
                         {price !== null ? `₹${price}` : 'Custom'}
                       </span>
-                      {price !== null && (
-                        <span className="text-sm font-body text-[#999]">{suffix}</span>
-                      )}
+                      {price !== null && <span className="text-sm font-body text-[#999]">{suffix}</span>}
                     </div>
                     {p.inherits && (
-                      <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">
-                        {p.inherits}
-                      </div>
+                      <div className="text-[15px] font-display font-extrabold text-[#7A004B] mt-1.5">{p.inherits}</div>
                     )}
                   </div>
                   <ul className="list-none p-0 m-0 flex flex-col gap-2.5 flex-1">
-                    {p.features.map(f => (
+                    {p.features.map((f) => (
                       <li key={f} className="flex items-start gap-2.5 text-[13px] font-body text-[#5C5C5C]">
                         {p.crossFeatures?.includes(f) ? (
-                          <FiX className="text-[#7A004B] shrink-0 mt-0.5" />
+                          /* RED cross — not included in this plan */
+                          <FiX strokeWidth={3} className="text-red-500 shrink-0 mt-0.5" />
                         ) : (
-                          <FiCheck className="text-[#7A004B] shrink-0 mt-0.5" />
+                          /* GREEN tick — included in this plan */
+                          <FiCheck strokeWidth={3} className="text-green-600 shrink-0 mt-0.5" />
                         )}
                         {f}
                       </li>
@@ -1142,31 +1078,31 @@ function Pricing() {
             })}
           </div>
 
-          {/* Storage guidance:
-              mobile  -> title on top, 2 x 2 storage tiles
-              tablet  -> title on top, 4 tiles in one row
-              desktop -> title + 4 tiles in one row */}
           <div className="bg-[#FDF4F8] rounded-[20px] px-5 sm:px-8 py-6 mb-6 border-2 border-[#7A004B]">
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] gap-x-3 gap-y-6 sm:gap-4 items-center">
               <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-center gap-2.5">
                 <FiHardDrive className="text-[#7A004B] text-[22px] shrink-0" />
                 <div>
                   <div className="text-[13px] font-display font-bold text-[#111]">Storage Guidance</div>
-                  <div className="text-[11px] font-body text-[#aaa] leading-snug">Finance documents, invoices, receipts, ledgers grow fast.</div>
+                  <div className="text-[11px] font-body text-[#aaa] leading-snug">
+                    Finance documents, invoices, receipts, ledgers grow fast.
+                  </div>
                 </div>
               </div>
-              {storage.map(s => (
+              {storage.map((s) => (
                 <div key={s.label} className="text-center">
                   <div className="text-2xl font-display font-extrabold text-[#111]">{s.val}</div>
                   <div className="text-[10px] text-[#aaa] font-body mb-1">Per company</div>
-                  <span className="inline-block whitespace-nowrap text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">{s.label}</span>
+                  <span className="inline-block whitespace-nowrap text-[10px] bg-white text-[#7A004B] font-bold px-3.5 py-0.5 rounded-full border border-[#EAC7D7] font-ui">
+                    {s.label}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {badges.map(b => (
+            {badges.map((b) => (
               <div key={b.label} className="flex items-start gap-3 px-4.5 py-4 bg-[#FDF4F8] rounded-2xl border border-[#EAC7D7]">
                 <div className="text-[#7A004B] shrink-0 mt-0.5">{b.icon}</div>
                 <div>
@@ -1184,7 +1120,9 @@ function Pricing() {
               </div>
               <div>
                 <div className="text-sm font-display font-bold text-[#111]">Not sure which plan is right for you?</div>
-                <div className="text-xs font-body text-[#aaa]">Our experts can help you choose the perfect plan based on your requirements.</div>
+                <div className="text-xs font-body text-[#aaa]">
+                  Our experts can help you choose the perfect plan based on your requirements.
+                </div>
               </div>
             </div>
             <a
@@ -1200,8 +1138,6 @@ function Pricing() {
   )
 }
 
-
-
 function Testimonials() {
   const testimonials = [
     { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
@@ -1211,42 +1147,62 @@ function Testimonials() {
     { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', initials: 'MP' },
   ]
 
-  // duplicated once so the CSS marquee loop is seamless
   const loopTestimonials = [...testimonials, ...testimonials]
 
   return (
-    <section id="testimonials" className="scroll-anchor bg-[#F6EDF2] font-body pt-8 pb-10">
-      <Wrap>
+    <section id="testimonials" className="scroll-anchor relative overflow-hidden font-body pt-10 pb-28">
+      <SectionBackdrop />
+
+      {/* Left/right blur (fade) effect hatane ke liye override */}
+      <style>{`
+        .testimonial-marquee,
+        .testimonial-track {
+          -webkit-mask-image: none !important;
+          mask-image: none !important;
+        }
+        .testimonial-marquee::before,
+        .testimonial-marquee::after,
+        .testimonial-track::before,
+        .testimonial-track::after {
+          content: none !important;
+          display: none !important;
+        }
+      `}</style>
+
+      <Wrap className="relative z-10">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-16">
-            <h2 className="font-hero font-medium text-[#111] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
-              Loved by <span className="text-[#7A004B]">Teams</span>, Trusted by <span className="text-[#7A004B]">Leaders</span>
+            <h2 className="font-hero font-medium text-white leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
+              Loved by <span className="text-[#ffb0d0]">Teams</span>, Trusted by <span className="text-[#ffb0d0]">Leaders</span>
             </h2>
-            <p className="text-lg text-[#555] max-w-[440px] mx-auto leading-relaxed">
+            <p className="text-lg text-white/60 max-w-[440px] mx-auto leading-relaxed">
               See how organizations like yours are using TorchX Talent to streamline HR and achieve more every day.
             </p>
           </div>
         </motion.div>
 
-        <div className="testimonial-marquee mb-12 -mx-5 sm:-mx-10 lg:-mx-16 px-5 sm:px-10 lg:px-16">
+        <div
+          className="testimonial-marquee mb-12 -mx-5 sm:-mx-10 lg:-mx-16 px-5 sm:px-10 lg:px-16"
+          style={{ WebkitMaskImage: 'none', maskImage: 'none' }}
+        >
           <div className="testimonial-track">
             {loopTestimonials.map((t, i) => (
               <div
                 key={`${t.name}-${i}`}
                 className="testi-card-m w-[280px] sm:w-[320px] md:w-[340px] bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
               >
-               <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
-<p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-4">{t.quote}</p>
-<div className="border-t border-dotted border-[#c88ba8] mb-4" />
-<div className="flex items-center gap-2.5">
-  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
-    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
-  </div>
-  <div className="flex-1 min-w-0">
-    <div className="text-[13px] font-display font-bold text-[#7A004B] truncate">{t.name}</div>
-    <div className="text-[11px] text-[#777] mt-0.5 truncate">{t.role}</div>
-  </div>
-</div>
+                <RiDoubleQuotesL className="text-4xl text-[#7A004B] mb-3.5" />
+                <p className="text-[13px] text-[#333] leading-[1.75] flex-1 mb-4">{t.quote}</p>
+                <div className="border-t border-dotted border-[#c88ba8] mb-4" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#740042] to-[#740022] flex items-center justify-center shrink-0 shadow-[0_4px_10px_rgba(122,0,75,0.25)]">
+                    <span className="text-white text-xs font-display font-bold">{t.initials}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-display font-bold text-[#7A004B] truncate">{t.name}</div>
+                    <div className="text-[11px] text-[#777] mt-0.5 truncate">{t.role}</div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1259,7 +1215,9 @@ function Testimonials() {
                 <HiOutlineSparkles className="text-white text-xl" />
               </div>
               <div>
-                <div className="text-lg font-display font-extrabold text-[#2A1120] mb-1">Join 100+ companies growing with TorchX Talent</div>
+                <div className="text-lg font-display font-extrabold text-[#2A1120] mb-1">
+                  Join 100+ companies growing with TorchX Talent
+                </div>
                 <div className="text-[13px] text-[#666]">Powerful HR tools. Happy teams. Better results.</div>
               </div>
             </div>
@@ -1275,42 +1233,51 @@ function Testimonials() {
     </section>
   )
 }
+
+/* ==========================================================================
+   LEGAL + FOOTER
+========================================================================== */
+
 const legalDocs = {
   privacy: {
-    title: 'Privacy Policy', effective: 'April 01, 2026',
+    title: 'Privacy Policy',
+    effective: 'April 01, 2026',
     sections: [
-      { heading:'Information We Collect', items:['Personal Information: Name, email address, phone number, billing information, company details, and account credentials.','Usage Information: IP address, browser type, device information, login activity, usage analytics, cookies and tracking information.','Customer Data: Any data uploaded, processed, or stored by customers while using our Services.'] },
-      { heading:'How We Use Information', items:['Provide and maintain Services, process subscriptions and payments, improve platform performance.','Offer customer support, prevent fraud and abuse, send service-related notifications, and comply with legal obligations.'] },
-      { heading:'Data Security & Sharing', items:['We implement commercially reasonable administrative, technical, and organizational safeguards to protect user data.','We do not sell personal data. We may share with payment processors, cloud hosting providers, analytics providers, and legal authorities when required by law.'] },
-      { heading:'User Rights', items:['Users may request access, correction, deletion, or export of personal data.','Send requests to: privacy@torchxsuite.com'] },
-      { heading:'Additional', items:['Data may be processed and stored outside your country subject to applicable laws.','Our Services are not intended for individuals under 18 years of age.','We reserve the right to modify this policy at any time. Contact: legal@torchxsuite.com'] },
+      { heading: 'Information We Collect', items: ['Personal Information: Name, email address, phone number, billing information, company details, and account credentials.', 'Usage Information: IP address, browser type, device information, login activity, usage analytics, cookies and tracking information.', 'Customer Data: Any data uploaded, processed, or stored by customers while using our Services.'] },
+      { heading: 'How We Use Information', items: ['Provide and maintain Services, process subscriptions and payments, improve platform performance.', 'Offer customer support, prevent fraud and abuse, send service-related notifications, and comply with legal obligations.'] },
+      { heading: 'Data Security & Sharing', items: ['We implement commercially reasonable administrative, technical, and organizational safeguards to protect user data.', 'We do not sell personal data. We may share with payment processors, cloud hosting providers, analytics providers, and legal authorities when required by law.'] },
+      { heading: 'User Rights', items: ['Users may request access, correction, deletion, or export of personal data.', 'Send requests to: privacy@torchxsuite.com'] },
+      { heading: 'Additional', items: ['Data may be processed and stored outside your country subject to applicable laws.', 'Our Services are not intended for individuals under 18 years of age.', 'We reserve the right to modify this policy at any time. Contact: legal@torchxsuite.com'] },
     ],
   },
   terms: {
-    title: 'Terms of Service', effective: 'April 01, 2026',
+    title: 'Terms of Service',
+    effective: 'April 01, 2026',
     sections: [
-      { heading:'Eligibility & Account Responsibilities', items:['You must be legally capable of entering into binding agreements to use our Services.','Users are responsible for maintaining account confidentiality and all activities under their account.','You agree not to use Services unlawfully, attempt unauthorized access, reverse engineer the platform, or upload malicious software.'] },
-      { heading:'Subscription & Billing', items:['Services are offered on subscription plans billed monthly, quarterly, or annually.','Payments are non-refundable unless stated otherwise in our Refund Policy.','Failure to pay may result in suspension or termination.'] },
-      { heading:'Intellectual Property & Customer Data', items:['All platform software, branding, designs, content, APIs, workflows, and technology remain the exclusive property of the Company.','Customers retain ownership of their uploaded data. You grant us limited rights necessary to host, process, and operate the Services.'] },
-      { heading:'Limitation of Liability & Termination', items:['We are not liable for indirect, incidental, or consequential damages. Total liability shall not exceed the amount paid during the previous 3 months.','Accounts may be suspended or terminated for violation of Terms, fraudulent activity, non-payment, or abuse of Services.'] },
-      { heading:'Governing Law', items:['These Terms shall be governed by the laws of India.','Disputes shall be subject to the jurisdiction of courts located in Bareilly, Uttar Pradesh, India.','Contact: legal@torchxsuite.com'] },
+      { heading: 'Eligibility & Account Responsibilities', items: ['You must be legally capable of entering into binding agreements to use our Services.', 'Users are responsible for maintaining account confidentiality and all activities under their account.', 'You agree not to use Services unlawfully, attempt unauthorized access, reverse engineer the platform, or upload malicious software.'] },
+      { heading: 'Subscription & Billing', items: ['Services are offered on subscription plans billed monthly, quarterly, or annually.', 'Payments are non-refundable unless stated otherwise in our Refund Policy.', 'Failure to pay may result in suspension or termination.'] },
+      { heading: 'Intellectual Property & Customer Data', items: ['All platform software, branding, designs, content, APIs, workflows, and technology remain the exclusive property of the Company.', 'Customers retain ownership of their uploaded data. You grant us limited rights necessary to host, process, and operate the Services.'] },
+      { heading: 'Limitation of Liability & Termination', items: ['We are not liable for indirect, incidental, or consequential damages. Total liability shall not exceed the amount paid during the previous 3 months.', 'Accounts may be suspended or terminated for violation of Terms, fraudulent activity, non-payment, or abuse of Services.'] },
+      { heading: 'Governing Law', items: ['These Terms shall be governed by the laws of India.', 'Disputes shall be subject to the jurisdiction of courts located in Bareilly, Uttar Pradesh, India.', 'Contact: legal@torchxsuite.com'] },
     ],
   },
   cookie: {
-    title: 'Cookie Policy', effective: 'April 01, 2026',
+    title: 'Cookie Policy',
+    effective: 'April 01, 2026',
     sections: [
-      { heading:'What Are Cookies?', items:['Cookies are small text files stored on your device to improve website functionality and user experience.'] },
-      { heading:'Types of Cookies We Use', items:['Essential Cookies: Required for authentication, security, and core functionality.','Analytics Cookies: Help us understand platform usage and improve performance.','Preference Cookies: Remember user settings and preferences.','Marketing Cookies: Used for relevant communication and advertising where permitted.'] },
-      { heading:'Managing Cookies', items:['Some third-party services integrated into our platform may place cookies subject to their own privacy policies.','Users can manage or disable cookies through browser settings. Disabling cookies may affect platform functionality.','We may update this Cookie Policy periodically.'] },
+      { heading: 'What Are Cookies?', items: ['Cookies are small text files stored on your device to improve website functionality and user experience.'] },
+      { heading: 'Types of Cookies We Use', items: ['Essential Cookies: Required for authentication, security, and core functionality.', 'Analytics Cookies: Help us understand platform usage and improve performance.', 'Preference Cookies: Remember user settings and preferences.', 'Marketing Cookies: Used for relevant communication and advertising where permitted.'] },
+      { heading: 'Managing Cookies', items: ['Some third-party services integrated into our platform may place cookies subject to their own privacy policies.', 'Users can manage or disable cookies through browser settings. Disabling cookies may affect platform functionality.', 'We may update this Cookie Policy periodically.'] },
     ],
   },
   refund: {
-    title: 'Refund Policy', effective: 'April 01, 2026',
+    title: 'Refund Policy',
+    effective: 'April 01, 2026',
     sections: [
-      { heading:'Subscription Payments', items:['All subscription payments are generally non-refundable once billed.','Where trial access is provided, users are encouraged to evaluate the Services before purchasing.'] },
-      { heading:'Exceptional Refunds', items:['Refunds may be considered for: duplicate payment, incorrect billing due to system error, or service unavailable for an extended verified duration caused solely by us.','Approved refunds are processed within 7–15 business days.'] },
-      { heading:'Non-Refundable Situations', items:['Refunds will not be issued for partial usage, change of mind, failure to cancel before renewal, account suspension due to policy violations, or third-party service interruptions.'] },
-      { heading:'Chargebacks', items:['Initiating fraudulent chargebacks without contacting support may result in immediate account suspension, permanent service restriction, and legal recovery actions where applicable.','Contact: accounts@torchxsuite.com'] },
+      { heading: 'Subscription Payments', items: ['All subscription payments are generally non-refundable once billed.', 'Where trial access is provided, users are encouraged to evaluate the Services before purchasing.'] },
+      { heading: 'Exceptional Refunds', items: ['Refunds may be considered for: duplicate payment, incorrect billing due to system error, or service unavailable for an extended verified duration caused solely by us.', 'Approved refunds are processed within 7–15 business days.'] },
+      { heading: 'Non-Refundable Situations', items: ['Refunds will not be issued for partial usage, change of mind, failure to cancel before renewal, account suspension due to policy violations, or third-party service interruptions.'] },
+      { heading: 'Chargebacks', items: ['Initiating fraudulent chargebacks without contacting support may result in immediate account suspension, permanent service restriction, and legal recovery actions where applicable.', 'Contact: accounts@torchxsuite.com'] },
     ],
   },
 }
@@ -1318,14 +1285,20 @@ const legalDocs = {
 function LegalModal({ docKey, onClose }) {
   const doc = legalDocs[docKey]
   useEffect(() => {
-    const handleKey = (e) => { if (e.key === 'Escape') onClose() }
+    const handleKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
+
   return (
     <div
+      data-no-smooth
       className="fixed inset-0 bg-black/55 z-[9999] flex items-center justify-center p-5"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div className="bg-white rounded-[14px] w-full max-w-[720px] max-h-[88vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.18)]">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[#f0e6ec]">
@@ -1357,31 +1330,42 @@ function LegalModal({ docKey, onClose }) {
 }
 
 export function Footer() {
+  const goToSection = useSectionNav()
   const cols = [
-    { title: 'Product', links: [
-      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
-      { label: 'Engage', href: '' },
-      { label: 'Finance', href: '' },
-      { label: 'Inventory', href: '' },
-      { label: 'Payroll', href: '' },
-    ] },
-    { title: 'Solutions', links: [
-      { label: 'Features', href: '#features' },
-      { label: 'Pricing', href: '#pricing' },
-    ] },
-    { title: 'Resources', links: [
-      { label: 'Documentation', to: '/documentation' },
-      { label: 'Guide', to: '/guide'},
-      { label: 'Blog', to: '/blog'},
-    ] },
+    {
+      title: 'Product',
+      links: [
+        { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+        { label: 'Engage', href: '' },
+        { label: 'Finance', href: '' },
+        { label: 'Inventory', href: '' },
+        { label: 'Payroll', href: '' },
+      ],
+    },
+    {
+      title: 'Solutions',
+      links: [
+        { label: 'Features', href: '#features' },
+        { label: 'Pricing', href: '#pricing' },
+      ],
+    },
+    {
+      title: 'Resources',
+      links: [
+        { label: 'Documentation', to: '/documentation' },
+        { label: 'Guide', to: '/guide' },
+        { label: 'Blog', to: '/blog' },
+      ],
+    },
   ]
   const socials = [
     { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/torchx-talent/', label: 'LinkedIn' },
     { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
     { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
-    { icon: <FaYoutube />,  href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
+    { icon: <FaYoutube />, href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
   ]
   const [activeDoc, setActiveDoc] = useState(null)
+  const linkCls = 'text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]'
 
   return (
     <>
@@ -1395,9 +1379,9 @@ export function Footer() {
                 Streamline recruitment, discover top candidates, and build high-performing teams effortlessly.
               </p>
               <div className="flex gap-2.5">
-                {socials.map((s, i) => (
+                {socials.map((s) => (
                   <a
-                    key={i}
+                    key={s.label}
                     href={s.href}
                     aria-label={s.label}
                     className="text-[#7A004B] text-lg no-underline w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all hover:-translate-y-0.5 hover:text-[#5a0033]"
@@ -1408,23 +1392,28 @@ export function Footer() {
               </div>
             </div>
 
-            {cols.map(col => (
+            {cols.map((col) => (
               <div key={col.title}>
                 <div className="text-2xl font-display font-bold text-[#7A004B] mb-4">{col.title}</div>
                 <ul className="list-none p-0 m-0 flex flex-col gap-3">
-                  {col.links.map(l => (
+                  {col.links.map((l) => (
                     <li key={l.label}>
-                      {l.href ? (
+                      {l.href && l.href.startsWith('#') ? (
                         <a
                           href={l.href}
-                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                          onClick={(e) => goToSection(e, l.href.slice(1))}
+                          className={linkCls}
                         >
+                          {l.label}
+                        </a>
+                      ) : l.href ? (
+                        <a href={l.href} className={linkCls}>
                           {l.label}
                         </a>
                       ) : (
                         <Link
                           to={l.to || `/coming-soon?product=${encodeURIComponent(l.label)}`}
-                          className="text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]"
+                          className={linkCls}
                         >
                           {l.label}
                         </Link>
@@ -1448,7 +1437,7 @@ export function Footer() {
                 { label: 'Terms of Service', key: 'terms' },
                 { label: 'Cookie Policy', key: 'cookie' },
                 { label: 'Refund Policy', key: 'refund' },
-              ].map(item => (
+              ].map((item) => (
                 <span
                   key={item.key}
                   onClick={() => setActiveDoc(item.key)}
@@ -1469,27 +1458,109 @@ export function Footer() {
   )
 }
 
+/* ==========================================================================
+   SEO
+========================================================================== */
+
+function useSEO() {
+  useEffect(() => {
+    document.title = 'TorchX Talent — HRMS Software for Attendance, Payroll & Recruitment'
+
+    const setMeta = (attr, key, content) => {
+      let el = document.querySelector(`meta[${attr}="${key}"]`)
+      if (!el) {
+        el = document.createElement('meta')
+        el.setAttribute(attr, key)
+        document.head.appendChild(el)
+      }
+      el.setAttribute('content', content)
+    }
+
+    const description =
+      'TorchX Talent is an all-in-one HRMS for attendance, leave, payroll and recruitment. Free forever plan, GPS and face attendance, and plans that scale with your team.'
+
+    setMeta('name', 'description', description)
+    setMeta('name', 'robots', 'index, follow')
+    setMeta('property', 'og:type', 'website')
+    setMeta('property', 'og:title', 'TorchX Talent — HRMS Software for Modern Teams')
+    setMeta('property', 'og:description', description)
+    setMeta('property', 'og:url', 'https://torchxsuite.com/talent/')
+    setMeta('name', 'twitter:card', 'summary_large_image')
+    setMeta('name', 'twitter:title', 'TorchX Talent — HRMS Software for Modern Teams')
+    setMeta('name', 'twitter:description', description)
+
+    let canonical = document.querySelector('link[rel="canonical"]')
+    if (!canonical) {
+      canonical = document.createElement('link')
+      canonical.setAttribute('rel', 'canonical')
+      document.head.appendChild(canonical)
+    }
+    canonical.setAttribute('href', 'https://torchxsuite.com/talent/')
+
+    let jsonLd = document.getElementById('torchx-talent-jsonld')
+    if (!jsonLd) {
+      jsonLd = document.createElement('script')
+      jsonLd.type = 'application/ld+json'
+      jsonLd.id = 'torchx-talent-jsonld'
+      document.head.appendChild(jsonLd)
+    }
+    jsonLd.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'TorchX Talent',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      description,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
+      aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '100' },
+    })
+  }, [])
+}
+
+/* ==========================================================================
+   PAGE
+========================================================================== */
+
 export default function LandingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { data: auth } = useAuth()
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
 
-  const accountLabel = isAuthenticated
-    ? 'Access Your Talent Account'
-    : 'Sign in to your Talent Account'
+  useSEO()
+  useSmoothScroll(scrollContainerRef)
+
+  // Arriving from another page (or with #hash): scroll to the requested section
+  useEffect(() => {
+    const id = location.state?.scrollTo || location.hash.replace('#', '')
+    if (!id) return
+    const t = setTimeout(() => scrollToSection(id, 1.2), 400)
+    return () => clearTimeout(t)
+  }, [location.state, location.hash])
+
+  const accountLabel = isAuthenticated ? 'Access Your Talent Account' : 'Sign in to your Talent Account'
 
   const handleAccountClick = () => {
-    
     navigate(isAuthenticated ? '/redirect' : '/login')
   }
 
   return (
-    <div ref={scrollContainerRef} style={{ height: '100vh', overflowY: 'auto' }}>
+    <div
+      ref={scrollContainerRef}
+      style={{ height: '100vh', overflowY: 'auto', scrollBehavior: 'auto' }}
+    >
       <style>{fontStyles}</style>
-      <Navbar accountLabel={accountLabel} onAccountClick={handleAccountClick} scrollContainerRef={scrollContainerRef} />
-      <Hero onOpenCalculator={() => navigate('/pricing-calculator')} />
-      <Stats />
+      <PageBackground />
+      <Navbar
+        accountLabel={accountLabel}
+        onAccountClick={handleAccountClick}
+        scrollContainerRef={scrollContainerRef}
+      />
+      <Hero
+        onOpenCalculator={() => navigate('/pricing-calculator')}
+        scrollContainerRef={scrollContainerRef}
+      />
       <Divider />
       <Features />
       <Divider />
