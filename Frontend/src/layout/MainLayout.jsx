@@ -7,11 +7,8 @@ import { Outlet } from "react-router-dom";
 import { useAuth, usePermissionsSync } from "../auth/store/getmeauth/getmeauth";
 import { useDismissWelcomeMessage, useDismissBirthdayWish } from "../auth/store/unifiedauth/Unifiedauth.hook";
 import WelcomeModal from "../components/WelcomeModal";
-import BirthdayModal from "../components/BirthdayModal";
+import BirthdayModal from "../components/Birthdaymodal";
 import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner";
-import StorageLimitBanner from "../components/StorageLimitBanner";
-import PolicyGateScreen from "../components/policy/PolicyGateScreen";
-import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 
 // True when `dob` (any year) falls on today's month/day.
 function isBirthdayToday(dob) {
@@ -32,11 +29,6 @@ export default function MainLayout() {
   const { mutate: dismissBirthday, isPending: isDismissingBirthday } = useDismissBirthdayWish();
 
   usePermissionsSync();
-
-  // TorchX Policy — Access Gate. While any mandatory policy assigned to
-  // this person is unacknowledged, render ONLY PolicyGateScreen below —
-  // no Sidebar, no Navbar, no route content — until it's cleared.
-  const { data: gateStatus, isLoading: isGateLoading } = useGateStatus();
 
   const roleLabels = {
     superadmin: "Super Admin",
@@ -189,16 +181,6 @@ export default function MainLayout() {
     });
   };
 
-  // Fail-safe like the backend gate: while the very first check is loading
-  // we don't yet know if the person is blocked, so avoid a flash of full
-  // dashboard content — but never hold this longer than one quick request.
-  if (isGateLoading) {
-    return <div className="min-h-screen bg-(--background)" />;
-  }
-  if (gateStatus?.blocked) {
-    return <PolicyGateScreen />;
-  }
-
   return (
     <div className="flex h-screen bg-(--background)">
       <SingleSignInApprovalBanner />
@@ -206,7 +188,6 @@ export default function MainLayout() {
 
       <div className="flex-1 flex flex-col">
         <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
-        <StorageLimitBanner role={auth?.role} />
         <div className="p-6 overflow-auto flex-1">
   <Outlet />
 </div>
