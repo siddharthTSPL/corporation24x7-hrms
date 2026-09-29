@@ -60,6 +60,7 @@ import {
   useUpdateDepartmentSuperAdmin,
   useDeleteDepartmentSuperAdmin,
 } from '../../auth/server-state/superadmin/department/Sudepartment.hook';
+import ApprovalFlowPanel from './ApprovalFlowPanel';
 import FieldWorkSettingsCard from '../field-operations/FieldWorkSettingsCard';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1718,6 +1719,7 @@ const TABS = [
   { key: 'leavepolicy', label: 'Leave policy', icon: Umbrella },
   { key: 'departments', label: 'Departments', icon: Building2 },
   { key: 'field_work', label: 'Field Work', icon: Settings2 },
+  { key: 'approval_flow', label: 'Approval Flow', icon: ShieldCheck },
 ];
 
 export default function SuperAdminManagement() {
@@ -1764,6 +1766,7 @@ export default function SuperAdminManagement() {
         {tab === 'leavepolicy' && <LeavePolicyPanel notify={notify} />}
         {tab === 'departments' && <DepartmentsPanel notify={notify} />}
         {tab === 'field_work' && <FieldWorkSettingsCard canToggleEnabled />}
+        {tab === 'approval_flow' && <ApprovalFlowPanel notify={notify} />}
       </div>
     </div>
   );
