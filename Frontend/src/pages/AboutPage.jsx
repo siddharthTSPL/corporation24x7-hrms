@@ -10,16 +10,9 @@ import { FiStar, FiUsers } from 'react-icons/fi'
 
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
-
-
+import { fadeUp, stagger, cardVariant } from "./announcement/animations";
 import slideWhiteOffice from '../assets/Office-meeting.png'
 import slideTeam from '../assets/Team-work.jpg'
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 36 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: 'easeOut' } },
-}
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12 } } }
 
 function HeroBadge({ children }) {
   return (

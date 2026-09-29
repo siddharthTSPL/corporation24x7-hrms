@@ -3303,7 +3303,7 @@ function EmpStepFields({
   onChange,
   errors,
   managersOnly,
-  managersWithAdmin,
+  managersWithAdmin,   // ← add this
   perms,
   onPermChange,
 }) {
