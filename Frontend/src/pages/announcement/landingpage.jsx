@@ -577,7 +577,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-28"
+      className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-30"
     >
       <Wrap className="relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-start gap-12 lg:gap-10">
@@ -587,7 +587,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-7"
+              className="mb-4"
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-[#EAC7D7] bg-[#FDF4F8] px-4 py-2 shadow-[0_8px_30px_rgba(122,0,75,0.08)]">
                 <span className="h-2 w-2 rounded-full bg-[#730042] shadow-[0_0_12px_rgba(115,0,66,0.5)]" />
