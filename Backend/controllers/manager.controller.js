@@ -16,6 +16,7 @@ const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = re
 const imagekit = require("../utils/imagekit.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
+const { resolveCustomRouting } = require("../utils/approvalFlow.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
 const Attendance = require("../Models/attendance.model");
@@ -477,7 +478,13 @@ const applyleavem = async (req, res, next) => {
     .select("reporting_manager reporting_manager_model")
     .lean();
 
-  if (!managerData.reporting_manager)
+  const customRouting = await resolveCustomRouting({
+    organisation_id,
+    module: "leave",
+    requesterRole: "Manager",
+  });
+
+  if (!managerData.reporting_manager && !customRouting)
     return next(
       Object.assign(
         new Error(
@@ -487,7 +494,7 @@ const applyleavem = async (req, res, next) => {
       )
     );
 
-  if (!["Manager", "Admin"].includes(managerData.reporting_manager_model))
+  if (!customRouting && !["Manager", "Admin"].includes(managerData.reporting_manager_model))
     return next(
       Object.assign(
         new Error(
@@ -551,8 +558,9 @@ const applyleavem = async (req, res, next) => {
     }
   }
 
-  const initialStatus =
-    managerData.reporting_manager_model === "Admin"
+  const initialStatus = customRouting
+    ? customRouting.status
+    : managerData.reporting_manager_model === "Admin"
       ? "pending_admin"
       : "pending_reporting_manager";
 
@@ -569,20 +577,26 @@ const applyleavem = async (req, res, next) => {
     reason,
     supportingDocument,
     status: initialStatus,
-    directed_to: managerData.reporting_manager,
-    directed_to_model: managerData.reporting_manager_model,
+    directed_to: customRouting ? customRouting.primary : managerData.reporting_manager,
+    directed_to_model: customRouting ? "Admin" : managerData.reporting_manager_model,
+    ...(customRouting && { approverPool: customRouting.pool }),
   });
 
-  notifyLeaveApplied({
-    requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
-    handlerModel: managerData.reporting_manager_model,
-    handlerId: managerData.reporting_manager,
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-  });
+  const mgrLeaveHandlers = customRouting
+    ? customRouting.pool.map((id) => ({ model: "Admin", id }))
+    : [{ model: managerData.reporting_manager_model, id: managerData.reporting_manager }];
+  for (const h of mgrLeaveHandlers) {
+    notifyLeaveApplied({
+      requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      handlerModel: h.model,
+      handlerId: h.id,
+      leaveType,
+      startDate: start,
+      endDate: end,
+      days,
+      reason,
+    });
+  }
 
   res.status(200).json({
     message: "Leave request submitted to your reporting manager",

@@ -1,6 +1,7 @@
 const Timesheet = require("../Models/Timesheet.model");
 const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
+const { resolveCustomRouting, isInPool } = require("../utils/approvalFlow.utils");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
 const TSJob = require("../Models/Tsjob.model");
@@ -36,6 +37,25 @@ const getWeekBounds = (anyDateInWeek) => {
 //   Manager   → their reporting_manager (Manager or Admin)
 //   Admin     → their reporting_manager (SuperAdmin always)
 const resolveFirstHandler = async ({ actor, organisation_id }) => {
+  // Org-configured custom flow (admin pool) takes priority; null => default rules below.
+  const customRole =
+    actor.model === "User" ? "Employee" : actor.model === "Manager" ? "Manager" : null;
+  if (customRole) {
+    const custom = await resolveCustomRouting({
+      organisation_id,
+      module: "timesheet",
+      requesterRole: customRole,
+    });
+    if (custom) {
+      return {
+        handler: custom.primary,
+        handlerModel: "Admin",
+        status: custom.status,
+        pool: custom.pool,
+      };
+    }
+  }
+
   if (actor.model === "User") {
     const user = await User.findOne({ _id: actor.id, organisation_id })
       .select("Under_manager")
@@ -139,6 +159,7 @@ const submitTimesheet = async (req, res, next) => {
   timesheet.total_billed_amount = Math.round(totalBilledAmount * 100) / 100;
   timesheet.currentHandler = routing?.handler || null;
   timesheet.currentHandlerModel = routing?.handlerModel || null;
+  timesheet.approverPool = routing?.pool || [];
   timesheet.status = routing ? routing.status : "approved";
   timesheet.submitted_at = new Date();
   timesheet.escalation_level = 0;
@@ -180,8 +201,14 @@ const getPendingApprovals = async (req, res, next) => {
 
   const timesheets = await Timesheet.find({
     organisation_id,
-    currentHandler: actor.id,
-    currentHandlerModel: actor.model,
+    ...(actor.model === "Admin"
+      ? {
+          $or: [
+            { currentHandler: actor.id, currentHandlerModel: "Admin" },
+            { approverPool: actor.id },
+          ],
+        }
+      : { currentHandler: actor.id, currentHandlerModel: actor.model }),
     status: {
       $in: ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"],
     },
@@ -207,8 +234,9 @@ const approveTimesheet = async (req, res, next) => {
   if (!timesheet) return next(httpError("Timesheet not found", 404));
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
 
   timesheet.status = "approved";
@@ -216,6 +244,7 @@ const approveTimesheet = async (req, res, next) => {
   timesheet.remarks = remarks || "";
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
 
   await timesheet.save();
   await TimeLog.updateMany({ timesheet: timesheet._id }, { $set: { status: "approved" } });
@@ -238,8 +267,9 @@ const rejectTimesheet = async (req, res, next) => {
   if (!timesheet) return next(httpError("Timesheet not found", 404));
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
 
   timesheet.status = "rejected";
@@ -247,6 +277,7 @@ const rejectTimesheet = async (req, res, next) => {
   timesheet.remarks = remarks;
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
 
   await timesheet.save();
   // Reset logs to draft so owner can edit and re-submit
@@ -277,8 +308,9 @@ const forwardTimesheet = async (req, res, next) => {
   if (!timesheet) return next(httpError("Timesheet not found", 404));
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
 
   let nextHandler = null;
@@ -312,6 +344,7 @@ const forwardTimesheet = async (req, res, next) => {
   timesheet.handlerChain.push(actor.id);
   timesheet.currentHandler = nextHandler;
   timesheet.currentHandlerModel = nextHandlerModel;
+  timesheet.approverPool = [];
   timesheet.status = nextStatus;
   timesheet.remarks = remarks || "";
 
@@ -346,6 +379,7 @@ const recallTimesheet = async (req, res, next) => {
   timesheet.status = "draft";
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
   timesheet.handlerChain = [];
   await timesheet.save();
 

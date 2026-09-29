@@ -65,6 +65,7 @@ const escalateStuckTimesheets = async () => {
         continue;
       }
 
+      timesheet.approverPool = [];
       timesheet.escalation_level += 1;
       timesheet.last_escalated_at = new Date();
       await timesheet.save();
