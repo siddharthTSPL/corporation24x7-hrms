@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   History,
   Building2,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -58,6 +59,7 @@ import {
 } from "../../auth/server-state/department/department.hook";
 import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
 import ApprovalFlowPanel from "./ApprovalFlowPanel";
+import AttendanceSettingsPanel from "./AttendanceSettingsPanel";
 
 const DAYS = [
   "monday",
@@ -2210,6 +2212,7 @@ const TABS = [
   { key: "departments", label: "Departments", icon: Building2 },
   { key: "field_work", label: "Field Work", icon: Settings2 },
   { key: "approval_flow", label: "Approval Flow", icon: ShieldCheck },
+  { key: "attendance", label: "Attendance", icon: LogOut },
 ];
 
 export default function AdminManagement() {
@@ -2259,6 +2262,7 @@ export default function AdminManagement() {
         {tab === "departments" && <DepartmentsPanel notify={notify} />}
         {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
         {tab === "approval_flow" && <ApprovalFlowPanel notify={notify} />}
+        {tab === "attendance" && <AttendanceSettingsPanel notify={notify} />}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import {
   Umbrella,
   Lock,
   Building2,
+  LogOut,
 } from 'lucide-react';
 import {
   useGetAllShiftsSuperAdmin,
@@ -61,6 +62,7 @@ import {
   useDeleteDepartmentSuperAdmin,
 } from '../../auth/server-state/superadmin/department/Sudepartment.hook';
 import ApprovalFlowPanel from './ApprovalFlowPanel';
+import AttendanceSettingsPanel from './AttendanceSettingsPanel';
 import FieldWorkSettingsCard from '../field-operations/FieldWorkSettingsCard';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1720,6 +1722,7 @@ const TABS = [
   { key: 'departments', label: 'Departments', icon: Building2 },
   { key: 'field_work', label: 'Field Work', icon: Settings2 },
   { key: 'approval_flow', label: 'Approval Flow', icon: ShieldCheck },
+  { key: 'attendance', label: 'Attendance', icon: LogOut },
 ];
 
 export default function SuperAdminManagement() {
@@ -1767,6 +1770,7 @@ export default function SuperAdminManagement() {
         {tab === 'departments' && <DepartmentsPanel notify={notify} />}
         {tab === 'field_work' && <FieldWorkSettingsCard canToggleEnabled />}
         {tab === 'approval_flow' && <ApprovalFlowPanel notify={notify} />}
+        {tab === 'attendance' && <AttendanceSettingsPanel notify={notify} />}
       </div>
     </div>
   );
