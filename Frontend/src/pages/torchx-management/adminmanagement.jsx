@@ -57,6 +57,7 @@ import {
   useDeleteDepartment,
 } from "../../auth/server-state/department/department.hook";
 import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
+import ApprovalFlowPanel from "./ApprovalFlowPanel";
 
 const DAYS = [
   "monday",
@@ -2208,6 +2209,7 @@ const TABS = [
   { key: "weekoff", label: "Week-off policy", icon: Settings2 },
   { key: "departments", label: "Departments", icon: Building2 },
   { key: "field_work", label: "Field Work", icon: Settings2 },
+  { key: "approval_flow", label: "Approval Flow", icon: ShieldCheck },
 ];
 
 export default function AdminManagement() {
@@ -2256,6 +2258,7 @@ export default function AdminManagement() {
         {tab === "weekoff" && <WeekOffPanel notify={notify} />}
         {tab === "departments" && <DepartmentsPanel notify={notify} />}
         {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
+        {tab === "approval_flow" && <ApprovalFlowPanel notify={notify} />}
       </div>
     </div>
   );
