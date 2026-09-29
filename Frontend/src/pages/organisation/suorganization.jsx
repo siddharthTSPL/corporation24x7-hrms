@@ -150,7 +150,7 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
+function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", verticalSpace = 26 }) {
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const containerRef = useRef(null);
   const rowRef = useRef(null);
@@ -201,13 +201,13 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [items.length]);
+  }, [items.length, verticalSpace]);
 
   if (items.length === 0) return null;
 
   return (
     <div ref={containerRef} className="relative w-full flex flex-col items-center">
-      <div aria-hidden style={{ height: 26 }} />
+      <div aria-hidden style={{ height: verticalSpace }} />
       {lines && (
         <svg
           className="absolute inset-0 pointer-events-none"
@@ -845,7 +845,7 @@ function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   );
 }
 
-function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
+function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
   const admDimmed = hasQ && !admMatch;
@@ -853,6 +853,9 @@ function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick,
 
   const admManagers = managers.filter(
     (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+  );
+  const coAdmins = allAdmins.filter(
+    (a) => idStr(a.reporting_manager) === adminId && a.reporting_manager_model === "Admin"
   );
 
   return (
@@ -866,7 +869,7 @@ function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick,
         onClick={() => onNodeClick(admin, "admin")}
       />
 
-      {admManagers.length > 0 ? (
+      {admManagers.length > 0 && (
         <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
           {admManagers.map((mgr, mi) => (
             <ManagerBranch
@@ -882,7 +885,27 @@ function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick,
             />
           ))}
         </OrgConnectorGroup>
-      ) : (
+      )}
+
+      {coAdmins.length > 0 && (
+        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4 md:gap-5" verticalSpace={44}>
+          {coAdmins.map((coAdmin, index) => (
+            <AdminBranch
+              key={coAdmin._id}
+              admin={coAdmin}
+              allAdmins={allAdmins}
+              managers={managers}
+              employees={employees}
+              matchName={matchName}
+              hasQ={hasQ}
+              onNodeClick={onNodeClick}
+              delay={delay + 340 + index * 60}
+            />
+          ))}
+        </OrgConnectorGroup>
+      )}
+
+      {admManagers.length === 0 && coAdmins.length === 0 && (
         <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
       )}
     </div>
@@ -904,6 +927,11 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
            normalize(desig).includes(q);
   };
 
+  const rootAdmins = admins.filter((admin) =>
+    admin.reporting_manager_model !== "Admin" ||
+    !admins.some((parent) => idStr(parent._id) === idStr(admin.reporting_manager))
+  );
+
   return (
     <div className="org-tree-root w-max min-w-full mx-auto">
       <SuperAdminNode
@@ -917,12 +945,13 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         onClick={() => onNodeClick(superAdmin, "superadmin")}
       />
 
-      {admins.length > 0 ? (
+      {rootAdmins.length > 0 ? (
         <OrgConnectorGroup parentRef={saRef} gapClassName="gap-3 sm:gap-4 md:gap-5">
-          {admins.map((admin, ai) => (
+          {rootAdmins.map((admin, ai) => (
             <AdminBranch
               key={admin._id}
               admin={admin}
+              allAdmins={admins}
               managers={managers}
               employees={employees}
               matchName={matchName}

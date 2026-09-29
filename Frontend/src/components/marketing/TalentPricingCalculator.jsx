@@ -11,7 +11,7 @@ import {
   FiAward,
 } from "react-icons/fi";
 
-const CALENDLY_URL = "https://calendly.com/torchx-talent/demo";
+const BOOKING_URL = "https://myavailability.info/meet/siddharthworldwide";
 
 const HEADCOUNT_BANDS = [
   { label: "1–25", sub: "Small team", value: 25 },
@@ -534,31 +534,8 @@ export default function TalentPricingCalculator() {
     return best;
   })();
 
-  useEffect(() => {
-    if (document.getElementById("calendly-widget-script")) return;
-
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://assets.calendly.com/assets/external/widget.css";
-
-    document.head.appendChild(link);
-
-    const script = document.createElement("script");
-    script.id = "calendly-widget-script";
-    script.src = "https://assets.calendly.com/assets/external/widget.js";
-    script.async = true;
-
-    document.body.appendChild(script);
-  }, []);
-
   const openBookingCalendar = () => {
-    if (window.Calendly) {
-      window.Calendly.initPopupWidget({
-        url: CALENDLY_URL,
-      });
-    } else {
-      window.open(CALENDLY_URL, "_blank", "noopener,noreferrer");
-    }
+    window.open(BOOKING_URL, "_blank", "noopener,noreferrer");
   };
 
   const selectCompetitor = (id) => {

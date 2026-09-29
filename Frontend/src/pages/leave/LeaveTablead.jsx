@@ -57,6 +57,8 @@ const LEAVE_STATUS_META = {
   rejected_admin:              { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   approved_reporting_manager:  { bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
   rejected_reporting_manager:  { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_reporting_manager:  { bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:  { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_reporting_manager:   { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
   pending_admin:               { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
 };
@@ -537,7 +539,7 @@ const SupportingDocumentBox = ({ document }) =>
 
 const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
-  const person = leave.employee || leave.manager || {};
+  const person = leave.employee || leave.manager || leave.admin || {};
   const hasLivePerson = !!(person.f_name || person.l_name);
   const roleGuess = leave.applicantRole || (leave.manager ? "Manager" : "Employee");
   const personName = hasLivePerson
@@ -1100,7 +1102,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
             {pagedHistory.map((leave, idx) => {
               const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
-              const canManageOwnLeave = leave.status === "pending_superadmin";
+              const canManageOwnLeave = ["pending_superadmin", "pending_reporting_manager"].includes(leave.status);
               return (
                 <div
                   key={leave._id || idx}
@@ -1435,6 +1437,49 @@ const ManagerLeavesPanel = ({ showToast }) => {
   );
 };
 
+const AdminLeavesPanel = ({ showToast }) => {
+  const [processingId, setProcessingId] = useState(null);
+  const { data, isLoading, refetch } = useGetForwardedLeaves();
+  const acceptMut = useAcceptLeave();
+  const rejectMut = useRejectLeave();
+  const leaves = Array.isArray(data?.adminLeaves?.leaves) ? data.adminLeaves.leaves : [];
+
+  const handleAction = async (leave, action) => {
+    setProcessingId(leave._id);
+    try {
+      const mutate = action === "approve" ? acceptMut : rejectMut;
+      await mutate.mutateAsync({ id: leave._id, leaveFor: "admin" });
+      showToast(action === "approve" ? "Admin leave approved" : "Admin leave rejected", action === "approve" ? "success" : "error");
+      refetch();
+    } catch (err) {
+      showToast(err?.message || "Something went wrong", "error");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (isLoading) return <Spinner />;
+  if (!leaves.length) return <EmptyState msg="No admin leave requests found" />;
+
+  return (
+    <div className="w-full">
+      <p className="text-xs text-[#8B7FA0] mb-4">Leave requests from admins who report to you.</p>
+      {leaves.map((leave) => (
+        <LeaveCard
+          key={leave._id}
+          leave={leave}
+          personLabel="Admin"
+          isProcessing={processingId === leave._id}
+          showActions={leave.status === "pending_reporting_manager"}
+          onApprove={() => handleAction(leave, "approve")}
+          onReject={() => handleAction(leave, "reject")}
+          showTimeline
+        />
+      ))}
+    </div>
+  );
+};
+
 const WFH_BLANK = { startDate: "", endDate: "", reason: "" };
 
 const MyWFHPanel = ({ showToast }) => {
@@ -1747,6 +1792,7 @@ const TeamWFHPanel = ({ showToast }) => {
 const TABS = [
   { key: "allLeaves",     label: "Employee Leaves" },
   { key: "managerLeaves", label: "Manager Leaves"  },
+  { key: "adminLeaves",   label: "Admin Leaves"    },
   { key: "myBalance",     label: "My Balance"       },
   { key: "applyLeave",    label: "Apply Leave"      },
   { key: "myWFH",         label: "My WFH"           },
@@ -1849,6 +1895,7 @@ const AdminLeaveWFH = () => {
           <>
             {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast} />}
             {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast} />}
+            {tab === "adminLeaves"   && <AdminLeavesPanel showToast={showToast} />}
             {tab === "myBalance"     && <MyBalancePanel admin={admin} leaveBalance={leaveBalance} />}
             {tab === "applyLeave"    && <ApplyLeavePanel admin={admin} leaveBalance={leaveBalance} showToast={showToast} />}
             {tab === "myWFH"         && <MyWFHPanel showToast={showToast} />}

@@ -895,6 +895,9 @@ const findallmanagerswoadmin = async (req, res, next) => {
 };
 
 const getAdminTeamManagerIds = async (adminId, organisation_id) => {
+  const scopeRootId = await getAdminScopeRootId(adminId, organisation_id);
+  const reportAdminIds = await getAdminReportingIds(adminId, organisation_id);
+  const rootAdminIds = new Set([scopeRootId, ...reportAdminIds]);
   const allManagers = await Managermodel.find({ organisation_id })
     .select("_id reporting_manager reporting_manager_model")
     .lean();
@@ -904,7 +907,7 @@ const getAdminTeamManagerIds = async (adminId, organisation_id) => {
     .filter(
       (m) =>
         m.reporting_manager_model === "Admin" &&
-        String(m.reporting_manager) === String(adminId)
+        rootAdminIds.has(String(m.reporting_manager))
     )
     .map((m) => String(m._id));
 
@@ -922,6 +925,56 @@ const getAdminTeamManagerIds = async (adminId, organisation_id) => {
   }
 
   return managerIds;
+};
+
+const getAdminScopeRootId = async (adminId, organisation_id) => {
+  const admins = await Adminmodel.find({ organisation_id })
+    .select("_id reporting_manager reporting_manager_model")
+    .lean();
+  const byId = new Map(admins.map((admin) => [String(admin._id), admin]));
+  let current = byId.get(String(adminId));
+  const visited = new Set([String(adminId)]);
+  while (current?.reporting_manager_model === "Admin" && current.reporting_manager) {
+    const parentId = String(current.reporting_manager);
+    const parent = byId.get(parentId);
+    if (!parent || visited.has(parentId)) break;
+    visited.add(parentId);
+    current = parent;
+  }
+  return String(current?._id || adminId);
+};
+
+const getAdminReportingIds = async (adminId, organisation_id) => {
+  const admins = await Adminmodel.find({ organisation_id })
+    .select("_id reporting_manager reporting_manager_model")
+    .lean();
+  const reportIds = new Set();
+  const scopeRootId = await getAdminScopeRootId(adminId, organisation_id);
+  let frontier = [scopeRootId];
+  while (frontier.length) {
+    const next = admins
+      .filter((admin) => admin.reporting_manager_model === "Admin" && frontier.includes(String(admin.reporting_manager)))
+      .map((admin) => String(admin._id))
+      .filter((id) => id !== scopeRootId && !reportIds.has(id));
+    next.forEach((id) => reportIds.add(id));
+    frontier = next;
+  }
+  return [...reportIds];
+};
+
+const getAdminScopeIds = async (adminId, organisation_id) => {
+  const rootId = await getAdminScopeRootId(adminId, organisation_id);
+  return [rootId, ...(await getAdminReportingIds(rootId, organisation_id))];
+};
+
+// Attendance for an admin includes admins who report to them and those
+// admins' manager/employee teams. Other admin views keep their existing scope.
+const getAdminAttendanceScope = async (adminId, organisation_id) => {
+  const [adminIds, managerIds] = await Promise.all([
+    getAdminReportingIds(adminId, organisation_id),
+    getAdminTeamManagerIds(adminId, organisation_id),
+  ]);
+  return { adminIds, managerIds: [...managerIds] };
 };
 
 const getallemployee = async (req, res, next) => {
@@ -2638,11 +2691,12 @@ const showallleaves = async (req, res, next) => {
       );
 
     const organisation_id = req.admin.organisation_id;
+    const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
 
-    const [employeeLeaves, managerLeaves] = await Promise.all([
+    const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
       Leave.find({
         organisation_id,
-        directed_to: req.admin._id,
+        directed_to: { $in: adminScopeIds },
         directed_to_model: "Admin",
       })
         .populate("employee", "f_name l_name work_email")
@@ -2651,18 +2705,27 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
-        directed_to: req.admin._id,
+        directed_to: { $in: adminScopeIds },
         directed_to_model: "Admin",
       })
         .populate("manager", "f_name l_name work_email department designation")
         .sort({ createdAt: -1 })
         .lean(),
+      adminScopeIds.length > 1
+        ? AdminLeave.find({ organisation_id, admin: { $in: adminScopeIds.slice(1) } })
+            .populate("admin", "f_name l_name work_email designation")
+            .populate("approvedBy")
+            .populate("rejectedBy")
+            .sort({ createdAt: -1 })
+            .lean()
+        : [],
     ]);
 
     res.status(200).json({
       success: true,
       employeeLeaves: { count: employeeLeaves.length, leaves: employeeLeaves },
       managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
+      adminLeaves: { count: adminLeaves.length, leaves: adminLeaves },
     });
   } catch (error) {
     next(error);
@@ -2693,8 +2756,9 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+      const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
-        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
         return next(
@@ -2766,8 +2830,9 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+      const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
-        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
         return next(
@@ -2818,6 +2883,51 @@ const acceptLeave = async (req, res, next) => {
       });
     }
 
+    if (leaveFor === "admin") {
+      const leave = await AdminLeave.findOne({
+        _id: id,
+        organisation_id,
+        status: "pending_reporting_manager",
+      });
+      if (!leave)
+        return next(Object.assign(new Error("Pending admin leave not found"), { statusCode: 404 }));
+      const adminScopeIds = (await getAdminReportingIds(req.admin._id, organisation_id))
+        .filter((id) => id !== String(req.admin._id));
+      if (!adminScopeIds.includes(String(leave.admin)))
+        return next(Object.assign(new Error("This admin leave is not assigned to you"), { statusCode: 403 }));
+
+      const leaveBalance = await leavebalanceModel.findOne({ employee: leave.admin, organisation_id });
+      if (!leaveBalance)
+        return next(Object.assign(new Error("Admin leave balance not found"), { statusCode: 404 }));
+      if (leave.leaveType === "ml") {
+        const start = new Date(leave.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 181);
+        leaveBalance.mlStartDate = start;
+        leaveBalance.mlEndDate = end;
+        await leaveBalance.save();
+      }
+      await processLeaveDeduction(leave);
+      leave.status = "approved_reporting_manager";
+      leave.approvedBy = req.admin._id;
+      leave.approvedByModel = "Admin";
+      leave.approvedAt = new Date();
+      leave.remarks = `Approved by Admin (${req.admin.f_name})`;
+      await leave.save();
+      notifyLeaveDecision({
+        recipientModel: "Admin",
+        recipientId: leave.admin,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "approved",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+      return res.status(200).json({ success: true, message: "Admin leave approved", leave });
+    }
+
     return next(
       Object.assign(new Error("Invalid leaveFor value"), { statusCode: 400 })
     );
@@ -2850,8 +2960,9 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+      const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
-        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
         return next(
@@ -2900,8 +3011,9 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+      const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
-        leave.directed_to?.toString() !== req.admin._id.toString() ||
+        !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
         return next(
@@ -2942,6 +3054,40 @@ const rejectLeave = async (req, res, next) => {
         message: "Manager leave rejected successfully",
         leave,
       });
+    }
+
+    if (leaveFor === "admin") {
+      const leave = await AdminLeave.findOne({
+        _id: id,
+        organisation_id,
+        status: "pending_reporting_manager",
+      });
+      if (!leave)
+        return next(Object.assign(new Error("Pending admin leave not found"), { statusCode: 404 }));
+      const adminScopeIds = (await getAdminReportingIds(req.admin._id, organisation_id))
+        .filter((id) => id !== String(req.admin._id));
+      if (!adminScopeIds.includes(String(leave.admin)))
+        return next(Object.assign(new Error("This admin leave is not assigned to you"), { statusCode: 403 }));
+
+      leave.status = "rejected_reporting_manager";
+      leave.rejectedBy = req.admin._id;
+      leave.rejectedByModel = "Admin";
+      leave.rejectedAt = new Date();
+      leave.remarks = `Rejected by Admin (${req.admin.f_name})`;
+      leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await leave.save();
+      notifyLeaveDecision({
+        recipientModel: "Admin",
+        recipientId: leave.admin,
+        leaveType: leave.leaveType,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        days: leave.days,
+        decision: "rejected",
+        decidedByName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        remarks: leave.remarks,
+      });
+      return res.status(200).json({ success: true, message: "Admin leave rejected", leave });
     }
 
     return next(
@@ -3016,7 +3162,7 @@ const applyleave = async (req, res, next) => {
       admin: req.admin._id,
       organisation_id,
       status: {
-        $nin: ["rejected_superadmin"],
+        $nin: ["rejected_superadmin", "rejected_reporting_manager"],
       },
       startDate: {
         $lte: end,
@@ -3080,7 +3226,9 @@ const applyleave = async (req, res, next) => {
       days,
       reason: reason.trim(),
       supportingDocument,
-      status: "pending_superadmin",
+      status: req.admin.reporting_manager_model === "Admin"
+        ? "pending_reporting_manager"
+        : "pending_superadmin",
     });
 
     return res.status(201).json({
@@ -3119,7 +3267,7 @@ const editleaveadmin = async (req, res, next) => {
       );
     }
 
-    if (leave.status !== "pending_superadmin") {
+    if (!['pending_superadmin', 'pending_reporting_manager'].includes(leave.status)) {
       return next(
         Object.assign(
           new Error(
@@ -3252,7 +3400,7 @@ const deleteleaveadmin = async (req, res, next) => {
     return next(
       Object.assign(new Error("Leave not found"), { statusCode: 404 })
     );
-  if (leave.status !== "pending_superadmin")
+  if (!['pending_superadmin', 'pending_reporting_manager'].includes(leave.status))
     return next(
       Object.assign(
         new Error("Cannot delete leave that is already processed or forwarded"),
@@ -4107,9 +4255,7 @@ const getTodayCheckins = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const today = startOfDay(new Date());
 
-  const teamManagerIds = [
-    ...(await getAdminTeamManagerIds(req.admin._id, organisation_id)),
-  ];
+  const { adminIds, managerIds: teamManagerIds } = await getAdminAttendanceScope(req.admin._id, organisation_id);
   const teamEmployees = teamManagerIds.length
     ? await Usermodel.find({
         organisation_id,
@@ -4119,6 +4265,7 @@ const getTodayCheckins = async (req, res) => {
         .lean()
     : [];
   const scopedEmployeeIds = [
+    ...adminIds,
     ...teamManagerIds,
     ...teamEmployees.map((u) => String(u._id)),
   ];
@@ -4133,10 +4280,7 @@ const getTodayCheckins = async (req, res) => {
     checkIn: { $exists: true },
     employee: { $in: scopedEmployeeIds },
   })
-    .populate(
-      "employee",
-      "f_name l_name work_email department designation profile_image"
-    )
+    .populate("employee", "f_name l_name work_email department designation profile_image")
     .select("employee onModel role latitude longitude checkIn checkOut source")
     .lean();
 
@@ -4168,11 +4312,15 @@ const getAttendanceOverview = async (req, res, next) => {
     const organisation_id = req.admin.organisation_id;
     const type = req.query.type === "monthly" ? "monthly" : "today";
 
-    const teamManagerIds = [
-      ...(await getAdminTeamManagerIds(req.admin._id, organisation_id)),
-    ];
+    const { adminIds: teamAdminIds, managerIds: teamManagerIds } = await getAdminAttendanceScope(req.admin._id, organisation_id);
 
-    const [managers, employees] = await Promise.all([
+    const [admins, managers, employees] = await Promise.all([
+      teamAdminIds.length
+        ? Adminmodel.find({ organisation_id, working_status: "working", _id: { $in: teamAdminIds } })
+            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager")
+            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+            .lean()
+        : [],
       teamManagerIds.length
   ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
@@ -4188,6 +4336,20 @@ const getAttendanceOverview = async (req, res, next) => {
     ]);
 
     const people = [
+      ...admins.map((a) => ({
+        id: String(a._id),
+        empid: a.empid,
+        name: [a.f_name, a.l_name].filter(Boolean).join(" "),
+        email: a.work_email,
+        role: a.role || "admin",
+        designation: a.designation,
+        department: a.department,
+        office_location: a.office_location,
+        avatar: a.profile_image || null,
+        reportingManager: a.reporting_manager
+          ? [a.reporting_manager.f_name, a.reporting_manager.l_name].filter(Boolean).join(" ")
+          : "—",
+      })),
       ...managers.map((m) => ({
         id: String(m._id),
         empid: m.empid,
@@ -4333,11 +4495,14 @@ const getAttendanceHistory = async (req, res, next) => {
         .status(400)
         .json({ success: false, message: "employeeId is required" });
 
-    const teamManagerIds = [
-      ...(await getAdminTeamManagerIds(req.admin._id, organisation_id)),
-    ];
+    const { adminIds: teamAdminIds, managerIds: teamManagerIds } = await getAdminAttendanceScope(req.admin._id, organisation_id);
 
-    const [manager, employee] = await Promise.all([
+    const [admin, manager, employee] = await Promise.all([
+      teamAdminIds.length
+        ? Adminmodel.findOne({ _id: employeeId, organisation_id, _id: { $in: teamAdminIds } })
+            .select("empid f_name l_name work_email role designation department office_location")
+            .lean()
+        : null,
       teamManagerIds.length
         ? Managermodel.findOne({
             _id: employeeId,
@@ -4359,7 +4524,7 @@ const getAttendanceHistory = async (req, res, next) => {
         )
         .lean(),
     ]);
-    const person = manager || employee;
+    const person = admin || manager || employee;
     if (!person)
       return res
         .status(404)

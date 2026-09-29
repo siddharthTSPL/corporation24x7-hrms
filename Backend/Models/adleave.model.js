@@ -91,8 +91,11 @@ const adminLeaveSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending_superadmin",
+        "pending_reporting_manager",
         "approved_superadmin",
+        "approved_reporting_manager",
         "rejected_superadmin",
+        "rejected_reporting_manager",
       ],
       default: "pending_superadmin",
       index: true,
@@ -100,14 +103,26 @@ const adminLeaveSchema = new mongoose.Schema(
 
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SuperAdmin",
+      refPath: "approvedByModel",
       default: null,
+    },
+
+    approvedByModel: {
+      type: String,
+      enum: ["SuperAdmin", "Admin"],
+      default: "SuperAdmin",
     },
 
     rejectedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SuperAdmin",
+      refPath: "rejectedByModel",
       default: null,
+    },
+
+    rejectedByModel: {
+      type: String,
+      enum: ["SuperAdmin", "Admin"],
+      default: "SuperAdmin",
     },
 
     remarks: {

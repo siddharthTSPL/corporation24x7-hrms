@@ -9,6 +9,33 @@ const {
   resolvePerson,
 } = require("../utils/notify.utils");
 
+const getAdminScopeIds = async (adminId, organisation_id) => {
+  const admins = await Admin.find({ organisation_id })
+    .select("_id reporting_manager reporting_manager_model")
+    .lean();
+  const byId = new Map(admins.map((admin) => [String(admin._id), admin]));
+  let root = byId.get(String(adminId));
+  const visited = new Set([String(adminId)]);
+  while (root?.reporting_manager_model === "Admin" && root.reporting_manager) {
+    const parentId = String(root.reporting_manager);
+    const parent = byId.get(parentId);
+    if (!parent || visited.has(parentId)) break;
+    visited.add(parentId);
+    root = parent;
+  }
+  const scope = new Set([String(root?._id || adminId)]);
+  let frontier = [...scope];
+  while (frontier.length) {
+    const next = admins
+      .filter((admin) => admin.reporting_manager_model === "Admin" && frontier.includes(String(admin.reporting_manager)))
+      .map((admin) => String(admin._id))
+      .filter((id) => !scope.has(id));
+    next.forEach((id) => scope.add(id));
+    frontier = next;
+  }
+  return [...scope];
+};
+
 const applyWFH = async (req, res, next) => {
   const { startDate, endDate, reason } = req.body;
   if (!startDate || !endDate || !reason)
@@ -319,11 +346,13 @@ const adminGetPendingWFH = async (req, res, next) => {
   if (!req.admin)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
 
+  const adminScopeIds = await getAdminScopeIds(req.admin._id, req.admin.organisation_id);
   const wfhList = await WFH.find({
-    currentHandler: req.admin._id,
+    currentHandler: { $in: adminScopeIds },
     currentHandlerModel: "Admin",
     organisation_id: req.admin.organisation_id,
     status: "pending_admin",
+    $nor: [{ requesterModel: "Admin", requester: req.admin._id }],
   })
     .populate("requester", "f_name l_name work_email department designation role")
     .sort({ createdAt: -1 })
@@ -342,12 +371,15 @@ const adminApproveWFH = async (req, res, next) => {
   const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.admin.organisation_id });
   if (!wfh)
     return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
-  if (wfh.currentHandler.toString() !== req.admin._id.toString() || wfh.currentHandlerModel !== "Admin")
+  const adminScopeIds = await getAdminScopeIds(req.admin._id, req.admin.organisation_id);
+  if (!adminScopeIds.includes(String(wfh.currentHandler)) || wfh.currentHandlerModel !== "Admin")
     return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+  if (wfh.requesterModel === "Admin" && String(wfh.requester) === String(req.admin._id))
+    return next(Object.assign(new Error("You cannot approve your own WFH request"), { statusCode: 403 }));
   if (wfh.status !== "pending_admin")
     return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
 
-  wfh.status = "approved_admin";
+  wfh.status = wfh.requesterModel === "Admin" ? "approved_reporting_manager" : "approved_admin";
   wfh.approvedBy = req.admin._id;
   wfh.remarks = remarks || "";
   await wfh.save();
@@ -377,12 +409,15 @@ const adminRejectWFH = async (req, res, next) => {
   const wfh = await WFH.findOne({ _id: wfhId, organisation_id: req.admin.organisation_id });
   if (!wfh)
     return next(Object.assign(new Error("WFH request not found"), { statusCode: 404 }));
-  if (wfh.currentHandler.toString() !== req.admin._id.toString() || wfh.currentHandlerModel !== "Admin")
+  const adminScopeIds = await getAdminScopeIds(req.admin._id, req.admin.organisation_id);
+  if (!adminScopeIds.includes(String(wfh.currentHandler)) || wfh.currentHandlerModel !== "Admin")
     return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
+  if (wfh.requesterModel === "Admin" && String(wfh.requester) === String(req.admin._id))
+    return next(Object.assign(new Error("You cannot reject your own WFH request"), { statusCode: 403 }));
   if (wfh.status !== "pending_admin")
     return next(Object.assign(new Error("WFH request is not awaiting your decision"), { statusCode: 400 }));
 
-  wfh.status = "rejected_admin";
+  wfh.status = wfh.requesterModel === "Admin" ? "rejected_reporting_manager" : "rejected_admin";
   wfh.rejectedBy = req.admin._id;
   wfh.remarks = remarks || "";
   wfh.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -422,11 +457,16 @@ const adminApplyWFH = async (req, res, next) => {
 
   const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
+  const reportsToAdmin = admin.reporting_manager_model === "Admin" && admin.reporting_manager;
+  const currentHandler = reportsToAdmin ? admin.reporting_manager : organisation_id;
+  const currentHandlerModel = reportsToAdmin ? "Admin" : "SuperAdmin";
+  const pendingStatus = reportsToAdmin ? "pending_admin" : "pending_superadmin";
+
   const overlapping = await WFH.findOne({
     requester: admin._id,
     requesterModel: "Admin",
     organisation_id,
-    status: { $nin: ["rejected_superadmin"] },
+    status: { $nin: ["rejected_superadmin", "rejected_reporting_manager"] },
     startDate: { $lte: end },
     endDate: { $gte: start },
   }).select("_id").lean();
@@ -437,27 +477,27 @@ const adminApplyWFH = async (req, res, next) => {
     organisation_id,
     requester: admin._id,
     requesterModel: "Admin",
-    currentHandler: organisation_id,
-    currentHandlerModel: "SuperAdmin",
+    currentHandler,
+    currentHandlerModel,
     superadmin: organisation_id,
     startDate: start,
     endDate: end,
     days,
     reason,
-    status: "pending_superadmin",
+    status: pendingStatus,
   });
 
   notifyWFHApplied({
     requesterName: `${admin.f_name} ${admin.l_name || ""}`.trim(),
-    handlerModel: "SuperAdmin",
-    handlerId: organisation_id,
+    handlerModel: currentHandlerModel,
+    handlerId: currentHandler,
     startDate: start,
     endDate: end,
     days,
     reason,
   });
 
-  res.status(201).json({ success: true, message: "WFH request submitted to superadmin", wfh });
+  res.status(201).json({ success: true, message: `WFH request submitted to ${currentHandlerModel.toLowerCase()}`, wfh });
 };
 
 const adminGetMyWFH = async (req, res, next) => {
@@ -482,7 +522,7 @@ const superadminGetPendingWFH = async (req, res, next) => {
   const wfhList = await WFH.find({
     superadmin: req.superAdmin._id,
     organisation_id: req.superAdmin._id,
-    status: "pending_superadmin",
+    requesterModel: "Admin",
   })
     .populate("requester", "f_name l_name work_email")
     .sort({ createdAt: -1 })

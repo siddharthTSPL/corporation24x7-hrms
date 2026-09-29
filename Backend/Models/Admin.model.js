@@ -150,7 +150,7 @@ const adminSchema = new mongoose.Schema(
 
     reporting_manager_model: {
       type: String,
-      enum: ["SuperAdmin", "Manager"],
+      enum: ["SuperAdmin", "Manager", "Admin"],
       default: null,
     },
 

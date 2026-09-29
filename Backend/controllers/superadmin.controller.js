@@ -952,6 +952,29 @@ const createAdmin = async (req, res, next) => {
       resolvedReportingManagerModel = "SuperAdmin";
     }
 
+    if (resolvedReportingManagerModel === "Admin") {
+      const reportingAdmin = await AdminModel.findOne({
+        _id: resolvedReportingManager,
+        organisation_id,
+        working_status: "working",
+      }).select("_id").lean();
+      if (!reportingAdmin)
+        return next(Object.assign(new Error("Reporting admin was not found in this organisation"), { statusCode: 400 }));
+    } else if (resolvedReportingManagerModel === "SuperAdmin") {
+      if (String(resolvedReportingManager) !== String(organisation_id))
+        return next(Object.assign(new Error("Invalid Super Admin reporting manager"), { statusCode: 400 }));
+    } else if (resolvedReportingManagerModel === "Manager") {
+      const reportingManager = await Managermodel.findOne({
+        _id: resolvedReportingManager,
+        organisation_id,
+        working_status: "working",
+      }).select("_id").lean();
+      if (!reportingManager)
+        return next(Object.assign(new Error("Reporting manager was not found in this organisation"), { statusCode: 400 }));
+    } else {
+      return next(Object.assign(new Error("Choose a valid reporting manager"), { statusCode: 400 }));
+    }
+
     const admin = await AdminModel.create({
       organisation_id, empid, uid, f_name, l_name, work_email: email, password, gender,
       designation, department, office_location, personal_contact, e_contact,
@@ -1159,6 +1182,45 @@ const updateAdmin = async (req, res, next) => {
       if (req.body[field] !== undefined) admin[field] = req.body[field];
     },
   );
+  if (req.body.reporting_manager !== undefined || req.body.reporting_manager_model !== undefined) {
+    const managerId = req.body.reporting_manager;
+    const managerModel = req.body.reporting_manager_model;
+    if (managerModel === "Admin") {
+      if (String(managerId) === String(id))
+        return next(Object.assign(new Error("An admin cannot report to themselves"), { statusCode: 400 }));
+      const allAdmins = await AdminModel.find({ organisation_id })
+        .select("_id reporting_manager reporting_manager_model")
+        .lean();
+      const descendantIds = new Set();
+      let frontier = [String(id)];
+      while (frontier.length) {
+        const next = allAdmins
+          .filter((candidate) => candidate.reporting_manager_model === "Admin" && frontier.includes(String(candidate.reporting_manager)))
+          .map((candidate) => String(candidate._id))
+          .filter((candidateId) => candidateId !== String(id) && !descendantIds.has(candidateId));
+        next.forEach((candidateId) => descendantIds.add(candidateId));
+        frontier = next;
+      }
+      if (descendantIds.has(String(managerId)))
+        return next(Object.assign(new Error("An admin cannot report to one of their own reporting admins"), { statusCode: 400 }));
+      const reportingAdmin = await AdminModel.findOne({ _id: managerId, organisation_id, working_status: "working" }).select("_id").lean();
+      if (!reportingAdmin)
+        return next(Object.assign(new Error("Reporting admin was not found in this organisation"), { statusCode: 400 }));
+      admin.reporting_manager = reportingAdmin._id;
+      admin.reporting_manager_model = "Admin";
+    } else if (managerModel === "Manager") {
+      const reportingManager = await Managermodel.findOne({ _id: managerId, organisation_id, working_status: "working" }).select("_id").lean();
+      if (!reportingManager)
+        return next(Object.assign(new Error("Reporting manager was not found in this organisation"), { statusCode: 400 }));
+      admin.reporting_manager = reportingManager._id;
+      admin.reporting_manager_model = "Manager";
+    } else if (managerModel === "SuperAdmin" && String(managerId) === String(organisation_id)) {
+      admin.reporting_manager = organisation_id;
+      admin.reporting_manager_model = "SuperAdmin";
+    } else {
+      return next(Object.assign(new Error("Choose a valid reporting manager"), { statusCode: 400 }));
+    }
+  }
   await admin.save();
   res.status(200).json({
     success: true,
@@ -1753,7 +1815,7 @@ const acceptleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.superAdmin._id;
  
-  const leave = await AdminLeave.findOne({ _id: id, organisation_id });
+  const leave = await AdminLeave.findOne({ _id: id, organisation_id, status: "pending_superadmin" });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
  
@@ -1777,6 +1839,7 @@ const acceptleavebyadmin = async (req, res, next) => {
  
   leave.status = "approved_superadmin";
   leave.approvedBy = req.superAdmin._id;
+  leave.approvedByModel = "SuperAdmin";
   leave.approvedAt = new Date();
   await leave.save();
 
@@ -1799,7 +1862,7 @@ const rejectleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.superAdmin._id;
  
-  const leave = await AdminLeave.findOne({ _id: id, organisation_id });
+  const leave = await AdminLeave.findOne({ _id: id, organisation_id, status: "pending_superadmin" });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
  
@@ -1808,6 +1871,7 @@ const rejectleavebyadmin = async (req, res, next) => {
  
   leave.status = "rejected_superadmin";
   leave.rejectedBy = req.superAdmin._id;
+  leave.rejectedByModel = "SuperAdmin";
   leave.rejectedAt = new Date();
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
@@ -2158,15 +2222,15 @@ const getAttendanceOverview = async (req, res, next) => {
     const organisation_id = req.superAdmin._id;
     const type = req.query.type === "monthly" ? "monthly" : "today";
 
-    // Every Admin reports to this Superadmin by default (there's no
-    // reporting_manager field on the Admin model) - show their actual
-    // name here instead of the literal word "Superadmin".
+    // Use the assigned reporting manager for admins with a configured chain;
+    // older admins without one still display the organisation Super Admin.
     const superAdminName =
       [req.superAdmin.f_name, req.superAdmin.l_name].filter(Boolean).join(" ") || "Superadmin";
 
     const [admins, managers, employees] = await Promise.all([
     AdminModel.find({ organisation_id, working_status: "working" })
-        .select("empid f_name l_name work_email role designation department office_location profile_image")
+        .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+        .populate({ path: "reporting_manager", select: "f_name l_name empid" })
         .lean(),
      Managermodel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
@@ -2189,7 +2253,9 @@ const getAttendanceOverview = async (req, res, next) => {
         department: a.department,
         office_location: a.office_location,
         avatar: a.profile_image || null,
-        reportingManager: superAdminName,
+        reportingManager: a.reporting_manager
+          ? [a.reporting_manager.f_name, a.reporting_manager.l_name].filter(Boolean).join(" ")
+          : superAdminName,
       })),
       ...managers.map((m) => ({
         id: String(m._id),

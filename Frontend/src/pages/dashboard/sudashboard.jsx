@@ -266,6 +266,8 @@ const BLANK_FORM = {
   account_holder_name: "",
   account_number: "",
   ifsc_code: "",
+  reporting_manager: "",
+  reporting_manager_model: "SuperAdmin",
 };
 
 const NAME_REGEX = /^[A-Za-z\s]*$/;
@@ -1057,7 +1059,7 @@ function EditPermissionsModal({ open, onClose, user, onSave, loading }) {
   );
 }
 
-function AdminModal({ open, onClose, initial, onSave, loading }) {
+function AdminModal({ open, onClose, initial, onSave, loading, admins = [], superAdminId }) {
   const { options: deptOptions } = useDepartmentOptions();
   const [form, setForm] = useState(BLANK_FORM);
   const [errors, setErrors] = useState({});
@@ -1066,6 +1068,7 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [permissions, setPermissions] = useState(DEFAULT_PERMISSIONS);
+  const [isCoAdmin, setIsCoAdmin] = useState(false);
 
   const [countryIso, setCountryIso] = useState("IN");
   const [stateIso, setStateIso] = useState("");
@@ -1084,14 +1087,17 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
         nextForm = {
           ...BLANK_FORM,
           ...rest,
+          reporting_manager: rest.reporting_manager?._id || rest.reporting_manager || superAdminId || "",
+          reporting_manager_model: rest.reporting_manager_model || "SuperAdmin",
           ...parseAddress(address || ""),
           confirmPassword: "",
           role: "admin",
         };
       } else {
-        nextForm = { ...BLANK_FORM };
+        nextForm = { ...BLANK_FORM, reporting_manager: superAdminId || "" };
       }
       setForm(nextForm);
+      setIsCoAdmin(nextForm.reporting_manager_model === "Admin");
       setErrors({});
       setTouched({});
       setSubmitted(false);
@@ -1218,6 +1224,20 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
 
   const showErr = (k) => (submitted || touched[k] ? errors[k] : "");
 
+  const setCoAdminChoice = (e) => {
+    const checked = e.target.checked;
+    setIsCoAdmin(checked);
+    setForm((current) => ({
+      ...current,
+      reporting_manager_model: checked ? "Admin" : "SuperAdmin",
+      reporting_manager: checked ? "" : (superAdminId || ""),
+    }));
+  };
+
+  const setReportingAdmin = (e) => {
+    setForm((current) => ({ ...current, reporting_manager_model: "Admin", reporting_manager: e.target.value }));
+  };
+
   const generatePassword = () => {
     const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
     const lower = "abcdefghijkmnopqrstuvwxyz";
@@ -1320,6 +1340,10 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
 
   const handleSave = () => {
     setSubmitted(true);
+    if (isCoAdmin && !form.reporting_manager) {
+      setErrors((current) => ({ ...current, reporting_manager: "Select the Admin this Co-Admin will report to" }));
+      return;
+    }
     const e = validateForm(form, isEdit);
     setErrors(e);
     if (hasErrors(e)) return;
@@ -1394,6 +1418,31 @@ function AdminModal({ open, onClose, initial, onSave, loading }) {
               />
               <FieldErr msg={showErr("l_name")} />
             </div>
+          </div>
+
+          <div className="mt-3 sm:mt-4 rounded-xl border border-[#e8d5e2] bg-[#fdf8fb] p-3.5">
+            <label className="flex items-start gap-2.5 text-[12px] font-semibold text-[#4A2440] cursor-pointer">
+              <input type="checkbox" checked={isCoAdmin} onChange={setCoAdminChoice} className="mt-0.5 accent-[#730042]" />
+              <span>Yes, create this Admin as a Co-Admin</span>
+            </label>
+            <p className="ml-6 mt-1 text-[10px] text-[#9B8BAE]">A Co-Admin reports to another Admin and follows them for approvals.</p>
+            {isCoAdmin && (
+              <div className="ml-6 mt-3">
+                <FLabel required>Reporting Admin</FLabel>
+                <FSel value={form.reporting_manager?._id || form.reporting_manager || ""} onChange={setReportingAdmin}>
+                  <option value="">Select reporting Admin</option>
+                  {admins
+                    .filter((admin) => String(admin._id) !== String(initial?._id) && (admin.working_status || "working") === "working")
+                    .map((admin) => (
+                      <option key={admin._id} value={admin._id}>{admin.f_name} {admin.l_name}</option>
+                    ))}
+                </FSel>
+                <FieldErr msg={showErr("reporting_manager")} />
+              </div>
+            )}
+            {!isCoAdmin && form.reporting_manager_model === "Manager" && (
+              <p className="ml-6 mt-2 text-[10px] text-[#9B8BAE]">The existing Manager reporting assignment will be preserved.</p>
+            )}
           </div>
 
           <div className="mt-3 sm:mt-4">
@@ -2556,7 +2605,7 @@ function SuperAdminDashboard() {
     : [];
   const activeLeaves = adminLeaves;
   const pendingAdminLeaves = adminLeaves.filter((l) =>
-    (l.status || "").includes("pending"),
+    l.status === "pending_superadmin",
   ).length;
   const attendanceRate =
     totalEmpCount > 0 ? Math.round((presentToday / totalEmpCount) * 100) : 0;
@@ -2780,11 +2829,6 @@ function SuperAdminDashboard() {
   const isAdminNonWorking = (admin) => {
     const ws = (admin.working_status || "working").toLowerCase();
     return ws !== "working";
-  };
-
-  const isPendingLeave = (leave) => {
-    const s = (leave.status || "").toLowerCase();
-    return s.includes("pending");
   };
 
   const leaveStatusClass = (status = "") => {
@@ -3209,7 +3253,7 @@ function SuperAdminDashboard() {
                 const type = leave.leaveType || leave.type || "Leave";
                 const from = leave.startDate || leave.from || "";
                 const to = leave.endDate || leave.to || "";
-                const pending = isPendingLeave(leave);
+                const pending = leave.status === "pending_superadmin";
                 return (
                   <div
                     key={leave._id}
@@ -3578,6 +3622,8 @@ function SuperAdminDashboard() {
         initial={adminModal.editing}
         onSave={saveAdmin}
         loading={creatingAdmin || updatingAdmin}
+        admins={admins}
+        superAdminId={superAdmin._id}
       />
 
       <ReviewModal

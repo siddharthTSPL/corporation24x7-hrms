@@ -937,7 +937,7 @@ const LeaveCard = ({
   );
 };
 
-const WFHCard = ({ wfh, processingId, onAction, idx }) => {
+const WFHCard = ({ wfh, processingId, onAction, idx, canAct = true }) => {
   const person = wfh.requester || {};
   const isProcessing = processingId === wfh._id;
   const days = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
@@ -1017,7 +1017,7 @@ const WFHCard = ({ wfh, processingId, onAction, idx }) => {
       </div>
 
       <div className="w-full sm:w-auto shrink-0">
-        {!isTerminalStatus(wfh.status) ? (
+        {canAct && !isTerminalStatus(wfh.status) ? (
           <ActionButtons
             onApprove={() => onAction(wfh._id, "approve")}
             onReject={() => onAction(wfh._id, "reject")}
@@ -1402,8 +1402,11 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
   const FILTERS = [
     { key: "all", label: "All" },
     { key: "pending_superadmin", label: "Pending" },
+    { key: "pending_reporting_manager", label: "Pending (Reporting Admin)" },
     { key: "approved_superadmin", label: "Approved" },
+    { key: "approved_reporting_manager", label: "Approved by Reporting Admin" },
     { key: "rejected_superadmin", label: "Rejected" },
+    { key: "rejected_reporting_manager", label: "Rejected by Reporting Admin" },
   ];
 
   const count = (key) =>
@@ -1455,20 +1458,20 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
           },
           {
             label: "Pending",
-            val: leaves.filter((l) => l.status === "pending_superadmin").length,
+            val: leaves.filter((l) => l.status === "pending_superadmin" || l.status === "pending_reporting_manager").length,
             color: "#92400E",
             bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)",
           },
           {
             label: "Approved",
-            val: leaves.filter((l) => l.status === "approved_superadmin")
+            val: leaves.filter((l) => l.status === "approved_superadmin" || l.status === "approved_reporting_manager")
               .length,
             color: "#14803D",
             bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)",
           },
           {
             label: "Rejected",
-            val: leaves.filter((l) => l.status === "rejected_superadmin")
+            val: leaves.filter((l) => l.status === "rejected_superadmin" || l.status === "rejected_reporting_manager")
               .length,
             color: "#991B1B",
             bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)",
@@ -1558,7 +1561,7 @@ const AdminLeavesTab = ({ leaves, isLoading, processingId, onAction }) => {
             leave={leave}
             person={leave.admin || {}}
             accentBadge="Admin"
-            actionable={true}
+            actionable={leave.status === "pending_superadmin"}
             processingId={processingId}
             onApprove={() => onAction(leave._id, "accept")}
             onReject={() => onAction(leave._id, "reject")}
@@ -1582,8 +1585,11 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
   const FILTERS = [
     { key: "all", label: "All" },
     { key: "pending_superadmin", label: "Pending" },
+    { key: "pending_admin", label: "Pending (Reporting Admin)" },
     { key: "approved_superadmin", label: "Approved" },
+    { key: "approved_reporting_manager", label: "Approved by Reporting Admin" },
     { key: "rejected_superadmin", label: "Rejected" },
+    { key: "rejected_reporting_manager", label: "Rejected by Reporting Admin" },
   ];
 
   const count = (key) =>
@@ -1633,21 +1639,21 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
           },
           {
             label: "Pending",
-            val: wfhList.filter((w) => w.status === "pending_superadmin")
+            val: wfhList.filter((w) => w.status === "pending_superadmin" || w.status === "pending_admin")
               .length,
             color: "#92400E",
             bg: "linear-gradient(135deg,#FFFBEB,#FEF3C7)",
           },
           {
             label: "Approved",
-            val: wfhList.filter((w) => w.status === "approved_superadmin")
+            val: wfhList.filter((w) => w.status === "approved_superadmin" || w.status === "approved_reporting_manager")
               .length,
             color: "#14803D",
             bg: "linear-gradient(135deg,#F0FDF4,#DCFCE7)",
           },
           {
             label: "Rejected",
-            val: wfhList.filter((w) => w.status === "rejected_superadmin")
+            val: wfhList.filter((w) => w.status === "rejected_superadmin" || w.status === "rejected_reporting_manager")
               .length,
             color: "#991B1B",
             bg: "linear-gradient(135deg,#FEF2F2,#FEE2E2)",
@@ -1736,6 +1742,7 @@ const WFHTab = ({ wfhList, isLoading, processingId, onAction }) => {
             processingId={processingId}
             onAction={onAction}
             idx={idx}
+            canAct={wfh.status === "pending_superadmin"}
           />
         ))
       )}
