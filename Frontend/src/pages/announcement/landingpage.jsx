@@ -17,6 +17,7 @@ import { FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import logo from '../../assets/TorchX.svg'
+import heroBg from '../../assets/Hero-bg.png' // vector (crisp on every screen)
 import { useAuth } from '../../auth/store/getmeauth/getmeauth'
 import { fadeUp, fontStyles } from './animations'
 
@@ -379,75 +380,99 @@ const sortedFreeForeverFeatures = [...freeForeverFeatures].sort(
   (a, b) => a.text.length - b.text.length
 )
 
-function PricingFeatureRow({ text, span }) {
+/* ==========================================================================
+   CARD BACKDROP — static vector design (NO animation)
+
+   Design ka flower-center card ke center par baithta hai aur poore hero me
+   faila rehta hai (section ka overflow-hidden hi isse clip karta hai).
+   Left ka khaali hissa mask se fade hota hai, taaki left content ke upar
+   design na aaye.
+========================================================================== */
+
+function CardBackdrop() {
   return (
-    <div className={`flex items-start gap-2 ${span ? 'sm:col-span-2' : ''}`}>
-      {/* GREEN tick — included feature */}
-      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-600 shadow-[0_2px_6px_rgba(22,163,74,0.35)]">
-        <FiCheck strokeWidth={3} className="text-[9px] text-white" />
-      </span>
-      <span className="text-[13px] font-medium leading-snug text-[#4a2a3a]">{text}</span>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
+      <img
+        src={heroBg}
+        alt=""
+        draggable={false}
+        className="absolute left-1/2 top-1/2 max-w-none select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 [-webkit-mask-image:linear-gradient(to_right,transparent_30%,#000_44%)] [mask-image:linear-gradient(to_right,transparent_30%,#000_44%)]"
+        style={{ transform: 'translate(-71.5%, -50%)' }}
+      />
     </div>
   )
 }
 
-function PricingHeroCard({ cardRef }) {
+/* ==========================================================================
+   PRICING CARD
+========================================================================== */
+
+function PricingFeatureRow({ text, span }) {
   return (
-    <div ref={cardRef} className="relative mx-auto w-full max-w-[440px] lg:mx-0">
-      {/* OUTER SPOTLIGHT GLOW */}
-      <div className="pointer-events-none absolute -inset-3 z-0 rounded-[36px] bg-gradient-to-br from-[#ff9ec7]/50 via-[#c9184a]/35 to-[#ff7a45]/40 blur-2xl animate-pulse" />
+    <div className={`flex items-start gap-2 ${span ? 'sm:col-span-2' : ''}`}>
+      {/* PINK tick — matches reference */}
+      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#fce4ee] text-[#c9184a]">
+        <FiCheck strokeWidth={3} className="text-[9px]" />
+      </span>
+      <span className="text-[13px] font-medium leading-snug text-[#3a2a30]">{text}</span>
+    </div>
+  )
+}
+
+function PricingHeroCard({ cardRef, cardShapeRef }) {
+  return (
+    <div ref={cardRef} className="relative mx-auto w-full max-w-[480px]">
+      {/* FLOATING MINI CARD — Attendance (fully above, top-left) */}
+      <div className="pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f7ef] text-[#16a34a]">
+          <FiActivity size={16} />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#999]">
+            Attendance
+            <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" />
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[15px] font-display font-extrabold text-[#111]">98.4%</span>
+            <span className="text-[10px] font-semibold text-[#16a34a]">Live On-Duty</span>
+          </div>
+        </div>
+      </div>
+
+      {/* FLOATING MINI CARD — Leave Balance (fully above, top-right) */}
+      <div className="pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
+          <FiCalendar size={16} />
+        </div>
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#999]">Leave Balance</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[14px] font-display font-extrabold text-[#111]">14 Days</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#fff4d6] text-[#a06b00]">
+              2 In Review
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* MAIN CARD */}
-      <div className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-white bg-gradient-to-br from-white via-[#fffafc] to-[#fdeef5] px-6 py-7 sm:px-8 sm:py-8 shadow-[0_30px_90px_rgba(255,158,199,0.25),0_20px_60px_rgba(0,0,0,0.5)]">
-        {/* TOP PREMIUM EDGE */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[3px] bg-gradient-to-r from-[#ff7a45] via-[#c9184a] to-[#7A004B]" />
-
-        {/* AMBIENT CORNER GLOW */}
-        <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/25 blur-3xl" />
-
-        {/* OFFER RIBBON — TOP LEFT "NEW PACK" */}
-        <style>{`
-          @keyframes ribbonShine {
-            0%   { transform: translateX(-200%) skewX(-20deg); }
-            55%, 100% { transform: translateX(600%) skewX(-20deg); }
-          }
-          @keyframes ribbonTwinkle {
-            0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
-            50%      { opacity: .55; transform: scale(.75) rotate(20deg); }
-          }
-        `}</style>
-
-        <div className="pointer-events-none absolute left-0 top-0 z-30 h-[140px] w-[140px] overflow-hidden rounded-tl-[28px]">
-          <div className="absolute -left-[52px] top-[30px] w-[200px] -rotate-45 overflow-hidden border-y border-[#ffe3a3]/80 bg-gradient-to-r from-[#ff9a3c] via-[#ff4f7b] to-[#b8005f] py-[7px] shadow-[0_8px_18px_rgba(201,24,74,0.55),inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_0_rgba(0,0,0,0.15)]">
-            <span
-              className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-transparent via-white/70 to-transparent"
-              style={{ animation: 'ribbonShine 3s ease-in-out infinite' }}
-            />
-            <div className="relative flex items-center justify-center gap-1.5">
-              <HiOutlineSparkles
-                className="text-[13px] text-[#fff3c4]"
-                style={{ animation: 'ribbonTwinkle 1.6s ease-in-out infinite' }}
-              />
-              <span className="font-ui text-[12px] font-black uppercase tracking-[2px] text-[#730042] [text-shadow:0_1px_2px_rgba(90,0,51,0.2)]">
-  New Pack
-</span>
-              <HiOutlineSparkles
-                className="text-[13px] text-[#fff3c4]"
-                style={{ animation: 'ribbonTwinkle 1.6s ease-in-out infinite .8s' }}
-              />
-            </div>
-          </div>
+      <div
+        ref={cardShapeRef}
+        className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]"
+      >
+        {/* TOP: FREE FOREVER badge + STARTER PLAN tag */}
+        <div className="relative flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
+            ⚡ Free Forever
+          </span>
+          <span className="inline-flex items-center rounded-full bg-[#f2f2f2] px-3 py-1.5 font-ui text-[11px] font-semibold text-[#777]">
+            Starter Plan
+          </span>
         </div>
 
         {/* CARD CONTENT */}
         <div className="relative z-10">
-          <div className="relative flex items-center justify-end">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
-              ⚡ Free Forever
-            </span>
-          </div>
-
-          <h3 className="relative mt-8 font-display text-[19px] font-bold leading-snug text-[#2A1120] sm:text-[21px]">
+          <h3 className="relative mt-6 font-display text-[19px] font-bold leading-snug text-[#2A1120] sm:text-[21px]">
             Great Start for Startup and Micro Teams
           </h3>
 
@@ -458,7 +483,7 @@ function PricingHeroCard({ cardRef }) {
           {/* PRICE */}
           <div className="relative mt-5 flex items-center justify-between">
             <div className="flex items-baseline gap-1">
-              <span className="font-display text-[34px] font-extrabold text-[#7A004B]">₹0</span>
+              <span className="font-display text-[34px] font-extrabold text-[#111]">₹0</span>
               <span className="font-body text-[12px] text-[#a08494]">/user/month</span>
             </div>
 
@@ -469,10 +494,10 @@ function PricingHeroCard({ cardRef }) {
           </div>
 
           {/* DIVIDER */}
-          <div className="relative my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7A004B]/25 to-transparent" />
+          <div className="relative my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7A004B]/15 to-transparent" />
 
           {/* FEATURES */}
-          <div className="relative grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
+          <div className="relative grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
             {sortedFreeForeverFeatures.map((f) => (
               <PricingFeatureRow key={f.text} text={f.text} span={f.text.length > 28} />
             ))}
@@ -481,7 +506,7 @@ function PricingHeroCard({ cardRef }) {
           {/* CTA */}
           <a
             href="https://torchxsuite.com/signup"
-            className="relative mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#7A004B] to-[#A60062] py-3.5 font-ui text-sm font-bold text-white shadow-[0_10px_26px_rgba(122,0,75,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(122,0,75,0.5)]"
+            className="relative mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#7A004B] py-3.5 font-ui text-sm font-bold text-white shadow-[0_10px_26px_rgba(122,0,75,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5a0033] hover:shadow-[0_14px_32px_rgba(122,0,75,0.4)]"
           >
             Get Started Free <FiArrowRight />
           </a>
@@ -491,13 +516,35 @@ function PricingHeroCard({ cardRef }) {
           </p>
         </div>
       </div>
+
+      {/* FLOATING MINI CARD — Payroll Status (fully below, bottom-right) */}
+      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
+          <FiCreditCard size={16} />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#999]">
+            Payroll Status
+            <span className="text-[9px] font-bold text-emerald-600">⚡ Instant NEFT</span>
+          </div>
+          <div className="flex items-center gap-1 text-[12.5px] font-display font-bold text-[#111]">
+            <span className="text-emerald-500">✓</span>
+            Disbursed &amp; Auto-Reconciled
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
+/* ==========================================================================
+   HERO SECTION
+========================================================================== */
+
 function Hero({ onOpenCalculator, scrollContainerRef }) {
   const reduceMotion = prefersReducedMotion()
   const cardRef = useRef(null)
+  const cardShapeRef = useRef(null)
   const sectionRef = useRef(null)
 
   // Scroll-linked parallax on the card (uses the app's own scroll container)
@@ -508,12 +555,19 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
     const card = cardRef.current
     if (!scroller || !section || !card) return
 
-    const onScroll = () => {
+    let ticking = false
+    const update = () => {
+      ticking = false
       const rect = section.getBoundingClientRect()
       const scrollerRect = scroller.getBoundingClientRect()
       const progress = (scrollerRect.top - rect.top) / rect.height
       const clamped = Math.max(-1, Math.min(1, progress))
-      gsap.to(card, { y: clamped * 40, duration: 0.6, ease: 'power3.out', overwrite: 'auto' })
+      gsap.to(card, { y: clamped * 40, duration: 0.6, ease: 'power3.out', overwrite: 'auto', force3D: true })
+    }
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(update)
     }
 
     scroller.addEventListener('scroll', onScroll, { passive: true })
@@ -523,14 +577,12 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden bg-white pt-28 pb-0 lg:pt-24"
+      className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-28"
     >
-      {/* SectionBackdrop hata diya - white background */}
-
       <Wrap className="relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-center gap-12 lg:gap-10">
-          {/* LEFT: copy */}
-          <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-start gap-12 lg:gap-10">
+          {/* LEFT: copy — apna top margin yahan control karo */}
+          <div className="relative z-10 flex flex-col items-center text-center lg:items-start lg:text-left mt-0 lg:mt-4">
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -606,18 +658,22 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             )}
           </div>
 
-          {/* RIGHT: card */}
+          {/* RIGHT: card — static design backdrop + card */}
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="relative mt-10 lg:mt-16"
           >
-            <PricingHeroCard cardRef={cardRef} />
+            <CardBackdrop />
+            <div className="relative z-10 mx-auto w-full max-w-[480px]">
+              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} />
+            </div>
           </motion.div>
         </div>
 
         {/* Stats strip */}
-        <div className="mt-16 lg:mt-20">
+        <div className="relative z-10 mt-16 lg:mt-20">
           <Stats />
         </div>
       </Wrap>
@@ -661,7 +717,6 @@ function Stats() {
     </motion.div>
   )
 }
-
 /* ==========================================================================
    FEATURES
 ========================================================================== */
@@ -976,7 +1031,7 @@ function Pricing() {
     { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
   ]
 
-   return (
+  return (
     <section id="pricing" className="scroll-anchor relative overflow-hidden bg-white pt-10 pb-28">
       {/* <SectionBackdrop />  ← hata diya, ab white background */}
       <Wrap className="relative z-10">
