@@ -4,7 +4,7 @@ import { useGetMeManager } from "../../auth/server-state/manager/managerauth/man
 import { uploadManagerDocument } from "../../../src/auth/api/managerapi/document/madocument.api";
 import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/manager/managgerother/managerother.hook";
 import { Country, State, City } from "country-state-city";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 
 

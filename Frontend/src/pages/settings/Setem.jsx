@@ -4,7 +4,7 @@ import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/se
 import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other.api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";

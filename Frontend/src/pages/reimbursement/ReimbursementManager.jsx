@@ -4,7 +4,7 @@ import {
   useApplyReimbursement,
   useUpdateReimbursement,
   useDeleteReimbursement,
-} from "../../auth/server-state/manager/managerreimbursement/managerreimbursement.hook";
+} from "../../auth/server-state/manager/managerreimbursement/Managerreimbursement.hook";
 
 export default function ReimbursementManager() {
   const myClaims = useGetMyReimbursements();

@@ -623,8 +623,6 @@ export default function ManagerTeamDocument() {
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [selectedDocType, setSelectedDocType] = useState(null);
 
-  if (!canView) return <NoPermission />;
-
   const personalDocs = personalData?.documents || [];
   const expenseDocs = expenseData?.documents || [];
   const loading = loadingPersonal || loadingExpense;
@@ -682,6 +680,8 @@ export default function ManagerTeamDocument() {
       return matchSearch && matchRole;
     });
   }, [groups, search, filterRole]);
+
+  if (!canView) return <NoPermission />;
 
   const totalDocs = personalDocs.length + expenseDocs.length;
   const totalUnviewed = groups.reduce((sum, g) => sum + g.unviewedCount, 0);

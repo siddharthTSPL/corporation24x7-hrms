@@ -12,7 +12,7 @@ import {
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, getTypeMeta } from "./notificationUtils";
 import NotificationItem from "./NotificationItem";
-import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./notificationSound";
+import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
 
 const LIVE_POLL_MS = 20000;
 

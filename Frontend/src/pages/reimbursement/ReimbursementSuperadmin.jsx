@@ -5,7 +5,7 @@ import {
   useApproveReimbursement,
   useRejectReimbursement,
   useMarkReimbursementPaid,
-} from "../../auth/server-state/superadmin/reimbursement/sureimbursement.hook";
+} from "../../auth/server-state/superadmin/reimbursement/Sureimbursement.hook";
 
 export default function ReimbursementSuperadmin() {
   const pending = useGetPendingReimbursements();
@@ -22,4 +22,3 @@ export default function ReimbursementSuperadmin() {
     />
   );
 }
-
