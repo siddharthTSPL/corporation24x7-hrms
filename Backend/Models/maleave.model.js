@@ -30,6 +30,9 @@ const managerLeaveSchema = new mongoose.Schema({
 
   lwpDays: { type: Number, default: 0 },
 
+  // Custom approval flow: admins allowed to act on this request (any one).
+  approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+
   reason: { type: String, required: true },
 
   supportingDocument: {
@@ -114,6 +117,7 @@ const managerLeaveSchema = new mongoose.Schema({
 });
 
 managerLeaveSchema.index({ manager: 1, status: 1 });
+managerLeaveSchema.index({ approverPool: 1, status: 1 });
 managerLeaveSchema.index({ directed_to: 1, status: 1 });
 managerLeaveSchema.index({ createdAt: -1 });
 

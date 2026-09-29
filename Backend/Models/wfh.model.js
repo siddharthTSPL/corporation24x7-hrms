@@ -33,6 +33,8 @@ const wfhSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
       },
     ],
+    // Custom approval flow: admins allowed to act on this request (any one).
+    approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
     superadmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
@@ -75,6 +77,7 @@ wfhSchema.index({ requester: 1, startDate: 1, endDate: 1 });
 wfhSchema.index({ currentHandler: 1, status: 1 });
 wfhSchema.index({ superadmin: 1, status: 1 });
 wfhSchema.index({ handlerChain: 1 });
+wfhSchema.index({ approverPool: 1, status: 1 });
 wfhSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.WFH || mongoose.model("WFH", wfhSchema);

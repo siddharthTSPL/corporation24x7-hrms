@@ -122,7 +122,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     checkoutRemark: {
       type: String,
-      enum: ["on_time", "overtime", "early_checkout", "auto_overtime", null],
+      enum: ["on_time", "overtime", "early_checkout", "auto_overtime", "missed_checkout", null],
       default: null,
     },
     overtimeMinutes: {

@@ -15,7 +15,10 @@ const leaveSchema = new mongoose.Schema({
   manager: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Manager",
-    required: true,
+    // Not required when a custom approval flow routes straight to an admin pool.
+    required: function () {
+      return !(this.approverPool && this.approverPool.length);
+    },
   },
   applicantName: { type: String },
   applicantEmail: { type: String },
@@ -69,6 +72,8 @@ const leaveSchema = new mongoose.Schema({
     type: String,
     enum: ["Manager", "Admin"],
   },
+  // Custom approval flow: admins allowed to act on this request (any one).
+  approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
   approvedBy: { type: mongoose.Schema.Types.ObjectId },
   approvedByModel: { type: String, enum: ["Manager", "Admin"] },
   rejectedBy: { type: mongoose.Schema.Types.ObjectId },
@@ -82,6 +87,7 @@ leaveSchema.index({ employee: 1, status: 1 });
 leaveSchema.index({ employee: 1, startDate: 1, endDate: 1 });
 leaveSchema.index({ manager: 1, status: 1 });
 leaveSchema.index({ directed_to: 1, status: 1 });
+leaveSchema.index({ approverPool: 1, status: 1 });
 leaveSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.Leave || mongoose.model("Leave", leaveSchema);

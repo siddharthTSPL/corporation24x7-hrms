@@ -241,6 +241,10 @@ const superAdminSchema = new mongoose.Schema(
     },
 
 
+    attendanceSettings: {
+      autoCheckoutEnabled: { type: Boolean, default: true },
+    },
+
     plan: {
       type: String,
       default: null,

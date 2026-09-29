@@ -1,6 +1,7 @@
 const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
+const SuperAdmin = require("../Models/superadmin.model");
 
 const FieldTeam = require("../Models/fieldTeam.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
@@ -573,6 +574,14 @@ const autoCheckoutAll = async () => {
 
     if (!openSessions.length) return;
 
+    const orgIds = [...new Set(openSessions.map((s) => String(s.organisation_id)))];
+    const orgSettings = await SuperAdmin.find({ _id: { $in: orgIds } })
+      .select("attendanceSettings")
+      .lean();
+    const autoCheckoutByOrg = new Map(
+      orgSettings.map((o) => [String(o._id), o.attendanceSettings?.autoCheckoutEnabled !== false])
+    );
+
     const shiftCache = new Map();
     const getShiftFor = async (session) => {
       if (session.shift) {
@@ -620,6 +629,26 @@ const autoCheckoutAll = async () => {
       // Manual/system activeMinutes is real tracked data - never overwrite it.
       const activeMinutesUpdate =
         a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
+
+      if (autoCheckoutByOrg.get(String(a.organisation_id)) === false) {
+        ops.push({
+          updateOne: {
+            filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
+            update: {
+              $set: {
+                checkOut: forceCheckoutAt,
+                status: "half_day",
+                checkoutRemark: "missed_checkout",
+                overtimeMinutes: 0,
+                autoCheckedOut: false,
+                ...activeMinutesUpdate,
+              },
+            },
+          },
+        });
+        summaryPayloads.push({ ...a, checkOut: forceCheckoutAt, status: "half_day" });
+        continue;
+      }
 
       ops.push({
         updateOne: {

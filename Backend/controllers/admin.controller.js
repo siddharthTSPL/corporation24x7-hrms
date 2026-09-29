@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus, TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("../utils/planAccess");
 const Adminmodel = require("../Models/Admin.model");
+const { directedOrPooled, isAdminHandler } = require("../utils/approvalFlow.utils");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Managermodel = require("../Models/manager.model");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
@@ -2696,8 +2697,12 @@ const showallleaves = async (req, res, next) => {
     const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
       Leave.find({
         organisation_id,
+
         directed_to: { $in: adminScopeIds },
         directed_to_model: "Admin",
+
+        ...directedOrPooled(req.admin._id),
+
       })
         .populate("employee", "f_name l_name work_email")
         .populate("manager", "f_name l_name work_email")
@@ -2705,8 +2710,12 @@ const showallleaves = async (req, res, next) => {
         .lean(),
       ManagerLeave.find({
         organisation_id,
+
         directed_to: { $in: adminScopeIds },
         directed_to_model: "Admin",
+
+        ...directedOrPooled(req.admin._id),
+
       })
         .populate("manager", "f_name l_name work_email department designation")
         .sort({ createdAt: -1 })
@@ -2756,11 +2765,15 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+
       const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
         !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
+
+      if (!isAdminHandler(leave, req.admin._id))
+
         return next(
           Object.assign(new Error("This leave is not directed to you"), {
             statusCode: 403,
@@ -2830,11 +2843,14 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+
       const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
         !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
+
+      if (!isAdminHandler(leave, req.admin._id))
         return next(
           Object.assign(new Error("This leave is not directed to you"), {
             statusCode: 403,
@@ -2960,11 +2976,15 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+
       const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
         !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
+
+      if (!isAdminHandler(leave, req.admin._id))
+
         return next(
           Object.assign(new Error("This leave is not directed to you"), {
             statusCode: 403,
@@ -3011,11 +3031,15 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 404,
           })
         );
+
       const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
       if (
         !adminScopeIds.includes(String(leave.directed_to)) ||
         leave.directed_to_model !== "Admin"
       )
+
+      if (!isAdminHandler(leave, req.admin._id))
+
         return next(
           Object.assign(new Error("This leave is not directed to you"), {
             statusCode: 403,

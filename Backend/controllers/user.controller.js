@@ -2,6 +2,7 @@ const usermodel = require("../Models/user.model");
 const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const Leave = require("../Models/leave.model");
+const { resolveCustomRouting } = require("../utils/approvalFlow.utils");
 const LeaveBalance = require("../Models/leavebalance.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const generateOTP = require("../automatic/otpgenerator");
@@ -496,7 +497,12 @@ const applyleave = async (req, res, next) => {
     return next(
       Object.assign(new Error("User not found"), { statusCode: 404 }),
     );
-  if (!user.Under_manager)
+  const customRouting = await resolveCustomRouting({
+    organisation_id,
+    module: "leave",
+    requesterRole: "Employee",
+  });
+  if (!user.Under_manager && !customRouting)
     return next(
       Object.assign(
         new Error("No reporting manager assigned. Cannot apply leave."),
@@ -606,23 +612,35 @@ const applyleave = async (req, res, next) => {
     days,
     reason,
     supportingDocument,
-    status: "pending_manager",
+    status: customRouting ? customRouting.status : "pending_manager",
+    ...(customRouting && {
+      directed_to: customRouting.primary,
+      directed_to_model: "Admin",
+      approverPool: customRouting.pool,
+    }),
   });
 
-  notifyLeaveApplied({
-    requesterName: `${user.f_name} ${user.l_name}`,
-    handlerModel: "Manager",
-    handlerId: user.Under_manager,
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-  });
+  const leaveHandlers = customRouting
+    ? customRouting.pool.map((id) => ({ model: "Admin", id }))
+    : [{ model: "Manager", id: user.Under_manager }];
+  for (const h of leaveHandlers) {
+    notifyLeaveApplied({
+      requesterName: `${user.f_name} ${user.l_name}`,
+      handlerModel: h.model,
+      handlerId: h.id,
+      leaveType,
+      startDate: start,
+      endDate: end,
+      days,
+      reason,
+    });
+  }
 
   res.status(201).json({
     success: true,
-    message: "Leave request submitted to your manager",
+    message: customRouting
+      ? "Leave request submitted for approval"
+      : "Leave request submitted to your manager",
     leave,
   });
 };
