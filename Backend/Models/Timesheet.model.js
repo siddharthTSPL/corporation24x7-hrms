@@ -67,6 +67,9 @@ const timesheetSchema = new mongoose.Schema(
       },
     ],
 
+    // Custom approval flow: admins allowed to act on this timesheet (any one).
+    approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+
     status: {
       type: String,
       enum: [
@@ -98,6 +101,7 @@ timesheetSchema.index(
 );
 timesheetSchema.index({ organisation_id: 1, currentHandler: 1, status: 1 });
 timesheetSchema.index({ organisation_id: 1, status: 1 });
+timesheetSchema.index({ organisation_id: 1, approverPool: 1, status: 1 });
 timesheetSchema.index({ status: 1, last_escalated_at: 1 });
 
 module.exports =
