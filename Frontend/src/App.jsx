@@ -8,6 +8,7 @@ import Guide from './components/Guide';
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const BlogPage = lazy(() => import("./pages/BlogPage"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/signup"));
@@ -72,6 +73,7 @@ const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
 const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
+const OfferResponse = lazy(() => import("./pages/recruitment/OfferResponse"));
 const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
 const Admindocument = lazy(() => import("./pages/document/admindocument"));
 const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
@@ -190,6 +192,7 @@ function App() {
               "Guide" in the footer (logged in or not) land here instead
               of being redirected to /login. */}
           <Route path="/guide" element={<Guide />} />
+          <Route path="/blog" element={<BlogPage />} /> 
           <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -201,6 +204,7 @@ function App() {
               land here; it creates one on THIS browser via the link's
               short-lived token. */}
           <Route path="/companion-login" element={<CompanionLogin />} />
+          <Route path="/offer-response/:token" element={<OfferResponse />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
               It authenticates itself with its own long-lived kiosk token,
