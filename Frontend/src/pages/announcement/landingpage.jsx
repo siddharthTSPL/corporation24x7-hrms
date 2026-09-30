@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import gsap from 'gsap'
@@ -387,6 +387,10 @@ const sortedFreeForeverFeatures = [...freeForeverFeatures].sort(
    faila rehta hai (section ka overflow-hidden hi isse clip karta hai).
    Left ka khaali hissa mask se fade hota hai, taaki left content ke upar
    design na aaye.
+
+   Image ka size / mask / opacity har device par same (desktop jaisa) hai.
+   Chhoti screen par poora stage (image + card + mini cards) ScaledStage
+   se proportionally scale hota hai.
 ========================================================================== */
 
 function CardBackdrop() {
@@ -396,9 +400,57 @@ function CardBackdrop() {
         src={heroBg}
         alt=""
         draggable={false}
-        className="absolute left-1/2 top-1/2 max-w-none select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 [-webkit-mask-image:linear-gradient(to_right,transparent_30%,#000_44%)] [mask-image:linear-gradient(to_right,transparent_30%,#000_44%)]"
+        className="absolute left-1/2 top-1/2 max-w-none select-none w-[1150px] [-webkit-mask-image:linear-gradient(to_right,transparent_30%,#000_44%)] [mask-image:linear-gradient(to_right,transparent_30%,#000_44%)]"
         style={{ transform: 'translate(-71.5%, -50%)' }}
       />
+    </div>
+  )
+}
+
+/* Desktop-size stage (image + card + mini cards) jo chhoti screen par
+   proportionally scale hota hai — layout hamesha desktop jaisa rehta hai. */
+const STAGE_W = 500
+
+function ScaledStage({ children }) {
+  const wrapRef = useRef(null)
+  const innerRef = useRef(null)
+  const [scale, setScale] = useState(1)
+  const [height, setHeight] = useState(null)
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current
+    const inner = innerRef.current
+    if (!wrap || !inner) return
+
+    const measure = () => {
+      setScale(Math.min(1, wrap.clientWidth / STAGE_W))
+      setHeight(inner.offsetHeight)
+    }
+    measure()
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(wrap)
+    ro.observe(inner)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative w-full"
+      style={{ height: height ? height * scale : undefined }}
+    >
+      <div
+        ref={innerRef}
+        className="absolute left-1/2 top-0 py-12 lg:py-0"
+        style={{
+          width: STAGE_W,
+          transform: `translateX(-50%) scale(${scale})`,
+          transformOrigin: 'top center',
+        }}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -423,7 +475,7 @@ function PricingHeroCard({ cardRef, cardShapeRef }) {
   return (
     <div ref={cardRef} className="relative mx-auto w-full max-w-[480px]">
       {/* FLOATING MINI CARD — Attendance (fully above, top-left) */}
-      <div className="pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -left-4 -top-12 z-30 flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f7ef] text-[#16a34a]">
           <FiActivity size={16} />
         </div>
@@ -440,7 +492,7 @@ function PricingHeroCard({ cardRef, cardShapeRef }) {
       </div>
 
       {/* FLOATING MINI CARD — Leave Balance (fully above, top-right) */}
-      <div className="pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -right-6 -top-8 z-30 flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCalendar size={16} />
         </div>
@@ -518,7 +570,7 @@ function PricingHeroCard({ cardRef, cardShapeRef }) {
       </div>
 
       {/* FLOATING MINI CARD — Payroll Status (fully below, bottom-right) */}
-      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCreditCard size={16} />
         </div>
@@ -658,17 +710,19 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             )}
           </div>
 
-          {/* RIGHT: card — static design backdrop + card */}
+          {/* RIGHT: card — static design backdrop + card (desktop-size stage, scales down on small screens) */}
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative mt-10 lg:mt-16"
+            className="relative mt-6 lg:mt-16"
           >
-            <CardBackdrop />
-            <div className="relative z-10 mx-auto w-full max-w-[480px]">
-              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} />
-            </div>
+            <ScaledStage>
+              <CardBackdrop />
+              <div className="relative z-10 mx-auto w-full max-w-[480px]">
+                <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} />
+              </div>
+            </ScaledStage>
           </motion.div>
         </div>
 
@@ -717,6 +771,8 @@ function Stats() {
     </motion.div>
   )
 }
+
+
 /* ==========================================================================
    FEATURES
 ========================================================================== */
@@ -776,14 +832,13 @@ const itemVariants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 }
-
 function FeatureCard({ f, tagLabel, showTag }) {
   const Icon = f.icon
 
   if (f.featured) {
     return (
       <motion.div variants={itemVariants} className="sm:col-span-2">
-        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B]/70 via-[#5a0033]/60 to-[#3d0022]/70 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] transition-all duration-500 ease-out hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_28px_70px_rgba(122,0,75,0.30),0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#A0005F] via-[#7A004B] to-[#4a0029] border border-white/15 shadow-[0_20px_50px_rgba(122,0,75,0.35)] transition-all duration-500 ease-out hover:-translate-y-1 hover:border-white/30 hover:shadow-[0_28px_70px_rgba(122,0,75,0.45)]">
           {/* hover atmosphere */}
           <div className="pointer-events-none absolute inset-0 z-0 rounded-[20px] bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_58%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
           {/* glass highlight */}
@@ -793,7 +848,7 @@ function FeatureCard({ f, tagLabel, showTag }) {
           {/* top edge */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70 transition-all duration-500 group-hover:via-white/80" />
           {/* corner glow */}
-          <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/10 blur-3xl opacity-70 transition-all duration-700 group-hover:bg-[#ffb0d0]/20 group-hover:scale-125" />
+          <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/20 blur-3xl opacity-70 transition-all duration-700 group-hover:bg-[#ffb0d0]/30 group-hover:scale-125" />
 
           <div className="relative z-30 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/50 group-hover:shadow-[0_6px_22px_rgba(255,255,255,0.20)]">
@@ -819,7 +874,7 @@ function FeatureCard({ f, tagLabel, showTag }) {
                 key={h}
                 className="flex items-center gap-2 text-[12px] sm:text-[12.5px] font-body text-white/85 transition-all duration-500 group-hover:text-white"
               >
-                {/* GREEN tick — dark background, so green-400 */}
+                {/* GREEN tick — dark card, so green-400 */}
                 <FiCheck strokeWidth={3} className="shrink-0 text-[13px] text-green-400 transition-transform duration-500 group-hover:scale-110" />
                 {h}
               </li>
@@ -832,15 +887,15 @@ function FeatureCard({ f, tagLabel, showTag }) {
 
   return (
     <motion.div variants={itemVariants}>
-      <div className="group relative h-full overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.15] via-white/[0.09] to-white/[0.05] backdrop-blur-xl border border-white/20 p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_8px_24px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.22)] transition-all duration-500 ease-out hover:-translate-y-1 hover:from-white/[0.22] hover:via-white/[0.13] hover:to-white/[0.07] hover:border-white/35 hover:shadow-[0_20px_48px_rgba(122,0,75,0.25),0_12px_35px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]">
-        <div className="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_65%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-        <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[15px] bg-gradient-to-br from-[#ffb0d0]/[0.07] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+      <div className="group relative h-full overflow-hidden rounded-2xl bg-gradient-to-br from-[#6d0a42] via-[#5a0033] to-[#43002a] border border-white/10 p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_10px_28px_rgba(90,0,51,0.28),inset_0_1px_0_rgba(255,255,255,0.14)] transition-all duration-500 ease-out hover:-translate-y-1 hover:from-[#84105a] hover:via-[#6a0040] hover:to-[#50002f] hover:border-white/25 hover:shadow-[0_22px_48px_rgba(90,0,51,0.4),inset_0_1px_0_rgba(255,255,255,0.25)]">
+        <div className="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.14),transparent_65%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[15px] bg-gradient-to-br from-[#ffb0d0]/[0.08] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
         <div className="pointer-events-none absolute -left-[130%] top-0 z-20 h-full w-[75%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.13] to-transparent blur-[9px] transition-transform duration-[850ms] ease-out group-hover:translate-x-[330%]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent transition-all duration-500 group-hover:via-white/80" />
-        <div className="pointer-events-none absolute -right-12 -top-12 z-0 h-32 w-32 rounded-full bg-[#ff9ec7]/[0.06] blur-3xl opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
+        <div className="pointer-events-none absolute -right-12 -top-12 z-0 h-32 w-32 rounded-full bg-[#ff9ec7]/[0.10] blur-3xl opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
 
         <div className="relative z-30 flex items-center justify-between gap-2 shrink-0 sm:w-full">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.18] text-white flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/40 group-hover:shadow-[0_6px_20px_rgba(255,255,255,0.18)]">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.14] text-[#ffb0d0] flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/40 group-hover:shadow-[0_6px_20px_rgba(255,255,255,0.18)]">
             <Icon className="text-[18px] sm:text-[20px]" />
           </div>
 
@@ -855,7 +910,7 @@ function FeatureCard({ f, tagLabel, showTag }) {
           <h3 className="font-display font-bold text-[15px] sm:text-base leading-snug text-white transition-transform duration-500 group-hover:translate-x-[2px]">
             {f.title}
           </h3>
-          <p className="font-body text-[12.5px] sm:text-[13px] leading-relaxed text-white/70 mt-1 transition-colors duration-500 group-hover:text-white/85">
+          <p className="font-body text-[12.5px] sm:text-[13px] leading-relaxed text-white/70 mt-1 transition-colors duration-500 group-hover:text-white/90">
             {f.desc}
           </p>
         </div>
@@ -923,20 +978,45 @@ function FeatureJourney() {
     </>
   )
 }
-
 function Features() {
   return (
     <section id="features" className="scroll-anchor relative overflow-hidden font-body pt-10 pb-28">
-      <SectionBackdrop />
+      {/* LIGHT BEETROOT BACKGROUND */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          background:
+            'linear-gradient(to bottom, #F6DEE9 0%, #EFCADC 50%, #F3D5E3 100%)',
+        }}
+      >
+        {/* soft top glow */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 420px at 50% 120px, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0) 100%)',
+          }}
+        />
+        {/* soft beetroot glow at the bottom */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-[260px]"
+          style={{
+            background:
+              'radial-gradient(ellipse 70% 160px at 50% 240px, rgba(139,30,77,0.22) 0%, transparent 100%)',
+          }}
+        />
+      </div>
+
       <Wrap className="relative z-10">
         <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true }}>
           <div className="text-center mb-10 sm:mb-12">
-            <h2 className="font-hero font-medium text-white leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
-              Powerful <span className="text-[#ffb0d0]">Features</span>
+            <h2 className="font-hero font-medium text-[#2A1120] leading-[1.1] mb-6 text-[clamp(32px,4vw,48px)]">
+              Powerful <span className="text-[#7A004B]">Features</span>
               <br />
-              Built for <span className="text-[#ffb0d0]">Modern</span> Teams
+              Built for <span className="text-[#7A004B]">Modern</span> Teams
             </h2>
-            <p className="text-lg sm:text-xl text-white/60 leading-relaxed max-w-[700px] mx-auto font-body">
+            <p className="text-lg sm:text-xl text-[#5C4050] leading-relaxed max-w-[700px] mx-auto font-body">
               Everything TorchX Talent offers to help you hire smarter, evaluate better, and empower your employees.
             </p>
           </div>
@@ -947,6 +1027,7 @@ function Features() {
     </section>
   )
 }
+
 
 /* ==========================================================================
    PRICING
@@ -1616,9 +1697,9 @@ export default function LandingPage() {
         onOpenCalculator={() => navigate('/pricing-calculator')}
         scrollContainerRef={scrollContainerRef}
       />
-      <Divider />
+
       <Features />
-      <Divider />
+
       <Pricing />
       <Divider />
       <Testimonials />
