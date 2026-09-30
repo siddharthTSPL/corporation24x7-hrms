@@ -73,6 +73,7 @@ const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
 const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
+const OfferResponse = lazy(() => import("./pages/recruitment/OfferResponse"));
 const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
 const Admindocument = lazy(() => import("./pages/document/admindocument"));
 const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
@@ -203,6 +204,7 @@ function App() {
               land here; it creates one on THIS browser via the link's
               short-lived token. */}
           <Route path="/companion-login" element={<CompanionLogin />} />
+          <Route path="/offer-response/:token" element={<OfferResponse />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
               It authenticates itself with its own long-lived kiosk token,

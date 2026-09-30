@@ -13,6 +13,7 @@ import {
   useSubmitInterviewFeedback,
 } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
+import OfferTab from "./OfferTab";
 import {
   FaBriefcase, FaClock, FaCheckCircle, FaTimesCircle,
   FaSearch, FaPlus, FaTimes, FaUsers,
@@ -37,8 +38,13 @@ const fmtDate = (iso) => {
 
 const PIPELINE_STAGES = [
   "APPLIED", "SCREENING", "SHORTLISTED", "INTERVIEW",
-  "HR_ROUND", "SELECTED", "OFFER_RELEASED", "JOINED",
+  "HR_ROUND", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "JOINED",
 ];
+
+const FILLED_STAGES = ["SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "JOINED"];
+const OFFER_STAGES = ["SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"];
+const OFFER_MANAGED_STAGES = ["OFFER_RELEASED", "OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"];
+const DEAD_STAGES = ["REJECTED", "OFFER_REJECTED"];
 
 const STAGE_ORDER = {
   APPLIED:        ["SCREENING", "REJECTED"],
@@ -47,7 +53,10 @@ const STAGE_ORDER = {
   INTERVIEW:      ["HR_ROUND", "SELECTED", "REJECTED"],
   HR_ROUND:       ["SELECTED", "REJECTED"],
   SELECTED:       ["OFFER_RELEASED"],
-  OFFER_RELEASED: ["JOINED"],
+  OFFER_RELEASED: ["OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"],
+  OFFER_ACCEPTED: ["JOINED"],
+  OFFER_REJECTED: [],
+  OFFER_EXPIRED:  ["OFFER_RELEASED"],
   JOINED:         [],
   REJECTED:       [],
 };
@@ -61,6 +70,9 @@ const STAGE_META = {
   SELECTED:       { color: "bg-emerald-50 text-emerald-700",     dot: "bg-emerald-500",  label: "Selected" },
   REJECTED:       { color: "bg-red-50 text-red-600",             dot: "bg-red-400",      label: "Rejected" },
   OFFER_RELEASED: { color: "bg-orange-50 text-orange-700",       dot: "bg-orange-400",   label: "Offer Released" },
+  OFFER_ACCEPTED: { color: "bg-lime-50 text-lime-700",           dot: "bg-lime-500",     label: "Offer Accepted" },
+  OFFER_REJECTED: { color: "bg-red-50 text-red-600",             dot: "bg-red-400",      label: "Offer Declined" },
+  OFFER_EXPIRED:  { color: "bg-amber-50 text-amber-700",         dot: "bg-amber-400",    label: "Offer Expired" },
   JOINED:         { color: "bg-teal-50 text-teal-700",           dot: "bg-teal-500",     label: "Joined" },
 };
 
@@ -72,6 +84,9 @@ const STAGE_TIMELINE_META = {
   HR_ROUND:       { icon: "🤝", accent: "#6d28d9", light: "#f5f3ff" },
   SELECTED:       { icon: "✅", accent: "#059669", light: "#ecfdf5" },
   OFFER_RELEASED: { icon: "📄", accent: "#d97706", light: "#fff7ed" },
+  OFFER_ACCEPTED: { icon: "🤝", accent: "#65a30d", light: "#f7fee7" },
+  OFFER_REJECTED: { icon: "🚫", accent: "#dc2626", light: "#fef2f2" },
+  OFFER_EXPIRED:  { icon: "⏳", accent: "#d97706", light: "#fffbeb" },
   JOINED:         { icon: "🎉", accent: "#0d9488", light: "#f0fdfa" },
   REJECTED:       { icon: "❌", accent: "#dc2626", light: "#fef2f2" },
 };
@@ -181,6 +196,19 @@ const PriorityPill = ({ priority }) => (
 );
 
 const CandidateTimeline = ({ currentStage }) => {
+  if (currentStage === "OFFER_REJECTED" || currentStage === "OFFER_EXPIRED") {
+    const declined = currentStage === "OFFER_REJECTED";
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${declined ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+        <span className="text-base">{declined ? "🚫" : "⏳"}</span>
+        <div>
+          <div className={`text-xs font-bold ${declined ? "text-red-600" : "text-amber-700"}`}>{declined ? "Offer declined by candidate" : "Offer expired"}</div>
+          <div className={`text-[10px] ${declined ? "text-red-400" : "text-amber-500"}`}>{declined ? "The opening is available again" : "No response was received before the validity date"}</div>
+        </div>
+      </div>
+    );
+  }
+
   if (currentStage === "REJECTED") {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100">
@@ -253,7 +281,7 @@ const CandidateTimeline = ({ currentStage }) => {
 
 const RequisitionProgressHeader = ({ requisition, candidates }) => {
   const filledCount = candidates.filter((c) =>
-    ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage)
+    FILLED_STAGES.includes(c.current_stage)
   ).length;
   const remaining = Math.max(0, requisition.openings - filledCount);
   const pct = Math.min(100, Math.round((filledCount / requisition.openings) * 100));
@@ -487,7 +515,8 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
   const [selectedRound, setSelectedRound] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
 
-  const allowed = STAGE_ORDER[candidate.current_stage] || [];
+  const allowed = (STAGE_ORDER[candidate.current_stage] || []).filter((s) => !OFFER_MANAGED_STAGES.includes(s));
+  const offerHandled = (STAGE_ORDER[candidate.current_stage] || []).some((s) => OFFER_MANAGED_STAGES.includes(s));
   const fbMut = useSubmitInterviewFeedback();
 
   const handleFeedback = async (roundId) => {
@@ -501,6 +530,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
     { key: "info", label: "Profile" },
     { key: "timeline", label: "Timeline" },
     { key: "rounds", label: `Rounds (${candidate.interview_rounds?.length || 0})` },
+    ...(OFFER_STAGES.includes(candidate.current_stage) ? [{ key: "offer", label: "Offer" }] : []),
     ...(canAddCandidate ? [{ key: "stage", label: "Move Stage" }] : []),
   ];
 
@@ -583,7 +613,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
               <div>
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-4">Recruitment Journey</div>
                 <div className="overflow-x-auto pb-2">
-                  <div className="min-w-[520px]">
+                  <div className="min-w-[600px]">
                     <CandidateTimeline currentStage={candidate.current_stage} />
                   </div>
                 </div>
@@ -723,12 +753,14 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
             </div>
           )}
 
+          {tab === "offer" && <OfferTab candidate={candidate} canAct={canAddCandidate} />}
+
           {tab === "stage" && canAddCandidate && (
             <div className="space-y-5">
               <div className="p-4 bg-[#fdf5f9] rounded-xl border border-[#eedde8]">
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Current Position in Pipeline</div>
                 <div className="overflow-x-auto pb-1">
-                  <div className="min-w-[480px]">
+                  <div className="min-w-[560px]">
                     <CandidateTimeline currentStage={candidate.current_stage} />
                   </div>
                 </div>
@@ -771,6 +803,10 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                     <textarea rows={3} className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all resize-y" value={stageForm.overall_feedback} onChange={(e) => setStageForm((f) => ({ ...f, overall_feedback: e.target.value }))} />
                   </div>
                 </>
+              ) : offerHandled ? (
+                <div className="p-4 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-600 leading-relaxed">
+                  The offer, candidate response and joining steps are handled from the <button onClick={() => setTab("offer")} className="font-semibold text-[#730042] underline">Offer tab</button>.
+                </div>
               ) : (
                 <p className="text-sm text-gray-400 py-4">No further stage transitions available.</p>
               )}
@@ -801,7 +837,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
 
 const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   const [showAddCandidate, setShowAddCandidate] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [stageFilter, setStageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -809,9 +845,10 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   const stageMut = useUpdateCandidateStage();
 
   const candidates = candidateData?.data || [];
+  const selectedCandidate = selectedCandidateId ? candidates.find((c) => c._id === selectedCandidateId) || null : null;
 
   const filledCount = useMemo(
-    () => candidates.filter((c) => ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage)).length,
+    () => candidates.filter((c) => FILLED_STAGES.includes(c.current_stage)).length,
     [candidates]
   );
   const remaining = Math.max(0, requisition.openings - filledCount);
@@ -875,9 +912,9 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total", val: candidates.length, icon: <FaUsers size={12} />, color: "text-[#730042]", bg: "bg-[#f7edf3]" },
-              { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "JOINED", "SELECTED", "OFFER_RELEASED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
               { label: "Selected / Offered", val: filledCount, icon: <FaCheckCircle size={12} />, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Rejected", val: candidates.filter((c) => c.current_stage === "REJECTED").length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
+              { label: "Rejected", val: candidates.filter((c) => DEAD_STAGES.includes(c.current_stage)).length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
             ].map(({ label, val, icon, color, bg }) => (
               <div key={label} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg ${bg} ${color} flex items-center justify-center flex-shrink-0`}>{icon}</div>
@@ -948,7 +985,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
             </div>
           ) : (
             filtered.map((c) => {
-              const isFilled = ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage);
+              const isFilled = FILLED_STAGES.includes(c.current_stage);
               return (
                 <div
                   key={c._id}
@@ -980,7 +1017,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
                     <StageBadge stage={c.current_stage} />
                     <span className="text-xs text-gray-400">{c.source}</span>
                     <button
-                      onClick={() => setSelectedCandidate(c)}
+                      onClick={() => setSelectedCandidateId(c._id)}
                       className="text-xs font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors"
                     >
                       View
@@ -1000,7 +1037,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
       {selectedCandidate && (
         <CandidateDetailModal
           candidate={selectedCandidate}
-          onClose={() => setSelectedCandidate(null)}
+          onClose={() => setSelectedCandidateId(null)}
           onStageUpdate={handleStageUpdate}
           onFeedback={refetch}
           canAddCandidate={canAddCandidate}
