@@ -1,5 +1,7 @@
 const HiringRequisition = require("../Models/Hiringrequisition.model");
 const Candidate = require("../Models/candidate.model");
+const OfferLetter = require("../Models/offerletter.model");
+const { syncRequisitionFillStatus } = require("../utils/recruitment/pipeline.utils");
 
 const STAGE_ORDER = {
   APPLIED: ["SCREENING", "REJECTED"],
@@ -8,38 +10,15 @@ const STAGE_ORDER = {
   INTERVIEW: ["HR_ROUND", "SELECTED", "REJECTED"],
   HR_ROUND: ["SELECTED", "REJECTED"],
   SELECTED: ["OFFER_RELEASED"],
-  OFFER_RELEASED: ["JOINED"],
+  OFFER_RELEASED: ["OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"],
+  OFFER_ACCEPTED: ["JOINED"],
+  OFFER_REJECTED: [],
+  OFFER_EXPIRED: ["OFFER_RELEASED"],
   JOINED: [],
   REJECTED: [],
 };
 
-// Stages that count as an "opening" being filled.
-const FILLED_STAGES = ["SELECTED", "OFFER_RELEASED", "JOINED"];
-
-// Recomputes filled_count for a requisition from its candidates and
-// keeps requisition.status in sync (APPROVED <-> FILLED) whenever the
-// number of filled openings changes. This is what makes "openings"
-// actually go down when a candidate is marked SELECTED.
-const syncRequisitionFillStatus = async (requisitionId) => {
-  const requisition = await HiringRequisition.findById(requisitionId);
-  if (!requisition) return null;
-
-  const filled_count = await Candidate.countDocuments({
-    requisition_id: requisitionId,
-    current_stage: { $in: FILLED_STAGES },
-  });
-
-  requisition.filled_count = filled_count;
-
-  // Only auto-manage the FILLED <-> APPROVED transition. Don't touch
-  // requisitions that are PENDING / REJECTED / ON_HOLD / REVISION_REQUIRED.
-  if (["APPROVED", "FILLED"].includes(requisition.status)) {
-    requisition.status = filled_count >= requisition.openings ? "FILLED" : "APPROVED";
-  }
-
-  await requisition.save();
-  return requisition;
-};
+const OFFER_MANAGED_STAGES = ["OFFER_RELEASED", "OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"];
 
 const createRequisition = async (req, res) => {
   const {
@@ -300,6 +279,17 @@ const updateCandidateStage = async (req, res) => {
       success: false,
       message: `Cannot move from ${candidate.current_stage} to ${stage}. Allowed next: ${allowed.join(", ") || "none"}`,
     });
+  }
+
+  if (OFFER_MANAGED_STAGES.includes(stage)) {
+    const hasOffer = await OfferLetter.exists({ candidate_id: candidate._id });
+    const legacyJoin = stage === "JOINED" && candidate.current_stage === "OFFER_RELEASED" && !hasOffer;
+    if (!legacyJoin) {
+      return res.status(400).json({
+        success: false,
+        message: "This step is handled from the Offer tab (generate, send, accept/reject and join)",
+      });
+    }
   }
 
   candidate.current_stage = stage;
