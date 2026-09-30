@@ -17,6 +17,7 @@ import { FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { HiOutlineSparkles } from 'react-icons/hi'
 import { BsPeopleFill, BsGraphUp, BsPersonBadge } from 'react-icons/bs'
 import logo from '../../assets/TorchX.svg'
+import heroBg from '../../assets/Hero-bg.png' // vector (crisp on every screen)
 import { useAuth } from '../../auth/store/getmeauth/getmeauth'
 import { fadeUp, fontStyles } from './animations'
 
@@ -379,273 +380,24 @@ const sortedFreeForeverFeatures = [...freeForeverFeatures].sort(
   (a, b) => a.text.length - b.text.length
 )
 
-const heroMotionStyles = `
-@keyframes heroFloatA{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-9px,0)}}
-@keyframes heroFloatB{0%,100%{transform:translate3d(0,-4px,0)}50%{transform:translate3d(0,7px,0)}}
-@keyframes heroFloatC{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5px,-8px,0)}}
-.hero-float-a{animation:heroFloatA 5.2s ease-in-out infinite}
-.hero-float-b{animation:heroFloatB 6.1s ease-in-out infinite .6s}
-.hero-float-c{animation:heroFloatC 5.6s ease-in-out infinite 1.1s}
-@media (prefers-reduced-motion:reduce){.hero-float-a,.hero-float-b,.hero-float-c{animation:none}}
-`
+/* ==========================================================================
+   CARD BACKDROP — static vector design (NO animation)
 
-const DESIGN_W = 838
-const DESIGN_H = 670
+   Design ka flower-center card ke center par baithta hai aur poore hero me
+   faila rehta hai (section ka overflow-hidden hi isse clip karta hai).
+   Left ka khaali hissa mask se fade hota hai, taaki left content ke upar
+   design na aaye.
+========================================================================== */
 
-function AnimatedBackdrop({ pointerRef }) {
-  const canvasRef = useRef(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const reduce = prefersReducedMotion()
-    const smooth = { x: 0, y: 0, boost: 0 }
-    const TIME_OFFSET = 2.5
-    let width = 0
-    let height = 0
-    let dpr = 1
-    let raf = 0
-    let playing = false
-    let visible = true
-    const startedAt = performance.now()
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-      width = rect.width
-      height = rect.height
-      canvas.width = Math.max(1, Math.round(width * dpr))
-      canvas.height = Math.max(1, Math.round(height * dpr))
-    }
-
-    const softDot = (x, y, r, color, alpha) => {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4)
-      g.addColorStop(0, `rgba(${color},${alpha})`)
-      g.addColorStop(0.35, `rgba(${color},${alpha * 0.35})`)
-      g.addColorStop(1, `rgba(${color},0)`)
-      ctx.globalAlpha = 1
-      ctx.fillStyle = g
-      ctx.beginPath()
-      ctx.arc(x, y, r * 3.4, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = `rgba(${color},${Math.min(1, alpha + 0.25)})`
-      ctx.beginPath()
-      ctx.arc(x, y, r, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    const wavePath = (k, base, amp, phase, amount, harmonic) => {
-      const steps = 320
-      ctx.beginPath()
-      for (let i = 0; i <= steps; i += 1) {
-        const th = (i / steps) * Math.PI * 2
-        const w = Math.sin(k * th + phase) + harmonic * Math.sin(2 * k * th + phase * 1.7)
-        const r = base + amp * amount * w
-        const x = Math.cos(th) * r
-        const y = Math.sin(th) * r
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
-      }
-      ctx.closePath()
-    }
-
-    const glowStroke = (color, core, alpha) => {
-      ctx.strokeStyle = color
-      ctx.lineJoin = 'round'
-      ctx.lineCap = 'round'
-      ctx.globalAlpha = alpha * 0.1
-      ctx.lineWidth = core * 8
-      ctx.stroke()
-      ctx.globalAlpha = alpha * 0.2
-      ctx.lineWidth = core * 3.4
-      ctx.stroke()
-      ctx.globalAlpha = alpha
-      ctx.lineWidth = core
-      ctx.stroke()
-      ctx.globalAlpha = 1
-    }
-
-    const draw = (t) => {
-      const p = pointerRef?.current
-      const tx = p ? p.x : 0
-      const ty = p ? p.y : 0
-      const active = p && p.active ? 1 : 0
-      smooth.x += (tx - smooth.x) * 0.06
-      smooth.y += (ty - smooth.y) * 0.06
-      smooth.boost += (active - smooth.boost) * 0.04
-
-      const s = width / DESIGN_W
-      const cx = width / 2 + smooth.x * 18
-      const cy = height / 2 + smooth.y * 12
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * cx, dpr * cy)
-
-      const breathe = 0.5 - 0.5 * Math.cos((Math.PI * 2 * t) / 16)
-      const amount = (0.04 + 0.96 * Math.pow(breathe, 1.4)) * (1 + smooth.boost * 0.22)
-
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 230)
-      halo.addColorStop(0, 'rgba(233,120,170,0.20)')
-      halo.addColorStop(0.55, 'rgba(233,120,170,0.07)')
-      halo.addColorStop(1, 'rgba(233,120,170,0)')
-      ctx.fillStyle = halo
-      ctx.beginPath()
-      ctx.arc(0, 0, 230, 0, Math.PI * 2)
-      ctx.fill()
-
-      const spokes = 96
-      const sweep = t * 0.6
-      ctx.lineWidth = 1
-      for (let i = 0; i < spokes; i += 1) {
-        const a = (i / spokes) * Math.PI * 2 + t * 0.03
-        const major = i % 8 === 0
-        const lit = Math.pow(Math.max(0, Math.cos(a - sweep)), 14)
-        const alpha = (major ? 0.13 : 0.06) + lit * 0.26
-        ctx.strokeStyle = `rgba(201,24,74,${alpha})`
-        ctx.beginPath()
-        ctx.moveTo(Math.cos(a) * 112, Math.sin(a) * 112)
-        ctx.lineTo(Math.cos(a) * (major ? 430 : 370), Math.sin(a) * (major ? 430 : 370))
-        ctx.stroke()
-      }
-
-      ;[180, 285, 390].forEach((r) => {
-        ctx.strokeStyle = 'rgba(122,0,75,0.13)'
-        ctx.lineWidth = 1.2
-        ctx.beginPath()
-        ctx.arc(0, 0, r, 0, Math.PI * 2)
-        ctx.stroke()
-      })
-
-      for (let j = 0; j < 2; j += 1) {
-        const prog = (t / 6 + j * 0.5) % 1
-        ctx.strokeStyle = `rgba(201,24,74,${(1 - prog) * 0.3})`
-        ctx.lineWidth = 1.6
-        ctx.beginPath()
-        ctx.arc(0, 0, 104 + prog * 330, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-
-      const arcs = [
-        { r: 330, dash: [46, 120], w: 3.6, dir: 1, speed: 0.12, a: 0.6 },
-        { r: 372, dash: [30, 160], w: 3, dir: -1, speed: 0.09, a: 0.5 },
-        { r: 292, dash: [18, 90], w: 2, dir: 1, speed: 0.16, a: 0.5 },
-      ]
-      arcs.forEach((arc) => {
-        ctx.save()
-        ctx.rotate(arc.dir * t * arc.speed)
-        ctx.setLineDash(arc.dash)
-        ctx.strokeStyle = `rgba(233,120,170,${arc.a})`
-        ctx.lineWidth = arc.w
-        ctx.lineCap = 'butt'
-        ctx.beginPath()
-        ctx.arc(0, 0, arc.r, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.restore()
-      })
-      ctx.setLineDash([])
-
-      wavePath(5, 258, 34, t * 0.3, amount, 0.08)
-      glowStroke('rgb(240,170,200)', 1.2, 0.55)
-
-      wavePath(8, 238, 46, -t * 0.42 + 1.3, amount, 0.1)
-      glowStroke('rgb(206,96,150)', 1.7, 0.6)
-
-      wavePath(8, 236, 62, t * 0.5, amount, 0.1)
-      glowStroke('rgb(122,0,75)', 2.4, 1)
-
-      ctx.globalAlpha = 1
-      ctx.strokeStyle = 'rgba(160,80,130,0.08)'
-      ctx.lineWidth = 20
-      ctx.beginPath()
-      ctx.arc(0, 0, 112, 0, Math.PI * 2)
-      ctx.stroke()
-
-      const ring = ctx.createLinearGradient(-100, -100, 100, 100)
-      ring.addColorStop(0, 'rgba(190,120,160,0.75)')
-      ring.addColorStop(1, 'rgba(122,0,75,0.85)')
-      ctx.strokeStyle = ring
-      ctx.lineWidth = 6
-      ctx.beginPath()
-      ctx.arc(0, 0, 100, 0, Math.PI * 2)
-      ctx.stroke()
-
-      ctx.strokeStyle = 'rgba(160,60,90,0.65)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.arc(0, 0, 80, 0, Math.PI * 2)
-      ctx.stroke()
-
-      const pulse = 0.6 + 0.4 * Math.sin(t * 2)
-      softDot(0, 0, 4, '214,51,132', 0.35 + pulse * 0.25)
-
-      const a1 = t * 0.9 + Math.PI / 2
-      softDot(Math.cos(a1) * 100, Math.sin(a1) * 100, 7, '224,122,168', 0.6)
-      const a2 = -t * 0.5 - 2.2
-      softDot(Math.cos(a2) * 185, Math.sin(a2) * 185, 9, '214,51,132', 0.45)
-      const a3 = t * 0.25 - 0.9
-      softDot(Math.cos(a3) * 300, Math.sin(a3) * 300, 6, '201,24,74', 0.5)
-    }
-
-    const frame = (now) => {
-      raf = requestAnimationFrame(frame)
-      draw((now - startedAt) / 1000 + TIME_OFFSET)
-    }
-
-    const play = () => {
-      if (playing || reduce) return
-      playing = true
-      raf = requestAnimationFrame(frame)
-    }
-
-    const pause = () => {
-      playing = false
-      cancelAnimationFrame(raf)
-    }
-
-    const sync = () => {
-      if (visible && !document.hidden) play()
-      else pause()
-    }
-
-    resize()
-    if (reduce) draw(7)
-
-    const ro = new ResizeObserver(() => {
-      resize()
-      if (reduce) draw(7)
-    })
-    ro.observe(canvas)
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting
-        sync()
-      },
-      { threshold: 0 }
-    )
-    io.observe(canvas)
-    document.addEventListener('visibilitychange', sync)
-    sync()
-
-    return () => {
-      pause()
-      ro.disconnect()
-      io.disconnect()
-      document.removeEventListener('visibilitychange', sync)
-    }
-  }, [pointerRef])
-
+function CardBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-      <canvas
-        ref={canvasRef}
-        width={DESIGN_W}
-        height={DESIGN_H}
-        className="absolute left-1/2 top-1/2 block max-w-none -translate-x-1/2 -translate-y-1/2 select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 aspect-[838/670] [-webkit-mask-image:linear-gradient(to_right,transparent_8%,#000_26%)] [mask-image:linear-gradient(to_right,transparent_8%,#000_26%)]"
+      <img
+        src={heroBg}
+        alt=""
+        draggable={false}
+        className="absolute left-1/2 top-1/2 max-w-none select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 [-webkit-mask-image:linear-gradient(to_right,transparent_30%,#000_44%)] [mask-image:linear-gradient(to_right,transparent_30%,#000_44%)]"
+        style={{ transform: 'translate(-71.5%, -50%)' }}
       />
     </div>
   )
@@ -667,11 +419,11 @@ function PricingFeatureRow({ text, span }) {
   )
 }
 
-function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
+function PricingHeroCard({ cardRef, cardShapeRef }) {
   return (
     <div ref={cardRef} className="relative mx-auto w-full max-w-[480px]">
       {/* FLOATING MINI CARD — Attendance (fully above, top-left) */}
-      <div className="hero-float-a pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f7ef] text-[#16a34a]">
           <FiActivity size={16} />
         </div>
@@ -688,7 +440,7 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
       </div>
 
       {/* FLOATING MINI CARD — Leave Balance (fully above, top-right) */}
-      <div className="hero-float-b pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCalendar size={16} />
         </div>
@@ -702,12 +454,6 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           </div>
         </div>
       </div>
-
-      <div
-        ref={edgeRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 rounded-[28px] bg-[#7A004B]/90"
-      />
 
       {/* MAIN CARD */}
       <div
@@ -772,7 +518,7 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
       </div>
 
       {/* FLOATING MINI CARD — Payroll Status (fully below, bottom-right) */}
-      <div className="hero-float-c pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCreditCard size={16} />
         </div>
@@ -799,9 +545,7 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
   const reduceMotion = prefersReducedMotion()
   const cardRef = useRef(null)
   const cardShapeRef = useRef(null)
-  const edgeRef = useRef(null)
   const sectionRef = useRef(null)
-  const pointerRef = useRef({ x: 0, y: 0, active: false })
 
   // Scroll-linked parallax on the card (uses the app's own scroll container)
   useEffect(() => {
@@ -830,95 +574,11 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
     return () => scroller.removeEventListener('scroll', onScroll)
   }, [reduceMotion, scrollContainerRef])
 
-  useEffect(() => {
-    if (reduceMotion) return
-    const section = sectionRef.current
-    const card = cardShapeRef.current
-    const edge = edgeRef.current
-    if (!section || !card || !edge) return
-
-    const pointer = pointerRef.current
-    const state = { x: 0, y: 0 }
-    let raf = 0
-    let running = false
-    let visible = true
-
-    const onMove = (e) => {
-      if (e.pointerType && e.pointerType !== 'mouse') return
-      const rect = section.getBoundingClientRect()
-      pointer.x = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1))
-      pointer.y = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1))
-      pointer.active = true
-    }
-
-    const onLeave = () => {
-      pointer.x = 0
-      pointer.y = 0
-      pointer.active = false
-    }
-
-    const tick = (now) => {
-      raf = requestAnimationFrame(tick)
-      const t = now / 1000
-      state.x += (pointer.x - state.x) * 0.07
-      state.y += (pointer.y - state.y) * 0.07
-      const rotY = state.x * 7 + Math.sin(t * 0.7) * 2.6
-      const rotX = -state.y * 5 + Math.cos(t * 0.55) * 1.8
-      gsap.set(card, { rotationY: rotY, rotationX: rotX, transformPerspective: 1200 })
-      gsap.set(edge, {
-        rotationY: rotY,
-        rotationX: rotX,
-        transformPerspective: 1200,
-        x: Math.max(-7, Math.min(7, -rotY * 0.9)),
-        y: Math.max(-7, Math.min(7, rotX * 0.9)),
-      })
-    }
-
-    const start = () => {
-      if (running) return
-      running = true
-      raf = requestAnimationFrame(tick)
-    }
-
-    const stop = () => {
-      running = false
-      cancelAnimationFrame(raf)
-    }
-
-    const sync = () => {
-      if (visible && !document.hidden) start()
-      else stop()
-    }
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting
-        sync()
-      },
-      { threshold: 0 }
-    )
-    io.observe(section)
-    section.addEventListener('pointermove', onMove, { passive: true })
-    section.addEventListener('pointerleave', onLeave)
-    document.addEventListener('visibilitychange', sync)
-    sync()
-
-    return () => {
-      stop()
-      io.disconnect()
-      section.removeEventListener('pointermove', onMove)
-      section.removeEventListener('pointerleave', onLeave)
-      document.removeEventListener('visibilitychange', sync)
-      gsap.set([card, edge], { clearProps: 'transform' })
-    }
-  }, [reduceMotion])
-
   return (
     <section
       ref={sectionRef}
       className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-30"
     >
-      <style>{heroMotionStyles}</style>
       <Wrap className="relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-start gap-12 lg:gap-10">
           {/* LEFT: copy — apna top margin yahan control karo */}
@@ -998,16 +658,16 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             )}
           </div>
 
-          {/* RIGHT: card — animated design backdrop + card */}
+          {/* RIGHT: card — static design backdrop + card */}
           <motion.div
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="relative mt-10 lg:mt-16"
           >
-            <AnimatedBackdrop pointerRef={pointerRef} />
+            <CardBackdrop />
             <div className="relative z-10 mx-auto w-full max-w-[480px]">
-              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} edgeRef={edgeRef} />
+              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} />
             </div>
           </motion.div>
         </div>
@@ -1056,7 +716,7 @@ function Stats() {
       ))}
     </motion.div>
   )
-}
+}z
 /* ==========================================================================
    FEATURES
 ========================================================================== */
