@@ -1,7 +1,7 @@
 const WFH = require("../Models/wfh.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
-const { resolveCustomRouting, isAdminHandlerCurrent } = require("../utils/approvalFlow.utils");
+const { resolveCustomRouting, resolveDefaultAdminHandler, isAdminHandlerCurrent } = require("../utils/approvalFlow.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const {
   notifyWFHApplied,
@@ -255,9 +255,13 @@ const forwardWFH = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("No reporting manager assigned. Cannot forward."), { statusCode: 400 }));
 
+  const nextHandlerId = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminHandler(currentManager.reporting_manager, req.manager.organisation_id)
+    : currentManager.reporting_manager;
+
   wfh.handlerChain = wfh.handlerChain || [];
   wfh.handlerChain.push(req.manager._id);
-  wfh.currentHandler = currentManager.reporting_manager;
+  wfh.currentHandler = nextHandlerId;
   wfh.currentHandlerModel = currentManager.reporting_manager_model;
   wfh.forwardedBy = req.manager._id;
   wfh.remarks = remarks || "";
@@ -270,7 +274,7 @@ const forwardWFH = async (req, res, next) => {
     requesterName: wfhRequesterDoc ? wfhRequesterDoc.name : "An employee",
     forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
     handlerModel: currentManager.reporting_manager_model,
-    handlerId: currentManager.reporting_manager,
+    handlerId: nextHandlerId,
     startDate: wfh.startDate,
     endDate: wfh.endDate,
     days: wfh.days,
@@ -322,12 +326,17 @@ const managerApplyWFH = async (req, res, next) => {
   const initialStatus = customRouting
     ? customRouting.status
     : currentManager.reporting_manager_model === "Admin" ? "pending_admin" : "pending_reporting_manager";
+  const initialHandlerId = customRouting
+    ? customRouting.primary
+    : currentManager.reporting_manager_model === "Admin"
+      ? await resolveDefaultAdminHandler(currentManager.reporting_manager, organisation_id)
+      : currentManager.reporting_manager;
 
   const wfh = await WFH.create({
     organisation_id,
     requester: managerId,
     requesterModel: "Manager",
-    currentHandler: customRouting ? customRouting.primary : currentManager.reporting_manager,
+    currentHandler: initialHandlerId,
     currentHandlerModel: customRouting ? "Admin" : currentManager.reporting_manager_model,
     ...(customRouting && { approverPool: customRouting.pool }),
     startDate: start,
@@ -339,7 +348,7 @@ const managerApplyWFH = async (req, res, next) => {
 
   const mgrWfhHandlers = customRouting
     ? customRouting.pool.map((id) => ({ model: "Admin", id }))
-    : [{ model: currentManager.reporting_manager_model, id: currentManager.reporting_manager }];
+    : [{ model: currentManager.reporting_manager_model, id: initialHandlerId }];
   for (const h of mgrWfhHandlers) {
     notifyWFHApplied({
       requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
@@ -382,7 +391,7 @@ const adminGetPendingWFH = async (req, res, next) => {
       { approverPool: req.admin._id },
     ],
     organisation_id: req.admin.organisation_id,
-    status: "pending_admin",
+    status: { $in: ["pending_admin", "forwarded_admin"] },
     $nor: [{ requesterModel: "Admin", requester: req.admin._id }],
   })
     .populate("requester", "f_name l_name work_email department designation role")
@@ -411,7 +420,7 @@ const adminApproveWFH = async (req, res, next) => {
     return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
   if (wfh.requesterModel === "Admin" && String(wfh.requester) === String(req.admin._id))
     return next(Object.assign(new Error("You cannot approve your own WFH request"), { statusCode: 403 }));
-  if (wfh.status !== "pending_admin")
+  if (!["pending_admin", "forwarded_admin"].includes(wfh.status))
     return next(Object.assign(new Error("WFH request is not awaiting your approval"), { statusCode: 400 }));
 
   wfh.status = wfh.requesterModel === "Admin" ? "approved_reporting_manager" : "approved_admin";
@@ -453,7 +462,7 @@ const adminRejectWFH = async (req, res, next) => {
     return next(Object.assign(new Error("This WFH request is not in your queue"), { statusCode: 403 }));
   if (wfh.requesterModel === "Admin" && String(wfh.requester) === String(req.admin._id))
     return next(Object.assign(new Error("You cannot reject your own WFH request"), { statusCode: 403 }));
-  if (wfh.status !== "pending_admin")
+  if (!["pending_admin", "forwarded_admin"].includes(wfh.status))
     return next(Object.assign(new Error("WFH request is not awaiting your decision"), { statusCode: 400 }));
 
   wfh.status = wfh.requesterModel === "Admin" ? "rejected_reporting_manager" : "rejected_admin";
@@ -474,6 +483,66 @@ const adminRejectWFH = async (req, res, next) => {
   });
 
   res.status(200).json({ success: true, message: "WFH request rejected by admin", wfh });
+};
+
+const adminForwardWFH = async (req, res, next) => {
+  if (!req.admin)
+    return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+  const { wfhId, remarks } = req.body;
+  if (!wfhId)
+    return next(Object.assign(new Error("wfhId is required"), { statusCode: 400 }));
+
+  const organisation_id = req.admin.organisation_id;
+  const coAdmin = await Admin.findOne({ _id: req.admin._id, organisation_id })
+    .select("f_name l_name reporting_manager reporting_manager_model")
+    .lean();
+  if (!coAdmin || coAdmin.reporting_manager_model !== "Admin" || !coAdmin.reporting_manager)
+    return next(Object.assign(new Error("Only a Co-Admin can forward this request to its reporting Admin"), { statusCode: 403 }));
+
+  const parentAdmin = await Admin.findOne({
+    _id: coAdmin.reporting_manager,
+    organisation_id,
+    working_status: "working",
+  })
+    .select("_id f_name l_name")
+    .lean();
+  if (!parentAdmin)
+    return next(Object.assign(new Error("Reporting Admin is unavailable"), { statusCode: 400 }));
+
+  const wfh = await WFH.findOne({
+    _id: wfhId,
+    organisation_id,
+    currentHandler: req.admin._id,
+    currentHandlerModel: "Admin",
+    status: "pending_admin",
+  });
+  if (!wfh)
+    return next(Object.assign(new Error("This WFH request is not pending in your queue"), { statusCode: 404 }));
+  if (wfh.approverPool?.length)
+    return next(Object.assign(new Error("Custom approval flow requests cannot be forwarded"), { statusCode: 403 }));
+
+  wfh.currentHandler = parentAdmin._id;
+  wfh.currentHandlerModel = "Admin";
+  wfh.status = "forwarded_admin";
+  wfh.forwardedBy = req.admin._id;
+  wfh.forwardedByModel = "Admin";
+  if (remarks) wfh.remarks = remarks;
+  await wfh.save();
+
+  const requester = await resolvePerson(wfh.requesterModel, wfh.requester);
+  notifyWFHForwarded({
+    requesterName: requester?.name || "A team member",
+    forwardedByName: `${coAdmin.f_name} ${coAdmin.l_name || ""}`.trim(),
+    handlerModel: "Admin",
+    handlerId: parentAdmin._id,
+    startDate: wfh.startDate,
+    endDate: wfh.endDate,
+    days: wfh.days,
+    reason: wfh.reason,
+  });
+
+  return res.status(200).json({ success: true, message: "WFH request forwarded to reporting Admin", wfh });
 };
 
 const adminApplyWFH = async (req, res, next) => {
@@ -734,6 +803,7 @@ module.exports = {
   adminGetPendingWFH,
   adminApproveWFH,
   adminRejectWFH,
+  adminForwardWFH,
   adminApplyWFH,
   adminGetMyWFH,
   superadminGetPendingWFH,

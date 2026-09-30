@@ -16,7 +16,7 @@ const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = re
 const imagekit = require("../utils/imagekit.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
-const { resolveCustomRouting } = require("../utils/approvalFlow.utils");
+const { resolveCustomRouting, resolveDefaultAdminHandler } = require("../utils/approvalFlow.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
 const Attendance = require("../Models/attendance.model");
@@ -345,7 +345,11 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     if (!currentManager.reporting_manager)
       return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-    leave.directed_to = currentManager.reporting_manager;
+    const nextHandlerId = currentManager.reporting_manager_model === "Admin"
+      ? await resolveDefaultAdminHandler(currentManager.reporting_manager, req.manager.organisation_id)
+      : currentManager.reporting_manager;
+
+    leave.directed_to = nextHandlerId;
     leave.directed_to_model = currentManager.reporting_manager_model;
     leave.status = currentManager.reporting_manager_model === "Admin"
       ? "pending_admin"
@@ -358,7 +362,7 @@ const forwardedtoreportingmanager = async (req, res, next) => {
       requesterName: employeeDoc ? `${employeeDoc.f_name} ${employeeDoc.l_name}` : "An employee",
       forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
       handlerModel: currentManager.reporting_manager_model,
-      handlerId: currentManager.reporting_manager,
+      handlerId: nextHandlerId,
       leaveType: leave.leaveType,
       startDate: leave.startDate,
       endDate: leave.endDate,
@@ -404,7 +408,11 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  leave.directed_to = currentManager.reporting_manager;
+  const nextHandlerId = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminHandler(currentManager.reporting_manager, organisation_id)
+    : currentManager.reporting_manager;
+
+  leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
   leave.status = currentManager.reporting_manager_model === "Admin"
     ? "pending_admin"
@@ -417,7 +425,7 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
     requesterName: employeeDocUpChain ? `${employeeDocUpChain.f_name} ${employeeDocUpChain.l_name}` : "An employee",
     forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
     handlerModel: currentManager.reporting_manager_model,
-    handlerId: currentManager.reporting_manager,
+    handlerId: nextHandlerId,
     leaveType: leave.leaveType,
     startDate: leave.startDate,
     endDate: leave.endDate,
@@ -563,6 +571,11 @@ const applyleavem = async (req, res, next) => {
     : managerData.reporting_manager_model === "Admin"
       ? "pending_admin"
       : "pending_reporting_manager";
+  const initialHandlerId = customRouting
+    ? customRouting.primary
+    : managerData.reporting_manager_model === "Admin"
+      ? await resolveDefaultAdminHandler(managerData.reporting_manager, organisation_id)
+      : managerData.reporting_manager;
 
   const leave = await managerLeaveModel.create({
     organisation_id,
@@ -577,14 +590,14 @@ const applyleavem = async (req, res, next) => {
     reason,
     supportingDocument,
     status: initialStatus,
-    directed_to: customRouting ? customRouting.primary : managerData.reporting_manager,
+    directed_to: initialHandlerId,
     directed_to_model: customRouting ? "Admin" : managerData.reporting_manager_model,
     ...(customRouting && { approverPool: customRouting.pool }),
   });
 
   const mgrLeaveHandlers = customRouting
     ? customRouting.pool.map((id) => ({ model: "Admin", id }))
-    : [{ model: managerData.reporting_manager_model, id: managerData.reporting_manager }];
+    : [{ model: managerData.reporting_manager_model, id: initialHandlerId }];
   for (const h of mgrLeaveHandlers) {
     notifyLeaveApplied({
       requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
@@ -818,7 +831,11 @@ const forwardLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  leave.directed_to = currentManager.reporting_manager;
+  const nextHandlerId = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminHandler(currentManager.reporting_manager, organisation_id)
+    : currentManager.reporting_manager;
+
+  leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
   leave.status = currentManager.reporting_manager_model === "Admin"
     ? "pending_admin"
@@ -831,7 +848,7 @@ const forwardLeaveUpChain = async (req, res, next) => {
     requesterName: originalManagerDoc ? `${originalManagerDoc.f_name} ${originalManagerDoc.l_name}` : "A manager",
     forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
     handlerModel: currentManager.reporting_manager_model,
-    handlerId: currentManager.reporting_manager,
+    handlerId: nextHandlerId,
     leaveType: leave.leaveType,
     startDate: leave.startDate,
     endDate: leave.endDate,

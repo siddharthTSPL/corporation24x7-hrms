@@ -53,3 +53,8 @@ export const adminRejectWFH = async (data) => {
   const res = await api.post("wfh/admin/rejectWFH", data);
   return res.data;
 };
+
+export const adminForwardWFH = async (data) => {
+  const res = await api.post("wfh/admin/forwardWFH", data);
+  return res.data;
+};

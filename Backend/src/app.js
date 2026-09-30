@@ -11,6 +11,7 @@ require('../automatic/Birthdaynotify');
 require('../automatic/Noticeperiodautoexit');
 require('../automatic/fieldOperationsRetention');
 require('../automatic/Subscriptionexpiryreminder');
+require('../automatic/Offerlifecycle');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)

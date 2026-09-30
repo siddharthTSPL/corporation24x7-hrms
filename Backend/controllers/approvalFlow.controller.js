@@ -1,7 +1,7 @@
 const ApprovalFlow = require("../Models/approvalFlow.model");
 const Admin = require("../Models/Admin.model");
 
-const MODULES = ["leave", "wfh", "timesheet"];
+const MODULES = ["leave", "wfh", "timesheet", "reimbursement"];
 const err = (msg, statusCode) => Object.assign(new Error(msg), { statusCode });
 
 const defaultFlow = (module) => ({
@@ -13,7 +13,7 @@ const defaultFlow = (module) => ({
   applyToManagers: true,
 });
 
-// GET /approval-flow  -> all three modules, defaults filled in
+// GET /approval-flow  -> all modules, defaults filled in
 const getApprovalFlows = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const rows = await ApprovalFlow.find({ organisation_id }).lean();

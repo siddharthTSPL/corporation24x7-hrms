@@ -2760,10 +2760,13 @@ const ApplyLeavePanel = ({ manager, showToast }) => {
           </p>
 
           {form.leaveType === "sl" && days > 3 && (
-            <FormField label="Supporting Document" error={errors.supportingDocument}>
-              <div style={{ border: `1.5px solid ${ib("supportingDocument")}`, borderRadius: 12, padding: 12, background: "#EFF6FF" }}>
-                <input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => set("supportingDocument", e.target.files?.[0] || null)} style={{ width: "100%", fontSize: 12, color: "#1C1028" }} />
+            <FormField label="Supporting Document *" error={errors.supportingDocument}>
+              <div style={{ border: `1.5px dashed ${errors.supportingDocument ? "#DC2626" : "#93C5FD"}`, borderRadius: 12, padding: 16, background: "#EFF6FF" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1E3A8A" }}>Upload Sick Leave supporting document</div>
+                <div style={{ fontSize: 11, color: "#475569", margin: "4px 0 12px" }}>Attach a medical certificate or other supporting file. Required for requests longer than 3 days.</div>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" onChange={(e) => set("supportingDocument", e.target.files?.[0] || null)} style={{ width: "100%", fontSize: 12, color: "#1C1028" }} />
                 <div style={{ fontSize: 10, color: "#64748B", marginTop: 6 }}>PDF, PNG or JPG · Maximum 2 MB</div>
+                {form.supportingDocument && <div style={{ fontSize: 11, color: "#166534", marginTop: 8 }}>Selected: {form.supportingDocument.name}</div>}
                 {editTarget?.supportingDocument?.url && !form.supportingDocument && (
                   <div style={{ fontSize: 11, color: "#1D4ED8", marginTop: 8 }}>Existing document: {editTarget.supportingDocument.originalName || "Supporting document"}</div>
                 )}

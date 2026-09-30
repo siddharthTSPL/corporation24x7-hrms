@@ -944,16 +944,18 @@ const LeaveApplyTab = ({ employee, showToast }) => {
             label="Supporting Document *"
             error={errors.supportingDocument}
           >
-            <div className="rounded-[12px] border border-[#E2D8EE] bg-[#FDFBFF] p-3">
+            <div className={`rounded-[12px] border border-dashed ${errors.supportingDocument ? "border-red-500" : "border-blue-300"} bg-[#EFF6FF] p-4`}>
+              <div className="text-[13px] font-semibold text-[#1E3A8A]">Upload Sick Leave supporting document</div>
+              <p className="text-[11px] text-[#475569] mt-1 mb-3">Attach a medical certificate or other supporting file. Required for requests longer than 3 days.</p>
               <input
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                 onChange={(e) =>
                   set("supportingDocument", e.target.files?.[0] || null)
                 }
-                className="w-full text-[12px] text-[#4A3860] font-['DM_Sans']"
+                className="w-full text-[12px] text-[#4A3860] font-['DM_Sans'] file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-[#1D4ED8]"
               />
-              <p className="text-[11px] text-[#9B8BAE] mt-1.5">
+              <p className="text-[11px] text-[#64748B] mt-2">
                 PDF, JPG or PNG · Maximum 2MB
               </p>
               {editTarget?.supportingDocument?.originalName &&
