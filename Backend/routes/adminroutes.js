@@ -54,6 +54,7 @@ const {
   getperticularemanager,
   deleteemployee,
   showallleaves,
+  forwardAdminLeave,
   acceptLeave,
   rejectLeave,
   applyleave,
@@ -311,6 +312,11 @@ adminrouter.put(
   "/rejectleave/:id",
   adminauthmiddleware,
   asyncHandler(rejectLeave),
+);
+adminrouter.post(
+  "/forwardleave",
+  adminauthmiddleware,
+  asyncHandler(forwardAdminLeave),
 );
 adminrouter.post(
   "/actionleave",

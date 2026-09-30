@@ -63,6 +63,7 @@ const managerLeaveSchema = new mongoose.Schema({
     enum: [
       "pending_reporting_manager",
       "pending_admin",
+      "forwarded_admin",
       "approved_reporting_manager",
       "approved_admin",
       "rejected_reporting_manager",
@@ -82,6 +83,9 @@ const managerLeaveSchema = new mongoose.Schema({
     enum: ["Manager", "Admin"],
     default: null,
   },
+
+  forwardedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+  forwardedByModel: { type: String, enum: ["Admin"], default: null },
 
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,

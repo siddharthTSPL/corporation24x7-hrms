@@ -29,6 +29,27 @@ const resolveCustomRouting = async ({ organisation_id, module, requesterRole }) 
   };
 };
 
+// Default Admin routing goes through the sole Co-Admin, when one exists.
+// Keep multi-Co-Admin organisations on the current direct-to-Admin route
+// because no manager-to-Co-Admin assignment is available to choose safely.
+const resolveDefaultAdminHandler = async (adminId, organisation_id) => {
+  if (!adminId || !organisation_id) return adminId;
+  const targetAdmin = await Admin.findOne({ _id: adminId, organisation_id })
+    .select("_id reporting_manager_model")
+    .lean();
+  if (!targetAdmin || targetAdmin.reporting_manager_model === "Admin") return adminId;
+
+  const coAdmins = await Admin.find({
+    organisation_id,
+    reporting_manager: targetAdmin._id,
+    reporting_manager_model: "Admin",
+    working_status: "working",
+  })
+    .select("_id")
+    .lean();
+  return coAdmins.length === 1 ? coAdmins[0]._id : targetAdmin._id;
+};
+
 const isInPool = (doc, adminId) =>
   !!doc?.approverPool?.some((id) => id.toString() === adminId.toString());
 
@@ -53,6 +74,7 @@ const isAdminHandlerCurrent = (doc, adminId) =>
 
 module.exports = {
   resolveCustomRouting,
+  resolveDefaultAdminHandler,
   isInPool,
   directedOrPooled,
   isAdminHandler,

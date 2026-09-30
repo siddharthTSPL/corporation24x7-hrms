@@ -69,6 +69,13 @@ export const rejectLeave = async ({ id, leaveFor }) => {
   return res.data;
 };
 
+export const forwardLeaveToAdmin = async ({ id, leaveFor }) => {
+  if (!id) throw new Error("Leave ID is required");
+  if (!leaveFor) throw new Error("leaveFor is required");
+  const res = await api.post("admin/forwardleave", { id, leaveFor });
+  return res.data;
+};
+
 export const applyleave = async (data) => {
   const payload = buildLeaveFormData(data);
 
