@@ -851,12 +851,21 @@ function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, o
   const admDimmed = hasQ && !admMatch;
   const adminId   = idStr(admin._id);
 
-  const admManagers = managers.filter(
-    (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
-  );
   const coAdmins = allAdmins.filter(
     (a) => idStr(a.reporting_manager) === adminId && a.reporting_manager_model === "Admin"
   );
+  const coAdminParent = admin.reporting_manager_model === "Admin"
+    ? allAdmins.find((a) => idStr(a._id) === idStr(admin.reporting_manager))
+    : null;
+  const parentCoAdmins = coAdminParent
+    ? allAdmins.filter((a) => idStr(a.reporting_manager) === idStr(coAdminParent._id) && a.reporting_manager_model === "Admin")
+    : [];
+  const isOnlyCoAdminForParent = parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === adminId;
+  const managerAdminId = isOnlyCoAdminForParent ? idStr(coAdminParent._id) : adminId;
+  const admManagers = managers.filter(
+    (m) => idStr(m.reporting_manager) === managerAdminId && m.reporting_manager_model === "Admin"
+  );
+  const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
 
   return (
     <div className="org-branch">
@@ -868,24 +877,6 @@ function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, o
         dimmed={admDimmed}
         onClick={() => onNodeClick(admin, "admin")}
       />
-
-      {admManagers.length > 0 && (
-        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
-          {admManagers.map((mgr, mi) => (
-            <ManagerBranch
-              key={mgr._id}
-              manager={mgr}
-              allManagers={managers}
-              employees={employees}
-              matchName={matchName}
-              hasQ={hasQ}
-              parentMatched={admMatch}
-              onNodeClick={onNodeClick}
-              delay={mi * 55}
-            />
-          ))}
-        </OrgConnectorGroup>
-      )}
 
       {coAdmins.length > 0 && (
         <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4 md:gap-5" verticalSpace={44}>
@@ -900,6 +891,24 @@ function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, o
               hasQ={hasQ}
               onNodeClick={onNodeClick}
               delay={delay + 340 + index * 60}
+            />
+          ))}
+        </OrgConnectorGroup>
+      )}
+
+      {showManagersHere && admManagers.length > 0 && (
+        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
+          {admManagers.map((mgr, mi) => (
+            <ManagerBranch
+              key={mgr._id}
+              manager={mgr}
+              allManagers={managers}
+              employees={employees}
+              matchName={matchName}
+              hasQ={hasQ}
+              parentMatched={admMatch}
+              onNodeClick={onNodeClick}
+              delay={mi * 55}
             />
           ))}
         </OrgConnectorGroup>

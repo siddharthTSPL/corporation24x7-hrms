@@ -25,6 +25,7 @@ const {
   adminGetPendingWFH,
   adminApproveWFH,
   adminRejectWFH,
+  adminForwardWFH,
   adminApplyWFH,
   adminGetMyWFH,
   superadminGetPendingWFH,
@@ -122,6 +123,12 @@ wfhRouter.post(
   "/admin/rejectWFH",
   adminauthmiddleware,
   asyncHandler(adminRejectWFH),
+);
+
+wfhRouter.post(
+  "/admin/forwardWFH",
+  adminauthmiddleware,
+  asyncHandler(adminForwardWFH),
 );
 
 wfhRouter.get(

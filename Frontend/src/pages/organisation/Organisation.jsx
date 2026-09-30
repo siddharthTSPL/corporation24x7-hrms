@@ -352,6 +352,39 @@ function SkeletonTree() {
   );
 }
 
+function ManagerGroup({ managers, q, matches, dim, delayRef }) {
+  const totalW = managers.reduce((s, m) => s + colWOf(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
+  const topBarW = Math.max(CARD_W, totalW);
+
+  return (
+    <>
+      {managers.length > 1 && (
+        <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
+          <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
+          <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
+          {managers.map((mgr, i) => {
+            let cx = 0;
+            for (let j = 0; j < i; j++) cx += colWOf(managers[j]) + MGR_GAP;
+            cx += colWOf(mgr) / 2;
+            return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
+          })}
+        </svg>
+      )}
+
+      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+        {managers.map(mgr => (
+          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+        ))}
+        {managers.length === 0 && (
+          <div style={{ padding: "14px 28px", borderRadius: 10, border: "1px dashed #e2e8f0", fontSize: 13, color: "#cbd5e1", background: "#fafafa" }}>
+            No managers added yet
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function OrgTree({ data, loading, q }) {
   if (loading) return <SkeletonTree />;
   if (!data) return null;
@@ -364,14 +397,18 @@ function OrgTree({ data, loading, q }) {
     if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
     if (chk(data.admin?.name, data.admin?.designation, data.admin?.department)) matches.add("admin");
     collectMatchKeys(data.managers || [], q, matches);
+    (data.coAdmins || []).forEach((coAdmin) => {
+      if ([coAdmin.name, coAdmin.designation, coAdmin.department].some(s => s && norm(s).includes(q)))
+        matches.add(`coadmin-${coAdmin.id}`);
+      collectMatchKeys(coAdmin.managers || [], q, matches);
+    });
   }
 
   const anyMatch = matches.size > 0;
   const dim = (k) => hasQ && anyMatch && !matches.has(k);
 
   const managers = data.managers || [];
-  const totalW = managers.reduce((s, m) => s + colWOf(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
-  const topBarW = Math.max(CARD_W, totalW);
+  const coAdmins = data.coAdmins || [];
 
   const delayRef = { current: 160 };
 
@@ -396,35 +433,53 @@ function OrgTree({ data, loading, q }) {
             dim={dim("admin")}
             hl={matches.has("admin")}
             q={q}
-            you
+            you={data.admin.isCurrentUser}
           />
           <VLine h={22} />
         </>
       )}
 
-      {managers.length > 1 && (
-        <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-          <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-          <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-          {managers.map((mgr, i) => {
-            let cx = 0;
-            for (let j = 0; j < i; j++) cx += colWOf(managers[j]) + MGR_GAP;
-            cx += colWOf(mgr) / 2;
-            return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
-          })}
-        </svg>
-      )}
-
-      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
-        {managers.map(mgr => (
-          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
-        ))}
-        {managers.length === 0 && (
-          <div style={{ padding: "14px 28px", borderRadius: 10, border: "1px dashed #e2e8f0", fontSize: 13, color: "#cbd5e1", background: "#fafafa" }}>
-            No managers added yet
+      {coAdmins.length > 0 ? (
+        <>
+          {managers.length > 0 && (
+            <>
+              <VLine h={18} />
+              <ManagerGroup managers={managers} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+              <VLine h={18} />
+            </>
+          )}
+          <VLine h={22} />
+          <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+            {coAdmins.map((coAdmin, index) => {
+              const key = `coadmin-${coAdmin.id}`;
+              const coAdminMatches = hasQ && [coAdmin.name, coAdmin.designation, coAdmin.department]
+                .some(s => s && norm(s).includes(q));
+              return (
+                <div key={coAdmin.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <Card
+                    level="admin"
+                    name={coAdmin.name}
+                    department={coAdmin.department ? getDepartmentName(coAdmin.department) : "—"}
+                    designation={coAdmin.designation || "—"}
+                    empid={coAdmin.empid}
+                    image={coAdmin.profile_image}
+                    width={CARD_W}
+                    delay={130 + index * 55}
+                    dim={dim(key)}
+                    hl={matches.has(key) || coAdminMatches}
+                    q={q}
+                    you={coAdmin.isCurrentUser}
+                  />
+                  <VLine h={18} />
+                  <ManagerGroup managers={coAdmin.managers || []} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <ManagerGroup managers={managers} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+      )}
     </div>
   );
 }
@@ -477,6 +532,10 @@ export default function OrganizationPageAdmin() {
       if (mgr.subManagers?.length) walk(mgr.subManagers);
     });
     walk(data.managers || []);
+    (data.coAdmins || []).forEach((coAdmin) => {
+      if (chk(coAdmin.name, coAdmin.designation, coAdmin.department)) n++;
+      walk(coAdmin.managers || []);
+    });
     return n;
   }, [searchQuery, data]);
 
@@ -484,7 +543,9 @@ export default function OrganizationPageAdmin() {
     if (!data) return 0;
     let n = 1;
     if (data.admin) n++;
+    n += (data.coAdmins || []).length;
     n += countNodes(data.managers || []);
+    (data.coAdmins || []).forEach((coAdmin) => { n += countNodes(coAdmin.managers || []); });
     return n;
   }, [data]);
 

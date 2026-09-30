@@ -51,6 +51,7 @@ const {
 const AssetModel = require("../Models/asset.model");
 const {
   notifyLeaveDecision,
+  notifyLeaveForwarded,
   notifyAssetAssigned,
   notifyLeaveApplied,
 } = require("../utils/notify.utils");
@@ -2693,6 +2694,9 @@ const showallleaves = async (req, res, next) => {
 
     const organisation_id = req.admin.organisation_id;
     const adminScopeIds = await getAdminScopeIds(req.admin._id, organisation_id);
+    const adminLeaveScopeIds = adminScopeIds.filter(
+      (id) => String(id) !== String(req.admin._id),
+    );
 
     const [employeeLeaves, managerLeaves, adminLeaves] = await Promise.all([
       Leave.find({
@@ -2720,8 +2724,8 @@ const showallleaves = async (req, res, next) => {
         .populate("manager", "f_name l_name work_email department designation")
         .sort({ createdAt: -1 })
         .lean(),
-      adminScopeIds.length > 1
-        ? AdminLeave.find({ organisation_id, admin: { $in: adminScopeIds.slice(1) } })
+      adminLeaveScopeIds.length > 0
+        ? AdminLeave.find({ organisation_id, admin: { $in: adminLeaveScopeIds } })
             .populate("admin", "f_name l_name work_email designation")
             .populate("approvedBy")
             .populate("rejectedBy")
@@ -2736,6 +2740,75 @@ const showallleaves = async (req, res, next) => {
       managerLeaves: { count: managerLeaves.length, leaves: managerLeaves },
       adminLeaves: { count: adminLeaves.length, leaves: adminLeaves },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const forwardAdminLeave = async (req, res, next) => {
+  try {
+    if (!req.admin)
+      return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
+
+    const { id, leaveFor } = req.body;
+    if (!id || !["employee", "manager"].includes(leaveFor))
+      return next(Object.assign(new Error("id and a valid leaveFor are required"), { statusCode: 400 }));
+
+    const organisation_id = req.admin.organisation_id;
+    const coAdmin = await Adminmodel.findOne({ _id: req.admin._id, organisation_id })
+      .select("f_name l_name reporting_manager reporting_manager_model")
+      .lean();
+    if (!coAdmin || coAdmin.reporting_manager_model !== "Admin" || !coAdmin.reporting_manager)
+      return next(Object.assign(new Error("Only a Co-Admin can forward this request to its reporting Admin"), { statusCode: 403 }));
+
+    const parentAdmin = await Adminmodel.findOne({
+      _id: coAdmin.reporting_manager,
+      organisation_id,
+      working_status: "working",
+    })
+      .select("_id f_name l_name")
+      .lean();
+    if (!parentAdmin)
+      return next(Object.assign(new Error("Reporting Admin is unavailable"), { statusCode: 400 }));
+
+    const LeaveModel = leaveFor === "employee" ? Leave : ManagerLeave;
+    const leave = await LeaveModel.findOne({
+      _id: id,
+      organisation_id,
+      directed_to: req.admin._id,
+      directed_to_model: "Admin",
+      status: "pending_admin",
+    });
+    if (!leave)
+      return next(Object.assign(new Error("This leave request is not pending in your queue"), { statusCode: 404 }));
+    if (leave.approverPool?.length)
+      return next(Object.assign(new Error("Custom approval flow requests cannot be forwarded"), { statusCode: 403 }));
+
+    leave.directed_to = parentAdmin._id;
+    leave.directed_to_model = "Admin";
+    leave.status = "forwarded_admin";
+    leave.forwardedBy = req.admin._id;
+    leave.forwardedByModel = "Admin";
+    if (req.body.remarks) leave.remarks = req.body.remarks;
+    await leave.save();
+
+    const requesterModel = leaveFor === "employee" ? Usermodel : Managermodel;
+    const requester = await requesterModel.findById(leaveFor === "employee" ? leave.employee : leave.manager)
+      .select("f_name l_name")
+      .lean();
+    notifyLeaveForwarded({
+      requesterName: requester ? `${requester.f_name} ${requester.l_name || ""}`.trim() : (leaveFor === "employee" ? "An employee" : "A manager"),
+      forwardedByName: `${coAdmin.f_name} ${coAdmin.l_name || ""}`.trim(),
+      handlerModel: "Admin",
+      handlerId: parentAdmin._id,
+      leaveType: leave.leaveType,
+      startDate: leave.startDate,
+      endDate: leave.endDate,
+      days: leave.days,
+      reason: leave.reason,
+    });
+
+    return res.status(200).json({ success: true, message: "Leave forwarded to reporting Admin", leave });
   } catch (error) {
     next(error);
   }
@@ -2779,7 +2852,7 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 403,
           })
         );
-      if (leave.status !== "pending_admin")
+      if (!["pending_admin", "forwarded_admin"].includes(leave.status))
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
             statusCode: 400,
@@ -2857,7 +2930,7 @@ const acceptLeave = async (req, res, next) => {
           })
         );
       if (
-        !["pending_admin", "pending_reporting_manager"].includes(leave.status)
+        !["pending_admin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
       )
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
@@ -2990,7 +3063,7 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 403,
           })
         );
-      if (leave.status !== "pending_admin")
+      if (!["pending_admin", "forwarded_admin"].includes(leave.status))
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
             statusCode: 400,
@@ -3046,7 +3119,7 @@ const rejectLeave = async (req, res, next) => {
           })
         );
       if (
-        !["pending_admin", "pending_reporting_manager"].includes(leave.status)
+        !["pending_admin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
       )
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
@@ -4625,18 +4698,28 @@ const getOrgInfo = async (req, res, next) => {
     if (!req.admin)
       return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const admin = await Adminmodel.findById(req.admin._id)
+    const currentAdmin = await Adminmodel.findById(req.admin._id)
       .select(
-        "empid f_name l_name work_email designation department office_location organisation_id profile_image"
+        "empid f_name l_name work_email designation department office_location organisation_id profile_image reporting_manager reporting_manager_model"
       )
       .lean();
 
-    if (!admin)
+    if (!currentAdmin)
       return res
         .status(404)
         .json({ success: false, message: "Admin not found" });
 
-    const organisation_id = admin.organisation_id;
+    const organisation_id = currentAdmin.organisation_id;
+    const chartAdmin = currentAdmin.reporting_manager_model === "Admin" && currentAdmin.reporting_manager
+      ? await Adminmodel.findOne({
+          _id: currentAdmin.reporting_manager,
+          organisation_id,
+        })
+          .select(
+            "empid f_name l_name work_email designation department office_location organisation_id profile_image reporting_manager reporting_manager_model"
+          )
+          .lean() || currentAdmin
+      : currentAdmin;
 
     const superAdmin = await SuperAdminModel.findById(organisation_id)
       .select("f_name l_name email organisation_name profile_image")
@@ -4645,6 +4728,16 @@ const getOrgInfo = async (req, res, next) => {
     const managers = await Managermodel.find({ organisation_id })
       .select(
         "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image"
+      )
+      .lean();
+
+    const coAdmins = await Adminmodel.find({
+      organisation_id,
+      reporting_manager: chartAdmin._id,
+      reporting_manager_model: "Admin",
+    })
+      .select(
+        "empid f_name l_name work_email designation department office_location profile_image"
       )
       .lean();
 
@@ -4657,10 +4750,11 @@ const getOrgInfo = async (req, res, next) => {
       )
       .lean();
 
-    const topLevelManagers = managers
-      .filter(
-        (mgr) =>
-          !mgr.reporting_manager || mgr.reporting_manager_model === "Admin"
+    const makeAdminManagers = (adminId) => managers
+      .filter((mgr) =>
+        mgr.reporting_manager &&
+        mgr.reporting_manager.toString() === adminId.toString() &&
+        mgr.reporting_manager_model === "Admin"
       )
       .map((mgr) => ({
         id: mgr._id,
@@ -4685,6 +4779,52 @@ const getOrgInfo = async (req, res, next) => {
         subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
       }));
 
+    const rootManagers = makeAdminManagers(chartAdmin._id);
+    const hasSingleCoAdmin = coAdmins.length === 1;
+    const chartCoAdmins = coAdmins.map((coAdmin) => ({
+      id: coAdmin._id,
+      empid: coAdmin.empid,
+      name: `${coAdmin.f_name} ${coAdmin.l_name}`,
+      email: coAdmin.work_email,
+      isCurrentUser: coAdmin._id.toString() === currentAdmin._id.toString(),
+      designation: coAdmin.designation,
+      department: coAdmin.department,
+      office_location: coAdmin.office_location,
+      profile_image: coAdmin.profile_image || null,
+      managers: [
+        ...makeAdminManagers(coAdmin._id),
+        ...(hasSingleCoAdmin ? rootManagers : []),
+      ],
+    }));
+    const unassignedManagers = managers
+      .filter((mgr) => !mgr.reporting_manager)
+      .map((mgr) => ({
+        id: mgr._id,
+        empid: mgr.empid,
+        name: `${mgr.f_name} ${mgr.l_name}`,
+        email: mgr.work_email,
+        designation: mgr.designation,
+        department: mgr.department,
+        office_location: mgr.office_location,
+        profile_image: mgr.profile_image || null,
+        employees: employees
+          .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
+          .map((emp) => ({
+            id: emp._id,
+            empid: emp.empid,
+            name: `${emp.f_name} ${emp.l_name}`,
+            email: emp.work_email,
+            designation: emp.designation,
+            department: emp.department,
+            profile_image: emp.profile_image || null,
+          })),
+        subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
+      }));
+    const topLevelManagers = [
+      ...unassignedManagers,
+      ...(hasSingleCoAdmin ? [] : rootManagers),
+    ];
+
     return res.status(200).json({
       success: true,
       organisation_id,
@@ -4699,15 +4839,17 @@ const getOrgInfo = async (req, res, next) => {
           }
         : null,
       admin: {
-        id: admin._id,
-        empid: admin.empid,
-        name: `${admin.f_name} ${admin.l_name}`,
-        email: admin.work_email,
-        designation: admin.designation,
-        department: admin.department,
-        office_location: admin.office_location,
-        profile_image: admin.profile_image || null,
+        id: chartAdmin._id,
+        empid: chartAdmin.empid,
+        name: `${chartAdmin.f_name} ${chartAdmin.l_name}`,
+        email: chartAdmin.work_email,
+        isCurrentUser: chartAdmin._id.toString() === currentAdmin._id.toString(),
+        designation: chartAdmin.designation,
+        department: chartAdmin.department,
+        office_location: chartAdmin.office_location,
+        profile_image: chartAdmin.profile_image || null,
       },
+      coAdmins: chartCoAdmins,
       managers: topLevelManagers,
     });
   } catch (error) {
@@ -5693,6 +5835,7 @@ module.exports = {
   getperticularemanager,
   deleteemployee,
   showallleaves,
+  forwardAdminLeave,
   acceptLeave,
   rejectLeave,
   applyleave,

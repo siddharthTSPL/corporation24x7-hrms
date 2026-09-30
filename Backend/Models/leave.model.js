@@ -59,6 +59,7 @@ const leaveSchema = new mongoose.Schema({
       "approved_reporting_manager",
       "rejected_reporting_manager",
       "pending_admin",
+      "forwarded_admin",
       "approved_admin",
       "rejected_admin",
     ],
@@ -74,6 +75,8 @@ const leaveSchema = new mongoose.Schema({
   },
   // Custom approval flow: admins allowed to act on this request (any one).
   approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+  forwardedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+  forwardedByModel: { type: String, enum: ["Admin"], default: null },
   approvedBy: { type: mongoose.Schema.Types.ObjectId },
   approvedByModel: { type: String, enum: ["Manager", "Admin"] },
   rejectedBy: { type: mongoose.Schema.Types.ObjectId },

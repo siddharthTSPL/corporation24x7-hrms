@@ -1,4 +1,4 @@
-import { adminApplyWFH, adminGetMyWFH, adminGetPendingWFH, adminApproveWFH, adminRejectWFH } from "../../api/adminapi/WFH/adminwfh.api";
+import { adminApplyWFH, adminGetMyWFH, adminGetPendingWFH, adminApproveWFH, adminRejectWFH, adminForwardWFH } from "../../api/adminapi/WFH/adminwfh.api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const useAdminApplyWFH = () => {
@@ -75,5 +75,13 @@ export const useAdminRejectForwardedWFH = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminPendingWFH"] });
     },
+  });
+};
+
+export const useAdminForwardWFH = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: adminForwardWFH,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["adminPendingWFH"] }),
   });
 };
