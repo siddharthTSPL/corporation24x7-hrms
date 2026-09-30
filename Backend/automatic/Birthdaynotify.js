@@ -46,8 +46,7 @@ const notifyBirthdays = async () => {
 
     if (birthdayPeople.length === 0) return;
 
-    // Group by org so the "someone's birthday" broadcast only goes to
-    // that person's own organisation, not the whole platform.
+    // Group by org so birthday alerts only go to that person's own organisation.
     const byOrg = new Map();
     birthdayPeople.forEach((p) => {
       const key = String(p.organisation_id);
@@ -56,19 +55,19 @@ const notifyBirthdays = async () => {
     });
 
     for (const [orgId, people] of byOrg.entries()) {
-      const [orgUsers, orgManagers, orgAdmins] = await Promise.all([
-        Usermodel.find({ organisation_id: orgId, working_status: "working" }).select("_id").lean(),
-        Managermodel.find({ organisation_id: orgId, working_status: "working" }).select("_id").lean(),
-        AdminModel.find({ organisation_id: orgId, working_status: "working" }).select("_id").lean(),
-      ]);
+      // Who should get the "X's birthday today" alert for this org?
+      //   1. If SuperAdmin has chosen HR admin(s) (isHR = true) -> only them.
+      //   2. If no HR is chosen                                  -> all admins.
+      const orgAdmins = await AdminModel.find({ organisation_id: orgId, working_status: "working" })
+        .select("_id isHR")
+        .lean();
 
-      const orgRoster = [
-        ...orgUsers.map((u) => ({ recipientId: u._id, recipientModel: "User" })),
-        ...orgManagers.map((m) => ({ recipientId: m._id, recipientModel: "Manager" })),
-        ...orgAdmins.map((a) => ({ recipientId: a._id, recipientModel: "Admin" })),
-      ];
+      const hrAdmins = orgAdmins.filter((a) => a.isHR === true);
+      const alertAdmins = hrAdmins.length > 0 ? hrAdmins : orgAdmins;
+      const alertRoster = alertAdmins.map((a) => ({ recipientId: a._id, recipientModel: "Admin" }));
 
       for (const person of people) {
+        // Personal greeting to the birthday person (unchanged).
         await createNotification({
           recipientModel: person.recipientModel,
           recipientId: person.id,
@@ -79,18 +78,20 @@ const notifyBirthdays = async () => {
           priority: "medium",
         });
 
-        const restOfOrg = orgRoster.filter(
-          (r) => !(String(r.recipientId) === String(person.id) && r.recipientModel === person.recipientModel)
+        // Don't alert someone about their own birthday (they got the greeting above).
+        const recipients = alertRoster.filter(
+          (r) => !(String(r.recipientId) === String(person.id) && person.recipientModel === "Admin")
         );
 
-        if (restOfOrg.length > 0) {
+        if (recipients.length > 0) {
           await createBulkNotifications({
-            recipients: restOfOrg,
+            recipients,
             organisation_id: orgId,
             type: "birthday",
             title: "🎂 Birthday Today",
             message: `It's ${person.name}'s birthday today! Take a moment to wish them well.`,
             priority: "low",
+            meta: { birthdayPersonId: person.id, birthdayPersonModel: person.recipientModel },
           });
         }
       }
