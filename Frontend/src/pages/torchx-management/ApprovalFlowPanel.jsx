@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Building2,
   Clock,
+  Receipt,
   ShieldCheck,
   Check,
   AlertTriangle,
@@ -35,6 +36,13 @@ const MODULES = [
     icon: Clock,
     defaultText:
       "Submitted timesheets go to the employee's manager, and a manager's timesheet to their reporting manager.",
+  },
+  {
+    key: "reimbursement",
+    title: "Reimbursement approval",
+    icon: Receipt,
+    defaultText:
+      "Employee and manager claims can be reviewed by any admin in the organisation. Admin claims go to the Super Admin.",
   },
 ];
 
