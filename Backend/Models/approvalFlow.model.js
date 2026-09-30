@@ -12,7 +12,7 @@ const approvalFlowSchema = new mongoose.Schema(
     },
     module: {
       type: String,
-      enum: ["leave", "wfh", "timesheet"],
+      enum: ["leave", "wfh", "timesheet", "reimbursement"],
       required: true,
     },
     enabled: { type: Boolean, default: false },
