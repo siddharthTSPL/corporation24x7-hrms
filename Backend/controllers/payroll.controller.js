@@ -7,6 +7,7 @@ const Admin = require("../Models/Admin.model");
 const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
+const { getTimesheetOvertimeByEmployee, buildOvertime } = require("../utils/Timesheetovertime.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
@@ -346,13 +347,30 @@ const generatePayroll = async (req, res) => {
     });
   }
 
+  // Timesheet -> payroll sync: approved timesheet overtime (if the org turned
+  // it on in Payroll Policy) becomes this month's overtime earning, unless the
+  // admin typed an overtime amount themselves (then that wins).
+  const overtimeMap = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel,
+    employeeIds: [employee],
+    month,
+    year,
+  });
+  const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+    policy,
+    structure,
+    overtimeEntry: overtimeMap.get(String(employee)),
+    manualOvertime: overtime,
+  });
+
   const result = calculatePayrollForMonth({
     structure,
     policy,
     attendanceSummary,
     month: Number(month),
     year: Number(year),
-    extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
+    extras: { bonus, incentive, overtime: overtimeAmount, reimbursement, otherEarnings, loan, advance, otherDeductions },
     manualAttendance,
     dateOfJoining,
   });
@@ -370,6 +388,7 @@ const generatePayroll = async (req, res) => {
         organisationSnapshot,
         ctc: structure.ctc,
         ...result,
+        overtimeDetail,
         policySnapshot: structure.policySnapshot,
         remarks: remarks || "",
         status: "generated",
@@ -436,6 +455,15 @@ const bulkGeneratePayroll = async (req, res) => {
   }).lean();
   const summaryByEmployee = new Map(summaries.map((s) => [String(s.employee), s]));
 
+  // One query for the whole run: approved-timesheet overtime per employee.
+  const overtimeByEmployee = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employeeIds,
+    month,
+    year,
+  });
+
 
   const existingPayrolls = await Payroll.find({
     employee: { $in: employeeIds },
@@ -489,13 +517,19 @@ const bulkGeneratePayroll = async (req, res) => {
     }
 
     const attendanceSummary = summaryByEmployee.get(String(structure.employee)) || null;
+    const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+      policy,
+      structure,
+      overtimeEntry: overtimeByEmployee.get(String(structure.employee)),
+      manualOvertime: 0,
+    });
     const result = calculatePayrollForMonth({
       structure,
       policy,
       attendanceSummary,
       month: Number(month),
       year: Number(year),
-      extras: {},
+      extras: { overtime: overtimeAmount },
       dateOfJoining: effectiveJoinDate,
     });
 
@@ -512,6 +546,7 @@ const bulkGeneratePayroll = async (req, res) => {
             organisationSnapshot,
             ctc: structure.ctc,
             ...result,
+            overtimeDetail,
             policySnapshot: structure.policySnapshot,
             status: "generated",
             generatedBy: req.admin._id,
