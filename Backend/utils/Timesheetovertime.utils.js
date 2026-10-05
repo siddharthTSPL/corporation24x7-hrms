@@ -79,9 +79,10 @@ const getTimesheetOvertimeByEmployee = async ({ organisation_id, employeeModel, 
 //   - Sync on, nothing typed  -> approved timesheet overtime x hourly rate x multiplier.
 // hourlyRate = monthlyGross / (org's fixed "No. of Working Days" x standard hours/day),
 // i.e. the same fixed denominator payroll already uses for its per-day rate.
-const buildOvertime = ({ policy, structure, overtimeEntry, manualOvertime }) => {
+const buildOvertime = ({ policy, structure, overtimeEntry, manualOvertime, forceEnabled = false }) => {
   const manual = round2(Number(manualOvertime) || 0);
   const cfg = shapeSyncConfig(policy);
+  if (forceEnabled) cfg.enabled = true;
   const approvedMinutes = overtimeEntry?.approvedMinutes || 0;
   const pendingMinutes = overtimeEntry?.pendingMinutes || 0;
 
