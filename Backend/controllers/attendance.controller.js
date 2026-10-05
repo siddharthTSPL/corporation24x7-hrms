@@ -507,7 +507,9 @@ const checkout = async (req, res) => {
       shift: shiftDoc,
     });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
-    attendance.status = status;
+    // Keep the Half Day already counted for a missed check-out so the record
+    // and AttendanceSummary (incremental + nightly rebuild) stay consistent.
+    attendance.status = alreadyCountedAsMissed ? "half_day" : status;
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
@@ -520,7 +522,7 @@ const checkout = async (req, res) => {
 
     res.json({
       message,
-      status,
+      status: attendance.status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
       activeMinutes: displayMinutes(attendance.activeMinutes),
