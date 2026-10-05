@@ -74,6 +74,7 @@ const payrollSchema = new mongoose.Schema(
       // true when paidDays was typed in by hand at generation time instead
       // of being pulled from AttendanceSummary.
       manualEntry: { type: Boolean, default: false },
+      basis: { type: String, enum: ["attendance", "timesheet"], default: "attendance" },
     },
 
     earnings: {
