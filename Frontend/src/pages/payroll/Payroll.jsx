@@ -544,6 +544,7 @@ const STATUTORY_SUBTABS = [
   { key: "pt", label: "Professional Tax" },
   { key: "lwf", label: "Labour Welfare Fund" },
   { key: "bonus", label: "Statutory Bonus" },
+  { key: "timesheet", label: "Timesheet Overtime" },
 ];
 
 function StatutoryTab({ notify }) {
@@ -587,6 +588,7 @@ function StatutoryTab({ notify }) {
         tds: form.tds,
         lwf: form.lwf,
         statutoryBonus: form.statutoryBonus,
+        timesheetSync: form.timesheetSync,
       },
       {
         onSuccess: () => notify("Statutory components updated", "success"),
@@ -710,6 +712,28 @@ function StatutoryTab({ notify }) {
           <Field label="% of Basic" hint="8.33 – 20">
             <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 160 }} />
           </Field>
+        </div>
+      )}
+
+      {sub === "timesheet" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Pay overtime from <b>approved timesheets</b> automatically. Each month's payroll picks up the overtime hours logged in that month on approved timesheets and adds them to Earnings as Overtime.
+            Hourly rate = Monthly Gross ÷ (No. of Working Days × Standard hours per day). Overtime on timesheets that are not approved yet is never paid.
+            If you type an Overtime amount while generating payroll, that amount is used instead.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.timesheetSync?.enabled} onChange={(v) => set("timesheetSync.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sync approved timesheet overtime to payroll</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ maxWidth: 420 }}>
+            <Field label="Overtime rate multiplier" hint="e.g. 1.5 = time-and-a-half">
+              <TextInput type="number" step="0.1" min={0.1} max={10} disabled={!form.timesheetSync?.enabled} value={form.timesheetSync?.overtimeMultiplier ?? 1.5} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
+            </Field>
+            <Field label="Standard hours per day" hint="Used for the hourly rate">
+              <TextInput type="number" step="0.5" min={1} max={24} disabled={!form.timesheetSync?.enabled} value={form.timesheetSync?.standardHoursPerDay ?? 9} onChange={(e) => set("timesheetSync.standardHoursPerDay", Number(e.target.value))} />
+            </Field>
+          </div>
         </div>
       )}
 
@@ -1399,7 +1423,7 @@ setSingleResult(null);
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
             <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
             <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
-            <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
+            <Field label="Overtime (₹)" hint="Leave blank to use approved timesheet overtime (if sync is on)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
             <Field label="Reimbursement (₹)"><TextInput type="number" min={0} value={single.reimbursement} onChange={(e) => setSingle((p) => ({ ...p, reimbursement: e.target.value }))} /></Field>
             <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
             <Field label="Loan EMI (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
