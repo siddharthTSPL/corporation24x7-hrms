@@ -14,6 +14,32 @@ const escapeCsvCell = (value) => {
  * @param {{key:string, label:string, format?: (row:object)=>string}[]} columns
  * @param {object[]} rows
  */
+export const paidDayValue = (r) => {
+  if (!r) return 0;
+  const paidLeave = !!r.leaveType && r.leaveType !== "lwp";
+  if (r.status === "present") return 1;
+  if (r.status === "half_day") return paidLeave ? 1 : 0.5;
+  if (r.status === "week_off" || r.status === "holiday") return 1;
+  if (r.status === "leave") return r.isLwpDay || r.leaveType === "lwp" ? 0 : 1;
+  if (r.status === "absent") return paidLeave ? 1 : 0;
+  return 0;
+};
+
+export const sumPaidDays = (rows) => (rows || []).reduce((s, r) => s + paidDayValue(r), 0);
+
+export const withTotalRow = (columns) =>
+  columns.map((c) => ({
+    ...c,
+    format: (r) => {
+      if (!r.__total) return c.format ? c.format(r) : r[c.key];
+      if (c.key === "date") return "TOTAL PAID DAYS";
+      if (c.key === "paidDay") return r.paidDays;
+      if (c.key === "employeeName") return r.employeeName || "";
+      if (c.key === "empid") return r.empid || "";
+      return "";
+    },
+  }));
+
 export function downloadCsv(filename, columns, rows) {
   const header = columns.map((c) => escapeCsvCell(c.label)).join(",");
   const lines = rows.map((row) =>

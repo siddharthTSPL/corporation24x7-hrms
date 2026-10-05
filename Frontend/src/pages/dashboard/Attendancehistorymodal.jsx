@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter, FaUsers } from "react-icons/fa";
-import { downloadCsv } from "./Exportcsv";
+import { downloadCsv, paidDayValue, sumPaidDays, withTotalRow } from "./Exportcsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -216,10 +216,12 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     );
   }, [rows]);
 
+  const paidDays = useMemo(() => sumPaidDays(allRows), [allRows]);
+
   const exportCsv = () => {
     downloadCsv(
       `attendance-history-${(employeeName || employeeId || "employee").replace(/\s+/g, "_")}-${range.startDate}_to_${range.endDate}.csv`,
-      [
+      withTotalRow([
         { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
         { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
         { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
@@ -230,8 +232,9 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
-      ],
-      rows
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
+      ]),
+      [...rows, { __total: true, paidDays }]
     );
   };
 
@@ -255,6 +258,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           if (sourceFilter !== "all" && r.source !== sourceFilter) return;
           combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
         });
+        combined.push({ __total: true, employeeName: person.name || "Unknown", empid: person.empid || "—", paidDays: sumPaidDays(dayRows) });
       } catch {
         failedNames.push(person.name || person.empid || person.id);
       } finally {
@@ -264,7 +268,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
 
     downloadCsv(
       `attendance-history-all-employees-${range.startDate}_to_${range.endDate}.csv`,
-      [
+      withTotalRow([
         { key: "employeeName", label: "Employee", format: (r) => r.employeeName },
         { key: "empid", label: "Emp ID", format: (r) => r.empid },
         { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
@@ -277,7 +281,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
-      ],
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
+      ]),
       combined
     );
 
@@ -400,6 +405,9 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           </span>
           <span className="text-[11.5px] text-gray-500">
             Days with check-in: <strong className="text-gray-800">{totals.daysPresentish}</strong>
+          </span>
+          <span className="text-[11.5px] text-gray-500" title="Present + half days + week off + holidays + paid leave">
+            Total Paid Days: <strong className="text-emerald-700">{paidDays}</strong>
           </span>
         </div>
 

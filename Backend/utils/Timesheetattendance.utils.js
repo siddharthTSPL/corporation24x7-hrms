@@ -104,24 +104,47 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
     let presentDays = 0;
     let halfDays = 0;
     let absentDays = 0;
+    const days = [];
 
     for (let d = 1; d <= lastDay; d += 1) {
       const date = istDateFromYMD(y, m, d);
-      if (joinStart && date < joinStart) continue;
-      if (date >= todayStart) continue;
-
       const key = toISTKey(date);
-      if (holidayKeys.has(key) || weekOffMap.get(key)?.isOff) continue;
+      if (joinStart && date < joinStart) {
+        days.push({ date: key, result: "before_joining" });
+        continue;
+      }
+      if (date >= todayStart) {
+        days.push({ date: key, result: "not_counted_today_or_future" });
+        continue;
+      }
+
+      if (holidayKeys.has(key)) {
+        days.push({ date: key, result: "holiday_paid" });
+        continue;
+      }
+      if (weekOffMap.get(key)?.isOff) {
+        days.push({ date: key, result: "weekoff_paid" });
+        continue;
+      }
 
       const leave = empLeaves.find(
         (l) => date >= startOfISTDay(new Date(l.startDate)) && date <= startOfISTDay(new Date(l.endDate)) && !isDateInLwpPortion(l, date)
       );
       if (leave) {
         if (leave.leaveType === "comp_off") presentDays += 1;
+        days.push({ date: key, result: leave.leaveType === "comp_off" ? "comp_off_present" : "paid_leave" });
         continue;
       }
 
-      const status = classifyDay(minutesByEmployeeDay.get(`${id}|${key}`) || 0, standardMinutes);
+      const dayMinutes = minutesByEmployeeDay.get(`${id}|${key}`) || 0;
+      const status = classifyDay(dayMinutes, standardMinutes);
+      days.push({
+        date: key,
+        approvedRegularMinutes: dayMinutes,
+        standardMinutes,
+        percent: standardMinutes > 0 ? Math.round((dayMinutes / standardMinutes) * 1000) / 10 : 0,
+        result: status === "full" ? "full_day" : status === "half" ? "half_day" : "absent_lop",
+      });
       if (status === "full") presentDays += 1;
       else if (status === "half") {
         presentDays += 0.5;
@@ -129,7 +152,7 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
       } else absentDays += 1;
     }
 
-    result.set(id, { presentDays, halfDays, absentDays, basis: "timesheet" });
+    result.set(id, { presentDays, halfDays, absentDays, basis: "timesheet", days });
   }
 
   return result;
