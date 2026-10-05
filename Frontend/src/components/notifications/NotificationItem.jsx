@@ -2,15 +2,26 @@ import React from "react";
 import { FaTrash } from "react-icons/fa";
 import { getTypeMeta, formatRelativeTime } from "./notificationUtils";
 
+const getBirthdayChip = (notification) => {
+  if (notification.type !== "birthday" || notification.meta?.self) return null;
+  const days = notification.meta?.daysUntil;
+  if (days === undefined || days === null) return null;
+  const when = days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`;
+  const date = notification.meta?.birthdayDateLabel;
+  return date ? `${when} • ${date}` : when;
+};
+
 function NotificationItem({ notification, onOpen, onDelete, dense = false }) {
   const meta = getTypeMeta(notification.type);
   const Icon = meta.icon;
+  const birthdayChip = getBirthdayChip(notification);
+  const personRole = notification.meta?.birthdayPersonRole;
 
   return (
     <div
       onClick={() => onOpen(notification)}
       className={`group relative flex gap-3 px-4 ${dense ? "py-3" : "py-3.5"} cursor-pointer transition-colors hover:bg-[#F6E8EF]/60 ${
-        !notification.isRead ? "bg-[#F1FAFF]" : "bg-white"
+        !notification.isRead ? (birthdayChip ? "bg-[#FFF5FA]" : "bg-[#F1FAFF]") : "bg-white"
       }`}
     >
       <div
@@ -30,6 +41,18 @@ function NotificationItem({ notification, onOpen, onDelete, dense = false }) {
           )}
         </div>
         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
+        {birthdayChip && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center rounded-full bg-[#FDE7F3] px-2 py-0.5 text-[10px] font-semibold text-[#EC4899]">
+              🎂 {birthdayChip}
+            </span>
+            {personRole && (
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                {personRole}
+              </span>
+            )}
+          </div>
+        )}
         <span className="text-[11px] text-gray-400 mt-1 inline-block">
           {formatRelativeTime(notification.createdAt)}
         </span>
