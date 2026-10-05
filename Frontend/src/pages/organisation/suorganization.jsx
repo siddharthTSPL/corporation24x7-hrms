@@ -17,10 +17,9 @@ const STYLES = `
 
   .su-org *, .su-org { font-family: 'Inter', sans-serif; box-sizing: border-box; }
 
-  .su-shell { min-height: 100vh; }
-  @supports (height: 100dvh) {
-    .su-shell { min-height: 100dvh; }
-  }
+  /* Never let the chart widen the page: extra width scrolls INSIDE the chart block only. */
+  .su-org { contain: inline-size; }
+  .su-shell { min-height: 0; }
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
@@ -60,14 +59,21 @@ const STYLES = `
     pointer-events: none;
   }
 
+  /* Chart scroll area: native bars hidden, the fixed bar at the bottom of the screen drives horizontal scroll */
   .su-scroll {
-    touch-action: pan-x;
     overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .su-scroll::-webkit-scrollbar { height:5px; width:5px; }
-  .su-scroll::-webkit-scrollbar-track { background:transparent; }
-  .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
-  .su-scroll { -webkit-overflow-scrolling: touch; }
+  .su-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  /* Horizontal bar pinned to the bottom of the screen */
+  .su-hbar { scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+  .su-hbar::-webkit-scrollbar { height: 12px; }
+  .su-hbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 8px; }
+  .su-hbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; border: 2px solid #e2e8f0; }
+  .su-hbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
   .su-field-row {
     display: flex;
@@ -1048,7 +1054,13 @@ export default function SuperAdminOrgChart() {
   const [exporting,   setExporting]   = useState(false);
   const [exportDone,  setExportDone]  = useState(false);
   const inputRef = useRef(null);
+
+  // treeRef = the horizontally scrolling viewport, exportRef = the full-width chart content inside it
   const treeRef = useRef(null);
+  const exportRef = useRef(null);
+  const barRef = useRef(null);
+  const [bar, setBar] = useState({ sw: 0, show: false });
+  const [pos, setPos] = useState({ left: 0, width: 0, top: 0, visible: false });
 
   const superAdmin = saData?.superAdmin || saData;
   const admins     = useMemo(() => admData?.admins || [], [admData]);
@@ -1094,6 +1106,49 @@ export default function SuperAdminOrgChart() {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
+  // Horizontal bar pinned to the bottom of the SCREEN (fixed), aligned with the chart block.
+  // If the chart's own bottom edge is on screen, the bar sits right at that edge instead.
+  useEffect(() => {
+    const inner = exportRef.current;
+    const sc = treeRef.current;
+    if (!inner || !sc) return undefined;
+    const BAR_H = 14;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const r = sc.getBoundingClientRect();
+      const vh = window.innerHeight;
+      setBar((prev) => {
+        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        return prev.sw === next.sw && prev.show === next.show ? prev : next;
+      });
+      const visible = r.bottom > BAR_H && r.top < vh - BAR_H;
+      const top = Math.min(r.bottom, vh) - BAR_H;
+      setPos((prev) =>
+        prev.left === r.left && prev.width === r.width && prev.top === top && prev.visible === visible
+          ? prev
+          : { left: r.left, width: r.width, top, visible }
+      );
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    ro?.observe(inner);
+    ro?.observe(sc);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true); // capture: also catches the layout's own scroll container
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const syncScroll = (from, to) => {
+    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  };
+
   function buildCsvRows() {
     const rows = [["Role", "Emp ID", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
 
@@ -1130,24 +1185,28 @@ export default function SuperAdminOrgChart() {
   }
 
   async function exportPng() {
-    if (!treeRef.current || exporting) return;
+    // Export the full-width inner content (not the clipped scroll viewport)
+    const target = exportRef.current;
+    if (!target || exporting) return;
     setExporting(true);
     try {
       await loadScript(HTML_TO_IMAGE_CDN);
-      treeRef.current.classList.add("su-export-flat");
-      const dataUrl = await window.htmlToImage.toPng(treeRef.current, {
+      target.classList.add("su-export-flat");
+      const dataUrl = await window.htmlToImage.toPng(target, {
         backgroundColor: "#ffffff",
         pixelRatio: 2,
         cacheBust: true,
+        width: target.scrollWidth,
+        height: target.scrollHeight,
       });
-      treeRef.current.classList.remove("su-export-flat");
+      target.classList.remove("su-export-flat");
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`);
       setExportDone(true);
       setTimeout(() => setExportDone(false), 2600);
     } catch (err) {
-      treeRef.current?.classList.remove("su-export-flat");
+      exportRef.current?.classList.remove("su-export-flat");
       window.alert("Could not generate the image export. Please try again.");
     } finally {
       setExporting(false);
@@ -1162,7 +1221,7 @@ export default function SuperAdminOrgChart() {
   ];
 
   return (
-    <div className="su-org su-shell w-full max-w-full min-w-0 bg-[#f4f7fb] flex flex-col overflow-x-hidden">
+    <div className="su-org su-shell w-full max-w-full min-w-0 bg-[#f4f7fb] flex flex-col">
       <style>{STYLES}</style>
 
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
@@ -1337,19 +1396,28 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
+          {/* Scroll viewport: width is capped to the page, extra width scrolls INSIDE this block (horizontal only) */}
           <div
             ref={treeRef}
-            className="su-scroll w-full max-w-full min-w-0 overflow-x-auto overflow-y-visible bg-white p-3 sm:p-6 lg:p-8"
+            onScroll={() => syncScroll(treeRef.current, barRef.current)}
+            className="su-scroll w-full max-w-full min-w-0 bg-white"
+            style={{ overflowX: "auto", overflowY: "hidden" }}
           >
-            <OrgTree
-              superAdmin={superAdmin}
-              admins={admins}
-              managers={managers}
-              employees={employees}
-              loading={loading}
-              searchQuery={searchQuery}
-              onNodeClick={(person, type) => setSelected({ person, type })}
-            />
+            <div
+              ref={exportRef}
+              className="bg-white p-3 sm:p-6 lg:p-8"
+              style={{ width: "max-content", minWidth: "100%" }}
+            >
+              <OrgTree
+                superAdmin={superAdmin}
+                admins={admins}
+                managers={managers}
+                employees={employees}
+                loading={loading}
+                searchQuery={searchQuery}
+                onNodeClick={(person, type) => setSelected({ person, type })}
+              />
+            </div>
           </div>
         </div>
 
@@ -1376,6 +1444,27 @@ export default function SuperAdminOrgChart() {
           </div>
         )}
       </main>
+
+      {/* Horizontal scrollbar: fixed at the bottom of the screen, never moves while the page scrolls */}
+      <div
+        ref={barRef}
+        className="su-hbar"
+        onScroll={() => syncScroll(barRef.current, treeRef.current)}
+        style={{
+          position: "fixed",
+          left: pos.left,
+          top: pos.top,
+          width: pos.width,
+          height: 14,
+          zIndex: 30,
+          overflowX: "auto",
+          overflowY: "hidden",
+          display: bar.show && pos.visible ? "block" : "none",
+          background: "transparent",
+        }}
+      >
+        <div style={{ width: bar.sw, height: 1 }} />
+      </div>
 
       {selected && (
         <EmployeeDetailPanel
