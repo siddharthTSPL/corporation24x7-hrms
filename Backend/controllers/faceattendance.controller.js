@@ -6,8 +6,9 @@ const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
 const FieldTeam = require("../Models/fieldTeam.model");
 const { updateSummary } = require("../automatic/monthattendanceupdate");
+const { computeLateStanding, applyLatePenaltyToStatus } = require("../utils/Laterule.utils");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
-const { startOfISTDay } = require("../utils/istDate.utils");
+const { startOfISTDay } = require("../utils/Istdate.utils");
 const {
   resolveEmployeeShift,
   evaluateCheckinWindow,
@@ -224,11 +225,22 @@ const scanFace = async (req, res) => {
         });
       }
 
+      // Late rule: which late check-in of the month is this?
+      const { lateCountInMonth, latePenalty, rule: lateRule } = await computeLateStanding({
+        organisation_id,
+        employee: best.employee,
+        role: best.role,
+        date: today,
+        isLate,
+      });
+
       if (attendance) {
         attendance.checkIn = now;
         attendance.source = "face";
         attendance.isLate = isLate;
         attendance.lateMinutes = lateMinutes;
+        attendance.lateCountInMonth = lateCountInMonth;
+        attendance.latePenalty = latePenalty;
         attendance.shift = shift._id;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
@@ -245,17 +257,25 @@ const scanFace = async (req, res) => {
           shift: shift._id,
           isLate,
           lateMinutes,
+          lateCountInMonth,
+          latePenalty,
           source: "face",
           checkInGate: gateName,
         });
       }
 
       const grace = shift.graceMinutes ?? 15;
-      const checkinMessage = !isLate
+      const baseCheckinMessage = !isLate
         ? "Checked in on time"
         : tooLate
           ? `You are quite late (by ${minutesToLabel(lateMinutes)}), but welcome! Checked in.`
           : `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`;
+      const lateNote = !isLate || !lateRule?.enabled
+        ? ""
+        : latePenalty
+          ? ` Late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}) — today will be counted as a Half Day.`
+          : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
+      const checkinMessage = baseCheckinMessage + lateNote;
 
       // Exact instant checkout unlocks, so the kiosk can show a live
       // countdown chip right after check-in instead of only surfacing it
@@ -274,6 +294,8 @@ const scanFace = async (req, res) => {
         time: attendance.checkIn,
         isLate,
         lateMinutes,
+        lateCountInMonth,
+        latePenalty,
         gate: gateName,
         shift: shiftInfo,
         checkoutOpensAt,
@@ -327,7 +349,7 @@ const scanFace = async (req, res) => {
     // length (<50% = absent, 50%-85% = half_day, >=85% = present) -
     // separate from the manual/agent flow, which still uses the shift's
     // fixed absentBelowMinutes/halfDayBelowMinutes untouched.
-    attendance.status = alreadyCountedAsMissed ? "half_day" : calculateFaceStatus(durationMinutes, shift);
+    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, calculateFaceStatus(durationMinutes, shift));
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
