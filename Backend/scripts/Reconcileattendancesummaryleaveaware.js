@@ -164,8 +164,13 @@ const leaveOverrideForDate = (allLeaveMap, employeeId, role, date) => {
   if (!ranges) return null;
   const leave = ranges.find((r) => date >= r.startDate && date <= r.endDate);
   if (!leave) return null;
-  return resolveLeaveDayOverride(leave, date);
+  return { ...resolveLeaveDayOverride(leave, date), leaveType: leave.leaveType };
 };
+
+// How much of a calendar day an approved leave covers: half_day_el/half_day_sl
+// = 0.5, everything else (el/sl/ml/pl/lwp/comp_off) = 1.
+const leaveDayValue = (leaveType) =>
+  typeof leaveType === "string" && leaveType.startsWith("half_day") ? 0.5 : 1;
 
 const bucketKey = (employee, role, year, month) => `${employee}_${role}_${year}_${month}`;
 
@@ -174,13 +179,19 @@ const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id
   if (!buckets.has(key)) {
     buckets.set(key, {
       employee, role, organisation_id, year, month,
-      presentDays: 0, halfDays: 0, absentDays: 0, weekOffHolidayDays: 0, totalWorkingMinutes: 0,
+      presentDays: 0, halfDays: 0, absentDays: 0, weekOffHolidayDays: 0, leaveDays: 0, totalWorkingMinutes: 0,
     });
   }
   return buckets.get(key);
 };
 
-const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
+// opts.currentAndPreviousMonth (used by the nightly cron): rebuild EVERY
+// employee's current IST month from day 1 through yesterday (plus the
+// previous month, for a leave approved in the first days of a new month).
+// A leave / half-day leave / comp off approved late is picked up the same
+// night, no matter how old its dates are, because the whole month is
+// always recomputed from scratch - never just the last few days.
+const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts = {}) => {
   const yesterday = startOfDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
   // Scoping for --days=N: find employees who either (a) had a checkout in
@@ -222,8 +233,25 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
     );
   }
 
+  if (!sinceDays && opts.currentAndPreviousMonth) {
+    const nowIst = getISTDateParts(new Date());
+    const prevIst = nowIst.month === 1
+      ? { year: nowIst.year - 1, month: 12 }
+      : { year: nowIst.year, month: nowIst.month - 1 };
+    scopeMonths = new Set([`${nowIst.year}-${nowIst.month}`, `${prevIst.year}-${prevIst.month}`]);
+    console.log(`Nightly rebuild: months ${[...scopeMonths].join(", ")} for all employees (day 1 -> yesterday)\n`);
+  }
+
+  // Only load the attendance window we are going to rebuild (with a couple
+  // of days of slack for IST/UTC month-boundary records).
+  const attendanceFilter = {};
+  if (scopeMonths) {
+    const firstMonth = [...scopeMonths].map((k) => k.split("-").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1])[0];
+    attendanceFilter.date = { $gte: new Date(Date.UTC(firstMonth[0], firstMonth[1] - 1, 1) - 2 * 24 * 60 * 60 * 1000) };
+  }
+
   const [allRecords, leaveMap, allLeaveMap] = await Promise.all([
-    Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id source").lean(),
+    Attendance.find(attendanceFilter).select("employee role date checkOut status activeMinutes organisation_id source checkoutRemark").lean(),
     loadApprovedLeaveRanges(),
     loadAllApprovedLeaveRangesWithType(),
   ]);
@@ -260,7 +288,10 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
     }
 
-    if (!r.checkOut) return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
+    // A session auto-closed as "missed_checkout" (org has auto check-out OFF)
+    // deliberately has NO checkOut time but is already a counted Half Day -
+    // keep it in the rebuild or this nightly $set wipes that half day.
+    if (!r.checkOut && r.checkoutRemark !== "missed_checkout") return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
 
     const { year, month } = getISTDateParts(r.date);
     if (scopeMonths && !scopeMonths.has(`${year}-${month}`)) return;
@@ -282,9 +313,17 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       if (r.status !== override.status) {
         statusCorrections.push({ _id: r._id, status: override.status });
       }
+      // Informational "Leave Days" for dashboards (any approved leave type).
+      b.leaveDays += leaveDayValue(override.leaveType);
+      // Half-day leave (half_day_el / half_day_sl): the day counts 0.5 no
+      // matter how long the person actually worked - even a full present
+      // day. The unpaid half (balance ran out) is handled just below.
       if (override.status === "half_day") {
         b.presentDays += 0.5;
         if (!override.isPaidForThisDate) b.halfDays += 1;
+      } else if (override.status === "present") {
+        // Compensatory Off day (see resolveLeaveDayOverride): counts as present.
+        b.presentDays += 1;
       } else if (!override.isPaidForThisDate) {
         b.absentDays += 1;
       }
@@ -367,8 +406,17 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
             // week-off or a company holiday.
             b.weekOffHolidayDays += 1;
           } else if (nonWorking.type !== "unconfigured") {
+            const ov = leaveOverrideForDate(allLeaveMap, emp._id, role, cursor);
+            if (ov) b.leaveDays += leaveDayValue(ov.leaveType);
             if (!isOnApprovedLeave(leaveMap, emp._id, role, cursor)) {
               b.absentDays += 1;
+            } else if (ov?.status === "present") {
+              // Approved Compensatory Off with no check-in -> present day
+              // (matches Marknoshowabsent.js).
+              b.presentDays += 1;
+            } else if (ov?.status === "half_day") {
+              // Approved half-day leave with no check-in: counts 0.5.
+              b.presentDays += 0.5;
             }
           }
         }
@@ -390,6 +438,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       && existing.halfDays === b.halfDays
       && existing.absentDays === b.absentDays
       && existing.weekOffHolidayDays === b.weekOffHolidayDays
+      && (existing.leaveDays ?? 0) === b.leaveDays
       && existing.totalWorkingMinutes === b.totalWorkingMinutes;
 
     if (!same) {
@@ -407,6 +456,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
               organisation_id: b.organisation_id,
               presentDays: b.presentDays, halfDays: b.halfDays,
               absentDays: b.absentDays, weekOffHolidayDays: b.weekOffHolidayDays,
+              leaveDays: b.leaveDays,
               totalWorkingMinutes: b.totalWorkingMinutes,
             },
           },

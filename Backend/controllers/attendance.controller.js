@@ -488,6 +488,10 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Already counted as Half Day by autoCheckoutAll() while auto check-out was
+    // OFF - don't add it to AttendanceSummary a second time on a late checkout.
+    const alreadyCountedAsMissed = attendance.checkoutRemark === "missed_checkout";
+
     attendance.checkOut = now;
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
@@ -503,11 +507,13 @@ const checkout = async (req, res) => {
       shift: shiftDoc,
     });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
-    attendance.status = status;
+    // Keep the Half Day already counted for a missed check-out so the record
+    // and AttendanceSummary (incremental + nightly rebuild) stay consistent.
+    attendance.status = alreadyCountedAsMissed ? "half_day" : status;
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
-    await updateSummary(attendance);
+    if (!alreadyCountedAsMissed) await updateSummary(attendance);
 
     const message =
       remark === "auto_overtime"
@@ -516,7 +522,7 @@ const checkout = async (req, res) => {
 
     res.json({
       message,
-      status,
+      status: attendance.status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
       activeMinutes: displayMinutes(attendance.activeMinutes),
@@ -570,6 +576,8 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
+      // Already handled once while the org had auto check-out OFF.
+      checkoutRemark: { $ne: "missed_checkout" },
     }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn").lean();
 
     if (!openSessions.length) return;
@@ -631,12 +639,14 @@ const autoCheckoutAll = async () => {
         a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
 
       if (autoCheckoutByOrg.get(String(a.organisation_id)) === false) {
+        // Auto check-out is OFF for this org: do NOT write a checkOut time.
+        // The member forgot to check out, so the day is just marked Half Day
+        // + "missed_checkout" and the session stays without a checkOut.
         ops.push({
           updateOne: {
             filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
             update: {
               $set: {
-                checkOut: forceCheckoutAt,
                 status: "half_day",
                 checkoutRemark: "missed_checkout",
                 overtimeMinutes: 0,
@@ -646,7 +656,7 @@ const autoCheckoutAll = async () => {
             },
           },
         });
-        summaryPayloads.push({ ...a, checkOut: forceCheckoutAt, status: "half_day" });
+        summaryPayloads.push({ ...a, status: "half_day" });
         continue;
       }
 

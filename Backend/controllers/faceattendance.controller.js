@@ -312,6 +312,10 @@ const scanFace = async (req, res) => {
 
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
+    // Already counted as Half Day by autoCheckoutAll() (org has auto
+    // check-out OFF) - keep that status and don't re-add it to the summary.
+    const alreadyCountedAsMissed = attendance.checkoutRemark === "missed_checkout";
+
     attendance.checkOut = now;
     attendance.checkOutGate = gateName;
     const durationMinutes = Math.round(
@@ -323,11 +327,11 @@ const scanFace = async (req, res) => {
     // length (<50% = absent, 50%-85% = half_day, >=85% = present) -
     // separate from the manual/agent flow, which still uses the shift's
     // fixed absentBelowMinutes/halfDayBelowMinutes untouched.
-    attendance.status = calculateFaceStatus(durationMinutes, shift);
+    attendance.status = alreadyCountedAsMissed ? "half_day" : calculateFaceStatus(durationMinutes, shift);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
-    await updateSummary(attendance);
+    if (!alreadyCountedAsMissed) await updateSummary(attendance);
 
     const remarkMessage = {
       on_time: "Checked out on time. Have a good day!",

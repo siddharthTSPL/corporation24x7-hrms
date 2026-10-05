@@ -693,12 +693,10 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           <FiCalendar size={16} />
         </div>
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#999]">Leave Balance</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[#999]">Free Trial</div>
           <div className="flex items-center gap-1.5">
             <span className="text-[14px] font-display font-extrabold text-[#111]">14 Days</span>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#fff4d6] text-[#a06b00]">
-              2 In Review
-            </span>
+            
           </div>
         </div>
       </div>
@@ -1966,3 +1964,5 @@ export default function LandingPage() {
     </div>
   )
 }
+
+                                                   

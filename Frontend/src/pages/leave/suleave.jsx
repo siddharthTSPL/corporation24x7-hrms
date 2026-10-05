@@ -61,6 +61,14 @@ const LEAVE_META = {
     accent: "#EC4899",
     dot: "#BE185D",
   },
+  comp_off: {
+    label: "Comp Off",
+    short: "CO",
+    bg: "#F3E8FF",
+    color: "#6B21A8",
+    accent: "#A855F7",
+    dot: "#9333EA",
+  },
   half_day_el: {
     label: "Half Day EL",
     bg: "#D1FAE5",

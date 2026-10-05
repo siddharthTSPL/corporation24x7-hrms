@@ -44,7 +44,22 @@ const STATUS_META = {
   present: { label: "Present", color: "#16A34A", bg: "#DCFCE7" },
   half_day: { label: "Half Day", color: "#B8760A", bg: "#FEF3C7" },
   absent: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
+  week_off: { label: "Week Off", color: "#475569", bg: "#F1F5F9" },
+  holiday: { label: "Holiday", color: "#0F766E", bg: "#CCFBF1" },
+  leave: { label: "Leave", color: "#6B21A8", bg: "#F3E8FF" },
 };
+
+const LEAVE_TYPE_LABEL = {
+  el: "Earned Leave",
+  sl: "Sick Leave",
+  ml: "Maternity Leave",
+  pl: "Paternity Leave",
+  half_day_el: "Half Day EL",
+  half_day_sl: "Half Day SL",
+  comp_off: "Comp Off",
+  lwp: "LWP",
+};
+const leaveLabel = (code) => LEAVE_TYPE_LABEL[code] || code || "Leave";
 
 const SOURCE_META = {
   face: { label: "🤳 Face", color: "#9B2554", bg: "#FDF2F7" },
@@ -65,6 +80,9 @@ const STATUS_FILTER_OPTIONS = [
   { value: "present", label: "Present" },
   { value: "half_day", label: "Half Day" },
   { value: "absent", label: "Absent" },
+  { value: "week_off", label: "Week Off" },
+  { value: "holiday", label: "Holiday" },
+  { value: "leave", label: "Leave" },
 ];
 
 const SOURCE_FILTER_OPTIONS = [
@@ -126,7 +144,7 @@ function HistoryRow({ r }) {
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: src.color, background: src.bg }}
         >
-          {src.label}
+          {r.synthetic ? "—" : src.label}
         </span>
       </td>
       <td className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap">{fmtMinutes(r.activeMinutes)}</td>
@@ -136,7 +154,12 @@ function HistoryRow({ r }) {
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: meta.color, background: meta.bg }}
         >
-          {meta.label}
+          {r.status === "leave"
+            ? leaveLabel(r.leaveType)
+            : r.status === "holiday" && r.holidayName
+              ? `Holiday · ${r.holidayName}`
+              : meta.label}
+          {r.status !== "leave" && r.leaveType ? ` · ${leaveLabel(r.leaveType)}` : ""}
           {r.isLate ? " · Late" : ""}
         </span>
       </td>
@@ -203,7 +226,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
         { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
         { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
-        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
       ],
@@ -249,7 +273,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
         { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
         { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
-        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
       ],

@@ -20,6 +20,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
+const { fillHistoryGaps } = require("../utils/attendanceHistoryFill.utils");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
@@ -2351,6 +2352,7 @@ const getAttendanceOverview = async (req, res, next) => {
       const halfDays = s?.halfDays ?? 0;
       const absentDays = s?.absentDays ?? 0;
       const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
+      const leaveDays = s?.leaveDays ?? 0;
       const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
       const markedDays = presentDays + halfDays + absentDays;
       return {
@@ -2359,6 +2361,7 @@ const getAttendanceOverview = async (req, res, next) => {
         halfDays,
         absentDays,
         weekOffHolidayDays,
+        leaveDays,
         markedDays,
         totalWorkingMinutes,
         attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
@@ -2435,6 +2438,16 @@ const getAttendanceHistory = async (req, res, next) => {
       checkOutGate: r.checkOutGate || null,
     }));
 
+    const roleKey = admin ? "admin" : manager ? "manager" : "employee";
+    const filled = await fillHistoryGaps({
+      organisation_id,
+      personId: person._id,
+      roleKey,
+      rows: data,
+      rangeStart,
+      rangeEnd,
+    });
+
     return res.json({
       success: true,
       employee: {
@@ -2449,8 +2462,8 @@ const getAttendanceHistory = async (req, res, next) => {
       },
       startDate: rangeStart,
       endDate: rangeEnd,
-      total: data.length,
-      data,
+      total: filled.length,
+      data: filled,
     });
   } catch (error) {
     next(error);

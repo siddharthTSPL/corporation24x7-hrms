@@ -41,6 +41,7 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
 const { logAudit } = require("../utils/auditLog.utils");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
+const { fillHistoryGaps } = require("../utils/attendanceHistoryFill.utils");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const {
@@ -4550,6 +4551,7 @@ const getAttendanceOverview = async (req, res, next) => {
       const halfDays = s?.halfDays ?? 0;
       const absentDays = s?.absentDays ?? 0;
       const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
+      const leaveDays = s?.leaveDays ?? 0;
       const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
       const markedDays = presentDays + halfDays + absentDays;
       return {
@@ -4558,6 +4560,7 @@ const getAttendanceOverview = async (req, res, next) => {
         halfDays,
         absentDays,
         weekOffHolidayDays,
+        leaveDays,
         markedDays,
         totalWorkingMinutes,
         attendancePercent:
@@ -4671,6 +4674,16 @@ const getAttendanceHistory = async (req, res, next) => {
       checkOutGate: r.checkOutGate || null,
     }));
 
+    const roleKey = admin ? "admin" : manager ? "manager" : "employee";
+    const filled = await fillHistoryGaps({
+      organisation_id,
+      personId: person._id,
+      roleKey,
+      rows: data,
+      rangeStart,
+      rangeEnd,
+    });
+
     return res.json({
       success: true,
       employee: {
@@ -4685,8 +4698,8 @@ const getAttendanceHistory = async (req, res, next) => {
       },
       startDate: rangeStart,
       endDate: rangeEnd,
-      total: data.length,
-      data,
+      total: filled.length,
+      data: filled,
     });
   } catch (error) {
     next(error);
