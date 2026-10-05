@@ -53,6 +53,8 @@ function isDateInLwpPortion(leave, date) {
 function resolveLeaveDayOverride(leave, date) {
   const isHalfDay = typeof leave.leaveType === "string" && leave.leaveType.startsWith("half_day");
   const isPaidForThisDate = leave.leaveType !== "lwp" && !isDateInLwpPortion(leave, date);
+  // Compensatory Off: approved day counts as a PRESENT day (paid).
+  if (leave.leaveType === "comp_off") return { status: "present", isPaidForThisDate: true };
   return { status: isHalfDay ? "half_day" : "absent", isPaidForThisDate };
 }
 
