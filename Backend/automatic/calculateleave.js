@@ -105,6 +105,14 @@ async function processLeaveDeduction(leave) {
       break;
     }
 
+    case "comp_off": {
+      // Compensatory Off: a PAID day (counted in pbc like EL/SL/ML/PL) but it
+      // is earned by working an off-day, so it has no balance bucket to run
+      // out of - it never converts to LWP.
+      $set.pbc = Number(((balance.pbc || 0) + days).toFixed(2));
+      break;
+    }
+
     default:
       // leaveType "lwp" (or anything unrecognised) - the whole application
       // is LWP. The leaveType field itself already excludes these from the
