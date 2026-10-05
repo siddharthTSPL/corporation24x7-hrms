@@ -12,6 +12,7 @@ require('../automatic/Noticeperiodautoexit');
 require('../automatic/fieldOperationsRetention');
 require('../automatic/Subscriptionexpiryreminder');
 require('../automatic/Offerlifecycle');
+require('../automatic/Trainingreminders');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -99,6 +100,7 @@ const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const singleSignInRouter = require('../routes/SingleSignIn.routes');
 const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
 const policyrouter = require('../routes/policy.route');
+const trainingRouter = require('../routes/training.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -141,6 +143,7 @@ app.use('/superadmin/analytics', analyticsrouter);
 // SuperAdmin+Admin under /policy/manage, viewer+acknowledgement for every
 // role under /policy/me). See routes/policy.route.js.
 app.use('/policy', policyrouter);
+app.use('/training', trainingRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

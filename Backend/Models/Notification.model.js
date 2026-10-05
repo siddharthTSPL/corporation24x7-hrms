@@ -18,6 +18,7 @@ const NOTIFICATION_TYPES = [
   "policy",
   "payroll",
   "review",
+  "training",
   "timesheet",
   "holiday",
   "birthday",

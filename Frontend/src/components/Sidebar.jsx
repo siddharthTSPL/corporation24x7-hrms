@@ -64,11 +64,13 @@ const superAdminMenu = [
   // Employees / Managers / Admins (see CreatePolicyModal's ROLE_OPTIONS),
   // never super_admin, so this page would always be empty for a superadmin.
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
+     { name: "Training records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
 
 const adminMenu = [
   
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
+  
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers />, blurb: "Add and manage employees and managers." },
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />, blurb: "Create and publish announcements for your organisation.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
@@ -93,11 +95,13 @@ const adminMenu = [
   { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
   { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
+  { name: "Training", path: "/training-admin", icon: <FaClipboardCheck />, blurb: "Assign training, manage stages and approve completion." },
 ];
 
 const managerMenu = [
  
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
+  
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt />, blurb: "Approve or forward leave requests from your team.",
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review your team's leave requests, check your own balance, or apply for your own leave." } },
@@ -114,11 +118,13 @@ const managerMenu = [
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
   { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager" },
+  { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "Manage sessions for training assignments where you are the trainer." },
 ];
 
 const employeeMenu = [
   { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee" },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
+ 
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place." },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Applying for leave", content: "Open the \"Apply Leave\" tab to submit a request, or \"Leave Balance\" to see how many days you have left." } },
@@ -133,6 +139,7 @@ const employeeMenu = [
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
   { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
+   { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "View your training assignments, schedules and certificates." },
 ];
 
 const menuByRole = {
