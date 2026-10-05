@@ -47,7 +47,7 @@ export const paidDayValue = (r) => BUCKET_VALUE[dayBucket(r)] ?? 0;
 export const sumPaidDays = (rows) => (rows || []).reduce((s, r) => s + paidDayValue(r), 0);
 
 export const summarizeDays = (rows) => {
-  const s = { totalDays: 0, present: 0, weekOff: 0, paidLeave: 0, holiday: 0, halfDay: 0, absent: 0, paidDays: 0 };
+  const s = { totalDays: 0, present: 0, weekOff: 0, paidLeave: 0, holiday: 0, halfDay: 0, absent: 0, paidDays: 0, timesheetDays: 0 };
   (rows || []).forEach((r) => {
     const b = dayBucket(r);
     s.totalDays += 1;
@@ -58,6 +58,7 @@ export const summarizeDays = (rows) => {
     else if (b === "half_day") s.halfDay += 1;
     else s.absent += 1;
     s.paidDays += BUCKET_VALUE[b] ?? 0;
+    if (r && r.source === "timesheet" && (b === "present" || b === "half_day")) s.timesheetDays += 1;
   });
   return s;
 };
@@ -74,6 +75,7 @@ export const summaryFooterRows = (sum) => [
   ["Half Day", sum.halfDay],
   ["Absent (all others)", sum.absent],
   ["Total Paid Days", sum.paidDays],
+  ["Days counted via Timesheet", sum.timesheetDays],
 ];
 
 // Per-employee summary table appended at the bottom of an all-employee CSV.

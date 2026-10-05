@@ -65,6 +65,7 @@ const SOURCE_META = {
   face: { label: "🤳 Face", color: "#9B2554", bg: "#FDF2F7" },
   agent: { label: "💻 Agent", color: "#2563EB", bg: "#EFF6FF" },
   system: { label: "📍 System", color: "#0D9E6E", bg: "#E8F7F1" },
+  timesheet: { label: "🗂 Timesheet", color: "#7C3AED", bg: "#F3E8FF" },
 };
 
 const PRESETS = [
@@ -90,6 +91,7 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "face", label: "🤳 Face" },
   { value: "system", label: "📍 System" },
   { value: "agent", label: "💻 Agent" },
+  { value: "timesheet", label: "🗂 Timesheet" },
 ];
 
 function presetRange(key) {
@@ -144,10 +146,15 @@ function HistoryRow({ r }) {
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: src.color, background: src.bg }}
         >
-          {r.synthetic ? "—" : src.label}
+          {r.synthetic && !r.source ? "—" : src.label}
         </span>
       </td>
-      <td className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap">{fmtMinutes(r.activeMinutes)}</td>
+      <td
+        className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap"
+        title={r.source === "timesheet" ? `Timesheet logs: ${fmtMinutes(r.timesheetMinutes)} (${r.timesheetPercent}% of standard day)${r.timesheetApproved === false ? " — timesheet not approved yet" : ""}` : undefined}
+      >
+        {r.source === "timesheet" ? fmtMinutes(r.timesheetMinutes) : fmtMinutes(r.activeMinutes)}
+      </td>
       <td className="py-2.5 px-2 text-[12px] text-amber-700 font-mono whitespace-nowrap">{fmtMinutes(r.idleMinutes)}</td>
       <td className="py-2.5 px-2">
         <span
@@ -161,6 +168,7 @@ function HistoryRow({ r }) {
               : meta.label}
           {r.status !== "leave" && r.leaveType ? ` · ${leaveLabel(r.leaveType)}` : ""}
           {r.isLate ? " · Late" : ""}
+          {r.source === "timesheet" ? ` · Timesheet ${r.timesheetPercent}%${r.timesheetApproved === false ? " (not approved yet)" : ""}` : ""}
         </span>
       </td>
       <td className="py-2.5 pr-3 pl-2 text-[12px] font-semibold font-mono" style={{ color: paidDayValue(r) ? "#16A34A" : "#DC2626" }}>
@@ -236,6 +244,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
         { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
         { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
       ]),
@@ -290,6 +300,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
         { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
         { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
       ]),
@@ -428,6 +440,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
             { label: "Holiday", value: summary.holiday, color: STATUS_META.holiday.color, bg: STATUS_META.holiday.bg },
             { label: "Half Day", value: summary.halfDay, color: STATUS_META.half_day.color, bg: STATUS_META.half_day.bg },
             { label: "Absent", value: summary.absent, color: STATUS_META.absent.color, bg: STATUS_META.absent.bg },
+            { label: "Via Timesheet", value: summary.timesheetDays, color: SOURCE_META.timesheet.color, bg: SOURCE_META.timesheet.bg },
           ].map((c) => (
             <span
               key={c.label}

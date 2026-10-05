@@ -234,9 +234,10 @@ function MonthlyRow({ p, onHistoryClick }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-purple-700 font-semibold">{p.leaveDays ?? 0}</td>
-      <td className="py-2.5 px-2 text-[12px] text-center font-bold whitespace-nowrap" style={{ color: "#730042" }} title="Present + Week Off + Paid Leave + Holiday + Half Day (0.5)">
+      <td className="py-2.5 px-2 text-[12px] text-center font-bold whitespace-nowrap" style={{ color: "#730042" }} title={`Present + Week Off + Paid Leave + Holiday + Half Day (0.5)${p.timesheetDays ? ` — ${p.timesheetDays} day(s) counted from timesheet logs` : ""}`}>
         {p.paidDays ?? "—"}
         {p.paidDays != null && p.totalDays ? <span className="text-gray-400 font-medium"> / {p.totalDays}</span> : null}
+        {p.timesheetDays ? <span className="ml-1 text-[9px] font-semibold rounded px-1 py-0.5" style={{ color: "#7C3AED", background: "#F3E8FF" }}>TS {p.timesheetDays}</span> : null}
       </td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
       <td className="py-2.5 px-2">

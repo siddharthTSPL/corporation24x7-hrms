@@ -158,4 +158,11 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
   return result;
 };
 
-module.exports = { isTimesheetBasis, getTimesheetAttendanceByEmployee, TIMESHEET_MODELS };
+module.exports = {
+  isTimesheetBasis,
+  getTimesheetAttendanceByEmployee,
+  TIMESHEET_MODELS,
+  classifyDay,
+  FULL_DAY_PERCENT,
+  HALF_DAY_PERCENT,
+};

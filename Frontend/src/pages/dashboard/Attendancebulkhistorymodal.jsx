@@ -34,6 +34,7 @@ const SOURCE_LABEL = {
   face: "Face",
   agent: "Agent",
   system: "System",
+  timesheet: "Timesheet",
 };
 
 const PRESETS = [
@@ -147,6 +148,8 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
             status: (STATUS_META[r.status] || STATUS_META.absent).label,
             isLate: r.isLate ? "Yes" : "No",
             overtimeMinutes: Math.round(r.overtimeMinutes || 0),
+            timesheetMinutes: r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "",
+            timesheetPercent: r.source === "timesheet" ? r.timesheetPercent : "",
             dayType: DAY_BUCKET_LABEL[dayBucket(r)],
             paidDay: paidDayValue(r),
           });
@@ -203,6 +206,8 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
         { key: "status", label: "Status" },
         { key: "isLate", label: "Late" },
         { key: "overtimeMinutes", label: "Overtime Minutes" },
+        { key: "timesheetMinutes", label: "Timesheet Minutes" },
+        { key: "timesheetPercent", label: "Timesheet %" },
         { key: "dayType", label: "Day Type" },
         { key: "paidDay", label: "Paid Day" },
       ]),

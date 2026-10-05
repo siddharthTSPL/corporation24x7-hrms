@@ -4569,6 +4569,7 @@ const getAttendanceOverview = async (req, res, next) => {
         leaveDays,
         paidDays: paid?.paidDays ?? null,
         totalDays: paid?.totalDays ?? null,
+        timesheetDays: paid?.timesheetDays ?? 0,
         markedDays,
         totalWorkingMinutes,
         attendancePercent:
