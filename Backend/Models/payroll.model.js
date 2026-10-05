@@ -110,6 +110,22 @@ const payrollSchema = new mongoose.Schema(
       statutoryBonus: { type: Number, default: 0 }, // informational estimate, not deducted from employee
     },
 
+    // How this month's overtime earning was arrived at. source "timesheet" =
+    // auto-synced from APPROVED timesheets (hours x hourly rate x multiplier);
+    // "manual" = typed by the admin; "none" = no overtime paid.
+    // pendingMinutes = overtime logged but whose timesheet is not approved yet
+    // (NOT paid) - lets the admin see something is still waiting.
+    overtimeDetail: {
+      source: { type: String, enum: ["none", "timesheet", "manual"], default: "none" },
+      minutes: { type: Number, default: 0 },
+      hours: { type: Number, default: 0 },
+      hourlyRate: { type: Number, default: 0 },
+      multiplier: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 },
+      timesheetIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Timesheet" }],
+      pendingMinutes: { type: Number, default: 0 },
+    },
+
     netSalary: { type: Number, default: 0 },
 
     status: {
