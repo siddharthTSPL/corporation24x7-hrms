@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter, FaUsers } from "react-icons/fa";
-import { downloadCsv, paidDayValue, sumPaidDays, withTotalRow } from "./Exportcsv";
+import { DAY_BUCKET_LABEL, dayBucket, downloadCsv, paidDayValue, summarizeDays, summaryFooterRows, summaryTableRows, withTotalRow } from "./Exportcsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -149,7 +149,7 @@ function HistoryRow({ r }) {
       </td>
       <td className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap">{fmtMinutes(r.activeMinutes)}</td>
       <td className="py-2.5 px-2 text-[12px] text-amber-700 font-mono whitespace-nowrap">{fmtMinutes(r.idleMinutes)}</td>
-      <td className="py-2.5 pr-3 pl-2">
+      <td className="py-2.5 px-2">
         <span
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: meta.color, background: meta.bg }}
@@ -162,6 +162,9 @@ function HistoryRow({ r }) {
           {r.status !== "leave" && r.leaveType ? ` · ${leaveLabel(r.leaveType)}` : ""}
           {r.isLate ? " · Late" : ""}
         </span>
+      </td>
+      <td className="py-2.5 pr-3 pl-2 text-[12px] font-semibold font-mono" style={{ color: paidDayValue(r) ? "#16A34A" : "#DC2626" }}>
+        {paidDayValue(r)}
       </td>
     </tr>
   );
@@ -216,7 +219,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     );
   }, [rows]);
 
-  const paidDays = useMemo(() => sumPaidDays(allRows), [allRows]);
+  const summary = useMemo(() => summarizeDays(allRows), [allRows]);
+  const paidDays = summary.paidDays;
 
   const exportCsv = () => {
     downloadCsv(
@@ -232,9 +236,11 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
         { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
       ]),
-      [...rows, { __total: true, paidDays }]
+      [...rows, { __total: true, paidDays }],
+      summaryFooterRows(summary)
     );
   };
 
@@ -247,6 +253,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     setExportAllProgress({ done: 0, total: people.length });
 
     const combined = [];
+    const empSummaries = [];
     const failedNames = [];
 
     await runWithConcurrency(people, CONCURRENCY, async (person) => {
@@ -258,7 +265,9 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           if (sourceFilter !== "all" && r.source !== sourceFilter) return;
           combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
         });
-        combined.push({ __total: true, employeeName: person.name || "Unknown", empid: person.empid || "—", paidDays: sumPaidDays(dayRows) });
+        const empSum = summarizeDays(dayRows);
+        empSummaries.push({ name: person.name || "Unknown", empid: person.empid || "—", sum: empSum });
+        combined.push({ __total: true, employeeName: person.name || "Unknown", empid: person.empid || "—", paidDays: empSum.paidDays });
       } catch {
         failedNames.push(person.name || person.empid || person.id);
       } finally {
@@ -281,9 +290,11 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
         { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
       ]),
-      combined
+      combined,
+      summaryTableRows(empSummaries)
     );
 
     setIsExportingAll(false);
@@ -406,8 +417,33 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           <span className="text-[11.5px] text-gray-500">
             Days with check-in: <strong className="text-gray-800">{totals.daysPresentish}</strong>
           </span>
-          <span className="text-[11.5px] text-gray-500" title="Present + half days + week off + holidays + paid leave">
-            Total Paid Days: <strong className="text-emerald-700">{paidDays}</strong>
+        </div>
+
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap flex-shrink-0 border-b border-gray-100">
+          {[
+            { label: "Total Days", value: summary.totalDays, color: "#1F2937", bg: "#F3F4F6" },
+            { label: "Present", value: summary.present, color: STATUS_META.present.color, bg: STATUS_META.present.bg },
+            { label: "Week Off", value: summary.weekOff, color: STATUS_META.week_off.color, bg: STATUS_META.week_off.bg },
+            { label: "Paid Leave", value: summary.paidLeave, color: STATUS_META.leave.color, bg: STATUS_META.leave.bg },
+            { label: "Holiday", value: summary.holiday, color: STATUS_META.holiday.color, bg: STATUS_META.holiday.bg },
+            { label: "Half Day", value: summary.halfDay, color: STATUS_META.half_day.color, bg: STATUS_META.half_day.bg },
+            { label: "Absent", value: summary.absent, color: STATUS_META.absent.color, bg: STATUS_META.absent.bg },
+          ].map((c) => (
+            <span
+              key={c.label}
+              className="text-[11px] font-semibold rounded-lg px-2.5 py-1 whitespace-nowrap"
+              style={{ color: c.color, background: c.bg }}
+              title={c.label === "Absent" ? "No-show + unpaid leave (LWP) + anything not Present / Week Off / Paid Leave / Holiday" : undefined}
+            >
+              {c.label}: {c.value}
+            </span>
+          ))}
+          <span
+            className="ml-auto text-[13px] font-bold rounded-lg px-3 py-1.5 whitespace-nowrap"
+            style={{ color: "#fff", background: "#730042" }}
+            title="Present + Week Off + Paid Leave + Holiday + Half Day (0.5)"
+          >
+            Total Paid Days: {paidDays} / {summary.totalDays}
           </span>
         </div>
 
@@ -437,7 +473,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Via</th>
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Active</th>
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Idle</th>
-                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Status</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Status</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Paid Day</th>
                 </tr>
               </thead>
               <tbody>

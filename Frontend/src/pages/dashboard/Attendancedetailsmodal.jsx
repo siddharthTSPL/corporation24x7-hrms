@@ -234,6 +234,10 @@ function MonthlyRow({ p, onHistoryClick }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-purple-700 font-semibold">{p.leaveDays ?? 0}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center font-bold whitespace-nowrap" style={{ color: "#730042" }} title="Present + Week Off + Paid Leave + Holiday + Half Day (0.5)">
+        {p.paidDays ?? "—"}
+        {p.paidDays != null && p.totalDays ? <span className="text-gray-400 font-medium"> / {p.totalDays}</span> : null}
+      </td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
       <td className="py-2.5 px-2">
         <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
@@ -353,12 +357,13 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
 
   const monthlyStats = useMemo(() => {
     if (tab !== "monthly") return null;
-    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalHours: "0h 0m" };
+    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalPaid: 0, totalHours: "0h 0m" };
     const totalPresent = filtered.reduce((s, p) => s + (p.presentDays || 0), 0);
     const totalAbsent = filtered.reduce((s, p) => s + (p.absentDays || 0), 0);
+    const totalPaid = filtered.reduce((s, p) => s + (p.paidDays || 0), 0);
     const totalMins = filtered.reduce((s, p) => s + (p.totalWorkingMinutes || 0), 0);
     const avgPercent = Math.round(filtered.reduce((s, p) => s + (p.attendancePercent || 0), 0) / filtered.length);
-    return { avgPercent, totalPresent, totalAbsent, totalHours: fmtMinutes(totalMins) };
+    return { avgPercent, totalPresent, totalAbsent, totalPaid, totalHours: fmtMinutes(totalMins) };
   }, [filtered, tab]);
 
   const exportCsv = () => {
@@ -399,6 +404,8 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "absentDays", label: "Absent Days" },
           { key: "weekOffHolidayDays", label: "Weekoff/Holiday Days" },
           { key: "leaveDays", label: "Leave Days" },
+          { key: "paidDays", label: "Total Paid Days", format: (r) => r.paidDays ?? "" },
+          { key: "totalDays", label: "Total Days", format: (r) => r.totalDays ?? "" },
           { key: "totalWorkingMinutes", label: "Total Hours", format: (r) => fmtMinutes(r.totalWorkingMinutes) },
           { key: "attendancePercent", label: "Attendance %", format: (r) => `${r.attendancePercent ?? 0}%` },
         ],
@@ -547,6 +554,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             <StatChip icon={<FaCheckCircle size={11} />} label="Avg Attendance" value={`${monthlyStats.avgPercent}%`} color="#16A34A" bg="#DCFCE7" />
             <StatChip icon={<FaUserClock size={11} />} label="Total Present Days" value={monthlyStats.totalPresent} color="#0D9E6E" bg="#E8F7F1" />
             <StatChip icon={<FaBan size={11} />} label="Total Absent Days" value={monthlyStats.totalAbsent} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaCheckCircle size={11} />} label="Total Paid Days" value={monthlyStats.totalPaid} color="#730042" bg="#fdf2f7" />
             <StatChip icon={<FaClock size={11} />} label="Total Hours" value={monthlyStats.totalHours} color="#730042" bg="#fdf2f7" />
           </div>
         )}
@@ -584,6 +592,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Leave</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Paid Days</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Attendance %</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Actions</th>

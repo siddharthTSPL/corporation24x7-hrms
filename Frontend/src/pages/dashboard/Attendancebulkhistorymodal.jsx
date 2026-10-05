@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaDownload, FaUsers } from "react-icons/fa";
-import { downloadCsv, paidDayValue, sumPaidDays, withTotalRow } from "./Exportcsv";
+import { DAY_BUCKET_LABEL, dayBucket, downloadCsv, paidDayValue, summarizeDays, summaryTableRows, withTotalRow } from "./Exportcsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -147,10 +147,11 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
             status: (STATUS_META[r.status] || STATUS_META.absent).label,
             isLate: r.isLate ? "Yes" : "No",
             overtimeMinutes: Math.round(r.overtimeMinutes || 0),
+            dayType: DAY_BUCKET_LABEL[dayBucket(r)],
             paidDay: paidDayValue(r),
           });
         });
-        summaries.push({ id: person.id, name: person.name, empid: person.empid, records: dayRows.length, active, idle, present, paid: sumPaidDays(dayRows) });
+        summaries.push({ id: person.id, name: person.name, empid: person.empid, records: dayRows.length, active, idle, present, sum: summarizeDays(dayRows), paid: summarizeDays(dayRows).paidDays });
       } catch {
         failedNames.push(person.name || person.empid || person.id);
       } finally {
@@ -179,7 +180,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
     perEmployee.forEach((e) => map.set(e.id, { ...e, days: [] }));
     rows.forEach((r) => {
       if (!map.has(r.employeeId)) {
-        map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, empid: r.empid, records: 0, active: 0, idle: 0, present: 0, paid: 0, days: [] });
+        map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, empid: r.empid, records: 0, active: 0, idle: 0, present: 0, paid: 0, sum: summarizeDays([]), days: [] });
       }
       map.get(r.employeeId).days.push(r);
     });
@@ -202,9 +203,11 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
         { key: "status", label: "Status" },
         { key: "isLate", label: "Late" },
         { key: "overtimeMinutes", label: "Overtime Minutes" },
+        { key: "dayType", label: "Day Type" },
         { key: "paidDay", label: "Paid Day" },
       ]),
-      groupedByEmployee.flatMap((e) => [...e.days, { __total: true, employeeName: e.name, empid: e.empid, paidDays: e.paid }])
+      groupedByEmployee.flatMap((e) => [...e.days, { __total: true, employeeName: e.name, empid: e.empid, paidDays: e.paid }]),
+      summaryTableRows(groupedByEmployee)
     );
   };
 
@@ -353,8 +356,12 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                     <div>
                       <p className="m-0 text-[13px] font-bold text-gray-900">{e.name} <span className="text-gray-400 font-normal">({e.empid})</span></p>
                       <p className="m-0 mt-0.5 text-[11px] text-gray-500">
-                        {e.records} record{e.records === 1 ? "" : "s"} · {e.present} day{e.present === 1 ? "" : "s"} present · {e.paid} paid day{e.paid === 1 ? "" : "s"} · Active {fmtMinutes(e.active)} · Idle {fmtMinutes(e.idle)}
+                        Total {e.sum.totalDays} · Present {e.sum.present} · Week Off {e.sum.weekOff} · Paid Leave {e.sum.paidLeave} · Absent {e.sum.absent} · Active {fmtMinutes(e.active)} · Idle {fmtMinutes(e.idle)}
                       </p>
+                    </div>
+                    <div className="text-right rounded-lg px-3 py-1.5" style={{ background: "#730042", color: "#fff" }}>
+                      <p className="m-0 text-[9.5px] uppercase tracking-wide opacity-80">Total Paid Days</p>
+                      <p className="m-0 text-[16px] font-bold leading-tight">{e.paid} <span className="text-[11px] font-medium opacity-80">/ {e.sum.totalDays}</span></p>
                     </div>
                   </div>
                   {e.days.length === 0 ? (

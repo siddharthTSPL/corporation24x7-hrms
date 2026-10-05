@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+const Attendance = require("../Models/attendance.model");
 const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
@@ -106,4 +108,66 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
   return out;
 };
 
-module.exports = { fillHistoryGaps };
+// ── Paid-day classification (same rules as the frontend Exportcsv.js) ──────
+// Present + Week Off + Paid Leave (+ Holiday, + Half Day as 0.5) are paid;
+// everything else (no-show, LWP / unpaid leave, unknown) is Absent.
+const dayPaidValue = (r) => {
+  const paidLeave = !!r.leaveType && r.leaveType !== "lwp" && !r.isLwpDay;
+  if (r.status === "present") return 1;
+  if (r.status === "half_day") return paidLeave ? 1 : 0.5;
+  if (r.status === "week_off" || r.status === "holiday") return 1;
+  if (r.status === "leave") return r.isLwpDay || r.leaveType === "lwp" ? 0 : 1;
+  if (r.status === "absent") return paidLeave ? 1 : 0;
+  return 0;
+};
+
+/**
+ * Month-wise Total Paid Days for many people at once, using exactly the same
+ * day rows as the Attendance History screen (fillHistoryGaps), so the number
+ * in the Monthly list always matches the History modal for that month.
+ * people: [{ id, roleKey: "admin" | "manager" | "employee" }]
+ * returns Map(id -> { paidDays, totalDays })
+ */
+const computeMonthPaidDays = async ({ organisation_id, people, month, year }) => {
+  const rangeStart = startOfDay(new Date(year, month - 1, 1));
+  const rangeEnd = startOfDay(new Date(year, month, 0));
+  const result = new Map();
+  const CHUNK = 8;
+
+  for (let i = 0; i < people.length; i += CHUNK) {
+    await Promise.all(
+      people.slice(i, i + CHUNK).map(async (person) => {
+        // History passes real ObjectIds; the overview list only has string ids.
+        const p = { ...person, oid: new mongoose.Types.ObjectId(String(person.id)) };
+        try {
+          const records = await Attendance.find({
+            organisation_id,
+            employee: p.oid,
+            date: { $gte: rangeStart, $lte: rangeEnd },
+          })
+            .select("date status")
+            .lean();
+          const rows = records.map((r) => ({ id: String(r._id), date: r.date, status: r.status || "absent" }));
+          const filled = await fillHistoryGaps({
+            organisation_id,
+            personId: p.oid,
+            roleKey: p.roleKey,
+            rows,
+            rangeStart,
+            rangeEnd,
+          });
+          result.set(p.id, {
+            paidDays: filled.reduce((sum, r) => sum + dayPaidValue(r), 0),
+            totalDays: filled.length,
+          });
+        } catch (err) {
+          console.error("[computeMonthPaidDays] failed for", p.id, err.message);
+          result.set(p.id, { paidDays: null, totalDays: null });
+        }
+      })
+    );
+  }
+  return result;
+};
+
+module.exports = { fillHistoryGaps, computeMonthPaidDays, dayPaidValue };

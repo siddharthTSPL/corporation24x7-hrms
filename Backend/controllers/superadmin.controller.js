@@ -20,7 +20,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
-const { fillHistoryGaps } = require("../utils/attendanceHistoryFill.utils");
+const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
@@ -2246,6 +2246,7 @@ const getAttendanceOverview = async (req, res, next) => {
     const people = [
       ...admins.map((a) => ({
         id: String(a._id),
+        roleKey: "admin",
         empid: a.empid,
         name: [a.f_name, a.l_name].filter(Boolean).join(" "),
         email: a.work_email,
@@ -2260,6 +2261,7 @@ const getAttendanceOverview = async (req, res, next) => {
       })),
       ...managers.map((m) => ({
         id: String(m._id),
+        roleKey: "manager",
         empid: m.empid,
         name: [m.f_name, m.l_name].filter(Boolean).join(" "),
         email: m.work_email,
@@ -2274,6 +2276,7 @@ const getAttendanceOverview = async (req, res, next) => {
       })),
       ...employees.map((u) => ({
         id: String(u._id),
+        roleKey: "employee",
         empid: u.empid,
         name: [u.f_name, u.l_name].filter(Boolean).join(" "),
         email: u.work_email,
@@ -2346,8 +2349,11 @@ const getAttendanceOverview = async (req, res, next) => {
     }).lean();
     const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
 
-    const data = people.map((p) => {
+    const paidByEmp = await computeMonthPaidDays({ organisation_id, people, month, year });
+
+    const data = people.map(({ roleKey, ...p }) => {
       const s = summaryByEmp.get(p.id);
+      const paid = paidByEmp.get(p.id);
       const presentDays = s?.presentDays ?? 0;
       const halfDays = s?.halfDays ?? 0;
       const absentDays = s?.absentDays ?? 0;
@@ -2362,6 +2368,8 @@ const getAttendanceOverview = async (req, res, next) => {
         absentDays,
         weekOffHolidayDays,
         leaveDays,
+        paidDays: paid?.paidDays ?? null,
+        totalDays: paid?.totalDays ?? null,
         markedDays,
         totalWorkingMinutes,
         attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
