@@ -19,8 +19,12 @@ const LEAVE_CONFIG = {
   Admin: { Model: AdminLeave, field: "admin", statuses: ["approved_superadmin"] },
 };
 
-const isTimesheetBasis = (structure, employeeModel) =>
-  structure?.attendanceBasis === "timesheet" && TIMESHEET_MODELS.includes(employeeModel);
+const isTimesheetBasis = (structure, employeeModel, month, year) => {
+  if (structure?.attendanceBasis !== "timesheet" || !TIMESHEET_MODELS.includes(employeeModel)) return false;
+  const from = structure.timesheetBasisFrom;
+  if (!from?.month || !from?.year || !month || !year) return true;
+  return Number(year) * 12 + Number(month) >= from.year * 12 + from.month;
+};
 
 const classifyDay = (regularMinutes, standardMinutes) => {
   if (standardMinutes <= 0) return "full";

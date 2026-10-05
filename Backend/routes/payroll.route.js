@@ -7,6 +7,7 @@ const planFeatureAnyRole = require("../middleware/auth/Planfeatureanyrole.middle
 const {
   getOrgOwner,
   setEmployeeCTC,
+  updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
   listSalaryStructures,
@@ -29,6 +30,7 @@ payrollrouter.post("/structure", adminauthmiddleware, asyncHandler(setEmployeeCT
 payrollrouter.get("/structure", adminauthmiddleware, asyncHandler(listSalaryStructures));
 payrollrouter.get("/structure/:employee", adminauthmiddleware, asyncHandler(getSalaryStructure));
 payrollrouter.post("/structure/:employee/reapply-policy", adminauthmiddleware, asyncHandler(reapplyPolicy));
+payrollrouter.patch("/structure/:employee/attendance-basis", adminauthmiddleware, asyncHandler(updateAttendanceBasis));
 
 
 payrollrouter.post("/generate", adminauthmiddleware, asyncHandler(generatePayroll));

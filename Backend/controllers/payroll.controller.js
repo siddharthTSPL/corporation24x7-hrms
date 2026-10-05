@@ -121,6 +121,52 @@ const getOrgOwner = async (req, res) => {
 
 
 
+const applyAttendanceBasis = async (structure, basis) => {
+  if (basis === structure.attendanceBasis) return;
+  structure.attendanceBasis = basis;
+  if (basis !== "timesheet") {
+    structure.timesheetBasisFrom = { month: null, year: null };
+    return;
+  }
+  const lastPaid = await Payroll.findOne({ employee: structure.employee, status: "paid" })
+    .sort({ year: -1, month: -1 })
+    .select("month year")
+    .lean();
+  structure.timesheetBasisFrom = !lastPaid
+    ? { month: null, year: null }
+    : lastPaid.month === 12
+      ? { month: 1, year: lastPaid.year + 1 }
+      : { month: lastPaid.month + 1, year: lastPaid.year };
+};
+
+const updateAttendanceBasis = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { employee } = req.params;
+  const { attendanceBasis } = req.body;
+
+  if (!["attendance", "timesheet"].includes(attendanceBasis))
+    return res.status(400).json({ success: false, message: "attendanceBasis must be attendance or timesheet" });
+
+  const structure = await SalaryStructure.findOne({ employee, organisation_id });
+  if (!structure) return res.status(404).json({ success: false, message: "Salary structure not found" });
+
+  if (attendanceBasis === "timesheet" && structure.employeeModel === "SuperAdmin")
+    return res.status(400).json({ success: false, message: "Timesheet basis is not available for the organisation owner" });
+
+  await applyAttendanceBasis(structure, attendanceBasis);
+  await structure.save();
+
+  const from = structure.timesheetBasisFrom;
+  const message =
+    attendanceBasis === "timesheet" && from?.month
+      ? `Timesheet basis applies from ${MONTH_NAMES[from.month - 1]} ${from.year}. Earlier paid months stay attendance-based.`
+      : attendanceBasis === "timesheet"
+        ? "Timesheet basis applies to all payroll months"
+        : "Attendance basis restored";
+
+  res.status(200).json({ success: true, structure, message });
+};
+
 const setEmployeeCTC = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
   const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom, attendanceBasis } = req.body;
@@ -165,7 +211,7 @@ const setEmployeeCTC = async (req, res) => {
     }
     existing.ctc = ctc;
     existing.annualTaxEstimate = annualTaxEstimate ?? existing.annualTaxEstimate;
-    if (attendanceBasis) existing.attendanceBasis = attendanceBasis;
+    if (attendanceBasis) await applyAttendanceBasis(existing, attendanceBasis);
     existing.effectiveFrom = effectiveFrom ? new Date(effectiveFrom) : new Date();
     existing.breakup = breakup;
     existing.policySnapshot = policySnapshot;
@@ -332,7 +378,7 @@ const generatePayroll = async (req, res) => {
       }
     : null;
 
-  const timesheetBasis = isTimesheetBasis(structure, employeeModel);
+  const timesheetBasis = isTimesheetBasis(structure, employeeModel, month, year);
 
   let attendanceSummary = manualAttendance || timesheetBasis
     ? null
@@ -508,7 +554,7 @@ const bulkGeneratePayroll = async (req, res) => {
     organisation_id,
     employeeModel: model,
     employees: structures
-      .filter((s) => isTimesheetBasis(s, model))
+      .filter((s) => isTimesheetBasis(s, model, month, year))
       .map((s) => ({ id: s.employee, joinDate: getEffectiveJoinDate(employeeDocById.get(String(s.employee))) })),
     month,
     year,
@@ -551,7 +597,7 @@ const bulkGeneratePayroll = async (req, res) => {
       continue;
     }
 
-    const timesheetBasis = isTimesheetBasis(structure, model);
+    const timesheetBasis = isTimesheetBasis(structure, model, month, year);
     const attendanceSummary = timesheetBasis
       ? timesheetAttendanceByEmployee.get(String(structure.employee)) || null
       : summaryByEmployee.get(String(structure.employee)) || null;
@@ -845,6 +891,7 @@ const bulkDeletePayroll = async (req, res) => {
 module.exports = {
   getOrgOwner,
   setEmployeeCTC,
+  updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
   listSalaryStructures,

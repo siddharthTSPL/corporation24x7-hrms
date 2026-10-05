@@ -12,6 +12,7 @@ import {
   useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
+  useUpdateAttendanceBasis,
   useReapplyPolicy,
   useGeneratePayroll,
   useBulkGeneratePayroll,
@@ -721,6 +722,7 @@ function StatutoryTab({ notify }) {
             Pay overtime from <b>approved timesheets</b> automatically. Each month's payroll picks up the overtime hours logged in that month on approved timesheets and adds them to Earnings as Overtime.
             Hourly rate = Monthly Gross ÷ (No. of Working Days × Standard hours per day). Overtime on timesheets that are not approved yet is never paid.
             If you type an Overtime amount while generating payroll, that amount is used instead.
+            Employees whose salary structure uses the Timesheet attendance basis always get approved overtime paid with this multiplier, even if the sync toggle below is off.
           </p>
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <Toggle checked={!!form.timesheetSync?.enabled} onChange={(v) => set("timesheetSync.enabled", v)} />
@@ -728,10 +730,10 @@ function StatutoryTab({ notify }) {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ maxWidth: 420 }}>
             <Field label="Overtime rate multiplier" hint="e.g. 1.5 = time-and-a-half">
-              <TextInput type="number" step="0.1" min={0.1} max={10} disabled={!form.timesheetSync?.enabled} value={form.timesheetSync?.overtimeMultiplier ?? 1.5} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
+              <TextInput type="number" step="0.1" min={0.1} max={10} value={form.timesheetSync?.overtimeMultiplier ?? 1.5} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
             </Field>
-            <Field label="Standard hours per day" hint="Used for the hourly rate">
-              <TextInput type="number" step="0.5" min={1} max={24} disabled={!form.timesheetSync?.enabled} value={form.timesheetSync?.standardHoursPerDay ?? 9} onChange={(e) => set("timesheetSync.standardHoursPerDay", Number(e.target.value))} />
+            <Field label="Standard hours per day" hint="Used for the hourly rate and for timesheet-basis day rules">
+              <TextInput type="number" step="0.5" min={1} max={24} value={form.timesheetSync?.standardHoursPerDay ?? 9} onChange={(e) => set("timesheetSync.standardHoursPerDay", Number(e.target.value))} />
             </Field>
           </div>
         </div>
@@ -1151,8 +1153,10 @@ function StructuresTab({ notify, directory }) {
   const { data, isLoading } = useListSalaryStructures(modelFilter ? { employeeModel: modelFilter } : undefined);
   const { mutate: setCTC, isPending: saving } = useSetEmployeeCTC();
   const { mutate: reapply } = useReapplyPolicy();
+  const { mutate: changeBasis, isPending: changingBasis } = useUpdateAttendanceBasis();
 
-  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "" });
+  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "", attendanceBasis: "attendance" });
+  const { data: formModelData } = useListSalaryStructures({ employeeModel: form.employeeModel });
 
   const people = directory.byModel[form.employeeModel] || [];
 
@@ -1165,12 +1169,23 @@ function StructuresTab({ notify, directory }) {
         employeeModel: form.employeeModel,
         ctc: Number(form.ctc),
         effectiveFrom: form.effectiveFrom || undefined,
+        attendanceBasis: form.attendanceBasis,
       },
       {
         onSuccess: (res) => {
           notify(res?.message || "Salary structure saved", "success");
-          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", effectiveFrom: "" });
+          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", effectiveFrom: "", attendanceBasis: "attendance" });
         },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const handleBasisChange = (employeeId, attendanceBasis) => {
+    changeBasis(
+      { employee: employeeId, attendanceBasis },
+      {
+        onSuccess: (res) => notify(res?.message || "Attendance basis updated", "success"),
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
@@ -1190,12 +1205,16 @@ function StructuresTab({ notify, directory }) {
       <Card title="Set / Revise CTC" subtitle="Setting CTC auto-computes the monthly breakup from the current policy. Setting it again revises CTC and keeps history.">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
-            <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
+            <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "", attendanceBasis: "attendance" }))}>
               {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Employee">
-            <Select value={form.employee} onChange={(e) => setForm((p) => ({ ...p, employee: e.target.value }))} disabled={directory.loading}>
+            <Select value={form.employee} onChange={(e) => {
+              const id = e.target.value;
+              const existing = (formModelData?.structures || []).find((s) => String(s.employee) === String(id));
+              setForm((p) => ({ ...p, employee: id, attendanceBasis: existing?.attendanceBasis || "attendance" }));
+            }} disabled={directory.loading}>
               <option value="">{directory.loading ? "Loading…" : "Select employee"}</option>
               {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
             </Select>
@@ -1205,6 +1224,12 @@ function StructuresTab({ notify, directory }) {
           </Field>
           <Field label="Effective From" hint="Defaults to today">
             <TextInput type="date" value={form.effectiveFrom} onChange={(e) => setForm((p) => ({ ...p, effectiveFrom: e.target.value }))} />
+          </Field>
+          <Field label="Payroll Attendance Basis" hint={form.attendanceBasis === "timesheet" ? "Approved timesheet hours: 85%+ = full day, 50–85% = half day, below 50% or no timesheet = absent (LOP). Approved overtime is paid too." : "Paid days come from attendance (default)"}>
+            <Select value={form.attendanceBasis} onChange={(e) => setForm((p) => ({ ...p, attendanceBasis: e.target.value }))} disabled={form.employeeModel === "SuperAdmin"}>
+              <option value="attendance">Attendance (default)</option>
+              <option value="timesheet" disabled={form.employeeModel === "SuperAdmin"}>Timesheet</option>
+            </Select>
           </Field>
           <PrimaryButton type="submit" loading={saving} className="mb-6">Save Salary Structure</PrimaryButton>
         </form>
@@ -1235,6 +1260,7 @@ function StructuresTab({ notify, directory }) {
                   <th style={{ padding: "6px 10px" }}>Basic</th>
                   <th style={{ padding: "6px 10px" }}>HRA</th>
                   <th style={{ padding: "6px 10px" }}>Effective From</th>
+                  <th style={{ padding: "6px 10px" }}>Attendance Basis</th>
                   <th style={{ padding: "6px 10px" }}></th>
                 </tr>
               </thead>
@@ -1260,6 +1286,15 @@ function StructuresTab({ notify, directory }) {
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.basic)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.hra)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{s.effectiveFrom ? new Date(s.effectiveFrom).toLocaleDateString("en-IN") : "—"}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>
+                      <Select value={s.attendanceBasis || "attendance"} disabled={changingBasis} onChange={(e) => handleBasisChange(s.employee, e.target.value)} style={{ minWidth: 130 }}>
+                        <option value="attendance">Attendance</option>
+                        <option value="timesheet" disabled={s.employeeModel === "SuperAdmin"}>Timesheet</option>
+                      </Select>
+                      {s.attendanceBasis === "timesheet" && s.timesheetBasisFrom?.month && (
+                        <div style={{ marginTop: 2, fontSize: 10.5 }}>from {MONTH_NAMES[s.timesheetBasisFrom.month - 1]} {s.timesheetBasisFrom.year}</div>
+                      )}
+                    </td>
                     <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                       <GhostButton onClick={() => handleReapply(s.employee)}>Re-apply Policy</GhostButton>
                     </td>

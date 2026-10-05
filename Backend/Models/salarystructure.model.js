@@ -37,6 +37,10 @@ const salaryStructureSchema = new mongoose.Schema(
     annualTaxEstimate: { type: Number, default: 0, min: 0 },
 
     attendanceBasis: { type: String, enum: ["attendance", "timesheet"], default: "attendance" },
+    timesheetBasisFrom: {
+      month: { type: Number, default: null },
+      year: { type: Number, default: null },
+    },
 
     // Cached computed breakup (monthly figures), produced by
     // utils/payroll.utils.js::calculateSalaryBreakup at the time CTC was set.
