@@ -40,6 +40,18 @@ const attendanceSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Late-rule bookkeeping, stamped at check-in. lateCountInMonth is which
+    // late check-in of the IST month this day was (1st, 2nd, 3rd ...).
+    // latePenalty is true when that count went past the org's free limit -
+    // checkout / auto-checkout then downgrade a "present" day to "half_day".
+    lateCountInMonth: {
+      type: Number,
+      default: 0,
+    },
+    latePenalty: {
+      type: Boolean,
+      default: false,
+    },
     checkIn: Date,
     checkOut: Date,
     // Which physical gate/kiosk the scan happened at. Face-kiosk only -

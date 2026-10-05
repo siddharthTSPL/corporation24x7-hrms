@@ -243,6 +243,14 @@ const superAdminSchema = new mongoose.Schema(
 
     attendanceSettings: {
       autoCheckoutEnabled: { type: Boolean, default: true },
+      // Late check-in rule (off by default so existing orgs are unaffected).
+      // After the shift's grace period a check-in is "late". Once an
+      // employee has had more than `allowedLatePerMonth` late check-ins in
+      // an IST calendar month, every further late day is marked Half Day.
+      lateRule: {
+        enabled: { type: Boolean, default: false },
+        allowedLatePerMonth: { type: Number, default: 3, min: 0, max: 31 },
+      },
     },
 
     plan: {
