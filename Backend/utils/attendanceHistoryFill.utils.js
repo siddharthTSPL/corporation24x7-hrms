@@ -124,8 +124,8 @@ const TIMESHEET_FALLBACK_FROM_KEY = "2026-09-01";
  * Attendance is always checked FIRST. Only a day (on/after 1 Sept 2026) that
  * attendance leaves as "absent" (no record / no-show / too little active
  * time) and that is not a leave, holiday or week-off is looked up in the
- * person's timesheet LOGS - any non-rejected timesheet (approved, pending or
- * not yet submitted); rejected ones are ignored. Same rule payroll uses:
+ * person's timesheet LOGS - only logs on an APPROVED timesheet count
+ * (pending / draft / rejected / unattached logs are ignored). Same rule payroll uses:
  *   logged regular minutes >= 85% of standard day -> present (full day)
  *   >= 50%                                       -> half_day
  *   below 50% / nothing logged                   -> stays absent
@@ -170,17 +170,16 @@ const applyTimesheetFallback = async ({ organisation_id, personId, onModel, rows
       : [];
     const statusById = new Map(sheets.map((t) => [String(t._id), t.status]));
 
-    // day -> { mins, allApproved }. Rejected timesheets never count; logs not
-    // yet attached to a timesheet (or on draft / pending ones) do, flagged as
-    // not-yet-approved so the screen can say so.
+    // day -> { mins, allApproved } built from approved-timesheet logs only.
     const byDay = new Map();
     for (const log of logs) {
       const st = log.timesheet ? statusById.get(String(log.timesheet)) : null;
-      if (st === "rejected") continue;
+      // Same as payroll: only logs on an APPROVED timesheet count. Pending,
+      // draft, rejected and not-yet-attached logs stay absent until approved.
+      if (st !== "approved") continue;
       const key = toISTKey(log.log_date);
       const cur = byDay.get(key) || { mins: 0, allApproved: true };
       cur.mins += log.regular_minutes || 0;
-      if (st !== "approved") cur.allApproved = false;
       byDay.set(key, cur);
     }
 
