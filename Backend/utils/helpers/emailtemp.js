@@ -43,6 +43,7 @@ const LEAVE_TYPE_LABELS = {
   half_day_el: "Half Day - Earned Leave",
   half_day_sl: "Half Day - Sick Leave",
   lwp: "Leave Without Pay",
+  comp_off: "Compensatory Off",
 };
 
 function leaveTypeLabel(code) {
