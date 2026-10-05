@@ -74,6 +74,7 @@ const payrollSchema = new mongoose.Schema(
       // true when paidDays was typed in by hand at generation time instead
       // of being pulled from AttendanceSummary.
       manualEntry: { type: Boolean, default: false },
+      basis: { type: String, enum: ["attendance", "timesheet"], default: "attendance" },
     },
 
     earnings: {
@@ -108,6 +109,22 @@ const payrollSchema = new mongoose.Schema(
       gratuity: { type: Number, default: 0 }, // informational estimate, not deducted from employee
       lwf: { type: Number, default: 0 },
       statutoryBonus: { type: Number, default: 0 }, // informational estimate, not deducted from employee
+    },
+
+    // How this month's overtime earning was arrived at. source "timesheet" =
+    // auto-synced from APPROVED timesheets (hours x hourly rate x multiplier);
+    // "manual" = typed by the admin; "none" = no overtime paid.
+    // pendingMinutes = overtime logged but whose timesheet is not approved yet
+    // (NOT paid) - lets the admin see something is still waiting.
+    overtimeDetail: {
+      source: { type: String, enum: ["none", "timesheet", "manual"], default: "none" },
+      minutes: { type: Number, default: 0 },
+      hours: { type: Number, default: 0 },
+      hourlyRate: { type: Number, default: 0 },
+      multiplier: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 },
+      timesheetIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Timesheet" }],
+      pendingMinutes: { type: Number, default: 0 },
     },
 
     netSalary: { type: Number, default: 0 },

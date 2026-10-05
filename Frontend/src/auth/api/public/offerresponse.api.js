@@ -1,6 +1,12 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000/";
+// Production build is served under /talent behind IIS, which proxies
+// /talent/api/* to the backend. If VITE_API_URL is missing at build time the
+// old fallback (http://localhost:5000/) made every candidate's browser call
+// its own localhost, so the offer page never loaded / Accept-Reject did nothing.
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "/talent/api" : "http://localhost:5000/");
 
 const api = axios.create({ baseURL });
 

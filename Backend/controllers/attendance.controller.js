@@ -8,6 +8,7 @@ const FieldAssignment = require("../Models/fieldAssignment.model");
 
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
+const { computeLateStanding, applyLatePenaltyToStatus } = require("../utils/Laterule.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
@@ -176,6 +177,21 @@ const checkin = async (req, res) => {
 
     const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
+    // Late rule: which late check-in of the month is this, and does it cross
+    // the org's free limit? (Stays false/0 when the rule is off.)
+    const { lateCountInMonth, latePenalty, rule: lateRule } = await computeLateStanding({
+      organisation_id,
+      employee: userId,
+      role: normalizeRole(user.role),
+      date: today,
+      isLate,
+    });
+    const lateNote = !isLate || !lateRule?.enabled
+      ? ""
+      : latePenalty
+        ? ` This is late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}), so today will be counted as a Half Day.`
+        : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
+
     if (attendance) {
       if (attendance.checkOut)
         return res.status(400).json({ message: "You have already completed your attendance for today.", alreadyDone: true });
@@ -189,11 +205,14 @@ const checkin = async (req, res) => {
         attendance.onModel = getOnModel(user.role);
         attendance.shift = shift._id;
         attendance.isLate = isLate;
+        attendance.lateMinutes = lateMinutes;
+        attendance.lateCountInMonth = lateCountInMonth;
+        attendance.latePenalty = latePenalty;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
         attendance.lastUpdated = Date.now();
         await attendance.save();
-        return res.json({ message: "Check-in successful", attendance, isLate });
+        return res.json({ message: `Check-in successful${lateNote}`, attendance, isLate, lateCountInMonth, latePenalty });
       }
       // One channel per day: whichever system checked you in owns the
       // whole day, including checkout. The other channel must not act on
@@ -225,6 +244,9 @@ const checkin = async (req, res) => {
         selfie,
         shift: shift._id,
         isLate,
+        lateMinutes,
+        lateCountInMonth,
+        latePenalty,
         activeMinutes: 0,
         idleMinutes: 0,
         lastUpdated: Date.now(),
@@ -242,9 +264,9 @@ const checkin = async (req, res) => {
     }
 
     const message = isLate
-      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
+      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.${lateNote}`
       : "Check-in successful";
-    res.json({ message, attendance: newAttendance, isLate, lateMinutes });
+    res.json({ message, attendance: newAttendance, isLate, lateMinutes, lateCountInMonth, latePenalty });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -488,6 +510,10 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Already counted as Half Day by autoCheckoutAll() while auto check-out was
+    // OFF - don't add it to AttendanceSummary a second time on a late checkout.
+    const alreadyCountedAsMissed = attendance.checkoutRemark === "missed_checkout";
+
     attendance.checkOut = now;
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
@@ -503,11 +529,13 @@ const checkout = async (req, res) => {
       shift: shiftDoc,
     });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
-    attendance.status = status;
+    // Keep the Half Day already counted for a missed check-out so the record
+    // and AttendanceSummary (incremental + nightly rebuild) stay consistent.
+    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, status);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
-    await updateSummary(attendance);
+    if (!alreadyCountedAsMissed) await updateSummary(attendance);
 
     const message =
       remark === "auto_overtime"
@@ -516,7 +544,7 @@ const checkout = async (req, res) => {
 
     res.json({
       message,
-      status,
+      status: attendance.status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
       activeMinutes: displayMinutes(attendance.activeMinutes),
@@ -570,7 +598,9 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn").lean();
+      // Already handled once while the org had auto check-out OFF.
+      checkoutRemark: { $ne: "missed_checkout" },
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn latePenalty").lean();
 
     if (!openSessions.length) return;
 
@@ -612,13 +642,13 @@ const autoCheckoutAll = async () => {
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
-      const status = resolveSessionStatus({
+      const status = applyLatePenaltyToStatus(a, resolveSessionStatus({
         source: a.source,
         activeMinutes: a.activeMinutes,
         elapsedSessionMinutes,
         thresholds,
         shift,
-      });
+      }));
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
       // scanFace() stores durationMinutes into activeMinutes for a manual
@@ -631,12 +661,14 @@ const autoCheckoutAll = async () => {
         a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
 
       if (autoCheckoutByOrg.get(String(a.organisation_id)) === false) {
+        // Auto check-out is OFF for this org: do NOT write a checkOut time.
+        // The member forgot to check out, so the day is just marked Half Day
+        // + "missed_checkout" and the session stays without a checkOut.
         ops.push({
           updateOne: {
             filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
             update: {
               $set: {
-                checkOut: forceCheckoutAt,
                 status: "half_day",
                 checkoutRemark: "missed_checkout",
                 overtimeMinutes: 0,
@@ -646,7 +678,7 @@ const autoCheckoutAll = async () => {
             },
           },
         });
-        summaryPayloads.push({ ...a, checkOut: forceCheckoutAt, status: "half_day" });
+        summaryPayloads.push({ ...a, status: "half_day" });
         continue;
       }
 

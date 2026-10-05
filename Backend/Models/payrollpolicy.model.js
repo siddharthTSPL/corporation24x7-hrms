@@ -144,6 +144,16 @@ const payrollPolicySchema = new mongoose.Schema(
       percentOfBasic: { type: Number, default: 8.33, min: 0, max: 20 },
     },
 
+    // Timesheet -> Payroll sync. When on, OVERTIME from APPROVED timesheets is
+    // paid automatically in that month's payroll (see utils/timesheetOvertime.utils.js).
+    // hourly rate = monthlyGross / (paySchedule.noOfWorkingDays x standardHoursPerDay).
+    // Off by default so existing orgs' payroll is unchanged.
+    timesheetSync: {
+      enabled: { type: Boolean, default: false },
+      overtimeMultiplier: { type: Number, default: 1.5, min: 0.1, max: 10 },
+      standardHoursPerDay: { type: Number, default: 9, min: 1, max: 24 },
+    },
+
     // Fixed, organisation-wide pay run schedule (mirrors the standard
     // "Pay Schedule" screen every payroll product has: how often people are
     // paid, which calendar days count as working days, which day of the

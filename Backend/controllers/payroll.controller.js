@@ -7,6 +7,8 @@ const Admin = require("../Models/Admin.model");
 const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
+const { getTimesheetOvertimeByEmployee, buildOvertime } = require("../utils/Timesheetovertime.utils");
+const { isTimesheetBasis, getTimesheetAttendanceByEmployee } = require("../utils/Timesheetattendance.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
@@ -119,9 +121,55 @@ const getOrgOwner = async (req, res) => {
 
 
 
+const applyAttendanceBasis = async (structure, basis) => {
+  if (basis === structure.attendanceBasis) return;
+  structure.attendanceBasis = basis;
+  if (basis !== "timesheet") {
+    structure.timesheetBasisFrom = { month: null, year: null };
+    return;
+  }
+  const lastPaid = await Payroll.findOne({ employee: structure.employee, status: "paid" })
+    .sort({ year: -1, month: -1 })
+    .select("month year")
+    .lean();
+  structure.timesheetBasisFrom = !lastPaid
+    ? { month: null, year: null }
+    : lastPaid.month === 12
+      ? { month: 1, year: lastPaid.year + 1 }
+      : { month: lastPaid.month + 1, year: lastPaid.year };
+};
+
+const updateAttendanceBasis = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { employee } = req.params;
+  const { attendanceBasis } = req.body;
+
+  if (!["attendance", "timesheet"].includes(attendanceBasis))
+    return res.status(400).json({ success: false, message: "attendanceBasis must be attendance or timesheet" });
+
+  const structure = await SalaryStructure.findOne({ employee, organisation_id });
+  if (!structure) return res.status(404).json({ success: false, message: "Salary structure not found" });
+
+  if (attendanceBasis === "timesheet" && structure.employeeModel === "SuperAdmin")
+    return res.status(400).json({ success: false, message: "Timesheet basis is not available for the organisation owner" });
+
+  await applyAttendanceBasis(structure, attendanceBasis);
+  await structure.save();
+
+  const from = structure.timesheetBasisFrom;
+  const message =
+    attendanceBasis === "timesheet" && from?.month
+      ? `Timesheet basis applies from ${MONTH_NAMES[from.month - 1]} ${from.year}. Earlier paid months stay attendance-based.`
+      : attendanceBasis === "timesheet"
+        ? "Timesheet basis applies to all payroll months"
+        : "Attendance basis restored";
+
+  res.status(200).json({ success: true, structure, message });
+};
+
 const setEmployeeCTC = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
-  const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom } = req.body;
+  const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom, attendanceBasis } = req.body;
 
   if (!employee || !employeeModel || !ctc)
     return res.status(400).json({ success: false, message: "employee, employeeModel and ctc are required" });
@@ -130,6 +178,12 @@ const setEmployeeCTC = async (req, res) => {
     return res.status(400).json({ success: false, message: "Invalid employeeModel" });
 
   if (ctc <= 0) return res.status(400).json({ success: false, message: "ctc must be greater than 0" });
+
+  if (attendanceBasis !== undefined && !["attendance", "timesheet"].includes(attendanceBasis))
+    return res.status(400).json({ success: false, message: "attendanceBasis must be attendance or timesheet" });
+
+  if (attendanceBasis === "timesheet" && employeeModel === "SuperAdmin")
+    return res.status(400).json({ success: false, message: "Timesheet basis is not available for the organisation owner" });
 
   const policy = await getOrCreatePolicy(organisation_id);
   const breakup = calculateSalaryBreakup(ctc, policy);
@@ -157,6 +211,7 @@ const setEmployeeCTC = async (req, res) => {
     }
     existing.ctc = ctc;
     existing.annualTaxEstimate = annualTaxEstimate ?? existing.annualTaxEstimate;
+    if (attendanceBasis) await applyAttendanceBasis(existing, attendanceBasis);
     existing.effectiveFrom = effectiveFrom ? new Date(effectiveFrom) : new Date();
     existing.breakup = breakup;
     existing.policySnapshot = policySnapshot;
@@ -172,6 +227,7 @@ const setEmployeeCTC = async (req, res) => {
     employeeModel,
     ctc,
     annualTaxEstimate: annualTaxEstimate || 0,
+    attendanceBasis: attendanceBasis || "attendance",
     effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
     breakup,
     policySnapshot,
@@ -322,7 +378,9 @@ const generatePayroll = async (req, res) => {
       }
     : null;
 
-  const attendanceSummary = manualAttendance
+  const timesheetBasis = isTimesheetBasis(structure, employeeModel, month, year);
+
+  let attendanceSummary = manualAttendance || timesheetBasis
     ? null
     : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
@@ -346,13 +404,43 @@ const generatePayroll = async (req, res) => {
     });
   }
 
+  // Timesheet -> payroll sync: approved timesheet overtime (if the org turned
+  // it on in Payroll Policy) becomes this month's overtime earning, unless the
+  // admin typed an overtime amount themselves (then that wins).
+  if (timesheetBasis && !manualAttendance) {
+    const attendanceMap = await getTimesheetAttendanceByEmployee({
+      organisation_id,
+      employeeModel,
+      employees: [{ id: employee, joinDate: dateOfJoining }],
+      month,
+      year,
+      policy,
+    });
+    attendanceSummary = attendanceMap.get(String(employee)) || null;
+  }
+
+  const overtimeMap = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel,
+    employeeIds: [employee],
+    month,
+    year,
+  });
+  const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+    policy,
+    structure,
+    overtimeEntry: overtimeMap.get(String(employee)),
+    manualOvertime: overtime,
+    forceEnabled: timesheetBasis,
+  });
+
   const result = calculatePayrollForMonth({
     structure,
     policy,
     attendanceSummary,
     month: Number(month),
     year: Number(year),
-    extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
+    extras: { bonus, incentive, overtime: overtimeAmount, reimbursement, otherEarnings, loan, advance, otherDeductions },
     manualAttendance,
     dateOfJoining,
   });
@@ -370,6 +458,7 @@ const generatePayroll = async (req, res) => {
         organisationSnapshot,
         ctc: structure.ctc,
         ...result,
+        overtimeDetail,
         policySnapshot: structure.policySnapshot,
         remarks: remarks || "",
         status: "generated",
@@ -436,6 +525,15 @@ const bulkGeneratePayroll = async (req, res) => {
   }).lean();
   const summaryByEmployee = new Map(summaries.map((s) => [String(s.employee), s]));
 
+  // One query for the whole run: approved-timesheet overtime per employee.
+  const overtimeByEmployee = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employeeIds,
+    month,
+    year,
+  });
+
 
   const existingPayrolls = await Payroll.find({
     employee: { $in: employeeIds },
@@ -451,6 +549,17 @@ const bulkGeneratePayroll = async (req, res) => {
     .select("account_number date_of_joining createdAt")
     .lean();
   const employeeDocById = new Map(employeeDocs.map((d) => [String(d._id), d]));
+
+  const timesheetAttendanceByEmployee = await getTimesheetAttendanceByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employees: structures
+      .filter((s) => isTimesheetBasis(s, model, month, year))
+      .map((s) => ({ id: s.employee, joinDate: getEffectiveJoinDate(employeeDocById.get(String(s.employee))) })),
+    month,
+    year,
+    policy,
+  });
 
   const ops = [];
   const skipped = [];
@@ -488,14 +597,24 @@ const bulkGeneratePayroll = async (req, res) => {
       continue;
     }
 
-    const attendanceSummary = summaryByEmployee.get(String(structure.employee)) || null;
+    const timesheetBasis = isTimesheetBasis(structure, model, month, year);
+    const attendanceSummary = timesheetBasis
+      ? timesheetAttendanceByEmployee.get(String(structure.employee)) || null
+      : summaryByEmployee.get(String(structure.employee)) || null;
+    const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+      policy,
+      structure,
+      overtimeEntry: overtimeByEmployee.get(String(structure.employee)),
+      manualOvertime: 0,
+      forceEnabled: timesheetBasis,
+    });
     const result = calculatePayrollForMonth({
       structure,
       policy,
       attendanceSummary,
       month: Number(month),
       year: Number(year),
-      extras: {},
+      extras: { overtime: overtimeAmount },
       dateOfJoining: effectiveJoinDate,
     });
 
@@ -512,6 +631,7 @@ const bulkGeneratePayroll = async (req, res) => {
             organisationSnapshot,
             ctc: structure.ctc,
             ...result,
+            overtimeDetail,
             policySnapshot: structure.policySnapshot,
             status: "generated",
             generatedBy: req.admin._id,
@@ -771,6 +891,7 @@ const bulkDeletePayroll = async (req, res) => {
 module.exports = {
   getOrgOwner,
   setEmployeeCTC,
+  updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
   listSalaryStructures,

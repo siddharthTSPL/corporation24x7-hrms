@@ -21,7 +21,7 @@ const { recomputeSummaries } = require("../scripts/Reconcileattendancesummarylea
 cron.schedule(
   "0 2 * * *",
   () => {
-    recomputeSummaries(true).catch((err) =>
+    recomputeSummaries(true, null, { currentAndPreviousMonth: true }).catch((err) =>
       console.error("[Cron] nightlyReconcile failed:", err.message)
     );
   },

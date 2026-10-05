@@ -144,10 +144,28 @@ async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 *
             leaveType: { $ne: "lwp" },
             startDate: { $lte: date },
             endDate: { $gte: date },
-          }).select("startDate endDate lwpDays").lean()
+          }).select("startDate endDate lwpDays leaveType").lean()
         : null;
       const onPaidLeave = paidLeaveDoc && !isDateInLwpPortion(paidLeaveDoc, date);
-      if (isWorkingDay && onPaidLeave) continue;
+      if (isWorkingDay && onPaidLeave) {
+        // Compensatory Off: unlike other paid leave (which is just excused),
+        // an approved comp-off day is counted as a PRESENT day. NoShowLog
+        // guards against double counting, same as the absent path below.
+        if (paidLeaveDoc.leaveType === "comp_off") {
+          try {
+            await NoShowLog.create({ employee: emp._id, role, date });
+          } catch (err) {
+            if (err.code === 11000) continue;
+            throw err;
+          }
+          await AttendanceSummary.findOneAndUpdate(
+            { employee: emp._id, role, month, year },
+            { $inc: { presentDays: 1 }, $setOnInsert: { organisation_id: emp.organisation_id } },
+            { upsert: true }
+          );
+        }
+        continue;
+      }
 
       // Claim this employee/day before incrementing anything. If another
       // invocation (nightly cron overlapping a startup catch-up, or two

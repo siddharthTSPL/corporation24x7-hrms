@@ -101,6 +101,7 @@ const NotificationsPage = lazy(() => import("./pages/notifications/Notifications
 const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
 const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
+const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -235,6 +236,8 @@ function App() {
             }
           >
             <Route path="/dashboard"                element={<Dashboard />} />
+            <Route path="/training-admin" element={<ProtectedRoute allowedRoles={["admin"]}><TrainingPage /></ProtectedRoute>} />
+            <Route path="/training" element={<TrainingPage />} />
             <Route path="/employee-dashboard"       element={<EmployeeDashboard />} />
             <Route path="/manager-dashboard"        element={<Managerdashboard />} />
             <Route path="/employee"                 element={<EmployeeTable />} />
@@ -462,6 +465,7 @@ function App() {
             }
           >
             <Route path="/superadmin-dashboard"          element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-training" element={<TrainingPage superAdminView />} />
             <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
             <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
             <Route path="/superadmin-leaves"              element={<ProtectedRoute><SuperAdminLeaves /></ProtectedRoute>} />

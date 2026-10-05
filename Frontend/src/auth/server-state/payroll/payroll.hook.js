@@ -10,6 +10,7 @@ import {
   setPaySchedule,
   getOrgOwner,
   setEmployeeCTC,
+  updateAttendanceBasis,
   listSalaryStructures,
   getSalaryStructure,
   reapplyPolicy,
@@ -149,6 +150,16 @@ export const useSetEmployeeCTC = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: setEmployeeCTC,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
+    },
+  });
+};
+
+export const useUpdateAttendanceBasis = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateAttendanceBasis,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
     },

@@ -1,5 +1,6 @@
 # Archives
 *.zip
+*.md
 
 # Python virtual environments
 .venv/
@@ -13,4 +14,4 @@ __pycache__/
 *.pyd
 
 # Accidentally created shell-command artifact
-tatus --short --untracked-files=all
+status --short --untracked-files=all
