@@ -233,6 +233,7 @@ function MonthlyRow({ p, onHistoryClick }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-amber-700 font-semibold">{p.halfDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-purple-700 font-semibold">{p.leaveDays ?? 0}</td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
       <td className="py-2.5 px-2">
         <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
@@ -397,6 +398,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "halfDays", label: "Half Days" },
           { key: "absentDays", label: "Absent Days" },
           { key: "weekOffHolidayDays", label: "Weekoff/Holiday Days" },
+          { key: "leaveDays", label: "Leave Days" },
           { key: "totalWorkingMinutes", label: "Total Hours", format: (r) => fmtMinutes(r.totalWorkingMinutes) },
           { key: "attendancePercent", label: "Attendance %", format: (r) => `${r.attendancePercent ?? 0}%` },
         ],
@@ -581,6 +583,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Half Day</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Leave</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Attendance %</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Actions</th>
