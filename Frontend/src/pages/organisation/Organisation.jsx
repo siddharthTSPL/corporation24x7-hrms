@@ -555,12 +555,12 @@ export default function OrganizationPageAdmin() {
         const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
         return prev.sw === next.sw && prev.show === next.show ? prev : next;
       });
-      const visible = r.bottom > BAR_H && r.top < vh - BAR_H;
-      const top = Math.min(r.bottom, vh) - BAR_H;
+      // Bar is always pinned to the bottom edge of the screen; only shown while the chart block is on screen
+      const visible = r.bottom > 0 && r.top < vh - BAR_H;
       setPos((prev) =>
-        prev.left === r.left && prev.width === r.width && prev.top === top && prev.visible === visible
+        prev.left === r.left && prev.width === r.width && prev.visible === visible
           ? prev
-          : { left: r.left, width: r.width, top, visible }
+          : { left: r.left, width: r.width, top: 0, visible }
       );
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
@@ -766,7 +766,7 @@ export default function OrganizationPageAdmin() {
           style={{
             position: "fixed",
             left: pos.left,
-            top: pos.top,
+            bottom: 0,
             width: pos.width,
             height: 14,
             zIndex: 40,
