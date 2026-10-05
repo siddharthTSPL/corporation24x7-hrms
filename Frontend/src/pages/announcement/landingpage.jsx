@@ -402,24 +402,46 @@ function AnimatedBackdrop({ pointerRef }) {
     if (!ctx) return
 
     const reduce = prefersReducedMotion()
-    const smooth = { x: 0, y: 0, boost: 0 }
+    const TAU = Math.PI * 2
     const TIME_OFFSET = 2.5
+    const HALF = 440 // cached layers cover -440..440 design units
+    const WAVE_STEPS = 240
+    const MAX_DPR = 1.5
+
+    const smooth = { x: 0, y: 0, boost: 0 }
     let width = 0
     let height = 0
-    let dpr = 1
+    let s = 1
+    let quality = Math.min(window.devicePixelRatio || 1, MAX_DPR)
+    let dpr = quality
     let raf = 0
     let playing = false
     let visible = true
-    const startedAt = performance.now()
+    let clock = TIME_OFFSET
+    let last = 0
+    let bottomLayer = null
+    let topLayer = null
+    let fade = null
+    let fadeW = 0
+    let costAvg = 0
+    let slowFrames = 0
 
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-      width = rect.width
-      height = rect.height
-      canvas.width = Math.max(1, Math.round(width * dpr))
-      canvas.height = Math.max(1, Math.round(height * dpr))
+    // angle tables for the wave paths (computed once)
+    const thT = new Float64Array(WAVE_STEPS + 1)
+    const cosT = new Float64Array(WAVE_STEPS + 1)
+    const sinT = new Float64Array(WAVE_STEPS + 1)
+    for (let i = 0; i <= WAVE_STEPS; i += 1) {
+      const th = (i / WAVE_STEPS) * TAU
+      thT[i] = th
+      cosT[i] = Math.cos(th)
+      sinT[i] = Math.sin(th)
     }
+
+    const arcs = [
+      { r: 330, dash: [46, 120], w: 3.6, dir: 1, speed: 0.12, a: 0.6 },
+      { r: 372, dash: [30, 160], w: 3, dir: -1, speed: 0.09, a: 0.5 },
+      { r: 292, dash: [18, 90], w: 2, dir: 1, speed: 0.16, a: 0.5 },
+    ]
 
     const softDot = (x, y, r, color, alpha) => {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4)
@@ -429,23 +451,22 @@ function AnimatedBackdrop({ pointerRef }) {
       ctx.globalAlpha = 1
       ctx.fillStyle = g
       ctx.beginPath()
-      ctx.arc(x, y, r * 3.4, 0, Math.PI * 2)
+      ctx.arc(x, y, r * 3.4, 0, TAU)
       ctx.fill()
       ctx.fillStyle = `rgba(${color},${Math.min(1, alpha + 0.25)})`
       ctx.beginPath()
-      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.arc(x, y, r, 0, TAU)
       ctx.fill()
     }
 
     const wavePath = (k, base, amp, phase, amount, harmonic) => {
-      const steps = 320
       ctx.beginPath()
-      for (let i = 0; i <= steps; i += 1) {
-        const th = (i / steps) * Math.PI * 2
+      for (let i = 0; i <= WAVE_STEPS; i += 1) {
+        const th = thT[i]
         const w = Math.sin(k * th + phase) + harmonic * Math.sin(2 * k * th + phase * 1.7)
         const r = base + amp * amount * w
-        const x = Math.cos(th) * r
-        const y = Math.sin(th) * r
+        const x = cosT[i] * r
+        const y = sinT[i] * r
         if (i === 0) ctx.moveTo(x, y)
         else ctx.lineTo(x, y)
       }
@@ -468,6 +489,86 @@ function AnimatedBackdrop({ pointerRef }) {
       ctx.globalAlpha = 1
     }
 
+    // Offscreen layer, painted in "design units" with origin at the centre
+    const makeLayer = (paint) => {
+      const px = Math.max(1, Math.round(HALF * 2 * s * dpr))
+      const layer = document.createElement('canvas')
+      layer.width = px
+      layer.height = px
+      const c = layer.getContext('2d')
+      const k = px / (HALF * 2)
+      c.setTransform(k, 0, 0, k, px / 2, px / 2)
+      paint(c)
+      return layer
+    }
+
+    const buildStatic = () => {
+      // things that never change: halo + the 3 faint circles
+      bottomLayer = makeLayer((c) => {
+        const halo = c.createRadialGradient(0, 0, 0, 0, 0, 230)
+        halo.addColorStop(0, 'rgba(233,120,170,0.20)')
+        halo.addColorStop(0.55, 'rgba(233,120,170,0.07)')
+        halo.addColorStop(1, 'rgba(233,120,170,0)')
+        c.fillStyle = halo
+        c.beginPath()
+        c.arc(0, 0, 230, 0, TAU)
+        c.fill()
+
+        c.strokeStyle = 'rgba(122,0,75,0.13)'
+        c.lineWidth = 1.2
+        ;[180, 285, 390].forEach((r) => {
+          c.beginPath()
+          c.arc(0, 0, r, 0, TAU)
+          c.stroke()
+        })
+      })
+
+      // centre rings (drawn above the waves)
+      topLayer = makeLayer((c) => {
+        c.strokeStyle = 'rgba(160,80,130,0.08)'
+        c.lineWidth = 20
+        c.beginPath()
+        c.arc(0, 0, 112, 0, TAU)
+        c.stroke()
+
+        const ring = c.createLinearGradient(-100, -100, 100, 100)
+        ring.addColorStop(0, 'rgba(190,120,160,0.75)')
+        ring.addColorStop(1, 'rgba(122,0,75,0.85)')
+        c.strokeStyle = ring
+        c.lineWidth = 6
+        c.beginPath()
+        c.arc(0, 0, 100, 0, TAU)
+        c.stroke()
+
+        c.strokeStyle = 'rgba(160,60,90,0.65)'
+        c.lineWidth = 1
+        c.beginPath()
+        c.arc(0, 0, 80, 0, TAU)
+        c.stroke()
+      })
+
+      // left-edge fade, same as the old CSS mask (transparent 8% -> opaque 26%)
+      fadeW = Math.ceil(canvas.width * 0.26) + 1
+      fade = ctx.createLinearGradient(0, 0, canvas.width, 0)
+      fade.addColorStop(0, 'rgba(0,0,0,1)')
+      fade.addColorStop(0.08, 'rgba(0,0,0,1)')
+      fade.addColorStop(0.26, 'rgba(0,0,0,0)')
+    }
+
+    const resize = (force = false) => {
+      // clientWidth ignores CSS transforms (entry scale animation), so size is exact
+      const w = canvas.clientWidth
+      const h = canvas.clientHeight
+      if (!force && w === width && h === height) return
+      width = w
+      height = h
+      dpr = quality
+      s = width / DESIGN_W
+      canvas.width = Math.max(1, Math.round(width * dpr))
+      canvas.height = Math.max(1, Math.round(height * dpr))
+      buildStatic()
+    }
+
     const draw = (t) => {
       const p = pointerRef?.current
       const tx = p ? p.x : 0
@@ -477,64 +578,66 @@ function AnimatedBackdrop({ pointerRef }) {
       smooth.y += (ty - smooth.y) * 0.06
       smooth.boost += (active - smooth.boost) * 0.04
 
-      const s = width / DESIGN_W
       const cx = width / 2 + smooth.x * 18
       const cy = height / 2 + smooth.y * 12
 
       ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 1
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * cx, dpr * cy)
 
-      const breathe = 0.5 - 0.5 * Math.cos((Math.PI * 2 * t) / 16)
+      const breathe = 0.5 - 0.5 * Math.cos((TAU * t) / 16)
       const amount = (0.04 + 0.96 * Math.pow(breathe, 1.4)) * (1 + smooth.boost * 0.22)
 
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 230)
-      halo.addColorStop(0, 'rgba(233,120,170,0.20)')
-      halo.addColorStop(0.55, 'rgba(233,120,170,0.07)')
-      halo.addColorStop(1, 'rgba(233,120,170,0)')
-      ctx.fillStyle = halo
-      ctx.beginPath()
-      ctx.arc(0, 0, 230, 0, Math.PI * 2)
-      ctx.fill()
+      // halo + circles (cached)
+      ctx.drawImage(bottomLayer, -HALF, -HALF, HALF * 2, HALF * 2)
 
+      // spokes: unlit ones batched into 2 paths, sweep-lit ones drawn individually
       const spokes = 96
       const sweep = t * 0.6
+      const rot = t * 0.03
+      const minorPath = new Path2D()
+      const majorPath = new Path2D()
       ctx.lineWidth = 1
       for (let i = 0; i < spokes; i += 1) {
-        const a = (i / spokes) * Math.PI * 2 + t * 0.03
+        const a = (i / spokes) * TAU + rot
         const major = i % 8 === 0
-        const lit = Math.pow(Math.max(0, Math.cos(a - sweep)), 14)
-        const alpha = (major ? 0.13 : 0.06) + lit * 0.26
-        ctx.strokeStyle = `rgba(201,24,74,${alpha})`
-        ctx.beginPath()
-        ctx.moveTo(Math.cos(a) * 112, Math.sin(a) * 112)
-        ctx.lineTo(Math.cos(a) * (major ? 430 : 370), Math.sin(a) * (major ? 430 : 370))
-        ctx.stroke()
+        const len = major ? 430 : 370
+        const ca = Math.cos(a)
+        const sa = Math.sin(a)
+        const d = Math.cos(a - sweep)
+        const lit = d > 0 ? Math.pow(d, 14) : 0
+        if (lit < 0.01) {
+          const path = major ? majorPath : minorPath
+          path.moveTo(ca * 112, sa * 112)
+          path.lineTo(ca * len, sa * len)
+        } else {
+          ctx.strokeStyle = `rgba(201,24,74,${(major ? 0.13 : 0.06) + lit * 0.26})`
+          ctx.beginPath()
+          ctx.moveTo(ca * 112, sa * 112)
+          ctx.lineTo(ca * len, sa * len)
+          ctx.stroke()
+        }
       }
+      ctx.strokeStyle = 'rgba(201,24,74,0.06)'
+      ctx.stroke(minorPath)
+      ctx.strokeStyle = 'rgba(201,24,74,0.13)'
+      ctx.stroke(majorPath)
 
-      ;[180, 285, 390].forEach((r) => {
-        ctx.strokeStyle = 'rgba(122,0,75,0.13)'
-        ctx.lineWidth = 1.2
-        ctx.beginPath()
-        ctx.arc(0, 0, r, 0, Math.PI * 2)
-        ctx.stroke()
-      })
-
+      // expanding pulses
       for (let j = 0; j < 2; j += 1) {
         const prog = (t / 6 + j * 0.5) % 1
         ctx.strokeStyle = `rgba(201,24,74,${(1 - prog) * 0.3})`
         ctx.lineWidth = 1.6
         ctx.beginPath()
-        ctx.arc(0, 0, 104 + prog * 330, 0, Math.PI * 2)
+        ctx.arc(0, 0, 104 + prog * 330, 0, TAU)
         ctx.stroke()
       }
 
-      const arcs = [
-        { r: 330, dash: [46, 120], w: 3.6, dir: 1, speed: 0.12, a: 0.6 },
-        { r: 372, dash: [30, 160], w: 3, dir: -1, speed: 0.09, a: 0.5 },
-        { r: 292, dash: [18, 90], w: 2, dir: 1, speed: 0.16, a: 0.5 },
-      ]
-      arcs.forEach((arc) => {
+      // rotating dashed arcs
+      for (let i = 0; i < arcs.length; i += 1) {
+        const arc = arcs[i]
         ctx.save()
         ctx.rotate(arc.dir * t * arc.speed)
         ctx.setLineDash(arc.dash)
@@ -542,12 +645,13 @@ function AnimatedBackdrop({ pointerRef }) {
         ctx.lineWidth = arc.w
         ctx.lineCap = 'butt'
         ctx.beginPath()
-        ctx.arc(0, 0, arc.r, 0, Math.PI * 2)
+        ctx.arc(0, 0, arc.r, 0, TAU)
         ctx.stroke()
         ctx.restore()
-      })
+      }
       ctx.setLineDash([])
 
+      // waves
       wavePath(5, 258, 34, t * 0.3, amount, 0.08)
       glowStroke('rgb(240,170,200)', 1.2, 0.55)
 
@@ -557,28 +661,11 @@ function AnimatedBackdrop({ pointerRef }) {
       wavePath(8, 236, 62, t * 0.5, amount, 0.1)
       glowStroke('rgb(122,0,75)', 2.4, 1)
 
+      // centre rings (cached)
       ctx.globalAlpha = 1
-      ctx.strokeStyle = 'rgba(160,80,130,0.08)'
-      ctx.lineWidth = 20
-      ctx.beginPath()
-      ctx.arc(0, 0, 112, 0, Math.PI * 2)
-      ctx.stroke()
+      ctx.drawImage(topLayer, -HALF, -HALF, HALF * 2, HALF * 2)
 
-      const ring = ctx.createLinearGradient(-100, -100, 100, 100)
-      ring.addColorStop(0, 'rgba(190,120,160,0.75)')
-      ring.addColorStop(1, 'rgba(122,0,75,0.85)')
-      ctx.strokeStyle = ring
-      ctx.lineWidth = 6
-      ctx.beginPath()
-      ctx.arc(0, 0, 100, 0, Math.PI * 2)
-      ctx.stroke()
-
-      ctx.strokeStyle = 'rgba(160,60,90,0.65)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.arc(0, 0, 80, 0, Math.PI * 2)
-      ctx.stroke()
-
+      // glowing dots
       const pulse = 0.6 + 0.4 * Math.sin(t * 2)
       softDot(0, 0, 4, '214,51,132', 0.35 + pulse * 0.25)
 
@@ -588,16 +675,45 @@ function AnimatedBackdrop({ pointerRef }) {
       softDot(Math.cos(a2) * 185, Math.sin(a2) * 185, 9, '214,51,132', 0.45)
       const a3 = t * 0.25 - 0.9
       softDot(Math.cos(a3) * 300, Math.sin(a3) * 300, 6, '201,24,74', 0.5)
+
+      // left-edge fade baked into the canvas (only the left 26% is touched)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = fade
+      ctx.fillRect(0, 0, fadeW, canvas.height)
+      ctx.globalCompositeOperation = 'source-over'
     }
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame)
-      draw((now - startedAt) / 1000 + TIME_OFFSET)
+      // clamp dt: a dropped frame slows the motion slightly instead of jumping
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60
+      last = now
+      clock += dt
+
+      const t0 = performance.now()
+      draw(clock)
+      const cost = performance.now() - t0
+
+      // safety net for weak devices: if drawing stays heavy, lower resolution a step
+      costAvg += (cost - costAvg) * 0.1
+      if (costAvg > 9 && quality > 1) {
+        slowFrames += 1
+        if (slowFrames > 45) {
+          slowFrames = 0
+          costAvg = 0
+          quality = Math.max(1, quality - 0.25)
+          resize(true)
+        }
+      } else {
+        slowFrames = 0
+      }
     }
 
     const play = () => {
       if (playing || reduce) return
       playing = true
+      last = 0
       raf = requestAnimationFrame(frame)
     }
 
@@ -611,7 +727,7 @@ function AnimatedBackdrop({ pointerRef }) {
       else pause()
     }
 
-    resize()
+    resize(true)
     if (reduce) draw(7)
 
     const ro = new ResizeObserver(() => {
@@ -636,6 +752,8 @@ function AnimatedBackdrop({ pointerRef }) {
       ro.disconnect()
       io.disconnect()
       document.removeEventListener('visibilitychange', sync)
+      bottomLayer = null
+      topLayer = null
     }
   }, [pointerRef])
 
@@ -645,12 +763,12 @@ function AnimatedBackdrop({ pointerRef }) {
         ref={canvasRef}
         width={DESIGN_W}
         height={DESIGN_H}
-        className="absolute left-1/2 top-1/2 block max-w-none -translate-x-1/2 -translate-y-1/2 select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 aspect-[838/670] [-webkit-mask-image:linear-gradient(to_right,transparent_8%,#000_26%)] [mask-image:linear-gradient(to_right,transparent_8%,#000_26%)]"
+        style={{ willChange: 'transform' }}
+        className="absolute left-1/2 top-1/2 block max-w-none -translate-x-1/2 -translate-y-1/2 select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 aspect-[838/670]"
       />
     </div>
   )
 }
-
 /* ==========================================================================
    PRICING CARD
 ========================================================================== */
@@ -667,11 +785,11 @@ function PricingFeatureRow({ text, span }) {
   )
 }
 
-function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
+function PricingHeroCard() {
   return (
-    <div ref={cardRef} className="relative mx-auto w-full max-w-[480px]">
-      {/* FLOATING MINI CARD — Attendance (fully above, top-left) */}
-      <div className="hero-float-a pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+    <div className="relative mx-auto w-full max-w-[480px]">
+      {/* MINI CARD — Attendance (top-left) */}
+      <div className="pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f7ef] text-[#16a34a]">
           <FiActivity size={16} />
         </div>
@@ -687,8 +805,8 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
         </div>
       </div>
 
-      {/* FLOATING MINI CARD — Leave Balance (fully above, top-right) */}
-      <div className="hero-float-b pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      {/* MINI CARD — Free Trial (top-right) */}
+      <div className="pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCalendar size={16} />
         </div>
@@ -696,22 +814,12 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#999]">Free Trial</div>
           <div className="flex items-center gap-1.5">
             <span className="text-[14px] font-display font-extrabold text-[#111]">14 Days</span>
-            
           </div>
         </div>
       </div>
 
-      <div
-        ref={edgeRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 rounded-[28px] bg-[#7A004B]/90"
-      />
-
       {/* MAIN CARD */}
-      <div
-        ref={cardShapeRef}
-        className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]"
-      >
+      <div className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]">
         {/* TOP: FREE FOREVER badge + STARTER PLAN tag */}
         <div className="relative flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
@@ -722,7 +830,6 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           </span>
         </div>
 
-        {/* CARD CONTENT */}
         <div className="relative z-10">
           <h3 className="relative mt-6 font-display text-[19px] font-bold leading-snug text-[#2A1120] sm:text-[21px]">
             Great Start for Startup and Micro Teams
@@ -745,7 +852,6 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
             </span>
           </div>
 
-          {/* DIVIDER */}
           <div className="relative my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7A004B]/15 to-transparent" />
 
           {/* FEATURES */}
@@ -769,8 +875,8 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
         </div>
       </div>
 
-      {/* FLOATING MINI CARD — Payroll Status (fully below, bottom-right) */}
-      <div className="hero-float-c pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      {/* MINI CARD — Payroll Status (bottom-right) */}
+      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCreditCard size={16} />
         </div>
@@ -793,53 +899,16 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
    HERO SECTION
 ========================================================================== */
 
-function Hero({ onOpenCalculator, scrollContainerRef }) {
-  const reduceMotion = prefersReducedMotion()
-  const cardRef = useRef(null)
-  const cardShapeRef = useRef(null)
-  const edgeRef = useRef(null)
+function Hero({ onOpenCalculator }) {
   const sectionRef = useRef(null)
   const pointerRef = useRef({ x: 0, y: 0, active: false })
 
-  // Scroll-linked parallax on the card (uses the app's own scroll container)
+  // Mouse position sirf animated backdrop ke halke shift ke liye (card static hai)
   useEffect(() => {
-    if (reduceMotion) return
-    const scroller = scrollContainerRef?.current
+    if (prefersReducedMotion()) return
     const section = sectionRef.current
-    const card = cardRef.current
-    if (!scroller || !section || !card) return
-
-    let ticking = false
-    const update = () => {
-      ticking = false
-      const rect = section.getBoundingClientRect()
-      const scrollerRect = scroller.getBoundingClientRect()
-      const progress = (scrollerRect.top - rect.top) / rect.height
-      const clamped = Math.max(-1, Math.min(1, progress))
-      gsap.to(card, { y: clamped * 40, duration: 0.6, ease: 'power3.out', overwrite: 'auto', force3D: true })
-    }
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(update)
-    }
-
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    return () => scroller.removeEventListener('scroll', onScroll)
-  }, [reduceMotion, scrollContainerRef])
-
-  useEffect(() => {
-    if (reduceMotion) return
-    const section = sectionRef.current
-    const card = cardShapeRef.current
-    const edge = edgeRef.current
-    if (!section || !card || !edge) return
-
+    if (!section) return
     const pointer = pointerRef.current
-    const state = { x: 0, y: 0 }
-    let raf = 0
-    let running = false
-    let visible = true
 
     const onMove = (e) => {
       if (e.pointerType && e.pointerType !== 'mouse') return
@@ -848,78 +917,28 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
       pointer.y = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1))
       pointer.active = true
     }
-
     const onLeave = () => {
       pointer.x = 0
       pointer.y = 0
       pointer.active = false
     }
 
-    const tick = (now) => {
-      raf = requestAnimationFrame(tick)
-      const t = now / 1000
-      state.x += (pointer.x - state.x) * 0.07
-      state.y += (pointer.y - state.y) * 0.07
-      const rotY = state.x * 7 + Math.sin(t * 0.7) * 2.6
-      const rotX = -state.y * 5 + Math.cos(t * 0.55) * 1.8
-      gsap.set(card, { rotationY: rotY, rotationX: rotX, transformPerspective: 1200 })
-      gsap.set(edge, {
-        rotationY: rotY,
-        rotationX: rotX,
-        transformPerspective: 1200,
-        x: Math.max(-7, Math.min(7, -rotY * 0.9)),
-        y: Math.max(-7, Math.min(7, rotX * 0.9)),
-      })
-    }
-
-    const start = () => {
-      if (running) return
-      running = true
-      raf = requestAnimationFrame(tick)
-    }
-
-    const stop = () => {
-      running = false
-      cancelAnimationFrame(raf)
-    }
-
-    const sync = () => {
-      if (visible && !document.hidden) start()
-      else stop()
-    }
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting
-        sync()
-      },
-      { threshold: 0 }
-    )
-    io.observe(section)
     section.addEventListener('pointermove', onMove, { passive: true })
     section.addEventListener('pointerleave', onLeave)
-    document.addEventListener('visibilitychange', sync)
-    sync()
-
     return () => {
-      stop()
-      io.disconnect()
       section.removeEventListener('pointermove', onMove)
       section.removeEventListener('pointerleave', onLeave)
-      document.removeEventListener('visibilitychange', sync)
-      gsap.set([card, edge], { clearProps: 'transform' })
     }
-  }, [reduceMotion])
+  }, [])
 
   return (
     <section
       ref={sectionRef}
       className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-30"
     >
-      <style>{heroMotionStyles}</style>
       <Wrap className="relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-start gap-12 lg:gap-10">
-          {/* LEFT: copy — apna top margin yahan control karo */}
+          {/* LEFT: copy */}
           <div className="relative z-10 flex flex-col items-center text-center lg:items-start lg:text-left mt-0 lg:mt-4">
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -996,18 +1015,13 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             )}
           </div>
 
-          {/* RIGHT: card — animated design backdrop + card */}
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative mt-10 lg:mt-16"
-          >
+          {/* RIGHT: animated backdrop + static card */}
+          <div className="relative mt-10 lg:mt-16">
             <AnimatedBackdrop pointerRef={pointerRef} />
             <div className="relative z-10 mx-auto w-full max-w-[480px]">
-              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} edgeRef={edgeRef} />
+              <PricingHeroCard />
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Stats strip */}
