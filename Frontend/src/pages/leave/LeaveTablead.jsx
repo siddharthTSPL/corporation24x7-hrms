@@ -26,7 +26,7 @@ const LEAVE_META = {
   pl:          { label: "Paternity Leave", short: "PL",  bg: "#FEF3C7", color: "#92400E", accent: "#F59E0B", dot: "#D97706" },
   half_day_el: { label: "Half Day EL",     short: "½EL", bg: "#ECFDF5", color: "#065F46", accent: "#10B981", dot: "#059669" },
   half_day_sl: { label: "Half Day SL",     short: "½SL", bg: "#EFF6FF", color: "#1E40AF", accent: "#60A5FA", dot: "#3B82F6" },
-  comp_off: { label: "Comp Off", short: "CO", bg: "#F3E8FF", color: "#6B21A8", accent: "#A855F7", dot: "#9333EA" },
+  comp_off: { label: "Compensatory Leave", short: "CO", bg: "#F3E8FF", color: "#6B21A8", accent: "#A855F7", dot: "#9333EA" },
   lwp:         { label: "Leave Without Pay", short: "LWP", bg: "#FCE7F3", color: "#9D174D", accent: "#DB2777", dot: "#DB2777" },
 };
 
@@ -90,7 +90,7 @@ const BASE_LEAVE_TYPES = [
   { value: "sl",          label: "Sick Leave"    },
   { value: "half_day_el", label: "Half Day EL"   },
   { value: "half_day_sl", label: "Half Day SL"   },
-  { value: "comp_off",    label: "Compensatory Off (Comp Off)" },
+  { value: "comp_off",    label: "Compensatory Leave" },
   { value: "lwp",         label: "Leave Without Pay" },
 ];
 
