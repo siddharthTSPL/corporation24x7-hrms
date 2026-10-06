@@ -20,6 +20,7 @@ const NOTIFICATION_TYPES = [
   "review",
   "training",
   "timesheet",
+  "overtime",
   "holiday",
   "birthday",
   "system",

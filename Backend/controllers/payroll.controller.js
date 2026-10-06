@@ -8,6 +8,7 @@ const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
 const { getTimesheetOvertimeByEmployee, buildOvertime } = require("../utils/Timesheetovertime.utils");
+const { getOvertimeRequestsByEmployee, linkRequestsToPayroll } = require("../utils/Overtimerequest.utils");
 const { isTimesheetBasis, getTimesheetAttendanceByEmployee } = require("../utils/Timesheetattendance.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
@@ -426,12 +427,22 @@ const generatePayroll = async (req, res) => {
     month,
     year,
   });
+  const requestMap = await getOvertimeRequestsByEmployee({
+    organisation_id,
+    employeeModel,
+    employeeIds: [employee],
+    month,
+    year,
+  });
   const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
     policy,
     structure,
     overtimeEntry: overtimeMap.get(String(employee)),
     manualOvertime: overtime,
     forceEnabled: timesheetBasis,
+    requestEntry: requestMap.get(String(employee)),
+    month,
+    year,
   });
 
   const result = calculatePayrollForMonth({
@@ -468,6 +479,15 @@ const generatePayroll = async (req, res) => {
     },
     { upsert: true, new: true }
   );
+
+  await linkRequestsToPayroll({
+    employee,
+    employeeModel,
+    month,
+    year,
+    payrollId: payroll?._id,
+    requestIds: overtimeDetail.requestIds,
+  });
 
 
   await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
@@ -535,6 +555,14 @@ const bulkGeneratePayroll = async (req, res) => {
   });
 
 
+  const requestsByEmployee = await getOvertimeRequestsByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employeeIds,
+    month,
+    year,
+  });
+
   const existingPayrolls = await Payroll.find({
     employee: { $in: employeeIds },
     month: Number(month),
@@ -561,6 +589,7 @@ const bulkGeneratePayroll = async (req, res) => {
     policy,
   });
 
+  const overtimeRequestIdsByEmployee = new Map();
   const ops = [];
   const skipped = [];
 
@@ -607,7 +636,11 @@ const bulkGeneratePayroll = async (req, res) => {
       overtimeEntry: overtimeByEmployee.get(String(structure.employee)),
       manualOvertime: 0,
       forceEnabled: timesheetBasis,
+      requestEntry: requestsByEmployee.get(String(structure.employee)),
+      month,
+      year,
     });
+    overtimeRequestIdsByEmployee.set(String(structure.employee), overtimeDetail.requestIds || []);
     const result = calculatePayrollForMonth({
       structure,
       policy,
@@ -644,6 +677,26 @@ const bulkGeneratePayroll = async (req, res) => {
   }
 
   const bulkResult = ops.length ? await Payroll.bulkWrite(ops) : { upsertedCount: 0, modifiedCount: 0 };
+
+  if (ops.length) {
+    const saved = await Payroll.find({
+      employee: { $in: [...overtimeRequestIdsByEmployee.keys()] },
+      month: Number(month),
+      year: Number(year),
+    })
+      .select("_id employee")
+      .lean();
+    for (const row of saved) {
+      await linkRequestsToPayroll({
+        employee: row.employee,
+        employeeModel: model,
+        month,
+        year,
+        payrollId: row._id,
+        requestIds: overtimeRequestIdsByEmployee.get(String(row.employee)),
+      });
+    }
+  }
 
   if (ops.length) await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
 
