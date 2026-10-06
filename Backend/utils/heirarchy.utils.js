@@ -13,6 +13,8 @@ const httpError = (message, statusCode) => {
 // ─── resolveActor / resolveOrgId ─────────────────────────────────────────────
 
 const resolveActor = (req) => {
+  if (req.actorModel === "User" && req.employee)
+    return { id: req.employee._id, model: "User" };
   if (req.superAdmin) return { id: req.superAdmin._id, model: "SuperAdmin" };
   if (req.admin)      return { id: req.admin._id,      model: "Admin" };
   if (req.manager)    return { id: req.manager._id,    model: "Manager" };

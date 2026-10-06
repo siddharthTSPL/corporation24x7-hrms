@@ -11,6 +11,7 @@ import {
   FaChartLine, FaDownload, FaLaptop, FaTimes, FaChevronRight,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
 import { useMyPayslips } from "../../auth/server-state/payroll/payroll.hook";
 import { downloadPayslip, MONTH_NAMES } from "../utils/Payslip";
@@ -239,6 +240,7 @@ function MyPayslipsCard({ enabled }) {
 export default function SelfServicePortal() {
   const navigate = useNavigate();
   const { data: auth } = useAuth();
+  const can = usePermissionStore((state) => state.can);
   const role = auth?.role || "employee";
   const paths = ROLE_PATHS[role] || ROLE_PATHS.employee;
   const { data, isLoading, isError } = useSelfServiceSummary();
@@ -281,7 +283,7 @@ export default function SelfServicePortal() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        {!isOrgScope && (
+        {!isOrgScope && can("leave.can_apply_leave") && (
           <ActionCard
             icon={<FaPlus size={16} />}
             title="Apply Leave"
@@ -290,13 +292,15 @@ export default function SelfServicePortal() {
             onClick={() => navigate(paths.leave)}
           />
         )}
-        <ActionCard
-          icon={<FaFileInvoiceDollar size={16} />}
-          title={isOrgScope ? "Reimbursements" : "Submit Claim"}
-          blurb={isOrgScope ? "Review org claims" : "Raise an expense claim"}
-          accent={PALETTE[1]}
-          onClick={() => navigate(paths.reimbursement)}
-        />
+        {(isOrgScope || can("reimbursement.can_submit_claim")) && (
+          <ActionCard
+            icon={<FaFileInvoiceDollar size={16} />}
+            title={isOrgScope ? "Reimbursements" : "Submit Claim"}
+            blurb={isOrgScope ? "Review org claims" : "Raise an expense claim"}
+            accent={PALETTE[1]}
+            onClick={() => navigate(paths.reimbursement)}
+          />
+        )}
         <ActionCard
           icon={<FaFolder size={16} />}
           title={isOrgScope ? "Documents" : "Upload Document"}
@@ -335,7 +339,7 @@ export default function SelfServicePortal() {
         </div>
       )}
 
-      {!isOrgScope && <MyPayslipsCard enabled={!isOrgScope} />}
+      {!isOrgScope && can("payroll.can_view_own_payslips") && <MyPayslipsCard enabled={!isOrgScope} />}
 
       <SectionHeading>Overview</SectionHeading>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -1938,7 +1938,7 @@ exports.deleteTeam = async (req, res) => {
 
 exports.getSettings = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
-  if (!["SuperAdmin", "Admin"].includes(actor.model))
+  if (!["SuperAdmin", "Admin"].includes(actor.model) && !(actor.model === "User" && req.actorModel === "User"))
     throw httpError(
       "Only an administrator can view Field Operations settings",
       403,
@@ -1964,7 +1964,7 @@ exports.getSettings = async (req, res) => {
 
 exports.updateSettings = async (req, res) => {
   const { actor, organisation_id } = actorContext(req);
-  if (!["SuperAdmin", "Admin"].includes(actor.model))
+  if (!["SuperAdmin", "Admin"].includes(actor.model) && !(actor.model === "User" && req.actorModel === "User"))
     throw httpError(
       "Only an administrator can change Field Operations settings",
       403,

@@ -12,7 +12,7 @@ const LEGACY_DEPARTMENTS = [
   { name: "Management", code: "MGMT" },
 ];
 
-const getOrgId = (req) => req.user.organisation_id || req.user._id;
+const getOrgId = (req) => req.superAdmin?._id || req.user.organisation_id || req.user._id;
 
 const ensureDefaultDepartments = async (organisation_id) => {
   const count = await Department.countDocuments({ organisation_id });

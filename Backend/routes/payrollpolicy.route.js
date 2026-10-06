@@ -1,7 +1,7 @@
 const express = require("express");
 const payrollpolicyrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
+const payrollManagementAuth = require("../middleware/auth/payrollManagement.middleware");
 
 const {
   getPolicy,
@@ -16,9 +16,9 @@ const {
 
 // Org-wide payroll policy: Basic %, HRA enable+%, PF enable+%, ESI enable+%,
 // Professional Tax enable+amount, TDS enable
-payrollpolicyrouter.get("/policy", adminauthmiddleware, asyncHandler(getPolicy));
-payrollpolicyrouter.put("/policy", adminauthmiddleware, asyncHandler(setPolicy));
-payrollpolicyrouter.post("/policy/reset", adminauthmiddleware, asyncHandler(resetToStandard));
+payrollpolicyrouter.get("/policy", payrollManagementAuth, asyncHandler(getPolicy));
+payrollpolicyrouter.put("/policy", payrollManagementAuth, asyncHandler(setPolicy));
+payrollpolicyrouter.post("/policy/reset", payrollManagementAuth, asyncHandler(resetToStandard));
 
 // Salary Components (Zoho-style): Earnings, Deductions, Benefits and
 // Reimbursements all share these same three endpoints — pass
@@ -26,12 +26,12 @@ payrollpolicyrouter.post("/policy/reset", adminauthmiddleware, asyncHandler(rese
 // body to place a component in the right tab. Also covers Medical,
 // Conveyance, custom ones, and the balancing "Special Allowance" that soaks
 // up whatever gross is left over.
-payrollpolicyrouter.post("/policy/allowance", adminauthmiddleware, asyncHandler(addAllowance));
-payrollpolicyrouter.put("/policy/allowance/:name", adminauthmiddleware, asyncHandler(updateAllowance));
-payrollpolicyrouter.delete("/policy/allowance/:name", adminauthmiddleware, asyncHandler(removeAllowance));
+payrollpolicyrouter.post("/policy/allowance", payrollManagementAuth, asyncHandler(addAllowance));
+payrollpolicyrouter.put("/policy/allowance/:name", payrollManagementAuth, asyncHandler(updateAllowance));
+payrollpolicyrouter.delete("/policy/allowance/:name", payrollManagementAuth, asyncHandler(removeAllowance));
 
 // Fixed org-wide Pay Schedule — locks after the first pay run is processed
-payrollpolicyrouter.get("/pay-schedule", adminauthmiddleware, asyncHandler(getPaySchedule));
-payrollpolicyrouter.put("/pay-schedule", adminauthmiddleware, asyncHandler(setPaySchedule));
+payrollpolicyrouter.get("/pay-schedule", payrollManagementAuth, asyncHandler(getPaySchedule));
+payrollpolicyrouter.put("/pay-schedule", payrollManagementAuth, asyncHandler(setPaySchedule));
 
 module.exports = payrollpolicyrouter;

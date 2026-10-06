@@ -22,7 +22,7 @@ const ROLE_MODEL_NAME_MAP = {
 
 const SHIFT_SUMMARY_FIELDS = "name startTime endTime isActive";
 
-const getOrgId = (req) => req.user.organisation_id || req.user._id;
+const getOrgId = (req) => req.superAdmin?._id || req.user.organisation_id || req.user._id;
 
 const createShift = async (req, res) => {
   try {
