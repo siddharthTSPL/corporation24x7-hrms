@@ -1,7 +1,8 @@
 const express = require("express");
 const departmentrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
+const departmentAccess = adminDelegatedAccess(["onboarding", "torchx_management"]);
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 const {
@@ -20,12 +21,12 @@ const {
 // out the TTL.
 departmentrouter.get(
   "/department",
-  adminauthmiddleware,
+  departmentAccess,
   cacheRoute(5 * 60_000),
   asyncHandler(listDepartments)
 );
-departmentrouter.post("/department", adminauthmiddleware, asyncHandler(createDepartment));
-departmentrouter.put("/department/:id", adminauthmiddleware, asyncHandler(updateDepartment));
-departmentrouter.delete("/department/:id", adminauthmiddleware, asyncHandler(deleteDepartment));
+departmentrouter.post("/department", departmentAccess, asyncHandler(createDepartment));
+departmentrouter.put("/department/:id", departmentAccess, asyncHandler(updateDepartment));
+departmentrouter.delete("/department/:id", departmentAccess, asyncHandler(deleteDepartment));
 
 module.exports = departmentrouter;

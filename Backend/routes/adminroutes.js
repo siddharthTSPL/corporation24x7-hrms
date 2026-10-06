@@ -5,6 +5,7 @@ const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
 const leaveDocumentUpload = require("../middleware/upload/Leavedocument.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
 const {
   restrictPlanFeature,
 } = require("../middleware/auth/planFeatureGate.middleware");
@@ -15,6 +16,9 @@ const { cacheRoute } = require("../middleware/cache/cache.middleware");
 // Advance/enterprise (or during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+const onboardingAccess = adminDelegatedAccess("onboarding");
+const onboardingOrTorchXAccess = adminDelegatedAccess(["onboarding", "torchx_management"]);
+const assetManagementAccess = adminDelegatedAccess("asset_management");
 // Self Service Portal — Leave, Reimbursements, and Document/File
 // self-management — is likewise fully locked on Basic and fully open on
 // Advance/enterprise (or during the free trial).
@@ -173,44 +177,44 @@ adminrouter.get(
   asyncHandler(getAttendanceHistory),
 );
 
-adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
+adminrouter.post("/addmanager", onboardingAccess, asyncHandler(addmanager));
 adminrouter.post(
   "/addemployee",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(addemployee),
 );
 
 adminrouter.get(
   "/employees/bulk-template",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(downloadEmployeeTemplate),
 );
 adminrouter.post(
   "/employees/bulk-upload",
-  adminauthmiddleware,
+  onboardingAccess,
   bulkOnboardingUpload.single("file"),
   asyncHandler(bulkUploadEmployees),
 );
 adminrouter.post(
   "/employees/bulk-import-sheet",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(bulkImportFromGoogleSheet),
 );
 adminrouter.get(
   "/findallmanagers",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(findallmanagers),
 );
 
 adminrouter.get(
   "/findallemployeesfull",
-  adminauthmiddleware,
+  onboardingOrTorchXAccess,
   asyncHandler(findallemployeesfull),
 );
 
 adminrouter.get(
   "/getallemployee",
-  adminOrSuperAdminAuth,
+  onboardingOrTorchXAccess,
   asyncHandler(getallemployee),
 );
 adminrouter.get(
@@ -220,33 +224,33 @@ adminrouter.get(
 );
 adminrouter.put(
   "/editemployee/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(editemployee),
 );
 adminrouter.put(
   "/editmanager/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(editmanager),
 );
 adminrouter.get(
   "/getperticularemployee/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(getperticularemployee),
 );
 adminrouter.get(
   "/getperticularemanager/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(getperticularemanager),
 );
 adminrouter.delete(
   "/deleteuser/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(deleteemployee),
 );
 
 adminrouter.post(
   "/employee/:id/promote/manager",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(promoteEmployeeToManager),
 );
 adminrouter.post(
@@ -261,7 +265,7 @@ adminrouter.post(
 );
 adminrouter.post(
   "/manager/:id/demote/employee",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(demoteManagerToEmployee),
 );
 adminrouter.post(
@@ -276,7 +280,7 @@ adminrouter.post(
 );
 adminrouter.put(
   "/manager/:id/role",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(changeManagerRole),
 );
 
@@ -459,19 +463,19 @@ adminrouter.get(
 
 adminrouter.get(
   "/all-no-admin",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(findallmanagerswoadmin),
 );
 
 adminrouter.put(
   "/employee/:id/working-status",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(setEmployeeWorkingStatus),
 );
 
 adminrouter.put(
   "/manager/:id/working-status",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(setManagerWorkingStatus),
 );
 adminrouter.get(
@@ -482,66 +486,66 @@ adminrouter.get(
 
 adminrouter.get(
   "/inactive-users",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(getInactiveUsers),
 );
-adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
+adminrouter.get("/active-user-count", onboardingAccess, getActiveUserCount);
 
 // ── Asset Management (Admin) — plan-gated: locked on Basic ─────────────────────
 adminrouter.post(
   "/assets",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(createAssetAdmin),
 );
 adminrouter.get(
   "/assets",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(getAllAssetsAdmin),
 );
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
 adminrouter.get(
   "/assets/employees",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(getEmployeesWithAssets),
 );
 adminrouter.get(
   "/assets/employees/:person_id/:person_model/history",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(getEmployeeAssetHistory),
 );
 adminrouter.get(
   "/assets/:id",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(getAssetByIdAdmin),
 );
 adminrouter.put(
   "/assets/:id",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(updateAssetAdmin),
 );
 adminrouter.delete(
   "/assets/:id",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(deleteAssetAdmin),
 );
 adminrouter.patch(
   "/assets/:id/assign-employee",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(assignAssetToEmployee),
 );
 adminrouter.patch(
   "/assets/:id/assign-manager",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(assignAssetToManager),
 );
 adminrouter.patch(
   "/assets/:id/revoke",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(revokeAssetAdmin),
 );
 adminrouter.get(
   "/assets/person/:person_id/:person_model",
-  adminauthmiddleware,
+  assetManagementAccess,
   asyncHandler(getAssetsOfPerson),
 );
 

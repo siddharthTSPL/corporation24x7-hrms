@@ -2,7 +2,7 @@ const express = require("express");
 const policyrouter = express.Router();
 
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
 const anyRoleAuth = require("../middleware/auth/Anyrole.middleware");
 const { policyDocumentUpload } = require("../middleware/auth/PolicyDocument.middleware");
 
@@ -36,17 +36,18 @@ const uploadFields = policyDocumentUpload.fields([
 ]);
 
 // ── Management (SuperAdmin or Admin) ─────────────────────────────────────
-policyrouter.get("/manage/dashboard", adminOrSuperAdminAuth, asyncHandler(getDashboardSummary));
-policyrouter.get("/manage", adminOrSuperAdminAuth, asyncHandler(listPolicies));
-policyrouter.post("/manage", adminOrSuperAdminAuth, uploadFields, asyncHandler(createPolicy));
-policyrouter.get("/manage/:id", adminOrSuperAdminAuth, asyncHandler(getPolicyDetail));
-policyrouter.put("/manage/:id", adminOrSuperAdminAuth, asyncHandler(updatePolicyMeta));
-policyrouter.delete("/manage/:id", adminOrSuperAdminAuth, asyncHandler(deletePolicy));
-policyrouter.post("/manage/:id/versions", adminOrSuperAdminAuth, uploadFields, asyncHandler(addPolicyVersion));
-policyrouter.post("/manage/:id/publish", adminOrSuperAdminAuth, asyncHandler(publishPolicyVersion));
-policyrouter.post("/manage/:id/archive", adminOrSuperAdminAuth, asyncHandler(archivePolicy));
-policyrouter.get("/manage/:id/report", adminOrSuperAdminAuth, asyncHandler(getAcknowledgementReport));
-policyrouter.get("/manage/:id/report/export", adminOrSuperAdminAuth, asyncHandler(exportAcknowledgementReportCsv));
+const policyManagementAccess = adminDelegatedAccess("policy_management");
+policyrouter.get("/manage/dashboard", policyManagementAccess, asyncHandler(getDashboardSummary));
+policyrouter.get("/manage", policyManagementAccess, asyncHandler(listPolicies));
+policyrouter.post("/manage", policyManagementAccess, uploadFields, asyncHandler(createPolicy));
+policyrouter.get("/manage/:id", policyManagementAccess, asyncHandler(getPolicyDetail));
+policyrouter.put("/manage/:id", policyManagementAccess, asyncHandler(updatePolicyMeta));
+policyrouter.delete("/manage/:id", policyManagementAccess, asyncHandler(deletePolicy));
+policyrouter.post("/manage/:id/versions", policyManagementAccess, uploadFields, asyncHandler(addPolicyVersion));
+policyrouter.post("/manage/:id/publish", policyManagementAccess, asyncHandler(publishPolicyVersion));
+policyrouter.post("/manage/:id/archive", policyManagementAccess, asyncHandler(archivePolicy));
+policyrouter.get("/manage/:id/report", policyManagementAccess, asyncHandler(getAcknowledgementReport));
+policyrouter.get("/manage/:id/report/export", policyManagementAccess, asyncHandler(exportAcknowledgementReportCsv));
 
 // ── Viewer (any authenticated role: employee, manager, admin, super_admin) ──
 policyrouter.get("/me/gate-status", anyRoleAuth, asyncHandler(getGateStatus));
