@@ -605,10 +605,28 @@ export default function SuperAdminTimesheet() {
   };
   const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
   const { data: departmentsData } = useGetAllDepartmentsSuperAdmin();
-  const reportDepartments = departmentsData?.departments ?? [];
-  const allReportRows = reportData?.rows ?? [];
-  const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
-  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+const reportDepartments = departmentsData?.departments ?? [];
+
+// code (ENG) / name / _id  ->  full department name (Engineering)
+const departmentNameMap = useMemo(() => {
+  const map = new Map();
+  (departmentsData?.departments ?? []).forEach((d) => {
+    [d.code, d.name, d._id].filter(Boolean).forEach((k) => map.set(String(k).toLowerCase(), d.name));
+  });
+  return map;
+}, [departmentsData]);
+
+// Rows ke department field ko full name se replace karo (card view + CSV dono me reflect hoga)
+const allReportRows = useMemo(() => {
+  const rows = reportData?.rows ?? [];
+  return rows.map((r) => {
+    const key = String(r.department || "").toLowerCase();
+    return departmentNameMap.has(key) ? { ...r, department: departmentNameMap.get(key) } : r;
+  });
+}, [reportData, departmentNameMap]);
+
+const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
+const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
 
   const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
   const reportJobOptions = reportJobsData?.jobs ?? [];

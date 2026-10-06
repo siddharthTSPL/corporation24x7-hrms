@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
 import {
@@ -684,7 +684,27 @@ export default function AdminTimesheet() {
   const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
   const { data: departmentsData } = useGetAllDepartments();
   const reportDepartments = departmentsData?.departments ?? [];
-  const allReportRows = reportData?.rows ?? [];
+
+  // code (ENG) / name / _id  ->  full department name (Engineering)
+  const departmentNameMap = useMemo(() => {
+    const map = new Map();
+    (departmentsData?.departments ?? []).forEach((d) => {
+      [d.code, d.name, d._id]
+        .filter(Boolean)
+        .forEach((k) => map.set(String(k).toLowerCase(), d.name));
+    });
+    return map;
+  }, [departmentsData]);
+
+  const getDeptName = useCallback(
+    (value) => departmentNameMap.get(String(value || "").toLowerCase()) || value || "—",
+    [departmentNameMap]
+  );
+
+  const allReportRows = useMemo(
+    () => (reportData?.rows ?? []).map((r) => ({ ...r, department: getDeptName(r.department) })),
+    [reportData, getDeptName]
+  );
   const [reportView, setReportView] = useState("detailed");
   const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
   const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
@@ -1167,7 +1187,7 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
-                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
+                        const meta = [row.empid, row.department && getDeptName(row.department), row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="border border-gray-100 rounded-xl p-2.5 min-w-0">
                             <div className="flex items-center gap-2 mb-2 min-w-0">
@@ -1211,7 +1231,7 @@ export default function AdminTimesheet() {
                           dt.setDate(dt.getDate() + d);
                           return dt.toISOString().slice(0, 10);
                         });
-                        const meta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
+                        const meta = [row.empid, row.department && getDeptName(row.department), row.designation].filter(Boolean).join(" • ");
                         return (
                           <div key={i} className="flex items-center gap-2.5 mb-2">
                             <div className="w-8 h-8 bg-[#730042]/[0.07] rounded-full flex items-center justify-center text-[11px] font-extrabold text-[#730042] shrink-0">
@@ -1626,7 +1646,7 @@ export default function AdminTimesheet() {
                           <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
                         )}
                       </div>
-                      <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
+                      <div className="text-[11px] text-gray-400 mb-2 break-words">{r.designation} · {r.department}</div>
                       {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
                       <div className="flex items-center justify-between flex-wrap gap-1.5">
                         <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
@@ -1647,7 +1667,7 @@ export default function AdminTimesheet() {
 
                 <Card className="hidden xl:block overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-[13px] min-w-[1180px]">
+                    <table className="w-full border-collapse text-[13px] min-w-[1280px]">
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
                           {["Name", "Designation", "Department", "Project", "Job", "Date", "Day", "Required", "Serving", "Overtime", "Status", "Approved/Rejected By"].map((h) => (
@@ -1662,7 +1682,7 @@ export default function AdminTimesheet() {
                             <tr key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`} className={`border-b border-gray-200 ${isOff ? "bg-gray-50/60" : ""}`}>
                               <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{r.name}</td>
                               <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.designation}</td>
-                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.department}</td>
+                              <td className="px-3 py-3 text-gray-700 min-w-[150px] max-w-[190px] leading-snug" title={r.department}>{r.department}</td>
                               <td className="px-3 py-3 text-gray-700 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">{r.project?.name || "—"}</td>
                               <td className="px-3 py-3 text-gray-700 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{r.job?.title || "—"}</td>
                               <td className="px-3 py-3 text-gray-400 whitespace-nowrap">{fmtShort(r.date)}</td>
