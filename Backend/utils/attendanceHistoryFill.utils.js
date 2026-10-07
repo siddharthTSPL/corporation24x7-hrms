@@ -16,7 +16,7 @@ const { shapeSyncConfig } = require("./Timesheetovertime.utils");
 const { classifyDay } = require("./Timesheetattendance.utils");
 // NOTE: keep this require string identical to the one used by
 // automatic/Marknoshowabsent.js (same file on disk).
-const { isDateInLwpPortion } = require("./leaveLwpDay.utils");
+const { isDateInLwpPortion } = require("./Leavelwpday.utils");
 
 const ROLE_CONFIG = {
   employee: {
@@ -64,8 +64,14 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
 
   const byKey = new Map(rows.map((r) => [toISTKey(r.date), r]));
   const out = rows.map((r) => {
-    const l = leaveFor(startOfDay(r.date));
-    return l ? { ...r, leaveType: l.leaveType } : r;
+    const d = startOfDay(r.date);
+    const l = leaveFor(d);
+    // isLwpDay: balance (EL/SL) ran out for this day, so the leave is unpaid.
+    // Without this flag a half_day_sl / half_day_el with NO balance left was
+    // still shown (and counted) as a fully paid day.
+    return l
+      ? { ...r, leaveType: l.leaveType, isLwpDay: l.leaveType === "lwp" || isDateInLwpPortion(l, d) }
+      : r;
   });
 
   const today = startOfDay(new Date());
@@ -205,13 +211,24 @@ const applyTimesheetFallback = async ({ organisation_id, personId, onModel, rows
 // ── Paid-day classification (same rules as the frontend Exportcsv.js) ──────
 // Present + Week Off + Paid Leave (+ Holiday, + Half Day as 0.5) are paid;
 // everything else (no-show, LWP / unpaid leave, unknown) is Absent.
+//
+// Half-day leave (half_day_sl / half_day_el) = 0.5 leave + 0.5 worked:
+//   - SL/EL balance available  -> leave half is PAID  -> day = 1
+//   - balance over (LWP half)  -> leave half UNPAID   -> day = 0.5
+//   - no check-in at all       -> only the leave half can be paid -> 0.5 / 0
+// Late penalty (4th+ late check-in of the month) is a plain half_day row
+// with no leave -> 0.5.
+const isHalfDayLeaveType = (t) => typeof t === "string" && t.startsWith("half_day");
 const dayPaidValue = (r) => {
   const paidLeave = !!r.leaveType && r.leaveType !== "lwp" && !r.isLwpDay;
   if (r.status === "present") return 1;
   if (r.status === "half_day") return paidLeave ? 1 : 0.5;
   if (r.status === "week_off" || r.status === "holiday") return 1;
-  if (r.status === "leave") return r.isLwpDay || r.leaveType === "lwp" ? 0 : 1;
-  if (r.status === "absent") return paidLeave ? 1 : 0;
+  if (r.status === "leave") {
+    if (isHalfDayLeaveType(r.leaveType)) return paidLeave ? 0.5 : 0;
+    return r.isLwpDay || r.leaveType === "lwp" ? 0 : 1;
+  }
+  if (r.status === "absent") return paidLeave ? (isHalfDayLeaveType(r.leaveType) ? 0.5 : 1) : 0;
   return 0;
 };
 
