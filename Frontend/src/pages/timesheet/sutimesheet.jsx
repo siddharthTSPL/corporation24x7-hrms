@@ -58,6 +58,59 @@ const clampMaxHoursPerDay = (v) => {
   return v;
 };
 
+// ─── Time Sheet Report helpers ───────────────────────────────────────────────
+const MONTHS_TO_SHOW = 12; // how many months the dropdown shows (current month included)
+
+const buildMonthOptions = (count = MONTHS_TO_SHOW) => {
+  const [y, m] = todayISTKey().split("-").map(Number);
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    return {
+      value: d.toISOString().slice(0, 7),
+      label: d.toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }),
+    };
+  });
+};
+
+const monthRangeOf = (ym) => {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}` };
+};
+
+const isOffRow = (r) => r.day_type === "week_off" || r.day_type === "holiday";
+const round2 = (n) => Math.round(n * 100) / 100;
+const initialsOf = (name = "") =>
+  name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
+const empKeyOf = (r) => `${r.employee_model}:${r.employee_id}`;
+
+// rows -> one group per employee (one card each)
+const groupReportRows = (rows) => {
+  const map = new Map();
+  rows.forEach((r) => {
+    const key = empKeyOf(r);
+    if (!map.has(key)) {
+      map.set(key, { key, name: r.name, designation: r.designation, department: r.department, employee_model: r.employee_model, rows: [] });
+    }
+    map.get(key).rows.push(r);
+  });
+  return [...map.values()]
+    .map((g) => {
+      const work = g.rows.filter((r) => !isOffRow(r));
+      return {
+        ...g,
+        required: round2(work.reduce((s, r) => s + (r.required_hours || 0), 0)),
+        served: round2(g.rows.reduce((s, r) => s + (r.serving_hours || 0), 0)),
+        overtime: round2(g.rows.reduce((s, r) => s + (r.overtime_hours || 0), 0)),
+        workDays: new Set(work.map((r) => r.date)).size,
+        offDays: new Set(g.rows.filter(isOffRow).map((r) => r.date)).size,
+        entries: work.length,
+        statuses: [...new Set(work.map((r) => r.timesheet_status))],
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
 const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
@@ -527,6 +580,162 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
   );
 }
 
+// ─── Time Sheet Report components ────────────────────────────────────────────
+
+function ReportStatusBadge({ status }) {
+  const s = STATUS_STYLE[status === "off" ? "draft" : status] || STATUS_STYLE.draft;
+  return <Badge tw={s.tw}>{s.label}</Badge>;
+}
+
+function ReportEmployeeCard({ group, view, onOpen }) {
+  const single = group.statuses.length === 1 ? group.statuses[0] : null;
+  return (
+    <Card onClick={onOpen} className="p-4 sm:p-5 group">
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#730042] to-[#94005a] text-white flex items-center justify-center text-[13px] font-bold shrink-0 shadow-sm shadow-[#730042]/30">
+          {initialsOf(group.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-[14px] text-gray-900 truncate group-hover:text-[#730042] transition-colors">{group.name}</div>
+          <div className="text-[11px] text-gray-400 truncate">{group.designation} · {group.department}</div>
+          <div className="mt-1.5 flex gap-1.5 flex-wrap">
+            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">
+              {group.employee_model === "User" ? "Employee" : group.employee_model}
+            </Badge>
+            {single ? <ReportStatusBadge status={single} /> : group.statuses.length > 1 ? <Badge tw="text-gray-500 bg-gray-100 border-gray-200">Mixed</Badge> : null}
+          </div>
+        </div>
+        <span className="text-gray-300 group-hover:text-[#730042] transition-colors text-lg leading-none shrink-0">›</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-gray-100">
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Required</div>
+          <div className="text-[15px] font-extrabold text-gray-900 truncate">{group.required}h</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Served</div>
+          <div className="text-[15px] font-extrabold text-emerald-600 truncate">{group.served}h</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Overtime</div>
+          <div className={cn("text-[15px] font-extrabold truncate", group.overtime > 0 ? "text-amber-600" : "text-gray-300")}>{group.overtime}h</div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-gray-400">
+        <span className="truncate">
+          {group.workDays} working day{group.workDays === 1 ? "" : "s"} · {group.entries} entr{group.entries === 1 ? "y" : "ies"}
+          {group.offDays > 0 && ` · ${group.offDays} off`}
+        </span>
+        <span className="text-[#730042] font-semibold shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+          {view === "weekend" ? "View weekend ›" : "View details ›"}
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+function ReportRowItem({ r }) {
+  const off = isOffRow(r);
+  return (
+    <div className={cn("rounded-lg border px-3.5 py-3 min-w-0", off ? "bg-gray-50/80 border-gray-200" : "bg-white border-gray-200")}>
+      <div className="flex items-center justify-between gap-2 mb-1.5 min-w-0">
+        <span className="text-[12px] font-bold text-gray-900">{fmtDate(r.date)}</span>
+        {off ? <Badge>{r.day_label}</Badge> : <ReportStatusBadge status={r.timesheet_status} />}
+      </div>
+      {(r.job || r.project) && (
+        <div className="text-[12px] text-gray-700 mb-1.5 truncate">
+          {r.job?.title}{r.job && r.project ? " · " : ""}{r.project?.name}
+        </div>
+      )}
+      <div className="flex items-center gap-3 flex-wrap text-[11px]">
+        <span className="text-gray-400">Req {r.required_hours}h</span>
+        <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
+        {r.billable && <span className="font-semibold text-blue-600">Billable</span>}
+      </div>
+      {(r.approved_by || r.rejected_by) && (
+        <div className="text-[11px] text-gray-400 mt-1.5">
+          {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+        </div>
+      )}
+      {r.remarks && <div className="text-[11px] text-gray-500 italic mt-1 break-words">"{r.remarks}"</div>}
+    </div>
+  );
+}
+
+function ReportDetailModal({ group, view, periodLabel, onClose }) {
+  useEffect(() => {
+    if (!group) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [group]);
+  if (!group) return null;
+
+  const sortRows = (rows) => [...rows].sort((a, b) => a.date.localeCompare(b.date));
+
+  // Weekend view: weekend/holiday rows first, then the rest of that week.
+  // Detailed / Monthly: the complete history in one list.
+  const sections =
+    view === "weekend"
+      ? [
+          { title: "Weekend / Holiday", rows: group.rows.filter(isOffRow) },
+          { title: "Rest of the week", rows: group.rows.filter((r) => !isOffRow(r)) },
+        ]
+      : [{ title: "History", rows: group.rows }];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-gray-900/45 overflow-hidden" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white border border-gray-200 sm:rounded-xl w-full h-full sm:h-auto sm:w-[95vw] lg:max-w-[760px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden shadow-xl"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 shrink-0 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#730042] to-[#94005a] text-white flex items-center justify-center text-[12px] font-bold shrink-0">
+              {initialsOf(group.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-[15px] text-gray-900 truncate">{group.name}</div>
+              <div className="text-[11px] text-gray-400 truncate">{group.designation} · {group.department} · {periodLabel}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
+        </div>
+
+        <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0 flex flex-col gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { label: "Required", value: `${group.required}h`, c: "text-gray-900" },
+              { label: "Served", value: `${group.served}h`, c: "text-emerald-600" },
+              { label: "Overtime", value: `${group.overtime}h`, c: "text-amber-600" },
+              { label: "Working Days", value: group.workDays, c: "text-[#730042]" },
+            ].map((s) => (
+              <div key={s.label} className="bg-gray-50/80 ring-1 ring-gray-100 rounded-xl p-3 min-w-0">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{s.label}</div>
+                <div className={cn("text-[18px] font-extrabold leading-none truncate", s.c)}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {sections.map((sec) => (
+            <div key={sec.title} className="flex flex-col gap-2">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                {sec.title} · {sec.rows.length} record{sec.rows.length === 1 ? "" : "s"}
+              </div>
+              {sec.rows.length === 0 ? (
+                <div className="text-[12px] text-gray-400 px-1">No records</div>
+              ) : (
+                sortRows(sec.rows).map((r, i) => <ReportRowItem key={r.time_log_id || `${sec.title}-${r.date}-${i}`} r={r} />)
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminTimesheet() {
   const [tab, setTab] = useState("overview");
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
@@ -580,9 +789,12 @@ export default function SuperAdminTimesheet() {
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
-  // ─── Time Sheet Report (detailed + weekend, filterable, org-wide) ────────
+  // ─── Time Sheet Report (Detailed / Weekend / Monthly, filterable, org-wide) ──
   const [reportWeek, setReportWeek] = useState(weekStart);
   const [reportView, setReportView] = useState("detailed");
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const [reportMonth, setReportMonth] = useState(() => buildMonthOptions()[0].value);
+  const [selectedReportKey, setSelectedReportKey] = useState(null);
   const [reportEmployeeName, setReportEmployeeName] = useState("");
   const [reportEmployeeModel, setReportEmployeeModel] = useState("");
   const [reportDepartment, setReportDepartment] = useState("");
@@ -593,7 +805,7 @@ export default function SuperAdminTimesheet() {
   const [reportBillable, setReportBillable] = useState("");
 
   const reportParams = {
-    week_start: reportWeek,
+    ...(reportView === "monthly" ? monthRangeOf(reportMonth) : { week_start: reportWeek }),
     ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
     ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
     ...(reportDepartment ? { department: reportDepartment } : {}),
@@ -605,28 +817,36 @@ export default function SuperAdminTimesheet() {
   };
   const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
   const { data: departmentsData } = useGetAllDepartmentsSuperAdmin();
-const reportDepartments = departmentsData?.departments ?? [];
+  const reportDepartments = departmentsData?.departments ?? [];
 
-// code (ENG) / name / _id  ->  full department name (Engineering)
-const departmentNameMap = useMemo(() => {
-  const map = new Map();
-  (departmentsData?.departments ?? []).forEach((d) => {
-    [d.code, d.name, d._id].filter(Boolean).forEach((k) => map.set(String(k).toLowerCase(), d.name));
-  });
-  return map;
-}, [departmentsData]);
+  // code (ENG) / name / _id  ->  full department name (Engineering)
+  const departmentNameMap = useMemo(() => {
+    const map = new Map();
+    (departmentsData?.departments ?? []).forEach((d) => {
+      [d.code, d.name, d._id].filter(Boolean).forEach((k) => map.set(String(k).toLowerCase(), d.name));
+    });
+    return map;
+  }, [departmentsData]);
 
-// Rows ke department field ko full name se replace karo (card view + CSV dono me reflect hoga)
-const allReportRows = useMemo(() => {
-  const rows = reportData?.rows ?? [];
-  return rows.map((r) => {
-    const key = String(r.department || "").toLowerCase();
-    return departmentNameMap.has(key) ? { ...r, department: departmentNameMap.get(key) } : r;
-  });
-}, [reportData, departmentNameMap]);
+  // Replace each row's department with the full name (reflects in cards + CSV)
+  const allReportRows = useMemo(() => {
+    const rows = reportData?.rows ?? [];
+    return rows.map((r) => {
+      const key = String(r.department || "").toLowerCase();
+      return departmentNameMap.has(key) ? { ...r, department: departmentNameMap.get(key) } : r;
+    });
+  }, [reportData, departmentNameMap]);
 
-const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
-const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+  const weekendReportRows = allReportRows.filter((r) => isOffRow(r));
+  // rows used for CSV export (unchanged behaviour)
+  const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+
+  // One card per employee. Weekend view lists everyone who filled a timesheet that
+  // week; their card opens to the weekend data + the rest of that week.
+  const reportGroups = useMemo(() => groupReportRows(allReportRows), [allReportRows]);
+  const selectedGroup = reportGroups.find((g) => g.key === selectedReportKey) || null;
+  const monthLabel = monthOptions.find((m) => m.value === reportMonth)?.label || reportMonth;
+  const periodLabel = reportView === "monthly" ? monthLabel : `Week of ${fmtDate(reportWeek)}`;
 
   const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
   const reportJobOptions = reportJobsData?.jobs ?? [];
@@ -635,7 +855,7 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
     downloadReportCSV(
       reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
       TIMESHEET_REPORT_CSV_COLUMNS,
-      `${reportView === "weekend" ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+      `${reportView}-timesheet-${reportView === "monthly" ? reportMonth : reportWeek}.csv`
     );
   };
 
@@ -1069,15 +1289,15 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
-  <button onClick={() => openJobDetail(job._id)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px] hover:bg-gray-50 hover:border-gray-300 transition-colors">View</button>
-  <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
-  <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
-    className={cn("bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px] hover:bg-gray-50 transition-colors", JOB_STATUS_TW[job.status] || "text-gray-900")}>
-    {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
-      <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
-    ))}
-  </select>
-</div>
+                        <button onClick={() => openJobDetail(job._id)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-gray-700 cursor-pointer min-h-[36px] hover:bg-gray-50 hover:border-gray-300 transition-colors">View</button>
+                        <button onClick={() => openEditJob(job)} className="bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold text-blue-600 cursor-pointer min-h-[36px]">Edit</button>
+                        <select value={job.status} onChange={e => updateJobStatus.mutate({ id: job._id, status: e.target.value }, { onSuccess: refetchJobs })}
+                          className={cn("bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] font-semibold outline-none cursor-pointer min-h-[36px] hover:bg-gray-50 transition-colors", JOB_STATUS_TW[job.status] || "text-gray-900")}>
+                          {["not_started", "in_progress", "on_hold", "completed", "cancelled"].map(s => (
+                            <option key={s} value={s} className="text-gray-900">{s.replace(/_/g, " ")}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     {job.estimated_hours > 0 && (
                       <div className="h-0.5 bg-gray-100 rounded-full mt-3 overflow-hidden">
@@ -1350,35 +1570,52 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
-                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                  {reportView === "weekend" ? "Weekend Timesheet" : reportView === "monthly" ? "Monthly Timesheet" : "Time Sheet Report"}
                 </h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">
-                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportGroups.length} employee{reportGroups.length === 1 ? "" : "s"} · {reportRows.length} record{reportRows.length === 1 ? "" : "s"} · {periodLabel}
                   {reportLoading && " · refreshing…"}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setReportView("detailed")}
-                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
-                  >
-                    Detailed
-                  </button>
-                  <button
-                    onClick={() => setReportView("weekend")}
-                    className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
-                  >
-                    Weekend
-                  </button>
+                  {[
+                    { id: "detailed", label: "Detailed" },
+                    { id: "weekend", label: "Weekend" },
+                    { id: "monthly", label: "Monthly" },
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => { setReportView(v.id); setSelectedReportKey(null); }}
+                      className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === v.id ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
                 </div>
-                <span className="text-xs text-gray-400 shrink-0">Week of</span>
-                <input
-                  type="date"
-                  value={reportWeek}
-                  onChange={(e) => setReportWeek(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
-                />
+
+                {reportView === "monthly" ? (
+                  <>
+                    <span className="text-xs text-gray-400 shrink-0">Month</span>
+                    <select
+                      value={reportMonth}
+                      onChange={(e) => setReportMonth(e.target.value)}
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none cursor-pointer w-full sm:w-auto"
+                    >
+                      {monthOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                    <input
+                      type="date"
+                      value={reportWeek}
+                      onChange={(e) => setReportWeek(e.target.value)}
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                    />
+                  </>
+                )}
                 <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">Export CSV</Btn>
               </div>
             </div>
@@ -1430,47 +1667,29 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
               )}
             </Card>
 
-            {reportRows.length === 0 ? (
+            {reportGroups.length === 0 ? (
               <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
                 <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
-                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+                <div className="text-gray-400 text-[13px]">
+                  {reportView === "monthly"
+                    ? "No one has filled a timesheet in this month"
+                    : "Adjust the week or filters to view the report"}
+                </div>
               </Card>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {reportRows.map((r, i) => (
-                  <Card
-                    key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
-                    className={cn("px-3.5 py-3", (r.day_type === "week_off" || r.day_type === "holiday") && "bg-gray-50/70")}
-                  >
-                    <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
-                      <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
-                      {r.day_type === "week_off" || r.day_type === "holiday" ? (
-                        <Badge>{r.day_label}</Badge>
-                      ) : (
-                        <Badge tw={(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).tw}>
-                          {(STATUS_STYLE[r.timesheet_status === "off" ? "draft" : r.timesheet_status] || STATUS_STYLE.draft).label}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-gray-400 mb-2">{r.designation} · {r.department}</div>
-                    {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
-                    <div className="flex items-center justify-between flex-wrap gap-1.5">
-                      <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
-                      <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
-                        <span className="text-gray-400">Req {r.required_hours}h</span>
-                        <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
-                        {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
-                      </div>
-                    </div>
-                    {(r.approved_by || r.rejected_by) && (
-                      <div className="text-[11px] text-gray-400 mt-1.5">
-                        {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
-                      </div>
-                    )}
-                  </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {reportGroups.map((g) => (
+                  <ReportEmployeeCard key={g.key} group={g} view={reportView} onOpen={() => setSelectedReportKey(g.key)} />
                 ))}
               </div>
             )}
+
+            <ReportDetailModal
+              group={selectedGroup}
+              view={reportView}
+              periodLabel={periodLabel}
+              onClose={() => setSelectedReportKey(null)}
+            />
           </div>
         )}
       </main>
@@ -1642,7 +1861,7 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
             </Select>
           </div>
           <div>
-          <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
+            <Input label="Max Hours / Day" type="number" step="0.5" min="0.5" max="24" placeholder="e.g. 7" value={jobForm.max_hours_per_day} onChange={e => setJobForm(p => ({ ...p, max_hours_per_day: clampMaxHoursPerDay(e.target.value) }))} />
             <p className="text-[11px] text-gray-500 mt-1">Time logged beyond this per day counts as overtime. Leave blank to use the employee's shift hours instead.</p>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer min-h-[24px]">

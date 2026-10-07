@@ -132,6 +132,79 @@ function fmtRate(rate, currency) {
   return `${symbol}${rate}/hr`;
 }
 
+// ─── Report helpers (UI only) ─────────────────────────────────────────────────
+const fmtHrs = (n) => `${Math.round((Number(n) || 0) * 100) / 100}h`;
+const isOffRow = (r) => r.day_type === "week_off" || r.day_type === "holiday";
+
+const monthLabelOf = (key) => {
+  const [y, m] = String(key).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+};
+
+// last 24 months (current month first)
+const buildMonthOptions = (count = 24) => {
+  const [y, m] = todayISTKey().slice(0, 7).split("-").map(Number);
+  return Array.from({ length: count }, (_, i) => {
+    const dt = new Date(Date.UTC(y, m - 1 - i, 1));
+    const value = dt.toISOString().slice(0, 7);
+    return { value, label: monthLabelOf(value) };
+  });
+};
+
+// all Mondays whose week touches the given month
+const weekStartsOfMonth = (monthKey) => {
+  const [y, m] = String(monthKey).split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const last = new Date(Date.UTC(y, m, 0));
+  const out = [];
+  const cur = new Date(`${getMonday(first)}T00:00:00.000Z`);
+  while (cur <= last) {
+    out.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 7);
+  }
+  return out;
+};
+
+const groupStatus = (rows) => {
+  const list = rows.map((r) => r.timesheet_status).filter((s) => s && s !== "off");
+  if (!list.length) return "draft";
+  if (list.includes("rejected")) return "rejected";
+  const pending = list.find((s) => String(s).startsWith("pending"));
+  if (pending) return pending;
+  if (list.includes("draft")) return "draft";
+  return "approved";
+};
+
+function groupReportByEmployee(rows) {
+  const map = new Map();
+  rows.forEach((r) => {
+    const key = String(r.employee_id || r.name || "unknown");
+    if (!map.has(key)) {
+      map.set(key, { key, name: r.name || "—", designation: r.designation, department: r.department, rows: [] });
+    }
+    map.get(key).rows.push(r);
+  });
+  return Array.from(map.values())
+    .map((g) => {
+      const sorted = [...g.rows].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      const requiredByDate = new Map();
+      sorted.forEach((r) => {
+        if (!isOffRow(r)) {
+          const d = String(r.date).slice(0, 10);
+          if (!requiredByDate.has(d)) requiredByDate.set(d, Number(r.required_hours) || 0);
+        }
+      });
+      const required = Array.from(requiredByDate.values()).reduce((s, v) => s + v, 0);
+      const serving = sorted.reduce((s, r) => s + (Number(r.serving_hours) || 0), 0);
+      const overtime = sorted.reduce((s, r) => s + (Number(r.overtime_hours) || 0), 0);
+      const workedDays = new Set(
+        sorted.filter((r) => Number(r.serving_hours) > 0).map((r) => String(r.date).slice(0, 10))
+      ).size;
+      return { ...g, rows: sorted, required, serving, overtime, workedDays, status: groupStatus(sorted) };
+    })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
 function TorchXLogo() {
   return (
     <div className="flex items-center gap-2.5 shrink-0 min-w-0">
@@ -212,7 +285,7 @@ function StatCard({ label, value, color = "text-[#730042]", sub }) {
   );
 }
 
-function Modal({ open, onClose, title, children }) {
+function Modal({ open, onClose, title, children, wide = false }) {
   useEffect(() => {
     if (open) document.body.style.overflow = "hidden";
     else document.body.style.overflow = "";
@@ -224,7 +297,10 @@ function Modal({ open, onClose, title, children }) {
       className="fixed inset-0 z-[200] bg-gray-900/45 flex items-center justify-center p-0 sm:p-4 overflow-hidden"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white border border-gray-200 rounded-t-xl sm:rounded-xl w-full sm:w-[80%] md:w-auto sm:max-w-[540px] shadow-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0">
+      <div className={cn(
+        "bg-white border border-gray-200 rounded-t-xl sm:rounded-xl w-full shadow-xl max-h-[92vh] sm:max-h-[90vh] flex flex-col mt-auto sm:mt-0 min-w-0",
+        wide ? "sm:w-[92%] sm:max-w-[980px]" : "sm:w-[80%] md:w-auto sm:max-w-[540px]"
+      )}>
         <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-gray-200 shrink-0 min-w-0">
           <span className="font-bold text-[15px] text-gray-900 truncate min-w-0">{title}</span>
           <button
@@ -283,6 +359,178 @@ function Btn({ children, variant = "primary", onClick, disabled, className = "" 
     >
       {children}
     </button>
+  );
+}
+
+// ─── Report: employee summary card ────────────────────────────────────────────
+function ReportEmployeeCard({ emp, view, onOpen }) {
+  const isWeekend = view === "weekend";
+  const pct = emp.required > 0 ? Math.min(100, Math.round((emp.serving / emp.required) * 100)) : 0;
+  const initials = String(emp.name || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase();
+  const offLabel = emp.rows.find(isOffRow)?.day_label;
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group text-left bg-white border border-gray-200 rounded-xl p-4 sm:p-5 min-w-0 w-full cursor-pointer transition-all hover:border-[#730042]/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#730042]/30"
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-xl bg-[#730042]/[0.08] text-[#730042] flex items-center justify-center text-sm font-extrabold shrink-0">
+          {initials || "?"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] font-bold text-gray-900 truncate group-hover:text-[#730042] transition-colors">{emp.name}</div>
+          <div className="text-[11px] text-gray-400 truncate mt-0.5">{emp.designation || "—"}</div>
+          <div className="text-[11px] text-gray-400 truncate">{emp.department || "—"}</div>
+        </div>
+        <Badge status={emp.status} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="bg-gray-50 rounded-lg px-2.5 py-2 min-w-0">
+          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide truncate">{isWeekend ? "Off Days" : "Required"}</div>
+          <div className="text-[13px] font-extrabold text-gray-800 mt-0.5 truncate">
+            {isWeekend ? emp.rows.length : fmtHrs(emp.required)}
+          </div>
+        </div>
+        <div className="bg-emerald-50 rounded-lg px-2.5 py-2 min-w-0">
+          <div className="text-[9px] font-bold text-emerald-600/80 uppercase tracking-wide truncate">Served</div>
+          <div className="text-[13px] font-extrabold text-emerald-600 mt-0.5 truncate">{fmtHrs(emp.serving)}</div>
+        </div>
+        <div className="bg-amber-50 rounded-lg px-2.5 py-2 min-w-0">
+          <div className="text-[9px] font-bold text-amber-600/80 uppercase tracking-wide truncate">Overtime</div>
+          <div className="text-[13px] font-extrabold text-amber-600 mt-0.5 truncate">{fmtHrs(emp.overtime)}</div>
+        </div>
+      </div>
+
+      {!isWeekend && emp.required > 0 && (
+        <div className="mt-3.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-gray-400">Completion</span>
+            <span className="text-[10px] font-bold text-gray-600">{pct}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-[#730042]" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100 gap-2">
+        <span className="text-[11px] text-gray-400 truncate">
+          {isWeekend && offLabel ? `${offLabel} · ` : ""}
+          {emp.workedDays} day{emp.workedDays === 1 ? "" : "s"} logged
+        </span>
+        <span className="text-[11px] font-bold text-[#730042] shrink-0 group-hover:translate-x-0.5 transition-transform">View details →</span>
+      </div>
+    </button>
+  );
+}
+
+// ─── Report: employee detail modal ────────────────────────────────────────────
+function ReportDetailModal({ emp, open, onClose, periodLabel }) {
+  if (!open || !emp) return null;
+  return (
+    <Modal open={open} onClose={onClose} title={`${emp.name} · ${periodLabel}`} wide>
+      <div className="flex flex-col gap-5 min-w-0">
+        <div className="flex items-center gap-3 flex-wrap min-w-0">
+          <div className="min-w-0">
+            <div className="text-[15px] font-bold text-gray-900 truncate">{emp.name}</div>
+            <div className="text-xs text-gray-400 truncate">{emp.designation || "—"} · {emp.department || "—"}</div>
+          </div>
+          <div className="ml-auto"><Badge status={emp.status} /></div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="bg-gray-50 rounded-xl p-3 min-w-0">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Required</div>
+            <div className="text-[16px] font-extrabold text-gray-900">{fmtHrs(emp.required)}</div>
+          </div>
+          <div className="bg-emerald-50 rounded-xl p-3 min-w-0">
+            <div className="text-[10px] font-semibold text-emerald-600/80 uppercase tracking-wide mb-1">Served</div>
+            <div className="text-[16px] font-extrabold text-emerald-600">{fmtHrs(emp.serving)}</div>
+          </div>
+          <div className="bg-amber-50 rounded-xl p-3 min-w-0">
+            <div className="text-[10px] font-semibold text-amber-600/80 uppercase tracking-wide mb-1">Overtime</div>
+            <div className="text-[16px] font-extrabold text-amber-600">{fmtHrs(emp.overtime)}</div>
+          </div>
+          <div className="bg-[#730042]/[0.07] rounded-xl p-3 min-w-0">
+            <div className="text-[10px] font-semibold text-[#730042]/80 uppercase tracking-wide mb-1">Days Logged</div>
+            <div className="text-[16px] font-extrabold text-[#730042]">{emp.workedDays}</div>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">History ({emp.rows.length} entries)</div>
+
+          <div className="sm:hidden flex flex-col gap-2">
+            {emp.rows.map((r, i) => (
+              <div key={r.time_log_id || `${r.date}-${i}`} className={`border border-gray-200 rounded-lg px-3 py-2.5 min-w-0 ${isOffRow(r) ? "bg-gray-50/70" : ""}`}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[12px] font-bold text-gray-900">{fmtDate(r.date)}</span>
+                  {isOffRow(r) ? <Chip color="gray">{r.day_label}</Chip> : <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />}
+                </div>
+                {r.job && <div className="text-[12px] text-gray-700 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
+                <div className="flex gap-3 text-[11px] mt-1.5 flex-wrap">
+                  <span className="text-gray-400">Req {r.required_hours}h</span>
+                  <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
+                  {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
+                </div>
+                {(r.approved_by || r.rejected_by) && (
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden sm:block border border-gray-200 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[13px] min-w-[760px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {["Date", "Day", "Project", "Job", "Required", "Serving", "Overtime", "Status", "Approved/Rejected By"].map((h) => (
+                      <th key={h} className="text-left px-3 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {emp.rows.map((r, i) => {
+                    const off = isOffRow(r);
+                    return (
+                      <tr key={r.time_log_id || `${r.date}-${i}`} className={`border-b border-gray-100 last:border-b-0 ${off ? "bg-gray-50/60" : ""}`}>
+                        <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">{fmtShort(r.date)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{off ? <Chip color="gray">{r.day_label}</Chip> : <Chip color="brand">Working</Chip>}</td>
+                        <td className="px-3 py-2.5 text-gray-700 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">{r.project?.name || "—"}</td>
+                        <td className="px-3 py-2.5 text-gray-700 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{r.job?.title || "—"}</td>
+                        <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">{r.required_hours}h</td>
+                        <td className="px-3 py-2.5 font-bold text-emerald-600 whitespace-nowrap">{r.serving_hours}h</td>
+                        <td className="px-3 py-2.5 font-bold whitespace-nowrap">
+                          {r.overtime_hours > 0 ? <span className="text-amber-600">{r.overtime_hours}h</span> : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap"><Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} /></td>
+                        <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                          {r.timesheet_status === "approved" && r.approved_by}
+                          {r.timesheet_status === "rejected" && r.rejected_by}
+                          {!["approved", "rejected"].includes(r.timesheet_status) && "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -661,6 +909,8 @@ export default function AdminTimesheet() {
 
   // ─── Time Sheet Report (detailed, filterable) ───────────────────────────────
   const [reportWeek, setReportWeek] = useState(weekStart);
+  const [reportView, setReportView] = useState("detailed");
+  const [reportMonth, setReportMonth] = useState(todayISTKey().slice(0, 7));
   const [reportEmployeeName, setReportEmployeeName] = useState("");
   const [reportEmployeeModel, setReportEmployeeModel] = useState("");
   const [reportDepartment, setReportDepartment] = useState("");
@@ -669,9 +919,13 @@ export default function AdminTimesheet() {
   const [reportJob, setReportJob] = useState("");
   const [reportStatus, setReportStatus] = useState("");
   const [reportBillable, setReportBillable] = useState("");
+  const [selectedReportEmp, setSelectedReportEmp] = useState(null);
 
-  const reportParams = {
-    week_start: reportWeek,
+  const monthOptions = useMemo(() => buildMonthOptions(24), []);
+  const monthWeekStarts = useMemo(() => weekStartsOfMonth(reportMonth), [reportMonth]);
+
+  const buildReportParams = (ws) => ({
+    week_start: ws,
     ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
     ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
     ...(reportDepartment ? { department: reportDepartment } : {}),
@@ -680,8 +934,24 @@ export default function AdminTimesheet() {
     ...(reportJob ? { job_id: reportJob } : {}),
     ...(reportStatus ? { status: reportStatus } : {}),
     ...(reportBillable ? { billable: reportBillable } : {}),
-  };
-  const { data: reportData, isFetching: reportLoading } = useTimesheetDetailedReport(reportParams);
+  });
+
+  const reportParams = buildReportParams(reportWeek);
+
+  // Monthly view = every week touching the month. Fixed 6 slots keep hook order stable;
+  // outside monthly view all slots share the same params, so react-query dedupes them into one request.
+  const slotParams = (i) =>
+    reportView === "monthly"
+      ? buildReportParams(monthWeekStarts[i] ?? monthWeekStarts[0])
+      : reportParams;
+  const rep0 = useTimesheetDetailedReport(slotParams(0));
+  const rep1 = useTimesheetDetailedReport(slotParams(1));
+  const rep2 = useTimesheetDetailedReport(slotParams(2));
+  const rep3 = useTimesheetDetailedReport(slotParams(3));
+  const rep4 = useTimesheetDetailedReport(slotParams(4));
+  const rep5 = useTimesheetDetailedReport(slotParams(5));
+  const reportSlots = [rep0, rep1, rep2, rep3, rep4, rep5];
+  const reportLoading = reportSlots.some((s) => s.isFetching);
   const { data: departmentsData } = useGetAllDepartments();
   const reportDepartments = departmentsData?.departments ?? [];
 
@@ -701,20 +971,39 @@ export default function AdminTimesheet() {
     [departmentNameMap]
   );
 
-  const allReportRows = useMemo(
-    () => (reportData?.rows ?? []).map((r) => ({ ...r, department: getDeptName(r.department) })),
-    [reportData, getDeptName]
-  );
-  const [reportView, setReportView] = useState("detailed");
+  const allReportRows = useMemo(() => {
+    let rawRows;
+    if (reportView === "monthly") {
+      const seen = new Set();
+      rawRows = [];
+      reportSlots.slice(0, monthWeekStarts.length).forEach((slot) => {
+        (slot.data?.rows ?? []).forEach((r) => {
+          if (!String(r.date).startsWith(reportMonth)) return;
+          const k = r.time_log_id || `${r.employee_id || r.name}|${r.date}|${r.day_type}|${r.job?._id || ""}`;
+          if (seen.has(k)) return;
+          seen.add(k);
+          rawRows.push(r);
+        });
+      });
+    } else {
+      rawRows = rep0.data?.rows ?? [];
+    }
+    return rawRows.map((r) => ({ ...r, department: getDeptName(r.department) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rep0.data, rep1.data, rep2.data, rep3.data, rep4.data, rep5.data, reportView, reportMonth, monthWeekStarts, getDeptName]);
+
   const weekendReportRows = allReportRows.filter((r) => r.day_type === "week_off" || r.day_type === "holiday");
   const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
+  const reportEmployees = useMemo(() => groupReportByEmployee(reportRows), [reportRows]);
+  const activeReportEmp = reportEmployees.find((e) => e.key === selectedReportEmp) || null;
+  const reportPeriodLabel = reportView === "monthly" ? monthLabelOf(reportMonth) : `Week of ${fmtDate(reportWeek)}`;
 
   const exportReportCSV = () => {
     const isWeekend = reportView === "weekend";
     downloadReportCSV(
       reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
       TIMESHEET_REPORT_CSV_COLUMNS,
-      `${isWeekend ? "weekend" : "detailed"}-timesheet-${reportWeek}.csv`
+      `${reportView === "monthly" ? "monthly" : isWeekend ? "weekend" : "detailed"}-timesheet-${reportView === "monthly" ? reportMonth : reportWeek}.csv`
     );
   };
 
@@ -1518,40 +1807,59 @@ export default function AdminTimesheet() {
             )}
           </div>
         )}
+
         {tab === "report" && (
           <div className="min-w-0">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
-                  {reportView === "weekend" ? "Weekend Timesheet" : "Time Sheet Report"}
+                  {reportView === "weekend" ? "Weekend Timesheet" : reportView === "monthly" ? "Monthly Timesheet" : "Time Sheet Report"}
                 </h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">
-                  {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · Week of {fmtDate(reportWeek)}
+                  {reportEmployees.length} employee{reportEmployees.length === 1 ? "" : "s"} · {reportRows.length} row{reportRows.length === 1 ? "" : "s"} · {reportPeriodLabel}
                   {reportLoading && " · refreshing…"}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                  <button
-                    onClick={() => setReportView("detailed")}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "detailed" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
-                  >
-                    Detailed
-                  </button>
-                  <button
-                    onClick={() => setReportView("weekend")}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === "weekend" ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
-                  >
-                    Weekend
-                  </button>
+                  {[
+                    { id: "detailed", label: "Detailed" },
+                    { id: "weekend", label: "Weekend" },
+                    { id: "monthly", label: "Monthly" },
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setReportView(v.id)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer ${reportView === v.id ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500"}`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
                 </div>
-                <span className="text-xs text-gray-400 shrink-0">Week of</span>
-                <input
-                  type="date"
-                  value={reportWeek}
-                  onChange={(e) => setReportWeek(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
-                />
+                {reportView === "monthly" ? (
+                  <>
+                    <span className="text-xs text-gray-400 shrink-0">Month</span>
+                    <select
+                      value={reportMonth}
+                      onChange={(e) => setReportMonth(e.target.value)}
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto cursor-pointer focus:border-[#730042] focus:ring-1 focus:ring-[#730042]"
+                    >
+                      {monthOptions.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-gray-400 shrink-0">Week of</span>
+                    <input
+                      type="date"
+                      value={reportWeek}
+                      onChange={(e) => setReportWeek(e.target.value)}
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
+                    />
+                  </>
+                )}
                 <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">
                   Export CSV
                 </Btn>
@@ -1625,95 +1933,44 @@ export default function AdminTimesheet() {
               )}
             </Card>
 
+            {reportRows.length > 0 && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-4">
+                <StatCard label="Employees" value={reportEmployees.length} color="text-[#730042]" sub={reportPeriodLabel} />
+                <StatCard label="Required" value={fmtHrs(reportEmployees.reduce((s, e) => s + e.required, 0))} color="text-gray-700" />
+                <StatCard label="Served" value={fmtHrs(reportEmployees.reduce((s, e) => s + e.serving, 0))} color="text-emerald-600" />
+                <StatCard label="Overtime" value={fmtHrs(reportEmployees.reduce((s, e) => s + e.overtime, 0))} color="text-amber-600" />
+              </div>
+            )}
+
             {reportRows.length === 0 ? (
               <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
                 <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
-                <div className="text-gray-400 text-[13px]">Adjust the week or filters to view the report</div>
+                <div className="text-gray-400 text-[13px]">
+                  {reportView === "monthly" ? "Adjust the month or filters to view the report" : "Adjust the week or filters to view the report"}
+                </div>
               </Card>
             ) : (
-              <>
-                <div className="xl:hidden flex flex-col gap-2.5">
-                  {reportRows.map((r, i) => (
-                    <Card
-                      key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`}
-                      className={`px-3.5 py-3 ${r.day_type === "week_off" || r.day_type === "holiday" ? "bg-gray-50/70" : ""}`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5 gap-2 min-w-0">
-                        <span className="text-[13px] font-bold text-gray-900 truncate min-w-0">{r.name}</span>
-                        {r.day_type === "week_off" || r.day_type === "holiday" ? (
-                          <Chip color="gray">{r.day_label}</Chip>
-                        ) : (
-                          <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
-                        )}
-                      </div>
-                      <div className="text-[11px] text-gray-400 mb-2 break-words">{r.designation} · {r.department}</div>
-                      {r.job && <div className="text-[12px] text-gray-700 mb-2 truncate">{r.job.title}{r.project ? ` · ${r.project.name}` : ""}</div>}
-                      <div className="flex items-center justify-between flex-wrap gap-1.5">
-                        <span className="text-[11px] text-gray-400">{fmtShort(r.date)}</span>
-                        <div className="flex gap-1.5 flex-wrap items-center text-[11px]">
-                          <span className="text-gray-400">Req {r.required_hours}h</span>
-                          <span className="font-bold text-emerald-600">Served {r.serving_hours}h</span>
-                          {r.overtime_hours > 0 && <span className="font-bold text-amber-600">Over Time {r.overtime_hours}h</span>}
-                        </div>
-                      </div>
-                      {(r.approved_by || r.rejected_by) && (
-                        <div className="text-[11px] text-gray-400 mt-1.5">
-                          {r.timesheet_status === "approved" ? `Approved by ${r.approved_by}` : `Rejected by ${r.rejected_by}`}
-                        </div>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-
-                <Card className="hidden xl:block overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-[13px] min-w-[1280px]">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          {["Name", "Designation", "Department", "Project", "Job", "Date", "Day", "Required", "Serving", "Overtime", "Status", "Approved/Rejected By"].map((h) => (
-                            <th key={h} className="text-left px-3 py-2.5 font-bold text-[11px] text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportRows.map((r, i) => {
-                          const isOff = r.day_type === "week_off" || r.day_type === "holiday";
-                          return (
-                            <tr key={r.time_log_id || `${r.employee_id}-${r.date}-${i}`} className={`border-b border-gray-200 ${isOff ? "bg-gray-50/60" : ""}`}>
-                              <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">{r.name}</td>
-                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.designation}</td>
-                              <td className="px-3 py-3 text-gray-700 min-w-[150px] max-w-[190px] leading-snug" title={r.department}>{r.department}</td>
-                              <td className="px-3 py-3 text-gray-700 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">{r.project?.name || "—"}</td>
-                              <td className="px-3 py-3 text-gray-700 max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap">{r.job?.title || "—"}</td>
-                              <td className="px-3 py-3 text-gray-400 whitespace-nowrap">{fmtShort(r.date)}</td>
-                              <td className="px-3 py-3 whitespace-nowrap">
-                                {isOff ? <Chip color="gray">{r.day_label}</Chip> : <Chip color="brand">Working</Chip>}
-                              </td>
-                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">{r.required_hours}h</td>
-                              <td className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">{r.serving_hours}h</td>
-                              <td className="px-3 py-3 font-bold whitespace-nowrap">
-                                {r.overtime_hours > 0 ? <span className="text-amber-600">{r.overtime_hours}h</span> : <span className="text-gray-300">—</span>}
-                              </td>
-                              <td className="px-3 py-3 whitespace-nowrap">
-                                <Badge status={r.timesheet_status === "off" ? "draft" : r.timesheet_status} />
-                              </td>
-                              <td className="px-3 py-3 text-gray-700 whitespace-nowrap">
-                                {r.timesheet_status === "approved" && r.approved_by}
-                                {r.timesheet_status === "rejected" && r.rejected_by}
-                                {!["approved", "rejected"].includes(r.timesheet_status) && "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              </>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                {reportEmployees.map((emp) => (
+                  <ReportEmployeeCard
+                    key={emp.key}
+                    emp={emp}
+                    view={reportView}
+                    onOpen={() => setSelectedReportEmp(emp.key)}
+                  />
+                ))}
+              </div>
             )}
           </div>
         )}
       </main>
+
+      <ReportDetailModal
+        emp={activeReportEmp}
+        open={!!activeReportEmp}
+        onClose={() => setSelectedReportEmp(null)}
+        periodLabel={reportPeriodLabel}
+      />
 
       <Modal open={jobModal} onClose={() => setJobModal(false)} title="Create Job">
         <div className="flex flex-col gap-4">
