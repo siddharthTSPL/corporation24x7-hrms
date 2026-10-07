@@ -2,6 +2,7 @@ const TimeLog = require("../Models/Timelog.model");
 const Timesheet = require("../Models/Timesheet.model");
 const { istDateFromYMD } = require("./Istdate.utils");
 const { round2 } = require("./payroll.utils");
+const { buildRequestOvertime } = require("./Overtimerequest.utils");
 
 const DEFAULT_MULTIPLIER = 1.5;
 const DEFAULT_STANDARD_HOURS_PER_DAY = 9;
@@ -79,7 +80,7 @@ const getTimesheetOvertimeByEmployee = async ({ organisation_id, employeeModel, 
 //   - Sync on, nothing typed  -> approved timesheet overtime x hourly rate x multiplier.
 // hourlyRate = monthlyGross / (org's fixed "No. of Working Days" x standard hours/day),
 // i.e. the same fixed denominator payroll already uses for its per-day rate.
-const buildOvertime = ({ policy, structure, overtimeEntry, manualOvertime, forceEnabled = false }) => {
+const buildOvertime = ({ policy, structure, overtimeEntry, manualOvertime, forceEnabled = false, requestEntry = null, month = null, year = null }) => {
   const manual = round2(Number(manualOvertime) || 0);
   const cfg = shapeSyncConfig(policy);
   if (forceEnabled) cfg.enabled = true;
@@ -97,29 +98,57 @@ const buildOvertime = ({ policy, structure, overtimeEntry, manualOvertime, force
     pendingMinutes: cfg.enabled ? pendingMinutes : 0,
   };
 
+  // HR-approved overtime REQUESTS (employee files -> HR approves). Per-day salary
+  // = monthlyGross / working days, per-hour = per-day / 9, amount = hours x per-hour.
+  const req = buildRequestOvertime({ policy, structure, requestEntry, month, year });
+  base.requestMinutes = req.detail.minutes;
+  base.requestHours = req.detail.hours;
+  base.requestAmount = req.amount;
+  base.requestIds = req.amount > 0 ? req.detail.requestIds : [];
+  base.perDaySalary = req.detail.perDaySalary;
+  base.perHourSalary = req.detail.perHourSalary;
+  base.pendingMinutes += req.detail.pendingMinutes;
+
   if (manual > 0) {
-    return { amount: manual, detail: { ...base, source: "manual", amount: manual } };
-  }
-  if (!cfg.enabled || approvedMinutes <= 0) {
-    return { amount: 0, detail: base };
+    // Admin typed an explicit amount: it wins, so approved requests are NOT
+    // paid on top (avoids paying the same hours twice).
+    return { amount: manual, detail: { ...base, source: "manual", amount: manual, requestMinutes: 0, requestHours: 0, requestAmount: 0, requestIds: [] } };
   }
 
-  const monthlyGross = structure?.breakup?.monthlyGross || 0;
-  const noOfWorkingDays = policy?.paySchedule?.noOfWorkingDays || 30;
-  const hourlyRate = monthlyGross > 0 ? monthlyGross / (noOfWorkingDays * cfg.standardHoursPerDay) : 0;
-  const hours = approvedMinutes / 60;
-  const amount = round2(hours * hourlyRate * cfg.overtimeMultiplier);
-
-  return {
-    amount,
-    detail: {
-      ...base,
-      source: "timesheet",
+  // Timesheet-derived part (only when the org enabled timesheet sync).
+  let tsAmount = 0;
+  let tsDetail = {};
+  if (cfg.enabled && approvedMinutes > 0) {
+    const monthlyGross = structure?.breakup?.monthlyGross || 0;
+    const noOfWorkingDays = policy?.paySchedule?.noOfWorkingDays || 30;
+    const hourlyRate = monthlyGross > 0 ? monthlyGross / (noOfWorkingDays * cfg.standardHoursPerDay) : 0;
+    const hours = approvedMinutes / 60;
+    tsAmount = round2(hours * hourlyRate * cfg.overtimeMultiplier);
+    tsDetail = {
       minutes: approvedMinutes,
       hours: round2(hours),
       hourlyRate: round2(hourlyRate),
-      amount,
       timesheetIds: overtimeEntry.timesheetIds,
+    };
+  }
+
+  const total = round2(tsAmount + req.amount);
+  if (total <= 0) return { amount: 0, detail: base };
+
+  const source = tsAmount > 0 && req.amount > 0 ? "mixed" : req.amount > 0 ? "overtime_request" : "timesheet";
+  const totalMinutes = (tsDetail.minutes || 0) + req.detail.minutes;
+  return {
+    amount: total,
+    detail: {
+      ...base,
+      ...tsDetail,
+      source,
+      minutes: totalMinutes,
+      hours: round2(totalMinutes / 60),
+      hourlyRate: tsDetail.hourlyRate || req.detail.perHourSalary,
+      multiplier: tsAmount > 0 ? cfg.overtimeMultiplier : req.detail.multiplier,
+      amount: total,
+      timesheetIds: tsDetail.timesheetIds || [],
     },
   };
 };

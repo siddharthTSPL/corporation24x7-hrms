@@ -117,7 +117,7 @@ const payrollSchema = new mongoose.Schema(
     // pendingMinutes = overtime logged but whose timesheet is not approved yet
     // (NOT paid) - lets the admin see something is still waiting.
     overtimeDetail: {
-      source: { type: String, enum: ["none", "timesheet", "manual"], default: "none" },
+      source: { type: String, enum: ["none", "timesheet", "manual", "overtime_request", "mixed"], default: "none" },
       minutes: { type: Number, default: 0 },
       hours: { type: Number, default: 0 },
       hourlyRate: { type: Number, default: 0 },
@@ -125,6 +125,14 @@ const payrollSchema = new mongoose.Schema(
       amount: { type: Number, default: 0 },
       timesheetIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Timesheet" }],
       pendingMinutes: { type: Number, default: 0 },
+      // HR-approved Overtime Requests part: per-day salary = monthlyGross /
+      // working days, per-hour = per-day / 9, amount = hours x per-hour.
+      requestMinutes: { type: Number, default: 0 },
+      requestHours: { type: Number, default: 0 },
+      requestAmount: { type: Number, default: 0 },
+      perDaySalary: { type: Number, default: 0 },
+      perHourSalary: { type: Number, default: 0 },
+      requestIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Overtime" }],
     },
 
     netSalary: { type: Number, default: 0 },

@@ -62,7 +62,7 @@ const LEAVE_META = {
     dot: "#BE185D",
   },
   comp_off: {
-    label: "Comp Off",
+    label: "Compensatory Leave",
     short: "CO",
     bg: "#F3E8FF",
     color: "#6B21A8",

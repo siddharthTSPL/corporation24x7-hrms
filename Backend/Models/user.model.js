@@ -180,4 +180,17 @@ userSchema.methods.isValidPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
 };
 
+
+// Onboarding hand-off: when a brand-new record is saved, tell the org's IT and
+// Accounts teams (if configured). See utils/Onboardingteams.utils.js.
+userSchema.pre("save", function () {
+  this.$locals.__wasNew = this.isNew;
+});
+userSchema.post("save", function (doc) {
+  if (doc.$locals && doc.$locals.__wasNew) {
+    doc.$locals.__wasNew = false;
+    require("../utils/Onboardingteams.utils").scheduleOnboardingTeamNotice("User", doc._id);
+  }
+});
+
 module.exports = mongoose.model("User", userSchema);

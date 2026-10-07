@@ -47,7 +47,7 @@ const LEAVE_META = {
     dot: "bg-[#D97706]",
   },
   comp_off: {
-    label: "Comp Off",
+    label: "Compensatory Leave",
     bg: "bg-[#F3E8FF]",
     text: "text-[#6B21A8]",
     dot: "bg-[#9333EA]",
@@ -767,7 +767,7 @@ const LeaveApplyTab = ({ employee, showToast }) => {
     { value: "pl", label: "Paternity Leave" },
     { value: "half_day_el", label: "Half Day EL" },
     { value: "half_day_sl", label: "Half Day SL" },
-    { value: "comp_off", label: "Compensatory Off (Comp Off)" },
+    { value: "comp_off", label: "Compensatory Leave" },
     { value: "lwp", label: "Leave Without Pay" },
   ].filter((t) => {
     if (t.value === "ml") return isFemaleMarried;

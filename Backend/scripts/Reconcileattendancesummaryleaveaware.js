@@ -9,7 +9,7 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion, resolveLeaveDayOverride } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion, resolveLeaveDayOverride } = require("../utils/Leavelwpday.utils");
 require("dotenv").config();
 
 const CLI_APPLY = process.argv.includes("--apply");
@@ -240,6 +240,17 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
       : { year: nowIst.year, month: nowIst.month - 1 };
     scopeMonths = new Set([`${nowIst.year}-${nowIst.month}`, `${prevIst.year}-${prevIst.month}`]);
     console.log(`Nightly rebuild: months ${[...scopeMonths].join(", ")} for all employees (day 1 -> yesterday)\n`);
+  }
+
+  if (opts.employeeId) {
+    scopeEmployeeRoles = new Set([`${opts.employeeId}_employee`]);
+    const nowIst = getISTDateParts(new Date());
+    const prevIst = nowIst.month === 1
+      ? { year: nowIst.year - 1, month: 12 }
+      : { year: nowIst.year, month: nowIst.month - 1 };
+    scopeMonths = opts.months
+      ? new Set(opts.months)
+      : new Set([`${nowIst.year}-${nowIst.month}`, `${prevIst.year}-${prevIst.month}`]);
   }
 
   // Only load the attendance window we are going to rebuild (with a couple

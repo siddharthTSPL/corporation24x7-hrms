@@ -89,6 +89,7 @@ const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/Reimburse
 const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
 const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
 const ReimbursementSuperadmin = lazy(() => import("./pages/reimbursement/ReimbursementSuperadmin"));
+const Overtime = lazy(() => import("./pages/overtime/Overtime"));
 
 // NOTE: renamed to PascalCase — lowercase-first identifiers are
 // interpreted by JSX as native DOM tags (e.g. <adminmanagement />
@@ -501,6 +502,7 @@ function App() {
             <Route path="/notifications"  element={<NotificationsPage />} />
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
+            <Route path="/overtime"       element={<Overtime />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

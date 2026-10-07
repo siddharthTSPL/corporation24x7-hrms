@@ -154,6 +154,12 @@ const payrollPolicySchema = new mongoose.Schema(
       standardHoursPerDay: { type: Number, default: 9, min: 1, max: 24 },
     },
 
+    // HR-approved Overtime Requests -> payroll. Hours x per-hour salary
+    // (per-day / 9) x multiplier. 1 = normal hourly rate.
+    overtimeRequests: {
+      multiplier: { type: Number, default: 1, min: 0.1, max: 10 },
+    },
+
     // Fixed, organisation-wide pay run schedule (mirrors the standard
     // "Pay Schedule" screen every payroll product has: how often people are
     // paid, which calendar days count as working days, which day of the
