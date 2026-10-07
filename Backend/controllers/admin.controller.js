@@ -4715,6 +4715,10 @@ const getAttendanceHistory = async (req, res, next) => {
   }
 };
 
+// Replace everything from `const getOrgInfo = async (...)` down to the end of
+// `const buildManagerTree = (...) => { ... };` in your controller with this block.
+// (These two functions sit next to each other in the file; buildManagerTreeWithCurrentFlags comes right after.)
+
 const getOrgInfo = async (req, res, next) => {
   try {
     if (!req.admin)
@@ -4747,30 +4751,80 @@ const getOrgInfo = async (req, res, next) => {
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
-    const managers = await Managermodel.find({ organisation_id })
+    const isWorking = (p) => !p.working_status || p.working_status === "working";
+
+    const allManagers = await Managermodel.find({ organisation_id })
       .select(
-        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image"
+        "empid f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image working_status"
       )
       .lean();
 
-    const coAdmins = await Adminmodel.find({
+    const allCoAdmins = await Adminmodel.find({
       organisation_id,
       reporting_manager: chartAdmin._id,
       reporting_manager_model: "Admin",
     })
       .select(
-        "empid f_name l_name work_email designation department office_location profile_image"
+        "empid f_name l_name work_email designation department office_location profile_image working_status"
       )
       .lean();
 
-    const employees = await Usermodel.find({
-      organisation_id,
-      Under_manager: { $in: managers.map((m) => m._id) },
-    })
-      .select(
-        "empid f_name l_name work_email designation department office_location Under_manager profile_image"
-      )
-      .lean();
+    const coAdmins = allCoAdmins.filter(isWorking);
+    const deadAdminIds = new Set(
+      allCoAdmins.filter((a) => !isWorking(a)).map((a) => String(a._id))
+    );
+    const mgrById = new Map(allManagers.map((m) => [String(m._id), m]));
+
+    const resolveParent = (mgr) => {
+      let id = mgr.reporting_manager;
+      let model = mgr.reporting_manager_model;
+      for (let hops = 0; hops < 20; hops += 1) {
+        if (!id || !model) return { id: null, model: null };
+        if (model === "Manager") {
+          const p = mgrById.get(String(id));
+          if (!p) return { id: null, model: null };
+          if (isWorking(p)) return { id: p._id, model: "Manager" };
+          id = p.reporting_manager;
+          model = p.reporting_manager_model;
+          continue;
+        }
+        if (model === "Admin" && deadAdminIds.has(String(id)))
+          return { id: chartAdmin._id, model: "Admin" };
+        return { id, model };
+      }
+      return { id: null, model: null };
+    };
+
+    const managers = allManagers.filter(isWorking).map((m) => {
+      const r = resolveParent(m);
+      return { ...m, reporting_manager: r.id, reporting_manager_model: r.model };
+    });
+
+    const resolveEmpManager = (managerId) => {
+      let cur = managerId ? mgrById.get(String(managerId)) : null;
+      for (let hops = 0; cur && hops < 20; hops += 1) {
+        if (isWorking(cur)) return cur._id;
+        cur =
+          cur.reporting_manager_model === "Manager" && cur.reporting_manager
+            ? mgrById.get(String(cur.reporting_manager))
+            : null;
+      }
+      return null;
+    };
+
+    const employees = (
+      await Usermodel.find({
+        organisation_id,
+        working_status: "working",
+        Under_manager: { $in: allManagers.map((m) => m._id) },
+      })
+        .select(
+          "empid f_name l_name work_email designation department office_location Under_manager profile_image"
+        )
+        .lean()
+    )
+      .map((e) => ({ ...e, Under_manager: resolveEmpManager(e.Under_manager) }))
+      .filter((e) => e.Under_manager);
 
     const makeAdminManagers = (adminId) => managers
       .filter((mgr) =>
@@ -4897,7 +4951,6 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       department: mgr.department,
       office_location: mgr.office_location,
       profile_image: mgr.profile_image || null,
-      _raw: mgr,
       employees: employees
         .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
         .map((emp) => ({
@@ -4913,7 +4966,6 @@ const buildManagerTree = (managers, parentId, parentModel, employees) => {
       subManagers: buildManagerTree(managers, mgr._id, "Manager", employees),
     }));
 };
-
 const buildManagerTreeWithCurrentFlags = (
   managers,
   parentId,

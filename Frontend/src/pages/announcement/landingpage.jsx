@@ -227,8 +227,10 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   useEffect(() => {
     const target = scrollContainerRef?.current || window
     const sectionIds = ['features', 'testimonials', 'pricing']
+    let ticking = false
 
     const read = () => {
+      ticking = false
       const top = target === window ? window.scrollY : target.scrollTop
       setScrolled(top > 10)
 
@@ -241,9 +243,16 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
       setActive(current)
     }
 
+    // one layout read per frame instead of one per scroll event
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(read)
+    }
+
     read()
-    target.addEventListener('scroll', read, { passive: true })
-    return () => target.removeEventListener('scroll', read)
+    target.addEventListener('scroll', onScroll, { passive: true })
+    return () => target.removeEventListener('scroll', onScroll)
   }, [scrollContainerRef])
 
   const handleLinkClick = (e, label) => {
@@ -379,276 +388,601 @@ const sortedFreeForeverFeatures = [...freeForeverFeatures].sort(
   (a, b) => a.text.length - b.text.length
 )
 
-const heroMotionStyles = `
-@keyframes heroFloatA{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-9px,0)}}
-@keyframes heroFloatB{0%,100%{transform:translate3d(0,-4px,0)}50%{transform:translate3d(0,7px,0)}}
-@keyframes heroFloatC{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5px,-8px,0)}}
-.hero-float-a{animation:heroFloatA 5.2s ease-in-out infinite}
-.hero-float-b{animation:heroFloatB 6.1s ease-in-out infinite .6s}
-.hero-float-c{animation:heroFloatC 5.6s ease-in-out infinite 1.1s}
-@media (prefers-reduced-motion:reduce){.hero-float-a,.hero-float-b,.hero-float-c{animation:none}}
-`
-
 const DESIGN_W = 838
 const DESIGN_H = 670
 
-function AnimatedBackdrop({ pointerRef }) {
-  const canvasRef = useRef(null)
+/* ==========================================================================
+   Backdrop engine - pure canvas drawing, no DOM access, no outside references.
+   Because it is fully self-contained it can run inside a Web Worker
+   (OffscreenCanvas), so the animation never competes with page scrolling.
+   If the browser can't do that, the same function runs on the main thread.
+========================================================================== */
+function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+  const designW = options.designW || 838
+  const TAU = Math.PI * 2
+  const TIME_OFFSET = 2.5
+  const HALF = 440 // cached layers cover -440..440 design units
+  const WAVE_STEPS = 240
 
-    const reduce = prefersReducedMotion()
-    const smooth = { x: 0, y: 0, boost: 0 }
-    const TIME_OFFSET = 2.5
-    let width = 0
-    let height = 0
-    let dpr = 1
-    let raf = 0
-    let playing = false
-    let visible = true
-    const startedAt = performance.now()
+  const ARCS = [
+    { r: 330, dash: [46, 120], w: 3.6, dir: 1, speed: 0.12, a: 0.6 },
+    { r: 372, dash: [30, 160], w: 3, dir: -1, speed: 0.09, a: 0.5 },
+    { r: 292, dash: [18, 90], w: 2, dir: 1, speed: 0.16, a: 0.5 },
+  ]
 
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect()
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-      width = rect.width
-      height = rect.height
-      canvas.width = Math.max(1, Math.round(width * dpr))
-      canvas.height = Math.max(1, Math.round(height * dpr))
+  // angle tables for the wave paths (computed once)
+  const thT = new Float64Array(WAVE_STEPS + 1)
+  const cosT = new Float64Array(WAVE_STEPS + 1)
+  const sinT = new Float64Array(WAVE_STEPS + 1)
+  for (let i = 0; i <= WAVE_STEPS; i += 1) {
+    const th = (i / WAVE_STEPS) * TAU
+    thT[i] = th
+    cosT[i] = Math.cos(th)
+    sinT[i] = Math.sin(th)
+  }
+
+  const maxDpr = options.maxDpr ?? 1.5
+  const heavyMs = options.heavyMs ?? 9
+  const g = globalThis
+
+  const hasRaf = typeof g.requestAnimationFrame === 'function'
+  const requestFrame = (cb) =>
+    hasRaf ? g.requestAnimationFrame(cb) : g.setTimeout(() => cb(performance.now()), 16)
+  const cancelFrame = (id) => (hasRaf ? g.cancelAnimationFrame(id) : g.clearTimeout(id))
+
+  const smooth = { x: 0, y: 0, boost: 0 }
+  const pointer = { x: 0, y: 0, active: false }
+
+  let cssW = 0
+  let cssH = 0
+  let deviceDpr = 0
+  let quality = 1
+  let dpr = 1
+  let s = 1
+  let bottomLayer = null
+  let topLayer = null
+  let fade = null
+  let fadeW = 0
+
+  let wantRun = false
+  let playing = false
+  let stillMode = false
+  let raf = 0
+  let clock = TIME_OFFSET
+  let last = 0
+  let costAvg = 0
+  let slowFrames = 0
+
+  const softDot = (x, y, r, color, alpha) => {
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4)
+    gr.addColorStop(0, `rgba(${color},${alpha})`)
+    gr.addColorStop(0.35, `rgba(${color},${alpha * 0.35})`)
+    gr.addColorStop(1, `rgba(${color},0)`)
+    ctx.globalAlpha = 1
+    ctx.fillStyle = gr
+    ctx.beginPath()
+    ctx.arc(x, y, r * 3.4, 0, TAU)
+    ctx.fill()
+    ctx.fillStyle = `rgba(${color},${Math.min(1, alpha + 0.25)})`
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, TAU)
+    ctx.fill()
+  }
+
+  const wavePath = (k, base, amp, phase, amount, harmonic) => {
+    ctx.beginPath()
+    for (let i = 0; i <= WAVE_STEPS; i += 1) {
+      const th = thT[i]
+      const w = Math.sin(k * th + phase) + harmonic * Math.sin(2 * k * th + phase * 1.7)
+      const r = base + amp * amount * w
+      const x = cosT[i] * r
+      const y = sinT[i] * r
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
     }
+    ctx.closePath()
+  }
 
-    const softDot = (x, y, r, color, alpha) => {
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4)
-      g.addColorStop(0, `rgba(${color},${alpha})`)
-      g.addColorStop(0.35, `rgba(${color},${alpha * 0.35})`)
-      g.addColorStop(1, `rgba(${color},0)`)
-      ctx.globalAlpha = 1
-      ctx.fillStyle = g
-      ctx.beginPath()
-      ctx.arc(x, y, r * 3.4, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = `rgba(${color},${Math.min(1, alpha + 0.25)})`
-      ctx.beginPath()
-      ctx.arc(x, y, r, 0, Math.PI * 2)
-      ctx.fill()
-    }
+  const glowStroke = (color, core, alpha) => {
+    ctx.strokeStyle = color
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.globalAlpha = alpha * 0.1
+    ctx.lineWidth = core * 8
+    ctx.stroke()
+    ctx.globalAlpha = alpha * 0.2
+    ctx.lineWidth = core * 3.4
+    ctx.stroke()
+    ctx.globalAlpha = alpha
+    ctx.lineWidth = core
+    ctx.stroke()
+    ctx.globalAlpha = 1
+  }
 
-    const wavePath = (k, base, amp, phase, amount, harmonic) => {
-      const steps = 320
-      ctx.beginPath()
-      for (let i = 0; i <= steps; i += 1) {
-        const th = (i / steps) * Math.PI * 2
-        const w = Math.sin(k * th + phase) + harmonic * Math.sin(2 * k * th + phase * 1.7)
-        const r = base + amp * amount * w
-        const x = Math.cos(th) * r
-        const y = Math.sin(th) * r
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
-      }
-      ctx.closePath()
-    }
+  // Offscreen layer, painted in "design units" with the origin at the centre
+  const makeLayer = (paint) => {
+    const px = Math.max(1, Math.round(HALF * 2 * s * dpr))
+    const layer = makeLayerCanvas(px, px)
+    const c = layer.getContext('2d')
+    const k = px / (HALF * 2)
+    c.setTransform(k, 0, 0, k, px / 2, px / 2)
+    paint(c)
+    return layer
+  }
 
-    const glowStroke = (color, core, alpha) => {
-      ctx.strokeStyle = color
-      ctx.lineJoin = 'round'
-      ctx.lineCap = 'round'
-      ctx.globalAlpha = alpha * 0.1
-      ctx.lineWidth = core * 8
-      ctx.stroke()
-      ctx.globalAlpha = alpha * 0.2
-      ctx.lineWidth = core * 3.4
-      ctx.stroke()
-      ctx.globalAlpha = alpha
-      ctx.lineWidth = core
-      ctx.stroke()
-      ctx.globalAlpha = 1
-    }
-
-    const draw = (t) => {
-      const p = pointerRef?.current
-      const tx = p ? p.x : 0
-      const ty = p ? p.y : 0
-      const active = p && p.active ? 1 : 0
-      smooth.x += (tx - smooth.x) * 0.06
-      smooth.y += (ty - smooth.y) * 0.06
-      smooth.boost += (active - smooth.boost) * 0.04
-
-      const s = width / DESIGN_W
-      const cx = width / 2 + smooth.x * 18
-      const cy = height / 2 + smooth.y * 12
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * cx, dpr * cy)
-
-      const breathe = 0.5 - 0.5 * Math.cos((Math.PI * 2 * t) / 16)
-      const amount = (0.04 + 0.96 * Math.pow(breathe, 1.4)) * (1 + smooth.boost * 0.22)
-
-      const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 230)
+  const buildStatic = () => {
+    // things that never change: halo + the 3 faint circles
+    bottomLayer = makeLayer((c) => {
+      const halo = c.createRadialGradient(0, 0, 0, 0, 0, 230)
       halo.addColorStop(0, 'rgba(233,120,170,0.20)')
       halo.addColorStop(0.55, 'rgba(233,120,170,0.07)')
       halo.addColorStop(1, 'rgba(233,120,170,0)')
-      ctx.fillStyle = halo
-      ctx.beginPath()
-      ctx.arc(0, 0, 230, 0, Math.PI * 2)
-      ctx.fill()
+      c.fillStyle = halo
+      c.beginPath()
+      c.arc(0, 0, 230, 0, TAU)
+      c.fill()
 
-      const spokes = 96
-      const sweep = t * 0.6
-      ctx.lineWidth = 1
-      for (let i = 0; i < spokes; i += 1) {
-        const a = (i / spokes) * Math.PI * 2 + t * 0.03
-        const major = i % 8 === 0
-        const lit = Math.pow(Math.max(0, Math.cos(a - sweep)), 14)
-        const alpha = (major ? 0.13 : 0.06) + lit * 0.26
-        ctx.strokeStyle = `rgba(201,24,74,${alpha})`
-        ctx.beginPath()
-        ctx.moveTo(Math.cos(a) * 112, Math.sin(a) * 112)
-        ctx.lineTo(Math.cos(a) * (major ? 430 : 370), Math.sin(a) * (major ? 430 : 370))
-        ctx.stroke()
-      }
-
+      c.strokeStyle = 'rgba(122,0,75,0.13)'
+      c.lineWidth = 1.2
       ;[180, 285, 390].forEach((r) => {
-        ctx.strokeStyle = 'rgba(122,0,75,0.13)'
-        ctx.lineWidth = 1.2
-        ctx.beginPath()
-        ctx.arc(0, 0, r, 0, Math.PI * 2)
-        ctx.stroke()
+        c.beginPath()
+        c.arc(0, 0, r, 0, TAU)
+        c.stroke()
       })
+    })
 
-      for (let j = 0; j < 2; j += 1) {
-        const prog = (t / 6 + j * 0.5) % 1
-        ctx.strokeStyle = `rgba(201,24,74,${(1 - prog) * 0.3})`
-        ctx.lineWidth = 1.6
-        ctx.beginPath()
-        ctx.arc(0, 0, 104 + prog * 330, 0, Math.PI * 2)
-        ctx.stroke()
-      }
+    // centre rings (drawn above the waves)
+    topLayer = makeLayer((c) => {
+      c.strokeStyle = 'rgba(160,80,130,0.08)'
+      c.lineWidth = 20
+      c.beginPath()
+      c.arc(0, 0, 112, 0, TAU)
+      c.stroke()
 
-      const arcs = [
-        { r: 330, dash: [46, 120], w: 3.6, dir: 1, speed: 0.12, a: 0.6 },
-        { r: 372, dash: [30, 160], w: 3, dir: -1, speed: 0.09, a: 0.5 },
-        { r: 292, dash: [18, 90], w: 2, dir: 1, speed: 0.16, a: 0.5 },
-      ]
-      arcs.forEach((arc) => {
-        ctx.save()
-        ctx.rotate(arc.dir * t * arc.speed)
-        ctx.setLineDash(arc.dash)
-        ctx.strokeStyle = `rgba(233,120,170,${arc.a})`
-        ctx.lineWidth = arc.w
-        ctx.lineCap = 'butt'
-        ctx.beginPath()
-        ctx.arc(0, 0, arc.r, 0, Math.PI * 2)
-        ctx.stroke()
-        ctx.restore()
-      })
-      ctx.setLineDash([])
-
-      wavePath(5, 258, 34, t * 0.3, amount, 0.08)
-      glowStroke('rgb(240,170,200)', 1.2, 0.55)
-
-      wavePath(8, 238, 46, -t * 0.42 + 1.3, amount, 0.1)
-      glowStroke('rgb(206,96,150)', 1.7, 0.6)
-
-      wavePath(8, 236, 62, t * 0.5, amount, 0.1)
-      glowStroke('rgb(122,0,75)', 2.4, 1)
-
-      ctx.globalAlpha = 1
-      ctx.strokeStyle = 'rgba(160,80,130,0.08)'
-      ctx.lineWidth = 20
-      ctx.beginPath()
-      ctx.arc(0, 0, 112, 0, Math.PI * 2)
-      ctx.stroke()
-
-      const ring = ctx.createLinearGradient(-100, -100, 100, 100)
+      const ring = c.createLinearGradient(-100, -100, 100, 100)
       ring.addColorStop(0, 'rgba(190,120,160,0.75)')
       ring.addColorStop(1, 'rgba(122,0,75,0.85)')
-      ctx.strokeStyle = ring
-      ctx.lineWidth = 6
-      ctx.beginPath()
-      ctx.arc(0, 0, 100, 0, Math.PI * 2)
-      ctx.stroke()
+      c.strokeStyle = ring
+      c.lineWidth = 6
+      c.beginPath()
+      c.arc(0, 0, 100, 0, TAU)
+      c.stroke()
 
-      ctx.strokeStyle = 'rgba(160,60,90,0.65)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.arc(0, 0, 80, 0, Math.PI * 2)
-      ctx.stroke()
-
-      const pulse = 0.6 + 0.4 * Math.sin(t * 2)
-      softDot(0, 0, 4, '214,51,132', 0.35 + pulse * 0.25)
-
-      const a1 = t * 0.9 + Math.PI / 2
-      softDot(Math.cos(a1) * 100, Math.sin(a1) * 100, 7, '224,122,168', 0.6)
-      const a2 = -t * 0.5 - 2.2
-      softDot(Math.cos(a2) * 185, Math.sin(a2) * 185, 9, '214,51,132', 0.45)
-      const a3 = t * 0.25 - 0.9
-      softDot(Math.cos(a3) * 300, Math.sin(a3) * 300, 6, '201,24,74', 0.5)
-    }
-
-    const frame = (now) => {
-      raf = requestAnimationFrame(frame)
-      draw((now - startedAt) / 1000 + TIME_OFFSET)
-    }
-
-    const play = () => {
-      if (playing || reduce) return
-      playing = true
-      raf = requestAnimationFrame(frame)
-    }
-
-    const pause = () => {
-      playing = false
-      cancelAnimationFrame(raf)
-    }
-
-    const sync = () => {
-      if (visible && !document.hidden) play()
-      else pause()
-    }
-
-    resize()
-    if (reduce) draw(7)
-
-    const ro = new ResizeObserver(() => {
-      resize()
-      if (reduce) draw(7)
+      c.strokeStyle = 'rgba(160,60,90,0.65)'
+      c.lineWidth = 1
+      c.beginPath()
+      c.arc(0, 0, 80, 0, TAU)
+      c.stroke()
     })
-    ro.observe(canvas)
+
+    // left-edge fade (transparent 8% -> opaque 26%), baked into the canvas
+    fadeW = Math.ceil(canvas.width * 0.26) + 1
+    fade = ctx.createLinearGradient(0, 0, canvas.width, 0)
+    fade.addColorStop(0, 'rgba(0,0,0,1)')
+    fade.addColorStop(0.08, 'rgba(0,0,0,1)')
+    fade.addColorStop(0.26, 'rgba(0,0,0,0)')
+  }
+
+  const draw = (t) => {
+    if (!cssW || !cssH || !bottomLayer || !topLayer) return
+
+    smooth.x += (pointer.x - smooth.x) * 0.06
+    smooth.y += (pointer.y - smooth.y) * 0.06
+    smooth.boost += ((pointer.active ? 1 : 0) - smooth.boost) * 0.04
+
+    const cx = cssW / 2 + smooth.x * 18
+    const cy = cssH / 2 + smooth.y * 12
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * cx, dpr * cy)
+
+    const breathe = 0.5 - 0.5 * Math.cos((TAU * t) / 16)
+    const amount = (0.04 + 0.96 * Math.pow(breathe, 1.4)) * (1 + smooth.boost * 0.22)
+
+    // halo + circles (cached)
+    ctx.drawImage(bottomLayer, -HALF, -HALF, HALF * 2, HALF * 2)
+
+    // spokes: unlit ones batched into 2 paths, sweep-lit ones drawn individually
+    const spokes = 96
+    const sweep = t * 0.6
+    const rot = t * 0.03
+    const minorPath = new Path2D()
+    const majorPath = new Path2D()
+    ctx.lineWidth = 1
+    for (let i = 0; i < spokes; i += 1) {
+      const a = (i / spokes) * TAU + rot
+      const major = i % 8 === 0
+      const len = major ? 430 : 370
+      const ca = Math.cos(a)
+      const sa = Math.sin(a)
+      const d = Math.cos(a - sweep)
+      const lit = d > 0 ? Math.pow(d, 14) : 0
+      if (lit < 0.01) {
+        const path = major ? majorPath : minorPath
+        path.moveTo(ca * 112, sa * 112)
+        path.lineTo(ca * len, sa * len)
+      } else {
+        ctx.strokeStyle = `rgba(201,24,74,${(major ? 0.13 : 0.06) + lit * 0.26})`
+        ctx.beginPath()
+        ctx.moveTo(ca * 112, sa * 112)
+        ctx.lineTo(ca * len, sa * len)
+        ctx.stroke()
+      }
+    }
+    ctx.strokeStyle = 'rgba(201,24,74,0.06)'
+    ctx.stroke(minorPath)
+    ctx.strokeStyle = 'rgba(201,24,74,0.13)'
+    ctx.stroke(majorPath)
+
+    // expanding pulses
+    for (let j = 0; j < 2; j += 1) {
+      const prog = (t / 6 + j * 0.5) % 1
+      ctx.strokeStyle = `rgba(201,24,74,${(1 - prog) * 0.3})`
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.arc(0, 0, 104 + prog * 330, 0, TAU)
+      ctx.stroke()
+    }
+
+    // rotating dashed arcs
+    for (let i = 0; i < ARCS.length; i += 1) {
+      const arc = ARCS[i]
+      ctx.save()
+      ctx.rotate(arc.dir * t * arc.speed)
+      ctx.setLineDash(arc.dash)
+      ctx.strokeStyle = `rgba(233,120,170,${arc.a})`
+      ctx.lineWidth = arc.w
+      ctx.lineCap = 'butt'
+      ctx.beginPath()
+      ctx.arc(0, 0, arc.r, 0, TAU)
+      ctx.stroke()
+      ctx.restore()
+    }
+    ctx.setLineDash([])
+
+    // waves
+    wavePath(5, 258, 34, t * 0.3, amount, 0.08)
+    glowStroke('rgb(240,170,200)', 1.2, 0.55)
+
+    wavePath(8, 238, 46, -t * 0.42 + 1.3, amount, 0.1)
+    glowStroke('rgb(206,96,150)', 1.7, 0.6)
+
+    wavePath(8, 236, 62, t * 0.5, amount, 0.1)
+    glowStroke('rgb(122,0,75)', 2.4, 1)
+
+    // centre rings (cached)
+    ctx.globalAlpha = 1
+    ctx.drawImage(topLayer, -HALF, -HALF, HALF * 2, HALF * 2)
+
+    // glowing dots
+    const pulse = 0.6 + 0.4 * Math.sin(t * 2)
+    softDot(0, 0, 4, '214,51,132', 0.35 + pulse * 0.25)
+
+    const a1 = t * 0.9 + Math.PI / 2
+    softDot(Math.cos(a1) * 100, Math.sin(a1) * 100, 7, '224,122,168', 0.6)
+    const a2 = -t * 0.5 - 2.2
+    softDot(Math.cos(a2) * 185, Math.sin(a2) * 185, 9, '214,51,132', 0.45)
+    const a3 = t * 0.25 - 0.9
+    softDot(Math.cos(a3) * 300, Math.sin(a3) * 300, 6, '201,24,74', 0.5)
+
+    // left-edge fade (only the left 26% is touched)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = fade
+    ctx.fillRect(0, 0, fadeW, canvas.height)
+    ctx.globalCompositeOperation = 'source-over'
+  }
+
+  const applySize = () => {
+    dpr = quality
+    s = cssW / designW
+    canvas.width = Math.max(1, Math.round(cssW * dpr))
+    canvas.height = Math.max(1, Math.round(cssH * dpr))
+    buildStatic()
+    if (stillMode) draw(7)
+  }
+
+  const frame = (now) => {
+    if (!playing) return
+    raf = requestFrame(frame)
+
+    // clamp dt: a dropped frame slows the motion slightly instead of jumping
+    const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60
+    last = now
+    clock += dt
+
+    const t0 = performance.now()
+    draw(clock)
+    const cost = performance.now() - t0
+
+    // safety net for weak devices: if drawing stays heavy, lower resolution a step
+    costAvg += (cost - costAvg) * 0.1
+    if (costAvg > heavyMs && quality > 1) {
+      slowFrames += 1
+      if (slowFrames > 45) {
+        slowFrames = 0
+        costAvg = 0
+        quality = Math.max(1, quality - 0.25)
+        applySize()
+      }
+    } else {
+      slowFrames = 0
+    }
+  }
+
+  const sync = () => {
+    const shouldPlay = wantRun && !stillMode
+    if (shouldPlay && !playing) {
+      playing = true
+      last = 0
+      raf = requestFrame(frame)
+    } else if (!shouldPlay && playing) {
+      playing = false
+      cancelFrame(raf)
+    }
+  }
+
+  return {
+    resize(w, h, devDpr) {
+      const nextDevice = devDpr || 1
+      if (w === cssW && h === cssH && nextDevice === deviceDpr) return
+      if (nextDevice !== deviceDpr) quality = Math.min(nextDevice, maxDpr)
+      deviceDpr = nextDevice
+      cssW = w
+      cssH = h
+      if (!cssW || !cssH) return
+      applySize()
+    },
+    setPointer(x, y, active) {
+      pointer.x = x
+      pointer.y = y
+      pointer.active = !!active
+    },
+    setRunning(value) {
+      wantRun = !!value
+      sync()
+    },
+    // reduced-motion: a single static frame, no loop
+    renderStill() {
+      stillMode = true
+      sync()
+      if (cssW && cssH) draw(7)
+    },
+    dispose() {
+      wantRun = false
+      stillMode = false
+      playing = false
+      cancelFrame(raf)
+      bottomLayer = null
+      topLayer = null
+    },
+  }
+}
+
+/* Worker script = the engine above + a tiny message handler. It is built from a
+   string at runtime, so no extra file is needed. */
+const BACKDROP_WORKER_SOURCE = `
+const createBackdropEngine = ${createBackdropEngine.toString()};
+let engine = null;
+self.onmessage = function (event) {
+  const m = event.data;
+  if (!m) return;
+  if (m.type === 'init') {
+    engine = createBackdropEngine(m.canvas, function (w, h) { return new OffscreenCanvas(w, h); }, { heavyMs: 12, designW: m.designW });
+    if (!engine) { self.postMessage({ type: 'failed' }); return; }
+    if (m.reduce) engine.renderStill();
+    engine.resize(m.width, m.height, m.dpr);
+    self.postMessage({ type: 'ready' });
+    return;
+  }
+  if (!engine) return;
+  if (m.type === 'resize') engine.resize(m.width, m.height, m.dpr);
+  else if (m.type === 'pointer') engine.setPointer(m.x, m.y, m.active);
+  else if (m.type === 'running') engine.setRunning(m.value);
+  else if (m.type === 'dispose') { engine.dispose(); engine = null; self.close(); }
+};
+`
+
+
+const BACKDROP_CANVAS_CLASS =
+  'absolute left-1/2 top-1/2 block max-w-none -translate-x-1/2 -translate-y-1/2 select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 aspect-[838/670]'
+
+function AnimatedBackdrop({ pointerRef }) {
+  const hostRef = useRef(null)
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    const reduce = prefersReducedMotion()
+    let renderer = null
+    let visible = true
+    let disposed = false
+    const pointerSent = { x: NaN, y: NaN, a: null }
+
+    const shouldRun = () => !reduce && visible && !document.hidden
+
+    // Canvas is created here (not in JSX) because a canvas can be handed to a
+    // worker only once; every mount gets a fresh element.
+    const makeCanvas = () => {
+      const c = document.createElement('canvas')
+      c.width = DESIGN_W
+      c.height = DESIGN_H
+      c.className = BACKDROP_CANVAS_CLASS
+      c.style.willChange = 'transform'
+      host.appendChild(c)
+      return c
+    }
+
+    // Fallback for old browsers: same engine, main thread
+    const createMainRenderer = () => {
+      const canvas = makeCanvas()
+      const engine = createBackdropEngine(
+        canvas,
+        (w, h) => {
+          const c = document.createElement('canvas')
+          c.width = w
+          c.height = h
+          return c
+        },
+        { heavyMs: 9, designW: DESIGN_W }
+      )
+      if (!engine) {
+        canvas.remove()
+        return null
+      }
+      if (reduce) engine.renderStill()
+      return {
+        canvas,
+        resize: () => engine.resize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio || 1),
+        pointer: (x, y, active) => engine.setPointer(x, y, active),
+        running: (value) => engine.setRunning(value),
+        dispose: () => {
+          engine.dispose()
+          canvas.remove()
+        },
+      }
+    }
+
+    const ro = new ResizeObserver(() => renderer?.resize())
+
+    const attach = () => {
+      if (!renderer) return
+      ro.disconnect()
+      ro.observe(renderer.canvas)
+      renderer.resize()
+      renderer.running(shouldRun())
+    }
+
+    // Preferred: animation runs in a Web Worker, so scrolling is never blocked
+    const createWorkerRenderer = () => {
+      if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return null
+      const canvas = makeCanvas()
+      if (typeof canvas.transferControlToOffscreen !== 'function') {
+        canvas.remove()
+        return null
+      }
+
+      let worker
+      let workerUrl = null
+      try {
+        workerUrl = URL.createObjectURL(new Blob([BACKDROP_WORKER_SOURCE], { type: 'text/javascript' }))
+        worker = new Worker(workerUrl)
+      } catch {
+        if (workerUrl) URL.revokeObjectURL(workerUrl)
+        canvas.remove()
+        return null
+      }
+
+      let offscreen
+      try {
+        offscreen = canvas.transferControlToOffscreen()
+      } catch {
+        worker.terminate()
+        URL.revokeObjectURL(workerUrl)
+        canvas.remove()
+        return null
+      }
+
+      let ready = false
+      const r = {
+        canvas,
+        resize: () =>
+          worker.postMessage({
+            type: 'resize',
+            width: canvas.clientWidth,
+            height: canvas.clientHeight,
+            dpr: window.devicePixelRatio || 1,
+          }),
+        pointer: (x, y, active) => worker.postMessage({ type: 'pointer', x, y, active }),
+        running: (value) => worker.postMessage({ type: 'running', value }),
+        dispose: () => {
+          worker.onmessage = null
+          worker.onerror = null
+          worker.terminate()
+          URL.revokeObjectURL(workerUrl)
+          canvas.remove()
+        },
+      }
+
+      const fallback = () => {
+        if (disposed || renderer !== r) return
+        r.dispose()
+        renderer = createMainRenderer()
+        pointerSent.x = NaN
+        attach()
+      }
+      worker.onmessage = (e) => {
+        const type = e.data && e.data.type
+        if (type === 'ready') ready = true
+        else if (type === 'failed') fallback()
+      }
+      worker.onerror = () => {
+        if (!ready) fallback()
+      }
+
+      worker.postMessage(
+        {
+          type: 'init',
+          canvas: offscreen,
+          width: canvas.clientWidth,
+          height: canvas.clientHeight,
+          dpr: window.devicePixelRatio || 1,
+          reduce,
+          designW: DESIGN_W,
+        },
+        [offscreen]
+      )
+      return r
+    }
+
+    renderer = createWorkerRenderer() || createMainRenderer()
+    attach()
+
+    // Forward the mouse position (smoothed inside the worker), only when it changed
+    const pointerTimer = reduce
+      ? 0
+      : window.setInterval(() => {
+          const p = pointerRef?.current
+          if (!p || !renderer) return
+          if (p.x !== pointerSent.x || p.y !== pointerSent.y || p.active !== pointerSent.a) {
+            pointerSent.x = p.x
+            pointerSent.y = p.y
+            pointerSent.a = p.active
+            renderer.pointer(p.x, p.y, p.active)
+          }
+        }, 33)
 
     const io = new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting
-        sync()
+        renderer?.running(shouldRun())
       },
-      { threshold: 0 }
+      { threshold: 0, rootMargin: '150px 0px' }
     )
-    io.observe(canvas)
-    document.addEventListener('visibilitychange', sync)
-    sync()
+    io.observe(host)
+
+    const onVisibility = () => renderer?.running(shouldRun())
+    document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
-      pause()
-      ro.disconnect()
+      disposed = true
+      window.clearInterval(pointerTimer)
       io.disconnect()
-      document.removeEventListener('visibilitychange', sync)
+      ro.disconnect()
+      document.removeEventListener('visibilitychange', onVisibility)
+      renderer?.dispose()
+      renderer = null
     }
   }, [pointerRef])
 
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-      <canvas
-        ref={canvasRef}
-        width={DESIGN_W}
-        height={DESIGN_H}
-        className="absolute left-1/2 top-1/2 block max-w-none -translate-x-1/2 -translate-y-1/2 select-none opacity-60 w-[760px] sm:w-[900px] lg:w-[1150px] lg:opacity-100 aspect-[838/670] [-webkit-mask-image:linear-gradient(to_right,transparent_8%,#000_26%)] [mask-image:linear-gradient(to_right,transparent_8%,#000_26%)]"
-      />
-    </div>
-  )
+  return <div ref={hostRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-0" />
 }
 
 /* ==========================================================================
@@ -667,11 +1001,11 @@ function PricingFeatureRow({ text, span }) {
   )
 }
 
-function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
+function PricingHeroCard() {
   return (
-    <div ref={cardRef} className="relative mx-auto w-full max-w-[480px]">
-      {/* FLOATING MINI CARD — Attendance (fully above, top-left) */}
-      <div className="hero-float-a pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+    <div className="relative mx-auto w-full max-w-[480px]">
+      {/* MINI CARD — Attendance (top-left) */}
+      <div className="pointer-events-none absolute -left-4 -top-12 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f7ef] text-[#16a34a]">
           <FiActivity size={16} />
         </div>
@@ -687,8 +1021,8 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
         </div>
       </div>
 
-      {/* FLOATING MINI CARD — Leave Balance (fully above, top-right) */}
-      <div className="hero-float-b pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      {/* MINI CARD — Free Trial (top-right) */}
+      <div className="pointer-events-none absolute -right-6 -top-8 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCalendar size={16} />
         </div>
@@ -696,22 +1030,12 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[#999]">Free Trial</div>
           <div className="flex items-center gap-1.5">
             <span className="text-[14px] font-display font-extrabold text-[#111]">14 Days</span>
-            
           </div>
         </div>
       </div>
 
-      <div
-        ref={edgeRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 rounded-[28px] bg-[#7A004B]/90"
-      />
-
       {/* MAIN CARD */}
-      <div
-        ref={cardShapeRef}
-        className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]"
-      >
+      <div className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]">
         {/* TOP: FREE FOREVER badge + STARTER PLAN tag */}
         <div className="relative flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
@@ -722,7 +1046,6 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
           </span>
         </div>
 
-        {/* CARD CONTENT */}
         <div className="relative z-10">
           <h3 className="relative mt-6 font-display text-[19px] font-bold leading-snug text-[#2A1120] sm:text-[21px]">
             Great Start for Startup and Micro Teams
@@ -745,7 +1068,6 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
             </span>
           </div>
 
-          {/* DIVIDER */}
           <div className="relative my-5 h-px w-full bg-gradient-to-r from-transparent via-[#7A004B]/15 to-transparent" />
 
           {/* FEATURES */}
@@ -769,8 +1091,8 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
         </div>
       </div>
 
-      {/* FLOATING MINI CARD — Payroll Status (fully below, bottom-right) */}
-      <div className="hero-float-c pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
+      {/* MINI CARD — Payroll Status (bottom-right) */}
+      <div className="pointer-events-none absolute -right-4 -bottom-10 z-30 hidden sm:flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 shadow-[0_12px_30px_rgba(122,0,75,0.18)] border border-white">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fdeef5] text-[#7A004B]">
           <FiCreditCard size={16} />
         </div>
@@ -793,53 +1115,16 @@ function PricingHeroCard({ cardRef, cardShapeRef, edgeRef }) {
    HERO SECTION
 ========================================================================== */
 
-function Hero({ onOpenCalculator, scrollContainerRef }) {
-  const reduceMotion = prefersReducedMotion()
-  const cardRef = useRef(null)
-  const cardShapeRef = useRef(null)
-  const edgeRef = useRef(null)
+function Hero({ onOpenCalculator }) {
   const sectionRef = useRef(null)
   const pointerRef = useRef({ x: 0, y: 0, active: false })
 
-  // Scroll-linked parallax on the card (uses the app's own scroll container)
+  // Mouse position sirf animated backdrop ke halke shift ke liye (card static hai)
   useEffect(() => {
-    if (reduceMotion) return
-    const scroller = scrollContainerRef?.current
+    if (prefersReducedMotion()) return
     const section = sectionRef.current
-    const card = cardRef.current
-    if (!scroller || !section || !card) return
-
-    let ticking = false
-    const update = () => {
-      ticking = false
-      const rect = section.getBoundingClientRect()
-      const scrollerRect = scroller.getBoundingClientRect()
-      const progress = (scrollerRect.top - rect.top) / rect.height
-      const clamped = Math.max(-1, Math.min(1, progress))
-      gsap.to(card, { y: clamped * 40, duration: 0.6, ease: 'power3.out', overwrite: 'auto', force3D: true })
-    }
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(update)
-    }
-
-    scroller.addEventListener('scroll', onScroll, { passive: true })
-    return () => scroller.removeEventListener('scroll', onScroll)
-  }, [reduceMotion, scrollContainerRef])
-
-  useEffect(() => {
-    if (reduceMotion) return
-    const section = sectionRef.current
-    const card = cardShapeRef.current
-    const edge = edgeRef.current
-    if (!section || !card || !edge) return
-
+    if (!section) return
     const pointer = pointerRef.current
-    const state = { x: 0, y: 0 }
-    let raf = 0
-    let running = false
-    let visible = true
 
     const onMove = (e) => {
       if (e.pointerType && e.pointerType !== 'mouse') return
@@ -848,78 +1133,28 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
       pointer.y = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1))
       pointer.active = true
     }
-
     const onLeave = () => {
       pointer.x = 0
       pointer.y = 0
       pointer.active = false
     }
 
-    const tick = (now) => {
-      raf = requestAnimationFrame(tick)
-      const t = now / 1000
-      state.x += (pointer.x - state.x) * 0.07
-      state.y += (pointer.y - state.y) * 0.07
-      const rotY = state.x * 7 + Math.sin(t * 0.7) * 2.6
-      const rotX = -state.y * 5 + Math.cos(t * 0.55) * 1.8
-      gsap.set(card, { rotationY: rotY, rotationX: rotX, transformPerspective: 1200 })
-      gsap.set(edge, {
-        rotationY: rotY,
-        rotationX: rotX,
-        transformPerspective: 1200,
-        x: Math.max(-7, Math.min(7, -rotY * 0.9)),
-        y: Math.max(-7, Math.min(7, rotX * 0.9)),
-      })
-    }
-
-    const start = () => {
-      if (running) return
-      running = true
-      raf = requestAnimationFrame(tick)
-    }
-
-    const stop = () => {
-      running = false
-      cancelAnimationFrame(raf)
-    }
-
-    const sync = () => {
-      if (visible && !document.hidden) start()
-      else stop()
-    }
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting
-        sync()
-      },
-      { threshold: 0 }
-    )
-    io.observe(section)
     section.addEventListener('pointermove', onMove, { passive: true })
     section.addEventListener('pointerleave', onLeave)
-    document.addEventListener('visibilitychange', sync)
-    sync()
-
     return () => {
-      stop()
-      io.disconnect()
       section.removeEventListener('pointermove', onMove)
       section.removeEventListener('pointerleave', onLeave)
-      document.removeEventListener('visibilitychange', sync)
-      gsap.set([card, edge], { clearProps: 'transform' })
     }
-  }, [reduceMotion])
+  }, [])
 
   return (
     <section
       ref={sectionRef}
       className="relative overflow-hidden bg-white pt-32 pb-0 lg:pt-30"
     >
-      <style>{heroMotionStyles}</style>
       <Wrap className="relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] items-start gap-12 lg:gap-10">
-          {/* LEFT: copy — apna top margin yahan control karo */}
+          {/* LEFT: copy */}
           <div className="relative z-10 flex flex-col items-center text-center lg:items-start lg:text-left mt-0 lg:mt-4">
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -996,18 +1231,13 @@ function Hero({ onOpenCalculator, scrollContainerRef }) {
             )}
           </div>
 
-          {/* RIGHT: card — animated design backdrop + card */}
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative mt-10 lg:mt-16"
-          >
+          {/* RIGHT: animated backdrop + static card */}
+          <div className="relative mt-10 lg:mt-16">
             <AnimatedBackdrop pointerRef={pointerRef} />
             <div className="relative z-10 mx-auto w-full max-w-[480px]">
-              <PricingHeroCard cardRef={cardRef} cardShapeRef={cardShapeRef} edgeRef={edgeRef} />
+              <PricingHeroCard />
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Stats strip */}
@@ -1952,7 +2182,6 @@ export default function LandingPage() {
       />
       <Hero
         onOpenCalculator={() => navigate('/pricing-calculator')}
-        scrollContainerRef={scrollContainerRef}
       />
       <Divider />
       <Features />

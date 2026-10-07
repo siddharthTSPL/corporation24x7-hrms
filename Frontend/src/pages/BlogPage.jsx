@@ -233,6 +233,24 @@ const BLOG_STYLE = `
 
   .tx-hero-glow{ position:absolute; pointer-events:none; z-index:-1; filter:blur(60px); opacity:.55; }
 
+  /* Modern light hero panel */
+  .tx-hero{ position:relative; isolation:isolate; overflow:hidden; border-radius:28px;
+    border:1px solid rgba(122,0,75,0.10);
+    background:
+      radial-gradient(560px 340px at 6% 0%, rgba(246,197,103,0.42), transparent 65%),
+      radial-gradient(640px 420px at 100% 100%, rgba(236,120,180,0.50), transparent 65%),
+      radial-gradient(460px 320px at 70% 0%, rgba(150,125,235,0.28), transparent 65%),
+      linear-gradient(135deg, #FFF3F9 0%, #FADCEC 50%, #EFE3FA 100%);
+    box-shadow:0 24px 60px -34px rgba(122,0,75,0.34); }
+  .tx-hero::before{ content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; opacity:.55;
+    background-image:radial-gradient(rgba(122,0,75,0.18) 1px, transparent 1px);
+    background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(to right, transparent 10%, #000 85%);
+    mask-image:linear-gradient(to right, transparent 10%, #000 85%); }
+  .tx-hero-pill{ display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .85rem;
+    border-radius:999px; border:1px solid rgba(122,0,75,0.14); background:rgba(255,255,255,0.75);
+    font-size:12px; font-weight:500; }
+
   /* OTP boxes for phone verification */
   .tx-otp-box{ width:clamp(34px,9vw,44px); height:clamp(42px,11vw,52px); text-align:center; font-size:1.1rem; font-weight:500;
     border:1px solid ${BORDER}; border-radius:8px; outline:none; background:#fff;
@@ -615,30 +633,29 @@ function FeedView({ posts, syncing, user, onWriteClick, onNotify, onEditPost, on
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6 sm:pb-24 sm:pt-14 lg:px-0">
-      <div className="relative max-w-2xl">
-        <span
-          className="tx-hero-glow -left-10 -top-16 h-56 w-56 rounded-full"
-          style={{ background: "linear-gradient(135deg, #F6C567 0%, #E29A2E 100%)" }}
-        />
-        <span
-          className="tx-hero-glow left-40 top-6 h-44 w-44 rounded-full"
-          style={{ background: `linear-gradient(135deg, #F19BC9 0%, ${BEETROOT} 100%)` }}
-        />
-        <span className="tx-eyebrow relative" style={{ color: BEETROOT }}>
-          The TorchX Talent journal
-        </span>
-        <h1 className="font-display relative mt-4 text-[2.3rem] leading-[1.12] tracking-tight sm:text-[3rem] md:text-[3.4rem]">
-          Notes on hiring, HR, and building great teams
-        </h1>
-        <p className="mt-4 max-w-xl text-[15px] leading-relaxed sm:text-[16px]" style={{ color: MUTED }}>
-          Product thinking, HR playbooks, and stories from people teams who've
-          moved their workforce operations onto TorchX Talent.
-        </p>
-        <div className="mt-5 flex items-center gap-2 text-[12.5px] font-medium" style={{ color: MUTED }}>
-          <span className="tx-live-dot" />
-          {syncing
-            ? "Connecting to the live feed…"
-            : `Synced in real time · ${posts.length} ${posts.length === 1 ? "story" : "stories"}`}
+      <div className="tx-hero px-6 py-10 sm:px-10 sm:py-14 lg:px-14 lg:py-16">
+        <div className="relative max-w-2xl">
+          <span className="tx-hero-pill" style={{ color: BEETROOT }}>
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} />
+            The TorchX Talent journal
+          </span>
+
+          <h1 className="font-display mt-5 text-[2.3rem] leading-[1.12] tracking-tight sm:text-[3rem] md:text-[3.4rem]">
+            Notes on hiring, HR, and building{" "}
+            <span className="italic" style={{ color: BEETROOT }}>great teams</span>
+          </h1>
+
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed sm:text-[16px]" style={{ color: MUTED }}>
+            Product thinking, HR playbooks, and stories from people teams who've
+            moved their workforce operations onto TorchX Talent.
+          </p>
+
+          <div className="tx-hero-pill mt-6" style={{ color: MUTED }}>
+            <span className="tx-live-dot" />
+            {syncing
+              ? "Connecting to the live feed…"
+              : `Synced in real time · ${posts.length} ${posts.length === 1 ? "story" : "stories"}`}
+          </div>
         </div>
       </div>
 

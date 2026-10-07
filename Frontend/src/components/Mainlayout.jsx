@@ -181,17 +181,17 @@ export default function MainLayout() {
     });
   };
 
-  return (
-    <div className="flex h-screen bg-(--background)">
-      <SingleSignInApprovalBanner />
-      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+ return (
+  <div className="flex h-screen overflow-hidden bg-(--background)">
+    <SingleSignInApprovalBanner />
+    <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
-      <div className="flex-1 flex flex-col">
-        <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
-        <div className="p-6 overflow-auto flex-1">
-  <Outlet />
-</div>
+    <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+      <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <div className="p-6 overflow-auto flex-1 min-h-0">
+        <Outlet />
       </div>
+    </div>
 
       {showWelcome && (
         <WelcomeModal

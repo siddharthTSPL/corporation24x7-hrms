@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Crown, Users, Building2, User,
@@ -27,7 +25,16 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
   .org-root, .org-root * { box-sizing: border-box; }
-  .org-root { font-family: 'DM Sans', sans-serif; }
+
+  /* Page scroll (vertical) is handled by MainLayout. The chart block never grows the page
+     sideways: extra width scrolls horizontally via the sticky bar at the bottom of the UI. */
+  .org-root {
+    font-family: 'DM Sans', sans-serif;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    contain: inline-size;
+  }
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
@@ -67,9 +74,16 @@ const STYLES = `
   .stat-h { transition: transform 0.14s ease; }
   .stat-h:hover { transform: translateY(-2px); }
 
-  .sc::-webkit-scrollbar { height: 5px; width: 5px; }
-  .sc::-webkit-scrollbar-track { background: transparent; }
-  .sc::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  /* Chart block: native bar hidden, the sticky bar below drives horizontal scroll */
+  .sc-hide { scrollbar-width: none; -ms-overflow-style: none; }
+  .sc-hide::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  /* Sticky horizontal bar - always visible at the bottom of the page UI */
+  .hbar { scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+  .hbar::-webkit-scrollbar { height: 12px; }
+  .hbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 8px; }
+  .hbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; border: 2px solid #e2e8f0; }
+  .hbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
   .hb {
     display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;
@@ -413,7 +427,7 @@ function OrgTree({ data, loading, q }) {
   const delayRef = { current: 160 };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "max-content" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "max-content", minWidth: "100%" }}>
       <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
         <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} image={data.organisation_logo} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
       </div>
@@ -486,7 +500,7 @@ function OrgTree({ data, loading, q }) {
 
 function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
   return (
-    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "13px 14px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden" }}>
+    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "13px 14px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden", minWidth: 0 }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
       <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <Icon size={14} style={{ color: accent }} />
@@ -514,10 +528,57 @@ export default function OrganizationPageAdmin() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [exportStatus, setExportStatus] = useState(null);
+  const scrollRef = useRef(null);
+  const barRef = useRef(null);
+  const [bar, setBar] = useState({ sw: 0, show: false });
+  const [pos, setPos] = useState({ left: 0, width: 0, top: 0, visible: false });
   const inputRef = useRef(null);
-  const chartRef = useRef(null);
+  const exportRef = useRef(null);
 
   const orgName = data?.organisation_name || "Organisation";
+
+  // Horizontal bar is pinned to the bottom of the SCREEN (fixed), aligned with the chart block.
+  // If the chart's own bottom is on screen, the bar sits right at the chart's bottom edge instead.
+  useEffect(() => {
+    const inner = exportRef.current;
+    const sc = scrollRef.current;
+    if (!inner || !sc) return;
+    const BAR_H = 14;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const r = sc.getBoundingClientRect();
+      const vh = window.innerHeight;
+      setBar((prev) => {
+        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        return prev.sw === next.sw && prev.show === next.show ? prev : next;
+      });
+      // Bar is always pinned to the bottom edge of the screen; only shown while the chart block is on screen
+      const visible = r.bottom > 0 && r.top < vh - BAR_H;
+      setPos((prev) =>
+        prev.left === r.left && prev.width === r.width && prev.visible === visible
+          ? prev
+          : { left: r.left, width: r.width, top: 0, visible }
+      );
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    ro?.observe(inner);
+    ro?.observe(sc);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true); // capture: catches the layout's scroll container too
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [data, loading, searchOpen]);
+
+  const syncScroll = (from, to) => {
+    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  };
 
   const matchCount = useMemo(() => {
     if (!searchQuery || !data) return 0;
@@ -562,7 +623,9 @@ export default function OrganizationPageAdmin() {
   }, [searchOpen]);
 
   const handleExport = useCallback(async () => {
-    if (!chartRef.current || exportStatus === "loading") return;
+    // Export the full-width inner content (not the clipped scroll viewport)
+    const target = exportRef.current;
+    if (!target || exportStatus === "loading") return;
     setExportStatus("loading");
     try {
       if (!window.html2canvas) {
@@ -573,10 +636,25 @@ export default function OrganizationPageAdmin() {
           document.head.appendChild(s);
         });
       }
-      const target = chartRef.current;
       target.classList.add("export-mode");
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const canvas = await window.html2canvas(target, { backgroundColor: "#ffffff", scale: 2, useCORS: true, allowTaint: false, logging: false });
+      const canvas = await window.html2canvas(target, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: target.scrollWidth,
+        height: target.scrollHeight,
+        windowWidth: Math.max(target.scrollWidth, window.innerWidth),
+        windowHeight: Math.max(target.scrollHeight, window.innerHeight),
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (doc) => {
+          const sc = doc.querySelector("[data-org-scroll]");
+          if (sc) { sc.style.overflow = "visible"; sc.style.maxWidth = "none"; }
+        },
+      });
       target.classList.remove("export-mode");
       const link = document.createElement("a");
       link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
@@ -585,7 +663,7 @@ export default function OrganizationPageAdmin() {
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
     } catch {
-      chartRef.current?.classList.remove("export-mode");
+      exportRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
   }, [exportStatus, orgName]);
@@ -593,10 +671,10 @@ export default function OrganizationPageAdmin() {
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
   return (
-    <div className="org-root min-h-screen bg-slate-50">
+    <div className="org-root">
       <style>{STYLES}</style>
 
-      <div className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-0 sm:h-[54px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4" style={{ animation: "fadeIn 0.3s ease forwards" }}>
+      <div className="shrink-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-0 sm:h-[54px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4" style={{ animation: "fadeIn 0.3s ease forwards" }}>
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink min-w-0 overflow-hidden">
           <span className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">{orgName}</span>
           <span className="text-slate-200 flex-shrink-0">›</span>
@@ -625,15 +703,15 @@ export default function OrganizationPageAdmin() {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 pt-4 sm:pt-[22px] pb-8 sm:pb-12">
-        <div className="mb-4 sm:mb-[18px]" style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0 }}>
+      <div className="max-w-[1600px] w-full min-w-0 mx-auto px-3 sm:px-6 pt-4 sm:pt-[22px] pb-6 sm:pb-8">
+        <div className="shrink-0 mb-4 sm:mb-[18px]" style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0 }}>
           <h1 className="text-[17px] sm:text-[19px] font-bold text-slate-900 m-0 tracking-[-0.3px]" style={{ fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
           <p className="text-[11px] sm:text-xs text-slate-400 mt-1 mb-0">
             {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} top-level manager${(data?.managers || []).length !== 1 ? "s" : ""}`}
           </p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-5 sm:mb-[22px]">
+        <div className="shrink-0 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-4 sm:mb-5">
           <StatCard label="Organisation"  text={orgName}                                icon={Building2} accent="#0f172a" delay={60}  />
           <StatCard label="Admin name"    text={adminInfo?.name}                        icon={User}      accent="#334155" delay={95}  />
           <StatCard label="Department"    text={adminInfo?.department ? getDepartmentName(adminInfo.department) : undefined} icon={Users}     accent="#475569" delay={130} />
@@ -641,13 +719,14 @@ export default function OrganizationPageAdmin() {
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
-          <div className="mb-3.5 px-3 sm:px-3.5 py-2.5 rounded-lg bg-yellow-100 border border-yellow-200 text-[12px] text-amber-800 flex items-center gap-2 flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
+          <div className="shrink-0 mb-3.5 px-3 sm:px-3.5 py-2.5 rounded-lg bg-yellow-100 border border-yellow-200 text-[12px] text-amber-800 flex items-center gap-2 flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
             <Search size={13} className="flex-shrink-0" />No results for <strong className="ml-0.5 break-all">"{searchQuery}"</strong>
           </div>
         )}
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden" style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0 }}>
-          <div className="px-3 sm:px-4 py-2.5 sm:py-[11px] border-b border-slate-100 flex items-center justify-between bg-[#fafafa] flex-wrap gap-2">
+        {/* Full hierarchy block: width is capped to the page, extra width scrolls INSIDE this block */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden" style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0 }}>
+          <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-[11px] border-b border-slate-100 flex items-center justify-between bg-[#fafafa] flex-wrap gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
               <Crown size={13} style={{ color: "#94a3b8" }} className="flex-shrink-0" />
               <span className="text-[12px] font-semibold text-slate-600 flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
@@ -660,9 +739,42 @@ export default function OrganizationPageAdmin() {
             </div>
           </div>
 
-          <div ref={chartRef} className="sc bg-white px-4 sm:px-10 py-7 sm:py-9" style={{ overflowX: "auto" }}>
-            <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
+          <div
+            data-org-scroll
+            ref={scrollRef}
+            onScroll={() => syncScroll(scrollRef.current, barRef.current)}
+            className="sc-hide bg-white"
+            style={{ width: "100%", maxWidth: "100%", overflowX: "auto", overflowY: "hidden" }}
+          >
+            <div
+              ref={exportRef}
+              className="bg-white px-4 sm:px-10 py-7 sm:py-9"
+              style={{ width: "max-content", minWidth: "100%" }}
+            >
+              <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
+            </div>
           </div>
+        </div>
+
+        {/* Horizontal scrollbar: fixed at the bottom of the screen, never moves while the page scrolls */}
+        <div
+          ref={barRef}
+          className="hbar"
+          onScroll={() => syncScroll(barRef.current, scrollRef.current)}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            bottom: 0,
+            width: pos.width,
+            height: 14,
+            zIndex: 40,
+            overflowX: "auto",
+            overflowY: "hidden",
+            display: bar.show && pos.visible ? "block" : "none",
+            background: "transparent",
+          }}
+        >
+          <div style={{ width: bar.sw, height: 1 }} />
         </div>
       </div>
 
