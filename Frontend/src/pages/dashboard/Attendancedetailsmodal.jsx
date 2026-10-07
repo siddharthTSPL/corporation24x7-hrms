@@ -199,7 +199,7 @@ function TodayRow({ p }) {
         </span>
       </td>
       <td className="py-2.5 pr-3 pl-2 text-[11px] text-gray-400 whitespace-nowrap">
-        {p.source === "face" ? "🤳 Face" : p.source === "live" ? "📍 System" : "—"}
+        {p.source === "face" ? "🤳 Face" : p.source === "field" ? "📍 Field Duty" : p.source === "live" ? "📍 System" : "—"}
       </td>
     </tr>
   );
@@ -383,7 +383,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
           { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
           { key: "status", label: "Status", format: (r) => resolveTodayMeta(r).label },
-          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "live" ? "System" : "—") },
+          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "field" ? "Field Duty" : r.source === "live" ? "System" : "—") },
           { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
           { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
         ],

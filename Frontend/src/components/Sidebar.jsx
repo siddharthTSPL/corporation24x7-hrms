@@ -132,7 +132,6 @@ const employeeMenu = [
   { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place.", permissionGroup: ["navigation.can_view_self_service"] },
   { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.", permissionGroup: ["leave.can_apply_leave"],
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Applying for leave", content: "Open the \"Apply Leave\" tab to submit a request, or \"Leave Balance\" to see how many days you have left." } },
-  { name: "My Payslips",  path: "/self-service",          icon: <FaFileInvoiceDollar />, blurb: "View and download your own payslips.", permissionGroup: ["payroll.can_view_own_payslips"] },
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
   { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart.", permissionGroup: ["navigation.can_view_organisation"] },
@@ -171,6 +170,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
+  const isCoAdmin = role === "admin" && auth?.data?.user?.reporting_manager_model === "Admin";
 
   const can = usePermissionStore((state) => state.can);
   const permRole = usePermissionStore((state) => state.role);
@@ -369,7 +369,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
       {role === "superadmin"
         ? "Super Admin"
         : role === "admin"
-        ? "Admin"
+        ? isCoAdmin ? "Co-Admin" : "Admin"
         : role === "manager"
         ? "Manager"
         : role === "employee"

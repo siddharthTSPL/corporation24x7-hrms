@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAttendanceTracker } from "./useattendanctracker";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
@@ -229,7 +230,7 @@ function AlreadyDoneScreen({ attendance }) {
         <>
           <div className="flex gap-1.5 justify-center flex-wrap w-full">
             <span className="text-[11px] font-semibold rounded-full px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500">
-              {attendance.source === "face" ? "🤳 Checked in via Face Attendance" : "📍 Checked in via System"}
+              {attendance.source === "face" ? "🤳 Checked in via Face Attendance" : attendance.source === "field" ? "📍 Checked in via Field Duty" : "📍 Checked in via System"}
               {attendance.checkInGate ? ` · ${attendance.checkInGate}` : ""}
             </span>
             {attendance.checkOut && (
@@ -238,6 +239,8 @@ function AlreadyDoneScreen({ attendance }) {
                   ? "⏱️ Auto checked-out (overtime limit reached)"
                   : attendance.source === "face"
                     ? "🤳 Checked out via Face Attendance"
+                    : attendance.source === "field"
+                      ? "📍 Checked out via Field Duty"
                     : "📍 Checked out via System"}
                 {attendance.checkOutGate ? ` · ${attendance.checkOutGate}` : ""}
               </span>
@@ -284,6 +287,7 @@ function AlreadyDoneScreen({ attendance }) {
 }
 
 export default function AttendancePage() {
+  const navigate = useNavigate();
   const { data: auth,      isLoading: authLoading  } = useAuth();
   const { data: todayData, isLoading: todayLoading } = useTodayAttendance();
 
@@ -481,6 +485,25 @@ export default function AttendancePage() {
             <p className="m-0 text-[13px] text-gray-500">
               You checked in at {formatTime(att.checkIn)}{att.checkInGate ? ` · ${att.checkInGate}` : ""}. Please use the Face Kiosk to check out too — System (this app) can't act on this record.
             </p>
+          </div>
+        </div>
+        <style>{fonts}</style>
+      </div>
+    );
+  }
+
+  if (todayData?.fieldDutyOnly && !todayData?.isCheckedOut) {
+    return (
+      <div className="min-h-screen bg-white" style={{ fontFamily: "'Sora', sans-serif" }}>
+        <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+          <BrandStrip />
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-3 shadow-sm text-center">
+            <div className="text-5xl">📍</div>
+            <h2 className="m-0 text-lg font-bold text-gray-900">Attendance is managed by Field Duty</h2>
+            <p className="m-0 text-[13px] text-gray-500">Use Field Duty to continue tracking or check out. This attendance page cannot change your field session.</p>
+            <button type="button" onClick={() => navigate("/field-operations")} className="bg-[#7B1C3E] text-white border-none rounded-xl px-4 py-2.5 font-bold text-sm cursor-pointer">
+              Open Field Duty
+            </button>
           </div>
         </div>
         <style>{fonts}</style>

@@ -63,6 +63,7 @@ const STATUS_META = {
   draft:                     { label: "Draft",           color: "text-gray-500",    bg: "bg-gray-100",     dot: "bg-gray-400"    },
   pending_manager:           { label: "Pending Manager", color: "text-amber-600",   bg: "bg-amber-50",     dot: "bg-amber-500"   },
   pending_reporting_manager: { label: "Pending Review",  color: "text-amber-600",   bg: "bg-amber-50",     dot: "bg-amber-500"   },
+  pending_coadmin:           { label: "Pending Co-Admin", color: "text-purple-600", bg: "bg-purple-50",    dot: "bg-purple-500"  },
   pending_admin:             { label: "Pending Admin",   color: "text-blue-600",    bg: "bg-blue-50",      dot: "bg-blue-500"    },
   pending_superadmin:        { label: "Pending SA",      color: "text-purple-600",  bg: "bg-purple-50",    dot: "bg-purple-500"  },
   approved:                  { label: "Approved",        color: "text-emerald-600", bg: "bg-emerald-50",   dot: "bg-emerald-500" },
@@ -767,7 +768,7 @@ export default function EmployeeTimesheet() {
   const canSubmit = !currentWeekSheet || ["draft", "rejected"].includes(currentWeekSheet?.status);
   const isPendingOrApproved = currentWeekSheet && !["draft", "rejected"].includes(currentWeekSheet?.status);
   const canRecall = currentWeekSheet &&
-    ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
+    ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   const openJobDetail = (jobId) => {
     setSelectedJobId(jobId);
@@ -1052,7 +1053,7 @@ export default function EmployeeTimesheet() {
               </div>
             ) : (
               timesheets.map((ts) => {
-                const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
+                const isPending = ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"].includes(ts.status);
                 return (
                   <div key={ts._id} className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
