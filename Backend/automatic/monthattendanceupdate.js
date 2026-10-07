@@ -47,7 +47,7 @@ const hasApprovedLeave = async (employeeId, date, role, { excludeLwp = false } =
   } else if (role === "admin") {
     leave = await AdminLeave.findOne({
       admin: id,
-      status: "approved_superadmin",
+      status: { $in: ["approved_reporting_manager", "approved_superadmin"] },
       startDate: { $lte: checkDate },
       endDate:   { $gte: checkDate },
       ...leaveTypeFilter,

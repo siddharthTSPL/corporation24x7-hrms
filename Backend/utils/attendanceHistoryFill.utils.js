@@ -29,7 +29,7 @@ const ROLE_CONFIG = {
   },
   admin: {
     Model: Admin, onModel: "Admin", LeaveModel: AdminLeave, leaveField: "admin",
-    approved: ["approved_superadmin"],
+    approved: ["approved_reporting_manager", "approved_superadmin"],
   },
 };
 

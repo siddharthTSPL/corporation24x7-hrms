@@ -94,7 +94,7 @@ const loadApprovedLeaveRanges = async () => {
       .select("employee startDate endDate lwpDays").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("manager startDate endDate lwpDays").lean(),
-    AdminLeave.find({ status: "approved_superadmin", leaveType: { $ne: "lwp" } })
+    AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] }, leaveType: { $ne: "lwp" } })
       .select("admin startDate endDate lwpDays").lean(),
   ]);
 
@@ -144,7 +144,7 @@ const loadAllApprovedLeaveRangesWithType = async () => {
       .select("employee startDate endDate lwpDays leaveType").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] } })
       .select("manager startDate endDate lwpDays leaveType").lean(),
-    AdminLeave.find({ status: "approved_superadmin" })
+    AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] } })
       .select("admin startDate endDate lwpDays leaveType").lean(),
   ]);
 
@@ -213,7 +213,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
       Attendance.find({ date: { $gte: sinceDate }, checkOut: { $exists: true } }).select("employee role").lean(),
       Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
       ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("manager").lean(),
-      AdminLeave.find({ status: "approved_superadmin", approvedAt: { $gte: sinceDate } }).select("admin").lean(),
+      AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] }, approvedAt: { $gte: sinceDate } }).select("admin").lean(),
     ]);
 
     scopeEmployeeRoles = new Set();
@@ -249,7 +249,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
   }
 
   if (opts.employeeId) {
-    scopeEmployeeRoles = new Set([`${opts.employeeId}_employee`]);
+    scopeEmployeeRoles = new Set([`${opts.employeeId}_${opts.role || "employee"}`]);
     const nowIst = getISTDateParts(new Date());
     const prevIst = nowIst.month === 1
       ? { year: nowIst.year - 1, month: 12 }
@@ -546,7 +546,18 @@ module.exports = { recomputeSummaries };
 if (require.main === module) {
   mongoose.connect(process.env.LINK)
     .then(async () => {
-      await recomputeSummaries();
+      const empArg = process.argv.find((a) => a.startsWith("--employee="));
+      const roleArg = process.argv.find((a) => a.startsWith("--role="));
+      const monthsArg = process.argv.find((a) => a.startsWith("--months="));
+      if (empArg) {
+        await recomputeSummaries(CLI_APPLY, null, {
+          employeeId: empArg.split("=")[1],
+          role: roleArg ? roleArg.split("=")[1] : "employee",
+          months: monthsArg ? monthsArg.split("=")[1].split(",") : undefined,
+        });
+      } else {
+        await recomputeSummaries();
+      }
       process.exit(0);
     })
     .catch((err) => {

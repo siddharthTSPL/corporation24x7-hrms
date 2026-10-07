@@ -60,6 +60,16 @@ export const summarizeDays = (rows) => {
   (rows || []).forEach((r) => {
     const b = dayBucket(r);
     s.totalDays += 1;
+    if (r && isHalfDayLeave(r.leaveType) && ["half_day", "absent", "leave"].includes(r.status)) {
+      const paidLeave = r.leaveType !== "lwp" && !r.isLwpDay;
+      const worked = r.status === "half_day";
+      s.present += 0.5;
+      if (paidLeave && worked) s.paidLeave += 0.5;
+      else s.absent += 0.5;
+      s.paidDays += BUCKET_VALUE[b] ?? 0;
+      if (r.source === "timesheet") s.timesheetDays += 1;
+      return;
+    }
     if (b === "present") s.present += 1;
     else if (b === "week_off") s.weekOff += 1;
     else if (b === "paid_leave") s.paidLeave += 1;

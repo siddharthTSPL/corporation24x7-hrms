@@ -16,7 +16,7 @@ const TIMESHEET_MODELS = ["User", "Manager", "Admin"];
 const LEAVE_CONFIG = {
   User: { Model: Leave, field: "employee", statuses: ["approved_manager", "approved_admin"] },
   Manager: { Model: ManagerLeave, field: "manager", statuses: ["approved_reporting_manager", "approved_admin"] },
-  Admin: { Model: AdminLeave, field: "admin", statuses: ["approved_superadmin"] },
+  Admin: { Model: AdminLeave, field: "admin", statuses: ["approved_reporting_manager", "approved_superadmin"] },
 };
 
 const isTimesheetBasis = (structure, employeeModel, month, year) => {

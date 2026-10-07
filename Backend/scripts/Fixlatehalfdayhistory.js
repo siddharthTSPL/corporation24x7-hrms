@@ -91,7 +91,7 @@ const fixLateRule = async (rangeStart, rangeEndExclusive) => {
 const LEAVE_SOURCES = [
   { Model: Leave, field: "employee", approved: ["approved_manager", "approved_admin"], model: "User" },
   { Model: ManagerLeave, field: "manager", approved: ["approved_reporting_manager", "approved_admin"], model: "Manager" },
-  { Model: AdminLeave, field: "admin", approved: ["approved_superadmin"], model: "Admin" },
+  { Model: AdminLeave, field: "admin", approved: ["approved_reporting_manager", "approved_superadmin"], model: "Admin" },
 ];
 const BUCKET = { el: "EL", half_day_el: "EL", sl: "SL", half_day_sl: "SL" };
 

@@ -57,6 +57,8 @@ const adminLeaveSchema = new mongoose.Schema(
       min: 0.5,
     },
 
+    lwpDays: { type: Number, default: 0 },
+
     reason: {
       type: String,
       required: true,
