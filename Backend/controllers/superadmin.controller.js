@@ -2426,7 +2426,7 @@ const getAttendanceHistory = async (req, res, next) => {
       employee: employeeId,
       date: { $gte: rangeStart, $lte: rangeEnd },
     })
-      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes lateCountInMonth latePenalty overtimeMinutes checkoutRemark checkInGate checkOutGate")
       .sort({ date: -1 })
       .lean();
 
@@ -2441,6 +2441,8 @@ const getAttendanceHistory = async (req, res, next) => {
       idleMinutes: r.idleMinutes ?? 0,
       isLate: !!r.isLate,
       lateMinutes: r.lateMinutes ?? 0,
+      lateCountInMonth: r.lateCountInMonth ?? 0,
+      latePenalty: !!r.latePenalty,
       overtimeMinutes: r.overtimeMinutes ?? 0,
       checkoutRemark: r.checkoutRemark || null,
       checkInGate: r.checkInGate || null,
