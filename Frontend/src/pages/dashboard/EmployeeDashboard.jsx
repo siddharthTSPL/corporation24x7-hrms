@@ -740,7 +740,22 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} isCheckedIn={isCheckedIn} isCheckedOut={isCheckedOut} myAtt={myAtt} checkinGate={checkinGate} onCheckIn={()=>navigate("/mark-attendance")} />
+        {calMeta?.today?.fieldDutyOnly ? (
+          <div className="rounded-2xl bg-gradient-to-br from-[#730042] to-[#a0004a] p-1 text-[#f9f8f2] shadow-[0_4px_20px_rgba(115,0,66,0.2)] sm:p-5 mb-4">
+            <p className="m-0 text-[10px] font-medium uppercase tracking-wide text-white/65">{new Date().toLocaleDateString("en-IN", { weekday: "long" })}</p>
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="m-0 text-lg font-bold sm:text-xl" style={{ fontFamily:"'Lora',serif" }}>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+                <p className="m-0 mt-1 text-xs text-white/75">Record today's attendance from Field Duty.</p>
+              </div>
+              <button type="button" onClick={() => navigate("/field-operations")} className="w-full shrink-0 rounded-xl border border-white/40 bg-white px-4 py-2.5 text-sm font-semibold text-[#730042] shadow-sm hover:bg-white/90 sm:w-auto mb-3">
+                Open Field Duty
+              </button>
+            </div>
+          </div>
+        ) : (
+          <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} isCheckedIn={isCheckedIn} isCheckedOut={isCheckedOut} myAtt={myAtt} checkinGate={checkinGate} onCheckIn={()=>navigate("/mark-attendance")} />
+        )}
 
         {/* Top 4 Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">

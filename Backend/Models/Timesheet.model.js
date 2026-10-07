@@ -76,6 +76,7 @@ const timesheetSchema = new mongoose.Schema(
         "draft",
         "pending_manager",
         "pending_reporting_manager",
+        "pending_coadmin",
         "pending_admin",
         "pending_superadmin",
         "approved",

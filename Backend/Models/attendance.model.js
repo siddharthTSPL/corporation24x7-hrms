@@ -129,9 +129,15 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "agent", "face"],
+      enum: ["manual", "agent", "face", "field"],
       default: "manual",
     },
+    fieldDutySession: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FieldDutySession",
+      default: null,
+    },
+    fieldSummarySyncedAt: { type: Date, default: null },
     checkoutRemark: {
       type: String,
       enum: ["on_time", "overtime", "early_checkout", "auto_overtime", "missed_checkout", null],

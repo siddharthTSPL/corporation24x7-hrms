@@ -491,6 +491,11 @@ const checkout = async (req, res) => {
         message: "You checked in via Face Attendance. Please use Face Attendance to check out too.",
         reason: "checked_in_by_face",
       });
+    if (attendance.source === "field")
+      return res.status(400).json({
+        message: "You checked in through Field Duty. Please check out from the Field Duty page too.",
+        reason: "checked_in_by_field_duty",
+      });
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
@@ -571,10 +576,21 @@ const getToday = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
+    const [onFieldTeam, individualFieldAssignment] = user.role === "employee"
+      ? await Promise.all([
+          FieldTeam.exists({ organisation_id, members: userId, active: true }),
+          FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+        ])
+      : [null, null];
     const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id }).lean();
+    const fieldDutyOnly = Boolean(
+      onFieldTeam ||
+      individualFieldAssignment ||
+      (attendance?.source === "field" && !attendance?.checkOut),
+    );
 
     if (!attendance)
-      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
+      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false, fieldDutyOnly });
 
     res.json({
       attendance: {
@@ -584,6 +600,7 @@ const getToday = async (req, res) => {
       },
       isCheckedIn: !attendance.checkOut && !!attendance.checkIn && attendance.source !== "agent",
       isCheckedOut: !!attendance.checkOut,
+      fieldDutyOnly,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -816,10 +833,22 @@ const getCalendarMeta = async (req, res) => {
       date: today0,
       organisation_id,
     }).select("source checkOut checkIn").lean();
+    const [onFieldTeam, individualFieldAssignment] = user.role === "employee"
+      ? await Promise.all([
+          FieldTeam.exists({ organisation_id, members: userId, active: true }),
+          FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+        ])
+      : [null, null];
+    const fieldDutyOnly = Boolean(
+      onFieldTeam ||
+      individualFieldAssignment ||
+      (todayAttendance?.source === "field" && !todayAttendance?.checkOut),
+    );
     const checkedInByFace = todayAttendance?.source === "face" && !todayAttendance?.checkOut;
 
     let disabledReason = null;
-    if (todayHoliday.isHoliday) disabledReason = "holiday";
+    if (fieldDutyOnly) disabledReason = "field_duty_only";
+    else if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
     else if (checkedInByFace) disabledReason = "checked_in_by_face";
     else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
@@ -843,7 +872,8 @@ const getCalendarMeta = async (req, res) => {
         },
         withinShiftWindow,
         isVeryLate: checkinTooLate,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
+        fieldDutyOnly,
+        canCheckIn: !fieldDutyOnly && !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
         disabledReason,
         checkedInByFace,
         faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,

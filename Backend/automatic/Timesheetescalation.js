@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const Timesheet = require("../Models/Timesheet.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const { resolveDefaultAdminHandler } = require("../utils/approvalFlow.utils");
 
 const ESCALATION_HOURS_THRESHOLD = 48;
 const MAX_ESCALATION_LEVEL = 3;
@@ -11,6 +12,19 @@ const PENDING_STATUSES = [
   "pending_admin",
   "pending_superadmin",
 ];
+
+const resolveAdminStage = async (adminId, organisation_id) => {
+  const handler = await resolveDefaultAdminHandler(adminId, organisation_id);
+  const targetAdmin = await Admin.findOne({ _id: handler, organisation_id })
+    .select("reporting_manager_model")
+    .lean();
+  return {
+    handler,
+    status: targetAdmin?.reporting_manager_model === "Admin"
+      ? "pending_coadmin"
+      : "pending_admin",
+  };
+};
 
 const escalateStuckTimesheets = async () => {
   try {
@@ -39,16 +53,23 @@ const escalateStuckTimesheets = async () => {
         }
 
         timesheet.handlerChain.push(timesheet.currentHandler);
-        timesheet.currentHandler = manager.reporting_manager;
-        timesheet.currentHandlerModel = manager.reporting_manager_model;
-        timesheet.status =
-          manager.reporting_manager_model === "Admin"
-            ? "pending_admin"
-            : "pending_reporting_manager";
+        if (manager.reporting_manager_model === "Admin") {
+          const adminStage = await resolveAdminStage(
+            manager.reporting_manager,
+            timesheet.organisation_id,
+          );
+          timesheet.currentHandler = adminStage.handler;
+          timesheet.currentHandlerModel = "Admin";
+          timesheet.status = adminStage.status;
+        } else {
+          timesheet.currentHandler = manager.reporting_manager;
+          timesheet.currentHandlerModel = manager.reporting_manager_model;
+          timesheet.status = "pending_reporting_manager";
+        }
 
       } else if (timesheet.currentHandlerModel === "Admin") {
         const admin = await Admin.findOne({ _id: timesheet.currentHandler })
-          .select("reporting_manager")
+          .select("reporting_manager reporting_manager_model")
           .lean();
 
         if (!admin?.reporting_manager) {
@@ -58,8 +79,12 @@ const escalateStuckTimesheets = async () => {
 
         timesheet.handlerChain.push(timesheet.currentHandler);
         timesheet.currentHandler = admin.reporting_manager;
-        timesheet.currentHandlerModel = "SuperAdmin";
-        timesheet.status = "pending_superadmin";
+        timesheet.currentHandlerModel = admin.reporting_manager_model;
+        timesheet.status = admin.reporting_manager_model === "Admin"
+          ? "pending_admin"
+          : admin.reporting_manager_model === "Manager"
+            ? "pending_reporting_manager"
+            : "pending_superadmin";
 
       } else {
         continue;

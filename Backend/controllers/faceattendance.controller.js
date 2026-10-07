@@ -5,6 +5,7 @@ const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
 const FieldTeam = require("../Models/fieldTeam.model");
+const FieldAssignment = require("../Models/fieldAssignment.model");
 const { updateSummary } = require("../automatic/monthattendanceupdate");
 const { computeLateStanding, applyLatePenaltyToStatus, refreshLateStanding, lateForgiveMinutes } = require("../utils/Laterule.utils");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
@@ -156,12 +157,19 @@ const scanFace = async (req, res) => {
         .json({ message: "Matched employee record no longer exists" });
 
     if (best.onModel === "User") {
-      const onFieldTeam = await FieldTeam.exists({
-        organisation_id,
-        members: best.employee,
-        active: true,
-      });
-      if (onFieldTeam)
+      const [onFieldTeam, individualFieldAssignment] = await Promise.all([
+        FieldTeam.exists({
+          organisation_id,
+          members: best.employee,
+          active: true,
+        }),
+        FieldAssignment.exists({
+          organisation_id,
+          employee: best.employee,
+          active: true,
+        }),
+      ]);
+      if (onFieldTeam || individualFieldAssignment)
         return res.status(409).json({
           message:
             "This employee is assigned to field work and checks in from the Field Duty app, not the kiosk.",
@@ -187,6 +195,13 @@ const scanFace = async (req, res) => {
       date: today,
       organisation_id,
     });
+
+    if (attendance?.source === "field" && !attendance.checkOut)
+      return res.status(409).json({
+        message:
+          "This employee started attendance through Field Duty. They must check out from the Field Duty app.",
+        reason: "checked_in_by_field_duty",
+      });
 
     // No record yet, OR only a background desktop-agent ping exists.
     // An "agent" record was never a real, window-validated check-in, so

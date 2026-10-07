@@ -4394,7 +4394,7 @@ const getTodayCheckins = async (req, res) => {
     lat: c.latitude ?? null,
     lng: c.longitude ?? null,
     hasLocation: c.latitude != null && c.longitude != null,
-    source: c.source === "face" ? "face" : "live",
+    source: c.source === "face" ? "face" : c.source === "field" ? "field" : "live",
     checkIn: c.checkIn,
     checkedOut: !!c.checkOut,
   }));
@@ -4517,7 +4517,7 @@ const getAttendanceOverview = async (req, res, next) => {
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
           status,
-          source: r?.source === "face" ? "face" : r ? "live" : null,
+          source: r?.source === "face" ? "face" : r?.source === "field" ? "field" : r ? "live" : null,
           lat: r?.latitude ?? null,
           lng: r?.longitude ?? null,
           activeMinutes: r?.activeMinutes ?? 0,
@@ -4669,6 +4669,8 @@ const getAttendanceHistory = async (req, res, next) => {
       source:
         r.source === "face"
           ? "face"
+          : r.source === "field"
+          ? "field"
           : r.source === "agent"
           ? "agent"
           : "system",

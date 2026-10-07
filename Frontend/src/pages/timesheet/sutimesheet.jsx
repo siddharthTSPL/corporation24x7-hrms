@@ -62,6 +62,7 @@ const STATUS_STYLE = {
   draft:                     { tw: "text-gray-400 bg-gray-100 border-gray-200",              label: "Draft" },
   pending_manager:           { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Manager" },
   pending_reporting_manager: { tw: "text-amber-600 bg-amber-50 border-amber-200",            label: "Pending Review" },
+  pending_coadmin:           { tw: "text-purple-600 bg-purple-50 border-purple-200",         label: "Pending Co-Admin" },
   pending_admin:             { tw: "text-blue-600 bg-blue-50 border-blue-200",               label: "Pending Admin" },
   pending_superadmin:        { tw: "text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20", label: "Pending SA" },
   approved:                  { tw: "text-emerald-600 bg-emerald-50 border-emerald-200",      label: "Approved" },
@@ -675,7 +676,7 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
     return ws.getFullYear() === wss.getFullYear() && ws.getMonth() === wss.getMonth() && ws.getDate() === wss.getDate();
   });
   const canSubmit = !currentWeekSheet || ["draft", "rejected"].includes(currentWeekSheet?.status);
-  const canRecall = currentWeekSheet && ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
+  const canRecall = currentWeekSheet && ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   const handleCreateProject = async () => {
     await createProject.mutateAsync({ ...projectForm, default_hourly_rate: Number(projectForm.default_hourly_rate) || 0 });
