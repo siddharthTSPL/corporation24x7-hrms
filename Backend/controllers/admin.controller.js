@@ -501,7 +501,7 @@ const addmanager = async (req, res, next) => {
         newmanager.role || "manager",
         organisation_id,
         req.admin._id,
-        "Admin",
+        req.actorModel || "Admin",
         null,
         permissions
       ),
@@ -693,7 +693,7 @@ const addemployee = async (req, res, next) => {
         newuser.role || "employee",
         organisation_id,
         req.admin._id,
-        "Admin",
+        req.actorModel || "Admin",
         null,
         permissions
       ),
@@ -1358,7 +1358,7 @@ const promoteEmployeeToManager = async (req, res, next) => {
         newManager.role || "manager",
         organisation_id,
         req.admin._id,
-        "Admin",
+        req.actorModel || "Admin",
         session
       ),
       Document.updateMany(
@@ -2011,7 +2011,7 @@ const demoteManagerToEmployee = async (req, res, next) => {
         "employee",
         organisation_id,
         req.admin._id,
-        "Admin",
+        req.actorModel || "Admin",
         session
       ),
       Usermodel.updateMany(

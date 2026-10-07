@@ -1,11 +1,13 @@
 const express = require("express");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const anyRole = require("../middleware/auth/Planfeatureanyrole.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
 const fieldVisitPhotoUpload = require("../middleware/upload/Fieldvisitphoto.middleware");
 const bulkFileUpload = require("../middleware/upload/Bulkonboarding.middleware");
 const controller = require("../controllers/fieldOperations.controller");
 
 const router = express.Router();
+const torchxManagementAccess = adminDelegatedAccess("torchx_management");
 router.use(anyRole);
 
 router.get("/my-duty", asyncHandler(controller.myDuty));
@@ -43,8 +45,8 @@ router.patch(
   asyncHandler(controller.cancelActivity),
 );
 
-router.get("/settings", asyncHandler(controller.getSettings));
-router.patch("/settings", asyncHandler(controller.updateSettings));
+router.get("/settings", torchxManagementAccess, asyncHandler(controller.getSettings));
+router.patch("/settings", torchxManagementAccess, asyncHandler(controller.updateSettings));
 
 router.get("/overview", asyncHandler(controller.getOverview));
 router.get("/employees/:employeeId/route", asyncHandler(controller.getRoute));

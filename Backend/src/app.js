@@ -101,6 +101,8 @@ const singleSignInRouter = require('../routes/SingleSignIn.routes');
 const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
 const policyrouter = require('../routes/policy.route');
 const trainingRouter = require('../routes/training.routes');
+const overtimeRouter = require('../routes/overtime.routes');
+const orgTeamRouter = require('../routes/orgteam.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -144,6 +146,8 @@ app.use('/superadmin/analytics', analyticsrouter);
 // role under /policy/me). See routes/policy.route.js.
 app.use('/policy', policyrouter);
 app.use('/training', trainingRouter);
+app.use('/overtime', overtimeRouter);
+app.use('/org-teams', orgTeamRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

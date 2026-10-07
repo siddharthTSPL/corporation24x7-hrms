@@ -56,7 +56,7 @@ const LEAVE_TYPE_LABEL = {
   pl: "Paternity Leave",
   half_day_el: "Half Day EL",
   half_day_sl: "Half Day SL",
-  comp_off: "Comp Off",
+  comp_off: "Compensatory Leave",
   lwp: "LWP",
 };
 const leaveLabel = (code) => LEAVE_TYPE_LABEL[code] || code || "Leave";

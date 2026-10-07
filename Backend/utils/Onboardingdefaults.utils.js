@@ -33,6 +33,27 @@ const DEFAULT_PERMISSIONS = {
       can_view_candidates: true,
       can_add_candidate: true,
     },
+    leave: { can_apply_leave: true },
+    reimbursement: { can_submit_claim: true },
+    timesheet: { can_access: true },
+    review: { can_access: true },
+    navigation: {
+      can_view_dashboard: true,
+      can_view_self_service: true,
+      can_view_organisation: true,
+      can_view_settings: true,
+      can_view_policies: true,
+      can_view_training: true,
+      can_view_field_operations: true,
+    },
+    adminAccess: {
+      can_manage_policy_management: false,
+      can_manage_torchx_management: false,
+      can_manage_onboarding: false,
+      can_manage_timesheet_admin: false,
+      can_manage_asset_management: false,
+    },
+    payroll: { can_view_own_payslips: true, can_manage_payroll: false },
   },
   manager: {
     announcements: {
@@ -57,6 +78,27 @@ const DEFAULT_PERMISSIONS = {
       can_view_candidates: true,
       can_add_candidate: true,
     },
+    leave: { can_apply_leave: true },
+    reimbursement: { can_submit_claim: true },
+    timesheet: { can_access: true },
+    review: { can_access: true },
+    navigation: {
+      can_view_dashboard: true,
+      can_view_self_service: true,
+      can_view_organisation: true,
+      can_view_settings: true,
+      can_view_policies: true,
+      can_view_training: true,
+      can_view_field_operations: true,
+    },
+    adminAccess: {
+      can_manage_policy_management: false,
+      can_manage_torchx_management: false,
+      can_manage_onboarding: false,
+      can_manage_timesheet_admin: false,
+      can_manage_asset_management: false,
+    },
+    payroll: { can_view_own_payslips: true, can_manage_payroll: false },
   },
   employee: {
     announcements: {
@@ -82,6 +124,27 @@ const DEFAULT_PERMISSIONS = {
       can_view_candidates: false,
       can_add_candidate: false,
     },
+    leave: { can_apply_leave: true },
+    reimbursement: { can_submit_claim: true },
+    timesheet: { can_access: true },
+    review: { can_access: true },
+    navigation: {
+      can_view_dashboard: true,
+      can_view_self_service: true,
+      can_view_organisation: true,
+      can_view_settings: true,
+      can_view_policies: true,
+      can_view_training: true,
+      can_view_field_operations: true,
+    },
+    adminAccess: {
+      can_manage_policy_management: false,
+      can_manage_torchx_management: false,
+      can_manage_onboarding: false,
+      can_manage_timesheet_admin: false,
+      can_manage_asset_management: false,
+    },
+    payroll: { can_view_own_payslips: true, can_manage_payroll: false },
   },
 };
 
@@ -127,6 +190,38 @@ const mergePermissions = (role, overrides) => {
       can_view_candidates: overrides.recruitment?.can_view_candidates ?? defaults.recruitment.can_view_candidates,
       can_add_candidate: overrides.recruitment?.can_add_candidate ?? defaults.recruitment.can_add_candidate,
     },
+    leave: {
+      can_apply_leave: overrides.leave?.can_apply_leave ?? defaults.leave.can_apply_leave,
+    },
+    payroll: {
+      can_view_own_payslips: overrides.payroll?.can_view_own_payslips ?? defaults.payroll.can_view_own_payslips,
+      can_manage_payroll: overrides.payroll?.can_manage_payroll ?? defaults.payroll.can_manage_payroll,
+    },
+    reimbursement: {
+      can_submit_claim: overrides.reimbursement?.can_submit_claim ?? defaults.reimbursement.can_submit_claim,
+    },
+    timesheet: {
+      can_access: overrides.timesheet?.can_access ?? defaults.timesheet.can_access,
+    },
+    review: {
+      can_access: overrides.review?.can_access ?? defaults.review.can_access,
+    },
+    navigation: {
+      can_view_dashboard: overrides.navigation?.can_view_dashboard ?? defaults.navigation.can_view_dashboard,
+      can_view_self_service: overrides.navigation?.can_view_self_service ?? defaults.navigation.can_view_self_service,
+      can_view_organisation: overrides.navigation?.can_view_organisation ?? defaults.navigation.can_view_organisation,
+      can_view_settings: overrides.navigation?.can_view_settings ?? defaults.navigation.can_view_settings,
+      can_view_policies: overrides.navigation?.can_view_policies ?? defaults.navigation.can_view_policies,
+      can_view_training: overrides.navigation?.can_view_training ?? defaults.navigation.can_view_training,
+      can_view_field_operations: overrides.navigation?.can_view_field_operations ?? defaults.navigation.can_view_field_operations,
+    },
+    adminAccess: {
+      can_manage_policy_management: overrides.adminAccess?.can_manage_policy_management ?? defaults.adminAccess.can_manage_policy_management,
+      can_manage_torchx_management: overrides.adminAccess?.can_manage_torchx_management ?? defaults.adminAccess.can_manage_torchx_management,
+      can_manage_onboarding: overrides.adminAccess?.can_manage_onboarding ?? defaults.adminAccess.can_manage_onboarding,
+      can_manage_timesheet_admin: overrides.adminAccess?.can_manage_timesheet_admin ?? defaults.adminAccess.can_manage_timesheet_admin,
+      can_manage_asset_management: overrides.adminAccess?.can_manage_asset_management ?? defaults.adminAccess.can_manage_asset_management,
+    },
   };
 };
 
@@ -140,7 +235,20 @@ const assignDefaultPermissions = async (
   overrides
 ) => {
   const user_model = USER_MODEL_MAP[role] || "User";
-  const perms = mergePermissions(role, overrides);
+  const safeOverrides = granted_by_model === "User"
+    ? {
+        ...overrides,
+        adminAccess: {
+          can_manage_policy_management: false,
+          can_manage_torchx_management: false,
+          can_manage_onboarding: false,
+          can_manage_timesheet_admin: false,
+          can_manage_asset_management: false,
+        },
+        payroll: { ...overrides?.payroll, can_manage_payroll: false },
+      }
+    : overrides;
+  const perms = mergePermissions(role, safeOverrides);
 
   await PermissionModel.findOneAndUpdate(
     { user_id, user_model, organisation_id },

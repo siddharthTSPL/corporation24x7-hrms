@@ -348,7 +348,7 @@ const LEAVE_META = {
     dot: "#D97706",
   },
   comp_off: {
-    label: "Comp Off",
+    label: "Compensatory Leave",
     short: "CO",
     bg: "#F3E8FF",
     color: "#6B21A8",
@@ -2527,7 +2527,7 @@ const ApplyLeavePanel = ({ manager, showToast }) => {
     { value: "sl", label: "Sick Leave" },
     { value: "half_day_el", label: "Half Day EL" },
     { value: "half_day_sl", label: "Half Day SL" },
-    { value: "comp_off", label: "Compensatory Off (Comp Off)" },
+    { value: "comp_off", label: "Compensatory Leave" },
     { value: "lwp", label: "Leave Without Pay" },
     ...(showML ? [{ value: "ml", label: "Maternity Leave" }] : []),
     ...(showPL ? [{ value: "pl", label: "Paternity Leave" }] : []),

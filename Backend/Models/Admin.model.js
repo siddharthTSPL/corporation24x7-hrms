@@ -349,6 +349,19 @@ adminSchema.methods.resolveLeaveStatus = function ({
     : pendingManagerStatus;
 };
 
+
+// Onboarding hand-off: when a brand-new record is saved, tell the org's IT and
+// Accounts teams (if configured). See utils/Onboardingteams.utils.js.
+adminSchema.pre("save", function () {
+  this.$locals.__wasNew = this.isNew;
+});
+adminSchema.post("save", function (doc) {
+  if (doc.$locals && doc.$locals.__wasNew) {
+    doc.$locals.__wasNew = false;
+    require("../utils/Onboardingteams.utils").scheduleOnboardingTeamNotice("Admin", doc._id);
+  }
+});
+
 const AdminModel = mongoose.model("Admin", adminSchema);
 
 module.exports = AdminModel;

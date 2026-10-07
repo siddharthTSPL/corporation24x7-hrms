@@ -89,6 +89,7 @@ const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/Reimburse
 const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
 const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
 const ReimbursementSuperadmin = lazy(() => import("./pages/reimbursement/ReimbursementSuperadmin"));
+const Overtime = lazy(() => import("./pages/overtime/Overtime"));
 
 // NOTE: renamed to PascalCase — lowercase-first identifiers are
 // interpreted by JSX as native DOM tags (e.g. <adminmanagement />
@@ -237,50 +238,50 @@ function App() {
           >
             <Route path="/dashboard"                element={<Dashboard />} />
             <Route path="/training-admin" element={<ProtectedRoute allowedRoles={["admin"]}><TrainingPage /></ProtectedRoute>} />
-            <Route path="/training" element={<TrainingPage />} />
-            <Route path="/employee-dashboard"       element={<EmployeeDashboard />} />
+            <Route path="/training" element={<ProtectedRoute permission="navigation.can_view_training"><TrainingPage /></ProtectedRoute>} />
+            <Route path="/employee-dashboard"       element={<ProtectedRoute permission="navigation.can_view_dashboard"><EmployeeDashboard /></ProtectedRoute>} />
             <Route path="/manager-dashboard"        element={<Managerdashboard />} />
-            <Route path="/employee"                 element={<EmployeeTable />} />
+            <Route path="/employee"                 element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_onboarding"><EmployeeTable /></ProtectedRoute>} />
             <Route path="/leave-manager"            element={<ProtectedRoute><LeaveTablema /></ProtectedRoute>} />
-            <Route path="/leave-employee"           element={<ProtectedRoute><LeaveTableem /></ProtectedRoute>} />
+            <Route path="/leave-employee"           element={<ProtectedRoute permission="leave.can_apply_leave"><LeaveTableem /></ProtectedRoute>} />
             <Route path="/leave-admin"              element={<ProtectedRoute><LeaveTablead /></ProtectedRoute>} />
             <Route path="/leave"                    element={<LeaveTable />} />
             <Route path="/file"                     element={<File />} />
             <Route path="/file-employee"            element={<ProtectedRoute><Fileem /></ProtectedRoute>} />
             <Route path="/file-manager"             element={<ProtectedRoute><Filema /></ProtectedRoute>} />
             <Route path="/settings"                 element={<Set />} />
-            <Route path="/settings-employee"        element={<Setem />} />
-            <Route path="/settings-manager"         element={<Setma />} />
+            <Route path="/settings-employee"        element={<ProtectedRoute permission="navigation.can_view_settings"><Setem /></ProtectedRoute>} />
+            <Route path="/settings-manager"         element={<ProtectedRoute permission="navigation.can_view_settings"><Setma /></ProtectedRoute>} />
             <Route path="/organisation"             element={<Organisation />} />
-            <Route path="/organisation-employee"    element={<Organisationem />} />
-            <Route path="/organisation-manager"     element={<Organisationma />} />
+            <Route path="/organisation-employee"    element={<ProtectedRoute permission="navigation.can_view_organisation"><Organisationem /></ProtectedRoute>} />
+            <Route path="/organisation-manager"     element={<ProtectedRoute permission="navigation.can_view_organisation"><Organisationma /></ProtectedRoute>} />
             <Route path="/review-admin"             element={<ProtectedRoute planFeature="review"><Reviewad /></ProtectedRoute>} />
-            <Route path="/review-manager"           element={<ProtectedRoute planFeature="review"><Reviewma /></ProtectedRoute>} />
-            <Route path="/review-employee"          element={<ProtectedRoute planFeature="review"><Reviewem /></ProtectedRoute>} />
+            <Route path="/review-manager"           element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewma /></ProtectedRoute>} />
+            <Route path="/review-employee"          element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewem /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
-            <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
-            <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
-            <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
-            <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
+            <Route path="/admin-timesheet"          element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_timesheet_admin" planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
+            <Route path="/manager-timesheet"        element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
+            <Route path="/employee-timesheet"       element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_asset_management" planFeature="asset"><Adminasset /></ProtectedRoute>} />
             <Route
               path="/reimbursement-admin"
               element={<ProtectedRoute><ReimbursementAdmin /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-manager"
-              element={<ProtectedRoute><ReimbursementManager /></ProtectedRoute>}
+              element={<ProtectedRoute permission="reimbursement.can_submit_claim"><ReimbursementManager /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-employee"
-              element={<ProtectedRoute><ReimbursementEmployee /></ProtectedRoute>}
+              element={<ProtectedRoute permission="reimbursement.can_submit_claim"><ReimbursementEmployee /></ProtectedRoute>}
             />
 
-            {/* Restricted to admins only — payroll policy, CTC and payslips
-                are sensitive financial data */}
+            {/* Employees receive this page only when explicitly granted full
+                payroll management permission by their organisation admin. */}
             <Route
               path="/payroll"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="payroll.can_manage_payroll">
                   <Payroll />
                 </ProtectedRoute>
               }
@@ -302,7 +303,7 @@ function App() {
             <Route
               path="/admin-management"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_torchx_management">
                   <AdminManagement />
                 </ProtectedRoute>
               }
@@ -313,7 +314,7 @@ function App() {
             <Route
               path="/admin-policy-management"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_policy_management">
                   <PolicyManagement />
                 </ProtectedRoute>
               }
@@ -496,11 +497,12 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/field-operations" element={<FieldOperations />} />
+            <Route path="/field-operations" element={<ProtectedRoute permission="navigation.can_view_field_operations"><FieldOperations /></ProtectedRoute>} />
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
-            <Route path="/self-service"   element={<ProtectedRoute><SelfServicePortal /></ProtectedRoute>} />
-            <Route path="/my-policies"    element={<MyPolicies />} />
+            <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
+            <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
+            <Route path="/overtime"       element={<Overtime />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

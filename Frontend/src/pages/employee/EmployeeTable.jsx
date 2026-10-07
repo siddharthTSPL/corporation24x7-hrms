@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Country, State, City } from "country-state-city";
+import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import {
   FaEdit,
   FaTrash,
@@ -267,6 +268,27 @@ const EMP_DEFAULT_PERMISSIONS = {
     can_view_candidates: false,
     can_add_candidate: false,
   },
+  leave: { can_apply_leave: true },
+  reimbursement: { can_submit_claim: true },
+  timesheet: { can_access: true },
+  review: { can_access: true },
+  navigation: {
+    can_view_dashboard: true,
+    can_view_self_service: true,
+    can_view_organisation: true,
+    can_view_settings: true,
+    can_view_policies: true,
+    can_view_training: true,
+    can_view_field_operations: true,
+  },
+  adminAccess: {
+    can_manage_policy_management: false,
+    can_manage_torchx_management: false,
+    can_manage_onboarding: false,
+    can_manage_timesheet_admin: false,
+    can_manage_asset_management: false,
+  },
+  payroll: { can_view_own_payslips: true, can_manage_payroll: false },
 };
 
 const MGR_DEFAULT_PERMISSIONS = {
@@ -289,6 +311,27 @@ const MGR_DEFAULT_PERMISSIONS = {
     can_view_candidates: false,
     can_add_candidate: false,
   },
+  leave: { can_apply_leave: true },
+  reimbursement: { can_submit_claim: true },
+  timesheet: { can_access: true },
+  review: { can_access: true },
+  navigation: {
+    can_view_dashboard: true,
+    can_view_self_service: true,
+    can_view_organisation: true,
+    can_view_settings: true,
+    can_view_policies: true,
+    can_view_training: true,
+    can_view_field_operations: true,
+  },
+  adminAccess: {
+    can_manage_policy_management: false,
+    can_manage_torchx_management: false,
+    can_manage_onboarding: false,
+    can_manage_timesheet_admin: false,
+    can_manage_asset_management: false,
+  },
+  payroll: { can_view_own_payslips: true, can_manage_payroll: false },
 };
 
 const ADMIN_PERMISSIONS = {
@@ -311,6 +354,27 @@ const ADMIN_PERMISSIONS = {
     can_view_candidates: true,
     can_add_candidate: true,
   },
+  leave: { can_apply_leave: true },
+  reimbursement: { can_submit_claim: true },
+  timesheet: { can_access: true },
+  review: { can_access: true },
+  navigation: {
+    can_view_dashboard: true,
+    can_view_self_service: true,
+    can_view_organisation: true,
+    can_view_settings: true,
+    can_view_policies: true,
+    can_view_training: true,
+    can_view_field_operations: true,
+  },
+  adminAccess: {
+    can_manage_policy_management: false,
+    can_manage_torchx_management: false,
+    can_manage_onboarding: false,
+    can_manage_timesheet_admin: false,
+    can_manage_asset_management: false,
+  },
+  payroll: { can_view_own_payslips: true, can_manage_payroll: false },
 };
 
 const EMP_STEPS = [
@@ -1082,12 +1146,20 @@ function getDisabledKeys(roleType) {
       documents: ["can_view_all_documents"],
       tickets: ["can_resolve_ticket", "can_rate_ticket"],
       recruitment: ["can_view_candidates", "can_add_candidate"],
+      payroll: ["can_manage_payroll"],
+      adminAccess: [
+        "can_manage_policy_management",
+        "can_manage_torchx_management",
+        "can_manage_onboarding",
+        "can_manage_timesheet_admin",
+        "can_manage_asset_management",
+      ],
     };
   }
   return {};
 }
 
-function PermissionsPanel({ perms, onChange, roleType = "employee" }) {
+function PermissionsPanel({ perms, onChange, roleType = "employee", showAdminAccess = true }) {
   const disabledKeys = getDisabledKeys(roleType);
   const sections = [
     {
@@ -1128,10 +1200,62 @@ function PermissionsPanel({ perms, onChange, roleType = "employee" }) {
         { k: "can_add_candidate", label: "Add Candidate" },
       ],
     },
+    {
+      key: "leave",
+      label: "Leave",
+      fields: [{ k: "can_apply_leave", label: "Apply for Leave" }],
+    },
+    {
+      key: "payroll",
+      label: "Payroll",
+      fields: [
+        { k: "can_view_own_payslips", label: "View Own Payslips" },
+        { k: "can_manage_payroll", label: "Full Payroll Management" },
+      ],
+    },
+    {
+      key: "reimbursement",
+      label: "Reimbursements",
+      fields: [{ k: "can_submit_claim", label: "Submit and Track Own Claims" }],
+    },
+    {
+      key: "timesheet",
+      label: "Timesheet",
+      fields: [{ k: "can_access", label: "Access Timesheet" }],
+    },
+    {
+      key: "review",
+      label: "Performance Review",
+      fields: [{ k: "can_access", label: "View Reviews" }],
+    },
+    {
+      key: "navigation",
+      label: "Other Employee Menus",
+      fields: [
+        { k: "can_view_dashboard", label: "Dashboard" },
+        { k: "can_view_self_service", label: "Self Service Portal" },
+        { k: "can_view_organisation", label: "Organisation" },
+        { k: "can_view_settings", label: "Settings" },
+        { k: "can_view_policies", label: "My Policies" },
+        { k: "can_view_training", label: "Training" },
+        { k: "can_view_field_operations", label: "Field Operations" },
+      ],
+    },
+    {
+      key: "adminAccess",
+      label: "Admin Menu Access",
+      fields: [
+        { k: "can_manage_policy_management", label: "Policy Management" },
+        { k: "can_manage_torchx_management", label: "TorchX Management" },
+        { k: "can_manage_onboarding", label: "Onboarding and Employee Management" },
+        { k: "can_manage_timesheet_admin", label: "Admin Timesheet" },
+        { k: "can_manage_asset_management", label: "Asset Management" },
+      ],
+    },
   ];
   return (
     <div className="col-span-1 sm:col-span-2 space-y-3">
-      {sections.map((sec) => (
+      {sections.filter((sec) => showAdminAccess || sec.key !== "adminAccess").map((sec) => (
         <div
           key={sec.key}
           className="rounded-xl border border-[#F4C0D1] overflow-hidden"
@@ -1343,7 +1467,20 @@ function PermissionsDrawer({ userId, userModel, userRole, onClose }) {
   useEffect(() => {
     api
       .get(`permission/admin/${userModel}/${userId}`)
-      .then((r) => setPerms(r.data.data || r.data))
+      .then((r) => {
+        const saved = r.data.data || r.data;
+        setPerms({
+          ...defaultPerms,
+          ...saved,
+          leave: { ...defaultPerms.leave, ...saved.leave },
+          payroll: { ...defaultPerms.payroll, ...saved.payroll },
+          reimbursement: { ...defaultPerms.reimbursement, ...saved.reimbursement },
+          timesheet: { ...defaultPerms.timesheet, ...saved.timesheet },
+          review: { ...defaultPerms.review, ...saved.review },
+          navigation: { ...defaultPerms.navigation, ...saved.navigation },
+          adminAccess: { ...defaultPerms.adminAccess, ...saved.adminAccess },
+        });
+      })
       .catch(() => setPerms({ ...defaultPerms }))
       .finally(() => setLoading(false));
   }, [userId, userModel]);
@@ -1854,6 +1991,7 @@ function AccountSummaryDrawer({
   allEmployees,
   currentAdminId,
   onRefresh,
+  canManageAdminAccounts,
 }) {
   const isManager = userRole === "manager" || userRole === "senior_manager";
   const isAdmin =
@@ -2005,12 +2143,14 @@ function AccountSummaryDrawer({
           >
             <p className="text-sm font-bold text-[#730042]">Account Summary</p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowPermissions(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#730042] border border-[#F4C0D1] hover:bg-[#FBEAF0]"
-              >
-                <FaKey size={10} /> Permissions
-              </button>
+              {canManageAdminAccounts && (
+                <button
+                  onClick={() => setShowPermissions(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#730042] border border-[#F4C0D1] hover:bg-[#FBEAF0]"
+                >
+                  <FaKey size={10} /> Permissions
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-[#993556] hover:bg-[#FBEAF0]"
@@ -2460,31 +2600,35 @@ function AccountSummaryDrawer({
                         >
                           <FaArrowUp size={10} /> Promote to Manager
                         </button>
-                        <button
-                          onClick={() => {
-                            onPromoteToAdmin(person);
-                            onClose();
-                          }}
-                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90"
-                          style={{ background: "#92400E" }}
-                        >
-                          <FaArrowUp size={10} /> Promote to Admin
-                        </button>
+                        {canManageAdminAccounts && (
+                          <button
+                            onClick={() => {
+                              onPromoteToAdmin(person);
+                              onClose();
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90"
+                            style={{ background: "#92400E" }}
+                          >
+                            <FaArrowUp size={10} /> Promote to Admin
+                          </button>
+                        )}
                       </>
                     )}
                     {(userRole === "manager" ||
                       userRole === "senior_manager") && (
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            onPromoteToAdmin(person);
-                            onClose();
-                          }}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90"
-                          style={{ background: "#92400E" }}
-                        >
-                          <FaArrowUp size={10} /> To Admin
-                        </button>
+                        {canManageAdminAccounts && (
+                          <button
+                            onClick={() => {
+                              onPromoteToAdmin(person);
+                              onClose();
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90"
+                            style={{ background: "#92400E" }}
+                          >
+                            <FaArrowUp size={10} /> To Admin
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             onDemoteToEmployee(person);
@@ -2532,7 +2676,7 @@ function AccountSummaryDrawer({
           )}
         </div>
       </div>
-      {showPermissions && person && (
+      {canManageAdminAccounts && showPermissions && person && (
         <PermissionsDrawer
           userId={person._id}
           userModel={userModel}
@@ -2799,6 +2943,7 @@ function ActionMenu({
   onDemoteToManager,
   onDemoteToEmployee2,
   currentAdminId,
+  canManageAdminAccounts,
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -2940,28 +3085,32 @@ function ActionMenu({
                     >
                       <FaArrowUp size={10} /> Promote to Manager
                     </button>
-                    <button
-                      onClick={() => {
-                        onPromoteToAdmin(user);
-                        setOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]"
-                    >
-                      <FaArrowUp size={10} /> Promote to Admin
-                    </button>
+                    {canManageAdminAccounts && (
+                      <button
+                        onClick={() => {
+                          onPromoteToAdmin(user);
+                          setOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]"
+                      >
+                        <FaArrowUp size={10} /> Promote to Admin
+                      </button>
+                    )}
                   </>
                 )}
                 {isManager && !isAdmin && (
                   <>
-                    <button
-                      onClick={() => {
-                        onPromoteToAdmin(user);
-                        setOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]"
-                    >
-                      <FaArrowUp size={10} /> Promote to Admin
-                    </button>
+                    {canManageAdminAccounts && (
+                      <button
+                        onClick={() => {
+                          onPromoteToAdmin(user);
+                          setOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#92400E] hover:bg-[#FEF3C7]"
+                      >
+                        <FaArrowUp size={10} /> Promote to Admin
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         onDemoteToEmployee(user);
@@ -3146,6 +3295,7 @@ function MobileCard({
   onDemoteToManager,
   onDemoteToEmployee2,
   currentAdminId,
+  canManageAdminAccounts,
 }) {
   const effectiveType =
     u.type ||
@@ -3238,6 +3388,7 @@ function MobileCard({
               onDemoteToManager={onDemoteToManager}
               onDemoteToEmployee2={onDemoteToEmployee2}
               currentAdminId={currentAdminId}
+              canManageAdminAccounts={canManageAdminAccounts}
             />
           </div>
         </div>
@@ -3306,6 +3457,7 @@ function EmpStepFields({
   managersWithAdmin,   // ← add this
   perms,
   onPermChange,
+  showAdminAccess,
 }) {
   const { options: deptOptions } = useDepartmentOptions();
   if (step === 0)
@@ -3669,6 +3821,7 @@ function EmpStepFields({
           perms={perms}
           onChange={onPermChange}
           roleType="employee"
+          showAdminAccess={showAdminAccess}
         />
       </div>
     );
@@ -3684,6 +3837,7 @@ function MgrStepFields({
   managersWithAdmin,
   perms,
   onPermChange,
+  showAdminAccess,
 }) {
   const { options: deptOptions } = useDepartmentOptions();
   if (step === 0)
@@ -4048,6 +4202,7 @@ function MgrStepFields({
           perms={perms}
           onChange={onPermChange}
           roleType="manager"
+          showAdminAccess={showAdminAccess}
         />
       </div>
     );
@@ -4248,6 +4403,8 @@ function getErrorSummary(err) {
 }
 
 export default function EmployeeTable() {
+  const { data: actorAuth } = useAuth();
+  const canGrantAdminModules = ["admin", "senior_admin", "official"].includes(actorAuth?.role);
   const { options: deptOptions } = useDepartmentOptions();
   const [open, setOpen] = useState(false);
   const [openBulkOnboard, setOpenBulkOnboard] = useState(false);
@@ -4919,6 +5076,7 @@ export default function EmployeeTable() {
     onDemoteToManager: openDemoteAdminToMgr,
     onDemoteToEmployee2: openDemoteAdminToEmp,
     currentAdminId,
+    canManageAdminAccounts: canGrantAdminModules,
   };
 
   const inactiveCount = inactiveData?.count ?? 0;
@@ -5533,6 +5691,7 @@ export default function EmployeeTable() {
           allEmployees={allUsers}
           currentAdminId={currentAdminId}
           onRefresh={refetchList}
+          canManageAdminAccounts={canGrantAdminModules}
         />
       )}
 
@@ -5561,6 +5720,7 @@ export default function EmployeeTable() {
             managersWithAdmin={managersWithAdmin}
             perms={empPerms}
             onPermChange={handleEmpPermChange}
+            showAdminAccess={canGrantAdminModules}
           />
         </StepModal>
       )}
@@ -5590,6 +5750,7 @@ export default function EmployeeTable() {
             managersWithAdmin={managersWithAdmin}
             perms={mgrPerms}
             onPermChange={handleMgrPermChange}
+            showAdminAccess={canGrantAdminModules}
           />
         </StepModal>
       )}

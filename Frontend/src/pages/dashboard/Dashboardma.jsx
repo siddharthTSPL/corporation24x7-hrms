@@ -654,7 +654,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   const leaveLabel = {
     el: "Earned Leave", sl: "Sick Leave", pl: "Paternity Leave",
     ml: "Maternity Leave", cl: "Casual Leave", lwp: "Leave Without Pay",
-    comp_off: "Compensatory Off",
+    comp_off: "Compensatory Leave",
   half_day_el: "Half Day EL",
   half_day_sl: "Half Day SL",
 };
@@ -791,7 +791,7 @@ const LEAVE_TYPE_META = {
   ml: { label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
   cl: { label:"Casual", color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
   lwp:{ label:"LWP",       color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
-  comp_off:{ label:"Comp Off", color:"#6B21A8", bg:"rgba(107,33,168,0.08)" },
+  comp_off:{ label: "Compensatory Leave", color:"#6B21A8", bg:"rgba(107,33,168,0.08)" },
   half_day_el:{ label:"Half Day EL", color:"#065F46", bg:"rgba(6,95,70,0.08)" },
   half_day_sl:{ label:"Half Day SL", color:"#1E40AF", bg:"rgba(30,64,175,0.08)" },
 };

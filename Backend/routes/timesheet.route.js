@@ -8,6 +8,8 @@ const managerAuth = require("../middleware/auth/manager.middleware");
 const employeeAuth = require("../middleware/auth/employee.middleware");
 const anyRoleBase = require("../middleware/auth/Planfeatureanyrole.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const checkPermission = require("../middleware/auth/Checkpermission.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
 const jwt = require("jsonwebtoken");
 
 // Timesheet is one of the three plan-gated features (locked fully on the
@@ -15,6 +17,8 @@ const jwt = require("jsonwebtoken");
 // runs after auth so req.superAdmin/req.admin/req.manager/req.employee is
 // already populated.
 const timesheetPlanGate = restrictPlanFeature("timesheet");
+const timesheetPermissionGate = checkPermission("timesheet.can_access");
+const adminTimesheetAccess = adminDelegatedAccess("timesheet_admin");
 
 // Wraps a role-check middleware so that, once it succeeds (calls next()
 // with no error), the plan gate runs before control reaches the route
@@ -23,7 +27,10 @@ const timesheetPlanGate = restrictPlanFeature("timesheet");
 const withPlanGate = (authMiddleware) => (req, res, next) => {
   authMiddleware(req, res, (err) => {
     if (err) return next(err);
-    timesheetPlanGate(req, res, next);
+    timesheetPlanGate(req, res, (planErr) => {
+      if (planErr) return next(planErr);
+      timesheetPermissionGate(req, res, next);
+    });
   });
 };
 
@@ -46,6 +53,9 @@ const saOrAdminBase = (req, res, next) => {
     return adminAuth(req, res, next);
   if (decoded.role === "official" && decoded.adminid)
     return adminAuth(req, res, next);
+  if (decoded.role === "employee") {
+    return employeeAuth(req, res, (err) => err ? next(err) : adminTimesheetAccess(req, res, next));
+  }
 
   return res
     .status(403)
@@ -71,6 +81,9 @@ const saAdminOrManagerBase = (req, res, next) => {
   if (decoded.role === "official") {
     if (decoded.adminid) return adminAuth(req, res, next);
     if (decoded.managerid) return managerAuth(req, res, next);
+  }
+  if (decoded.role === "employee") {
+    return employeeAuth(req, res, (err) => err ? next(err) : adminTimesheetAccess(req, res, next));
   }
 
   return res

@@ -86,6 +86,7 @@ userrouter.post(
   "/review/respond",
   employeemiddleware,
   reviewPlanGate,
+  checkPermission("review.can_access"),
   asyncHandler(respondToMyReview),
 );
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));
@@ -104,6 +105,7 @@ userrouter.post(
 userrouter.post(
   "/applyleave",
   employeemiddleware,
+  checkPermission("leave.can_apply_leave"),
   leaveDocumentUpload.fields([
     { name: "supportingDocument", maxCount: 1 },
     { name: "document", maxCount: 1 },

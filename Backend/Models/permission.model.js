@@ -29,7 +29,7 @@ const permissionSchema = new mongoose.Schema(
     granted_by_model: {
       type: String,
       required: true,
-      enum: ["SuperAdmin", "Admin"],
+      enum: ["SuperAdmin", "Admin", "User"],
     },
 
     announcements: {
@@ -56,6 +56,45 @@ const permissionSchema = new mongoose.Schema(
       can_create_hiring_requisition: { type: Boolean, default: false },
       can_view_candidates: { type: Boolean, default: false },
       can_add_candidate: { type: Boolean, default: false },
+    },
+
+    leave: {
+      can_apply_leave: { type: Boolean, default: true },
+    },
+
+    reimbursement: {
+      can_submit_claim: { type: Boolean, default: true },
+    },
+
+    timesheet: {
+      can_access: { type: Boolean, default: true },
+    },
+
+    review: {
+      can_access: { type: Boolean, default: true },
+    },
+
+    navigation: {
+      can_view_dashboard: { type: Boolean, default: true },
+      can_view_self_service: { type: Boolean, default: true },
+      can_view_organisation: { type: Boolean, default: true },
+      can_view_settings: { type: Boolean, default: true },
+      can_view_policies: { type: Boolean, default: true },
+      can_view_training: { type: Boolean, default: true },
+      can_view_field_operations: { type: Boolean, default: true },
+    },
+
+    adminAccess: {
+      can_manage_policy_management: { type: Boolean, default: false },
+      can_manage_torchx_management: { type: Boolean, default: false },
+      can_manage_onboarding: { type: Boolean, default: false },
+      can_manage_timesheet_admin: { type: Boolean, default: false },
+      can_manage_asset_management: { type: Boolean, default: false },
+    },
+
+    payroll: {
+      can_view_own_payslips: { type: Boolean, default: true },
+      can_manage_payroll: { type: Boolean, default: false },
     },
   },
   { timestamps: true }
