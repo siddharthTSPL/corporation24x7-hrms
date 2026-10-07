@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
-import { FaTimes, FaClock, FaCalendarAlt, FaDownload, FaUsers } from "react-icons/fa";
-import { DAY_BUCKET_LABEL, dayBucket, downloadCsv, paidDayValue, summarizeDays, summaryTableRows, withTotalRow } from "./Exportcsv";
+import { useMemo, useState } from "react";
+import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter, FaUsers } from "react-icons/fa";
+import { DAY_BUCKET_LABEL, dayBucket, downloadCsv, paidDayValue, summarizeDays, summaryFooterRows, summaryTableRows, withTotalRow } from "./Exportcsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -24,17 +24,48 @@ const toInputDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
+const CONCURRENCY = 5;
+
+async function runWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function runner() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  const runners = Array.from({ length: Math.min(limit, items.length) }, runner);
+  await Promise.all(runners);
+  return results;
+}
+
 const STATUS_META = {
   present: { label: "Present", color: "#16A34A", bg: "#DCFCE7" },
   half_day: { label: "Half Day", color: "#B8760A", bg: "#FEF3C7" },
   absent: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
+  week_off: { label: "Week Off", color: "#475569", bg: "#F1F5F9" },
+  holiday: { label: "Holiday", color: "#0F766E", bg: "#CCFBF1" },
+  leave: { label: "Leave", color: "#6B21A8", bg: "#F3E8FF" },
 };
 
-const SOURCE_LABEL = {
-  face: "Face",
-  agent: "Agent",
-  system: "System",
-  timesheet: "Timesheet",
+const LEAVE_TYPE_LABEL = {
+  el: "Earned Leave",
+  sl: "Sick Leave",
+  ml: "Maternity Leave",
+  pl: "Paternity Leave",
+  half_day_el: "Half Day EL",
+  half_day_sl: "Half Day SL",
+  comp_off: "Compensatory Leave",
+  lwp: "LWP",
+};
+const leaveLabel = (code) => LEAVE_TYPE_LABEL[code] || code || "Leave";
+
+const SOURCE_META = {
+  face: { label: "🤳 Face", color: "#9B2554", bg: "#FDF2F7" },
+  agent: { label: "💻 Agent", color: "#2563EB", bg: "#EFF6FF" },
+  system: { label: "📍 System", color: "#0D9E6E", bg: "#E8F7F1" },
+  timesheet: { label: "🗂 Timesheet", color: "#7C3AED", bg: "#F3E8FF" },
 };
 
 const PRESETS = [
@@ -43,6 +74,24 @@ const PRESETS = [
   { key: "this_month", label: "This Month" },
   { key: "last_30", label: "Last 30 Days" },
   { key: "custom", label: "Custom" },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "present", label: "Present" },
+  { value: "half_day", label: "Half Day" },
+  { value: "absent", label: "Absent" },
+  { value: "week_off", label: "Week Off" },
+  { value: "holiday", label: "Holiday" },
+  { value: "leave", label: "Leave" },
+];
+
+const SOURCE_FILTER_OPTIONS = [
+  { value: "all", label: "All Sources" },
+  { value: "face", label: "🤳 Face" },
+  { value: "system", label: "📍 System" },
+  { value: "agent", label: "💻 Agent" },
+  { value: "timesheet", label: "🗂 Timesheet" },
 ];
 
 function presetRange(key) {
@@ -65,169 +114,220 @@ function presetRange(key) {
     start.setDate(start.getDate() - 29);
     return { startDate: toInputDate(start), endDate: toInputDate(end) };
   }
+  // this_month (default)
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   return { startDate: toInputDate(start), endDate: toInputDate(now) };
 }
 
-const CONCURRENCY = 5;
+function FilterSelect({ value, onChange, options }) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none bg-white"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
 
-async function runWithConcurrency(items, limit, worker) {
-  const results = new Array(items.length);
-  let next = 0;
-  async function runner() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await worker(items[i], i);
-    }
-  }
-  const runners = Array.from({ length: Math.min(limit, items.length) }, runner);
-  await Promise.all(runners);
-  return results;
+function HistoryRow({ r }) {
+  const meta = STATUS_META[r.status] || STATUS_META.absent;
+  const src = SOURCE_META[r.source] || SOURCE_META.system;
+  return (
+    <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
+      <td className="py-2.5 pl-3 pr-2 text-[12px] font-medium text-gray-800 whitespace-nowrap">{fmtDate(r.date)}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono">{fmtTime(r.checkIn)}</td>
+      <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono">{fmtTime(r.checkOut)}</td>
+      <td className="py-2.5 px-2">
+        <span
+          className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
+          style={{ color: src.color, background: src.bg }}
+        >
+          {r.synthetic && !r.source ? "—" : src.label}
+        </span>
+      </td>
+      <td
+        className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap"
+        title={r.source === "timesheet" ? `Timesheet logs: ${fmtMinutes(r.timesheetMinutes)} (${r.timesheetPercent}% of standard day)${r.timesheetApproved === false ? " — timesheet not approved yet" : ""}` : undefined}
+      >
+        {r.source === "timesheet" ? fmtMinutes(r.timesheetMinutes) : fmtMinutes(r.activeMinutes)}
+      </td>
+      <td className="py-2.5 px-2 text-[12px] text-amber-700 font-mono whitespace-nowrap">{fmtMinutes(r.idleMinutes)}</td>
+      <td className="py-2.5 px-2">
+        <span
+          className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
+          style={{ color: meta.color, background: meta.bg }}
+        >
+          {r.status === "leave"
+            ? leaveLabel(r.leaveType)
+            : r.status === "holiday" && r.holidayName
+              ? `Holiday · ${r.holidayName}`
+              : meta.label}
+          {r.status !== "leave" && r.leaveType ? ` · ${leaveLabel(r.leaveType)}` : ""}
+          {r.status === "half_day" && !r.leaveType && !r.latePenalty && r.source !== "timesheet"
+            ? (r.checkoutRemark === "missed_checkout" ? " · Missed check-out" : r.checkOut ? " · Short hours" : "")
+            : ""}
+          {r.isLate ? (r.latePenalty ? (r.lateCountInMonth ? ` · Late #${r.lateCountInMonth} (Half Day)` : " · Late 1h+ (Half Day)") : r.lateCountInMonth ? ` · Late ${r.lateCountInMonth}` : " · Late") : ""}
+          {r.source === "timesheet" ? ` · Timesheet ${r.timesheetPercent}%${r.timesheetApproved === false ? " (not approved yet)" : ""}` : ""}
+        </span>
+      </td>
+      <td className="py-2.5 pr-3 pl-2 text-[12px] font-semibold font-mono" style={{ color: paidDayValue(r) ? "#16A34A" : "#DC2626" }}>
+        {paidDayValue(r)}
+      </td>
+    </tr>
+  );
 }
 
 /**
- * Bulk version of AttendanceHistoryModal — instead of pulling day-wise
- * history for one employee at a time, this fetches it for every employee
- * currently visible on the Monthly tab in one go (same 7/30/custom day
- * presets) and lets the admin export it all as a single CSV.
+ * Day-wise attendance history for a single employee — opened via the
+ * "History" button on the Monthly tab of AttendanceDetailsModal.
+ *
+ * `useHistoryHook` is the role-specific hook (useGetAttendanceHistory from
+ * suother.hook.js, or useGetEmployeeAttendanceHistory from
+ * adminother.hook.js) so this stays shared between both dashboards.
  */
-export default function AttendanceBulkHistoryModal({ open, onClose, people, fetchHistory }) {
+export default function AttendanceHistoryModal({ open, onClose, employeeId, employeeName, useHistoryHook, people, fetchHistory }) {
   const [preset, setPreset] = useState("this_month");
   const [range, setRange] = useState(() => presetRange("this_month"));
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [rows, setRows] = useState(null);
-  const [perEmployee, setPerEmployee] = useState([]);
-  const [failed, setFailed] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [exportAllProgress, setExportAllProgress] = useState({ done: 0, total: 0 });
 
   const applyPreset = (key) => {
     setPreset(key);
-    if (key !== "custom") {
-      const r = presetRange(key);
-      setRange(r);
-      generate(r);
-    } else {
-      setRows(null);
-      setPerEmployee([]);
-      setFailed([]);
-    }
+    if (key !== "custom") setRange(presetRange(key));
   };
 
-  const generate = async (rangeOverride) => {
-    const useRange = rangeOverride || range;
-    if (!people?.length || !fetchHistory || isGenerating) return;
-    setIsGenerating(true);
-    setRows(null);
-    setPerEmployee([]);
-    setFailed([]);
-    setProgress({ done: 0, total: people.length });
+  const { data, isLoading, isError } = useHistoryHook(
+    employeeId,
+    { startDate: range.startDate, endDate: range.endDate },
+    { enabled: open && !!employeeId }
+  );
 
-    const failedNames = [];
-    const summaries = [];
+  const allRows = data?.data ?? [];
+
+  const rows = useMemo(() => {
+    return allRows.filter((r) => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (sourceFilter !== "all" && r.source !== sourceFilter) return false;
+      return true;
+    });
+  }, [allRows, statusFilter, sourceFilter]);
+
+  const totals = useMemo(() => {
+    return rows.reduce(
+      (acc, r) => {
+        acc.active += r.activeMinutes || 0;
+        acc.idle += r.idleMinutes || 0;
+        if (r.checkIn) acc.daysPresentish += 1;
+        return acc;
+      },
+      { active: 0, idle: 0, daysPresentish: 0 }
+    );
+  }, [rows]);
+
+  const summary = useMemo(() => summarizeDays(allRows), [allRows]);
+  const paidDays = summary.paidDays;
+
+  const exportCsv = () => {
+    downloadCsv(
+      `attendance-history-${(employeeName || employeeId || "employee").replace(/\s+/g, "_")}-${range.startDate}_to_${range.endDate}.csv`,
+      withTotalRow([
+        { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
+        { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+        { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+        { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
+        { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+        { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
+        { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
+        { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
+      ]),
+      [...rows, { __total: true, paidDays }],
+      summaryFooterRows(summary)
+    );
+  };
+
+  // "Export All" beside the per-employee export — reuses the SAME date
+  // range/preset currently picked here (7/15/30/this-month/custom), but
+  // pulls every employee's full history for it instead of just this one.
+  const exportAllUsersCsv = async () => {
+    if (!people?.length || !fetchHistory || isExportingAll) return;
+    setIsExportingAll(true);
+    setExportAllProgress({ done: 0, total: people.length });
+
     const combined = [];
+    const empSummaries = [];
+    const failedNames = [];
 
     await runWithConcurrency(people, CONCURRENCY, async (person) => {
       try {
-        const res = await fetchHistory(person.id, { startDate: useRange.startDate, endDate: useRange.endDate });
+        const res = await fetchHistory(person.id, { startDate: range.startDate, endDate: range.endDate });
         const dayRows = res?.data ?? [];
-        let active = 0, idle = 0, present = 0;
         dayRows.forEach((r) => {
-          active += r.activeMinutes || 0;
-          idle += r.idleMinutes || 0;
-          if (r.checkIn) present += 1;
-          combined.push({
-            employeeId: person.id,
-            employeeName: person.name || "Unknown",
-            empid: person.empid || "—",
-            date: fmtDate(r.date),
-            checkIn: fmtTime(r.checkIn),
-            checkOut: fmtTime(r.checkOut),
-            via: SOURCE_LABEL[r.source] || "System",
-            activeMinutes: Math.round(r.activeMinutes || 0),
-            idleMinutes: Math.round(r.idleMinutes || 0),
-            status: (STATUS_META[r.status] || STATUS_META.absent).label,
-            isLate: r.isLate ? "Yes" : "No",
-            overtimeMinutes: Math.round(r.overtimeMinutes || 0),
-            timesheetMinutes: r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "",
-            timesheetPercent: r.source === "timesheet" ? r.timesheetPercent : "",
-            dayType: DAY_BUCKET_LABEL[dayBucket(r)],
-            paidDay: paidDayValue(r),
-          });
+          if (statusFilter !== "all" && r.status !== statusFilter) return;
+          if (sourceFilter !== "all" && r.source !== sourceFilter) return;
+          combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
         });
-        summaries.push({ id: person.id, name: person.name, empid: person.empid, records: dayRows.length, active, idle, present, sum: summarizeDays(dayRows), paid: summarizeDays(dayRows).paidDays });
+        const empSum = summarizeDays(dayRows);
+        empSummaries.push({ name: person.name || "Unknown", empid: person.empid || "—", sum: empSum });
+        combined.push({ __total: true, employeeName: person.name || "Unknown", empid: person.empid || "—", paidDays: empSum.paidDays });
       } catch {
         failedNames.push(person.name || person.empid || person.id);
       } finally {
-        setProgress((p) => ({ ...p, done: p.done + 1 }));
+        setExportAllProgress((p) => ({ ...p, done: p.done + 1 }));
       }
     });
 
-    setRows(combined);
-    setPerEmployee(summaries.sort((a, b) => (a.name || "").localeCompare(b.name || "")));
-    setFailed(failedNames);
-    setIsGenerating(false);
-  };
-
-  useEffect(() => {
-    if (open && people?.length && fetchHistory) {
-      generate(range);
-    }
-    // Auto-generate once when the modal opens, same as the individual
-    // history modal fetching as soon as it's opened.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const groupedByEmployee = useMemo(() => {
-    if (!rows) return [];
-    const map = new Map();
-    perEmployee.forEach((e) => map.set(e.id, { ...e, days: [] }));
-    rows.forEach((r) => {
-      if (!map.has(r.employeeId)) {
-        map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, empid: r.empid, records: 0, active: 0, idle: 0, present: 0, paid: 0, sum: summarizeDays([]), days: [] });
-      }
-      map.get(r.employeeId).days.push(r);
-    });
-    return [...map.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  }, [rows, perEmployee]);
-
-  const exportCsv = () => {
-    if (!rows?.length) return;
     downloadCsv(
-      `attendance-history-all-${range.startDate}_to_${range.endDate}.csv`,
+      `attendance-history-all-employees-${range.startDate}_to_${range.endDate}.csv`,
       withTotalRow([
-        { key: "employeeName", label: "Employee" },
-        { key: "empid", label: "Emp ID" },
-        { key: "date", label: "Date" },
-        { key: "checkIn", label: "Check-in" },
-        { key: "checkOut", label: "Check-out" },
-        { key: "via", label: "Via" },
-        { key: "activeMinutes", label: "Active Minutes" },
-        { key: "idleMinutes", label: "Idle Minutes" },
-        { key: "status", label: "Status" },
-        { key: "isLate", label: "Late" },
-        { key: "overtimeMinutes", label: "Overtime Minutes" },
-        { key: "timesheetMinutes", label: "Timesheet Minutes" },
-        { key: "timesheetPercent", label: "Timesheet %" },
-        { key: "dayType", label: "Day Type" },
-        { key: "paidDay", label: "Paid Day" },
+        { key: "employeeName", label: "Employee", format: (r) => r.employeeName },
+        { key: "empid", label: "Emp ID", format: (r) => r.empid },
+        { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
+        { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
+        { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
+        { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
+        { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
+        { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
+        { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
+        { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
       ]),
-      groupedByEmployee.flatMap((e) => [...e.days, { __total: true, employeeName: e.name, empid: e.empid, paidDays: e.paid }]),
-      summaryTableRows(groupedByEmployee)
+      combined,
+      summaryTableRows(empSummaries)
     );
+
+    setIsExportingAll(false);
+    if (failedNames.length) {
+      console.warn("Could not fetch attendance history for:", failedNames.join(", "));
+    }
   };
 
   if (!open) return null;
 
-  const total = people?.length || 0;
-
   return (
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-6"
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-6"
       style={{ background: "rgba(20,10,15,0.55)" }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] flex flex-col overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -235,11 +335,11 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
           style={{ background: "linear-gradient(135deg, #730042 0%, #9B2554 100%)" }}
         >
           <div className="min-w-0">
-            <h2 className="m-0 text-base sm:text-lg font-bold flex items-center gap-2">
-              <FaUsers size={15} /> Bulk Attendance History
+            <h2 className="m-0 text-base sm:text-lg font-bold flex items-center gap-2 truncate">
+              <FaClock size={15} /> Attendance History{employeeName ? ` — ${employeeName}` : ""}
             </h2>
             <p className="m-0 mt-0.5 text-[11px] sm:text-[12px] text-white/75">
-              Generate day-wise history for all {total} listed employee{total === 1 ? "" : "s"} at once
+              Day-wise check-in / check-out, source and active-idle time
             </p>
           </div>
           <button
@@ -256,8 +356,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
               <button
                 key={p.key}
                 onClick={() => applyPreset(p.key)}
-                disabled={isGenerating}
-                className="px-3 py-1.5 text-[11.5px] font-semibold rounded-lg transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-[11.5px] font-semibold rounded-lg transition-colors"
                 style={
                   preset === p.key
                     ? { color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }
@@ -275,12 +374,7 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                 type="date"
                 value={range.startDate}
                 max={range.endDate}
-                disabled={isGenerating}
-                onChange={(e) => {
-                  const r = { ...range, startDate: e.target.value };
-                  setRange(r);
-                  if (r.startDate && r.endDate && r.startDate <= r.endDate) generate(r);
-                }}
+                onChange={(e) => setRange((r) => ({ ...r, startDate: e.target.value }))}
                 className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
               />
               <span className="text-[11px] text-gray-400">to</span>
@@ -289,119 +383,122 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
                 value={range.endDate}
                 min={range.startDate}
                 max={toInputDate(new Date())}
-                disabled={isGenerating}
-                onChange={(e) => {
-                  const r = { ...range, endDate: e.target.value };
-                  setRange(r);
-                  if (r.startDate && r.endDate && r.startDate <= r.endDate) generate(r);
-                }}
+                onChange={(e) => setRange((r) => ({ ...r, endDate: e.target.value }))}
                 className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 outline-none"
               />
             </div>
           )}
         </div>
 
-        <div className="px-4 sm:px-6 py-3 flex items-center gap-3 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
-          <button
-            type="button"
-            onClick={() => generate()}
-            disabled={isGenerating || !total}
-            className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ color: "#fff", background: "#730042" }}
-          >
-            <FaClock size={10} /> {isGenerating ? `Generating ${progress.done}/${progress.total}…` : "Refresh"}
-          </button>
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0 bg-gray-50/40">
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 mr-0.5">
+            <FaFilter size={9} /> Filters
+          </span>
+          <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+          <FilterSelect value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS} />
           <button
             type="button"
             onClick={exportCsv}
-            disabled={!rows?.length}
-            className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+            disabled={!rows.length}
+            className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ color: "#fff", background: "#730042" }}
           >
             <FaDownload size={10} /> Export CSV
           </button>
-          {!total && (
-            <span className="text-[11.5px] text-gray-400">No employees in the current list to generate for.</span>
+          {people?.length > 0 && fetchHistory && (
+            <button
+              type="button"
+              onClick={exportAllUsersCsv}
+              disabled={isExportingAll}
+              title={`Export this same ${PRESETS.find((p) => p.key === preset)?.label || "range"} for every employee`}
+              className="flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ color: "#730042", background: "#fdf2f7", border: "1px solid #e8b8cf" }}
+            >
+              <FaUsers size={10} />
+              {isExportingAll
+                ? `Exporting ${exportAllProgress.done}/${exportAllProgress.total}…`
+                : `Export All (${PRESETS.find((p) => p.key === preset)?.label || "range"})`}
+            </button>
           )}
         </div>
 
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-4 flex-wrap flex-shrink-0 bg-gray-50/60 border-b border-gray-100">
+          <span className="text-[11.5px] text-gray-500">
+            Active: <strong className="text-emerald-700">{fmtMinutes(totals.active)}</strong>
+          </span>
+          <span className="text-[11.5px] text-gray-500">
+            Idle: <strong className="text-amber-700">{fmtMinutes(totals.idle)}</strong>
+          </span>
+          <span className="text-[11.5px] text-gray-500">
+            Days with check-in: <strong className="text-gray-800">{totals.daysPresentish}</strong>
+          </span>
+        </div>
+
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap flex-shrink-0 border-b border-gray-100">
+          {[
+            { label: "Total Days", value: summary.totalDays, color: "#1F2937", bg: "#F3F4F6" },
+            { label: "Present", value: summary.present, color: STATUS_META.present.color, bg: STATUS_META.present.bg },
+            { label: "Week Off", value: summary.weekOff, color: STATUS_META.week_off.color, bg: STATUS_META.week_off.bg },
+            { label: "Paid Leave", value: summary.paidLeave, color: STATUS_META.leave.color, bg: STATUS_META.leave.bg },
+            { label: "Holiday", value: summary.holiday, color: STATUS_META.holiday.color, bg: STATUS_META.holiday.bg },
+            { label: "Half Day", value: summary.halfDay, color: STATUS_META.half_day.color, bg: STATUS_META.half_day.bg },
+            { label: "Absent", value: summary.absent, color: STATUS_META.absent.color, bg: STATUS_META.absent.bg },
+            { label: "Via Timesheet", value: summary.timesheetDays, color: SOURCE_META.timesheet.color, bg: SOURCE_META.timesheet.bg },
+          ].map((c) => (
+            <span
+              key={c.label}
+              className="text-[11px] font-semibold rounded-lg px-2.5 py-1 whitespace-nowrap"
+              style={{ color: c.color, background: c.bg }}
+              title={c.label === "Absent" ? "No-show + unpaid leave (LWP) + anything not Present / Week Off / Paid Leave / Holiday" : undefined}
+            >
+              {c.label}: {c.value}
+            </span>
+          ))}
+          <span
+            className="ml-auto text-[13px] font-bold rounded-lg px-3 py-1.5 whitespace-nowrap"
+            style={{ color: "#fff", background: "#730042" }}
+            title="Present + Week Off + Paid Leave + Holiday + Half Day (0.5)"
+          >
+            Total Paid Days: {paidDays} / {summary.totalDays}
+          </span>
+        </div>
+
         <div className="overflow-auto flex-1">
-          {isGenerating && !rows && (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-[13px] text-gray-400">
-              <span className="text-lg">⏳</span>
-              Fetching history for {progress.done}/{progress.total} employees…
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-gray-400">
+              <span className="text-lg">⏳</span> Loading history…
             </div>
-          )}
-
-          {!isGenerating && rows === null && (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-              <span className="text-3xl">📋</span>
+          ) : isError ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-red-500">
+              ⚠ Could not load attendance history.
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
+              <span className="text-3xl">📍</span>
               <p className="text-[13px] text-gray-400">
-                Pick a date range above — everyone's day-wise history is generated automatically.
+                {allRows.length ? "No records match your filters" : "No attendance records in this range"}
               </p>
             </div>
-          )}
-
-          {!isGenerating && rows !== null && (
-            <div className="px-4 sm:px-6 py-4 flex flex-col gap-3">
-              <p className="m-0 text-[11.5px] text-gray-500">
-                {rows.length} record{rows.length === 1 ? "" : "s"} across {perEmployee.length} employee{perEmployee.length === 1 ? "" : "s"}
-                {failed.length ? `, ${failed.length} failed` : ""} — {range.startDate} → {range.endDate}
-              </p>
-
-              {failed.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11.5px] text-red-600">
-                  Could not fetch history for: {failed.join(", ")}
-                </div>
-              )}
-
-              {groupedByEmployee.map((e) => (
-                <div key={e.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="px-3 py-2.5 flex items-center justify-between flex-wrap gap-2" style={{ background: "#fdf2f7" }}>
-                    <div>
-                      <p className="m-0 text-[13px] font-bold text-gray-900">{e.name} <span className="text-gray-400 font-normal">({e.empid})</span></p>
-                      <p className="m-0 mt-0.5 text-[11px] text-gray-500">
-                        Total {e.sum.totalDays} · Present {e.sum.present} · Week Off {e.sum.weekOff} · Paid Leave {e.sum.paidLeave} · Absent {e.sum.absent} · Active {fmtMinutes(e.active)} · Idle {fmtMinutes(e.idle)}
-                      </p>
-                    </div>
-                    <div className="text-right rounded-lg px-3 py-1.5" style={{ background: "#730042", color: "#fff" }}>
-                      <p className="m-0 text-[9.5px] uppercase tracking-wide opacity-80">Total Paid Days</p>
-                      <p className="m-0 text-[16px] font-bold leading-tight">{e.paid} <span className="text-[11px] font-medium opacity-80">/ {e.sum.totalDays}</span></p>
-                    </div>
-                  </div>
-                  {e.days.length === 0 ? (
-                    <p className="m-0 px-3 py-3 text-[12px] text-gray-400">No records in this range.</p>
-                  ) : (
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50/60 border-b border-gray-100">
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pl-3 pr-2">Date</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Check-in</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Check-out</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Via</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Active</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 px-2">Idle</th>
-                          <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2 pr-3 pl-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {e.days.map((d, i) => (
-                          <tr key={i} className="border-b border-gray-50 last:border-b-0">
-                            <td className="py-2 pl-3 pr-2 text-[12px] font-medium text-gray-800 whitespace-nowrap">{d.date}</td>
-                            <td className="py-2 px-2 text-[12px] text-gray-600 font-mono">{d.checkIn}</td>
-                            <td className="py-2 px-2 text-[12px] text-gray-600 font-mono">{d.checkOut}</td>
-                            <td className="py-2 px-2 text-[12px] text-gray-600">{d.via}</td>
-                            <td className="py-2 px-2 text-[12px] text-emerald-700 font-mono">{fmtMinutes(d.activeMinutes)}</td>
-                            <td className="py-2 px-2 text-[12px] text-amber-700 font-mono">{fmtMinutes(d.idleMinutes)}</td>
-                            <td className="py-2 pr-3 pl-2 text-[12px] text-gray-600 whitespace-nowrap">{d.status}{d.isLate === "Yes" ? " · Late" : ""}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              ))}
-            </div>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 bg-white z-10 shadow-[0_1px_0_0_#f1f1f1]">
+                <tr>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pl-3 pr-2">Date</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Check-in</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Check-out</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Via</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Active</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Idle</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Status</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Paid Day</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <HistoryRow key={r.id} r={r} />
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
@@ -409,6 +506,10 @@ export default function AttendanceBulkHistoryModal({ open, onClose, people, fetc
           <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
             <FaCalendarAlt size={9} />
             {range.startDate} → {range.endDate}
+          </span>
+          <span className="text-[11px] text-gray-400">
+            <FaMapMarkerAlt size={9} className="inline mr-1" />
+            {rows.length} record{rows.length === 1 ? "" : "s"}
           </span>
         </div>
       </div>

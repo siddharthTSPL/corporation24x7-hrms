@@ -40,16 +40,12 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 const Attendance = require("../Models/attendance.model");
-const SuperAdmin = require("../Models/superadmin.model");
-const Shift = require("../Models/shift.model");
 const LeaveBalance = require("../Models/leavebalance.model");
 const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
-const { shapeLateRule } = require("../utils/Laterule.utils");
+const { recomputeLatePenalties } = require("../utils/Laterule.utils");
 const { getISTDateParts, istDateFromYMD } = require("../utils/Istdate.utils");
-const { getShiftThresholds, calculateFaceStatus } = require("../utils/shift.utils");
-const { calculateStatus } = require("../automatic/monthattendanceupdate");
 const { isSandwichLeave } = require("../automatic/sandwitchleave");
 const { recomputeSummaries } = require("./Reconcileattendancesummaryleaveaware");
 
@@ -77,106 +73,17 @@ const ymKey = ({ year, month }) => `${year}-${month}`;
 const r2 = (n) => Math.round(n * 100) / 100;
 
 // ───────────────────────── Step 1: monthly late rule ─────────────────────────
+// Same function the nightly job uses (utils/Laterule.utils.js).
 const fixLateRule = async (rangeStart, rangeEndExclusive) => {
   console.log("\n=== STEP 1: Late rule (monthly, free limit then Half Day) ===");
-
-  const orgFilter = ORG ? { _id: ORG } : {};
-  const orgs = await SuperAdmin.find(orgFilter).select("attendanceSettings organisation_name").lean();
-
-  const shiftCache = new Map();
-  const getShift = async (id) => {
-    if (!id) return null;
-    const k = String(id);
-    if (!shiftCache.has(k)) shiftCache.set(k, await Shift.findById(id).lean());
-    return shiftCache.get(k);
-  };
-
-  let totalCountFix = 0, totalToHalf = 0, totalRevert = 0;
-
-  for (const org of orgs) {
-    const rule = shapeLateRule(org);
-    if (!rule.enabled && !FORCE_LATE) {
-      console.log(`[SKIP] ${org.organisation_name || org._id}: late rule is OFF (turn it on in Attendance Settings, or use --force-late-rule)`);
-      continue;
-    }
-    const allowed = ALLOWED_OVERRIDE !== null ? ALLOWED_OVERRIDE : rule.allowedLatePerMonth;
-
-    const q = {
-      organisation_id: org._id,
-      isLate: true,
-      date: { $gte: rangeStart, $lt: rangeEndExclusive },
-    };
-    if (EMPLOYEE) q.employee = EMPLOYEE;
-
-    const lates = await Attendance.find(q)
-      .select("employee role date status isLate latePenalty lateCountInMonth checkIn checkOut source activeMinutes shift checkoutRemark")
-      .sort({ date: 1 })
-      .lean();
-
-    // person + IST month -> ordered late days (oldest first)
-    const groups = new Map();
-    for (const a of lates) {
-      const { year, month } = getISTDateParts(a.date);
-      const key = `${a.employee}_${a.role}_${year}_${month}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(a);
-    }
-
-    const ops = [];
-    let countFix = 0, toHalf = 0, revert = 0;
-
-    for (const list of groups.values()) {
-      list.forEach((a, i) => {
-        const n = i + 1; // which late check-in of the month this is
-        const penalty = n > allowed;
-        const $set = {};
-
-        if ((a.lateCountInMonth || 0) !== n) $set.lateCountInMonth = n;
-        if (!!a.latePenalty !== penalty) $set.latePenalty = penalty;
-        if (Object.keys($set).length) countFix++;
-
-        if (penalty && a.status === "present") {
-          $set.status = "half_day";
-          toHalf++;
-        }
-        if (Object.keys($set).length) {
-          ops.push({ updateOne: { filter: { _id: a._id }, update: { $set } } });
-        }
-        a.__n = n; a.__penalty = penalty;
-      });
-    }
-
-    // Days that were wrongly penalised before (e.g. old counter ran across
-    // months) -> restore the status the day earned on its own hours.
-    for (const list of groups.values()) {
-      for (const a of list) {
-        if (a.__penalty || !a.latePenalty) continue;
-        if (a.status !== "half_day" || !a.checkOut || a.checkoutRemark === "missed_checkout") continue;
-        const shift = await getShift(a.shift);
-        if (!shift) continue;
-        const base =
-          a.source === "face"
-            ? calculateFaceStatus((new Date(a.checkOut) - new Date(a.checkIn)) / 60000, shift)
-            : calculateStatus(a.activeMinutes || 0, getShiftThresholds(shift));
-        if (base === "present") {
-          ops.push({ updateOne: { filter: { _id: a._id }, update: { $set: { status: "present" } } } });
-          revert++;
-        }
-      }
-    }
-
-    console.log(
-      `${org.organisation_name || org._id}: limit ${allowed}/month | late days ${lates.length} | ` +
-      `counter fixes ${countFix} | present->half_day ${toHalf} | half_day->present (wrongly penalised) ${revert}`
-    );
-    totalCountFix += countFix; totalToHalf += toHalf; totalRevert += revert;
-
-    if (APPLY && ops.length) await Attendance.bulkWrite(ops, { ordered: false });
-  }
-
+  const t = await recomputeLatePenalties({
+    rangeStart, rangeEndExclusive, apply: APPLY,
+    organisation_id: ORG, employee: EMPLOYEE,
+    allowedOverride: ALLOWED_OVERRIDE, force: FORCE_LATE,
+  });
   console.log(
-    `LATE TOTAL: counter fixes ${totalCountFix}, present->half_day ${totalToHalf}, ` +
-    `half_day->present ${totalRevert} ${APPLY ? "(applied)" : "(dry run)"}`
+    `LATE TOTAL: counter fixes ${t.countFixes}, present->half_day ${t.toHalf}, ` +
+    `half_day->present ${t.reverted} ${APPLY ? "(applied)" : "(dry run)"}`
   );
 };
 

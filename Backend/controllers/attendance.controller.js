@@ -8,7 +8,7 @@ const FieldAssignment = require("../Models/fieldAssignment.model");
 
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
-const { computeLateStanding, applyLatePenaltyToStatus } = require("../utils/Laterule.utils");
+const { computeLateStanding, applyLatePenaltyToStatus, refreshLateStanding, lateForgiveMinutes } = require("../utils/Laterule.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
@@ -185,11 +185,14 @@ const checkin = async (req, res) => {
       role: normalizeRole(user.role),
       date: today,
       isLate,
+      lateMinutes,
     });
     const lateNote = !isLate || !lateRule?.enabled
       ? ""
       : latePenalty
-        ? ` This is late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}), so today will be counted as a Half Day.`
+        ? (lateCountInMonth
+            ? ` This is late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}), so today will be counted as a Half Day.`
+            : ` You are more than 1 hour late, so today will be counted as a Half Day.`)
         : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
 
     if (attendance) {
@@ -521,10 +524,15 @@ const checkout = async (req, res) => {
     // checkout() only ever runs for source "manual" (agent/face are blocked
     // above), so this always judges by real, measured activeMinutes - no
     // duration fallback. See resolveSessionStatus for why.
+    // Fresh monthly late count (not the check-in stamp). A FREE late day
+    // (late #1..#N of the month) gets its late time added back, so being late
+    // never turns a full day into a half day - only the (N+1)th late does.
+    const lateStanding = await refreshLateStanding(attendance);
+    const forgive = lateForgiveMinutes(attendance, shiftDoc, lateStanding);
     const status = resolveSessionStatus({
       source: attendance.source,
-      activeMinutes: attendance.activeMinutes,
-      elapsedSessionMinutes,
+      activeMinutes: (attendance.activeMinutes || 0) + forgive,
+      elapsedSessionMinutes: elapsedSessionMinutes + forgive,
       thresholds,
       shift: shiftDoc,
     });
@@ -600,7 +608,7 @@ const autoCheckoutAll = async () => {
       checkOut: { $exists: false },
       // Already handled once while the org had auto check-out OFF.
       checkoutRemark: { $ne: "missed_checkout" },
-    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn latePenalty").lean();
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn isLate lateMinutes latePenalty").lean();
 
     if (!openSessions.length) return;
 
@@ -642,10 +650,12 @@ const autoCheckoutAll = async () => {
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
+      const lateStanding = await refreshLateStanding(a); // fresh monthly late count (see checkout())
+      const forgive = lateForgiveMinutes(a, shift, lateStanding);
       const status = applyLatePenaltyToStatus(a, resolveSessionStatus({
         source: a.source,
-        activeMinutes: a.activeMinutes,
-        elapsedSessionMinutes,
+        activeMinutes: (a.activeMinutes || 0) + forgive,
+        elapsedSessionMinutes: elapsedSessionMinutes + forgive,
         thresholds,
         shift,
       }));
@@ -689,6 +699,8 @@ const autoCheckoutAll = async () => {
             $set: {
               checkOut: forceCheckoutAt,
               status,
+              lateCountInMonth: a.lateCountInMonth || 0,
+              latePenalty: !!a.latePenalty,
               checkoutRemark: "auto_overtime",
               overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
               autoCheckedOut: true,

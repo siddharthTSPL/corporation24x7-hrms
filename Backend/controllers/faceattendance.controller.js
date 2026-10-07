@@ -6,7 +6,7 @@ const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
 const FieldTeam = require("../Models/fieldTeam.model");
 const { updateSummary } = require("../automatic/monthattendanceupdate");
-const { computeLateStanding, applyLatePenaltyToStatus } = require("../utils/Laterule.utils");
+const { computeLateStanding, applyLatePenaltyToStatus, refreshLateStanding, lateForgiveMinutes } = require("../utils/Laterule.utils");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
 const { startOfISTDay } = require("../utils/Istdate.utils");
 const {
@@ -232,6 +232,7 @@ const scanFace = async (req, res) => {
         role: best.role,
         date: today,
         isLate,
+        lateMinutes,
       });
 
       if (attendance) {
@@ -273,7 +274,9 @@ const scanFace = async (req, res) => {
       const lateNote = !isLate || !lateRule?.enabled
         ? ""
         : latePenalty
-          ? ` Late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}) — today will be counted as a Half Day.`
+          ? (lateCountInMonth
+              ? ` Late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}) — today will be counted as a Half Day.`
+              : ` You are more than 1 hour late — today will be counted as a Half Day.`)
           : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
       const checkinMessage = baseCheckinMessage + lateNote;
 
@@ -349,7 +352,11 @@ const scanFace = async (req, res) => {
     // length (<50% = absent, 50%-85% = half_day, >=85% = present) -
     // separate from the manual/agent flow, which still uses the shift's
     // fixed absentBelowMinutes/halfDayBelowMinutes untouched.
-    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, calculateFaceStatus(durationMinutes, shift));
+    // Fresh monthly late count; a FREE late day gets its late time added back
+    // so lateness alone never makes it a half day (only late #N+1 onward does).
+    const lateStanding = await refreshLateStanding(attendance);
+    const forgive = lateForgiveMinutes(attendance, shift, lateStanding);
+    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, calculateFaceStatus(durationMinutes + forgive, shift));
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
