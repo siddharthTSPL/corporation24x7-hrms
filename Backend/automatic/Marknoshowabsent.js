@@ -9,7 +9,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const NoShowLog = require("../Models/noshowlog.model");
 const { classifyNonWorkingDay, startOfDay } = require("./weekoffcalendar");
 const { getISTDateParts } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion } = require("../utils/Leavelwpday.utils");
 
 // Same shape as monthattendanceupdate.js's hasApprovedLeave — kept local
 // so this file has no runtime dependency on that module's internals.

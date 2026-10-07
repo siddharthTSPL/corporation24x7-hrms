@@ -4,7 +4,7 @@ const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 const { getISTDateParts } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion } = require("../utils/Leavelwpday.utils");
 const mongoose = require("mongoose");
 
 function calculateStatus(activeMinutes, thresholds) {

@@ -37,7 +37,8 @@ const computeLateStanding = async ({ organisation_id, employee, role, date, isLa
     employee,
     role,
     isLate: true,
-    date: { $gte: monthStart, $lt: nextMonthStart, $ne: date },
+    // Only strictly-earlier days of the SAME IST month (resets every month).
+    date: { $gte: monthStart, $lt: date < nextMonthStart ? date : nextMonthStart },
   });
 
   const lateCountInMonth = earlierLates + 1;

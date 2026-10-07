@@ -242,6 +242,12 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
     console.log(`Nightly rebuild: months ${[...scopeMonths].join(", ")} for all employees (day 1 -> yesterday)\n`);
   }
 
+  // All employees, explicit months (e.g. ["2026-9"]) - used by the half-day /
+  // late-rule fix script to rebuild old months, not just current + previous.
+  if (opts.months && !opts.employeeId) {
+    scopeMonths = new Set(opts.months);
+  }
+
   if (opts.employeeId) {
     scopeEmployeeRoles = new Set([`${opts.employeeId}_employee`]);
     const nowIst = getISTDateParts(new Date());
@@ -389,7 +395,10 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
       let cursor = scopeMonths
         ? (() => {
             const now = new Date();
-            const start = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+            const [fy, fm] = [...scopeMonths].map((k) => k.split("-").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1])[0];
+            const earliest = startOfDay(new Date(fy, fm - 1, 1));
+            const prevStart = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+            const start = earliest < prevStart ? earliest : prevStart;
             const join = startOfDay(effectiveJoinDate);
             return join > start ? join : start;
           })()
