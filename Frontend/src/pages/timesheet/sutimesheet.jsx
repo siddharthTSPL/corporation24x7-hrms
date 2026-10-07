@@ -475,7 +475,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
                     <div className={cn("text-[11px] font-bold shrink-0", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>
+                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>)}
               </div>
             </div>
           );
@@ -517,7 +517,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
                     <div className={cn("text-[9px] sm:text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>
+                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>)}
               </div>
             );
           })}
@@ -1704,7 +1704,7 @@ const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
             {assignedJobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Select>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Date" type="date" value={logForm.log_date} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Date" type="date" value={logForm.log_date} max={todayISTKey()} onChange={e => setLogForm(p => ({ ...p, log_date: e.target.value }))} />
             <Input label="Duration (minutes)" type="number" placeholder="e.g. 90" min="1" value={logForm.duration_minutes} onChange={e => setLogForm(p => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
           </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />

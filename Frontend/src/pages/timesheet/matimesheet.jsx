@@ -444,7 +444,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     )}
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors">+ Add entry</button>
+                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors">+ Add entry</button>)}
               </div>
             </div>
           );
@@ -493,7 +493,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     </div>
                   </div>
                 ))}
-                <button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors">+ Add</button>
+                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors">+ Add</button>)}
               </div>
             );
           })}
@@ -1244,7 +1244,7 @@ export default function ManagerTimesheet() {
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
           </Sel>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input label="Date" type="date" value={logForm.log_date} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
+            <Input label="Date" type="date" value={logForm.log_date} max={todayISTKey()} onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))} />
             <Input label="Duration (minutes)" type="number" min="1" placeholder="e.g. 60" value={logForm.duration_minutes} onChange={(e) => setLogForm((p) => ({ ...p, duration_minutes: nonNegative(e.target.value) }))} />
           </div>
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />

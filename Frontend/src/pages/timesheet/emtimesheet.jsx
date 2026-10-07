@@ -550,12 +550,12 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     )}
                   </div>
                 ))}
-                <button
+                {iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors"
                 >
                   + Add entry
-                </button>
+                </button>)}
               </div>
             </div>
           );
@@ -633,12 +633,12 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     </div>
                   </div>
                 ))}
-                <button
+                {iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors"
                 >
                   + Add
-                </button>
+                </button>)}
               </div>
             );
           })}
@@ -1128,7 +1128,7 @@ export default function EmployeeTimesheet() {
             <Input
               label="Date"
               type="date"
-              value={logForm.log_date}
+              value={logForm.log_date} max={todayISTKey()}
               onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))}
             />
             <Input
