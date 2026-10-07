@@ -28,6 +28,12 @@ export const DAY_BUCKET_LABEL = {
   absent: "Absent",
 };
 
+const isHalfDayLeave = (t) => typeof t === "string" && t.startsWith("half_day");
+
+// Half Day SL / Half Day EL = 0.5 leave + 0.5 worked.
+//   balance available -> paid -> whole day counts 1 ("Paid Leave" bucket)
+//   balance over (LWP) -> unpaid half -> day counts 0.5 ("Half Day" bucket)
+// Late penalty (4th+ late of the month) is a plain Half Day -> 0.5.
 export const dayBucket = (r) => {
   if (!r) return "absent";
   const paidLeave = !!r.leaveType && r.leaveType !== "lwp" && !r.isLwpDay;
@@ -35,7 +41,10 @@ export const dayBucket = (r) => {
   if (r.status === "half_day") return paidLeave ? "paid_leave" : "half_day";
   if (r.status === "week_off") return "week_off";
   if (r.status === "holiday") return "holiday";
+  // Half-day leave with no check-in: only the leave half exists -> 0.5 if paid.
+  if (r.status === "leave" && isHalfDayLeave(r.leaveType)) return paidLeave ? "half_day" : "absent";
   if (r.status === "leave") return r.isLwpDay || r.leaveType === "lwp" ? "absent" : "paid_leave";
+  if (r.status === "absent" && isHalfDayLeave(r.leaveType)) return paidLeave ? "half_day" : "absent";
   if (r.status === "absent") return paidLeave ? "paid_leave" : "absent";
   return "absent";
 };
