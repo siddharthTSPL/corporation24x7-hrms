@@ -722,7 +722,6 @@ function StatutoryTab({ notify }) {
             Pay overtime from <b>approved timesheets</b> automatically. Each month's payroll picks up the overtime hours logged in that month on approved timesheets and adds them to Earnings as Overtime.
             Hourly rate = Monthly Gross ÷ (No. of Working Days × Standard hours per day). Overtime on timesheets that are not approved yet is never paid.
             If you type an Overtime amount while generating payroll, that amount is used instead.
-            Employees whose salary structure uses the Timesheet attendance basis always get approved overtime paid with this multiplier, even if the sync toggle below is off.
           </p>
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <Toggle checked={!!form.timesheetSync?.enabled} onChange={(v) => set("timesheetSync.enabled", v)} />
