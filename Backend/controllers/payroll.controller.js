@@ -1,6 +1,7 @@
 const SalaryStructure = require("../Models/salarystructure.model");
 const Payroll = require("../Models/payroll.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
@@ -10,9 +11,18 @@ const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/p
 const { getTimesheetOvertimeByEmployee, buildOvertime } = require("../utils/Timesheetovertime.utils");
 const { getOvertimeRequestsByEmployee, linkRequestsToPayroll } = require("../utils/Overtimerequest.utils");
 const { isTimesheetBasis, getTimesheetAttendanceByEmployee } = require("../utils/Timesheetattendance.utils");
+const FieldDutySession = require("../Models/fieldDutySession.model");
+const { istDateFromYMD } = require("../utils/Istdate.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
+
+const getPayrollPeriodBounds = (month, year) => ({
+  start: istDateFromYMD(Number(year), Number(month), 1),
+  end: Number(month) === 12
+    ? istDateFromYMD(Number(year) + 1, 1, 1)
+    : istDateFromYMD(Number(year), Number(month) + 1, 1),
+});
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -369,6 +379,37 @@ const generatePayroll = async (req, res) => {
 
   const role = employeeModel === "User" ? "employee" : employeeModel.toLowerCase();
 
+  if (employeeModel === "User") {
+    const period = getPayrollPeriodBounds(month, year);
+    const [openFieldDuty, unsyncedFieldAttendance] = await Promise.all([
+      FieldDutySession.exists({
+        organisation_id,
+        employee,
+        status: { $in: ["active", "paused", "offline"] },
+        startedAt: { $lt: period.end },
+      }),
+      Attendance.exists({
+        organisation_id,
+        employee,
+        role: "employee",
+        source: "field",
+        date: { $gte: period.start, $lt: period.end },
+        $or: [
+          { checkOut: { $exists: false } },
+          { checkOut: null },
+          { fieldSummarySyncedAt: { $exists: false } },
+          { fieldSummarySyncedAt: null },
+        ],
+      }),
+    ]);
+    if (openFieldDuty || unsyncedFieldAttendance)
+      return res.status(409).json({
+        success: false,
+        message: "This employee has an unfinished or unsynced field attendance record in the selected payroll period. Complete or resolve it before generating payroll.",
+        reason: "field_duty_incomplete",
+      });
+  }
+
 
   const hasManualPaidDays = paidDays !== undefined && paidDays !== null && paidDays !== "";
   const manualAttendance = hasManualPaidDays
@@ -536,6 +577,34 @@ const bulkGeneratePayroll = async (req, res) => {
   const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
 
   const employeeIds = structures.map((s) => s.employee);
+  const period = getPayrollPeriodBounds(month, year);
+  const [openFieldDuties, unsyncedFieldAttendances] = model === "User"
+    ? await Promise.all([
+        FieldDutySession.find({
+          organisation_id,
+          employee: { $in: employeeIds },
+          status: { $in: ["active", "paused", "offline"] },
+          startedAt: { $lt: period.end },
+        }).select("employee").lean(),
+        Attendance.find({
+          organisation_id,
+          employee: { $in: employeeIds },
+          role: "employee",
+          source: "field",
+          date: { $gte: period.start, $lt: period.end },
+          $or: [
+            { checkOut: { $exists: false } },
+            { checkOut: null },
+            { fieldSummarySyncedAt: { $exists: false } },
+            { fieldSummarySyncedAt: null },
+          ],
+        }).select("employee").lean(),
+      ])
+    : [[], []];
+  const employeesWithOpenFieldDuty = new Set([
+    ...openFieldDuties.map((row) => String(row.employee)),
+    ...unsyncedFieldAttendances.map((row) => String(row.employee)),
+  ]);
   const summaries = await AttendanceSummary.find({
     employee: { $in: employeeIds },
     role,
@@ -593,6 +662,11 @@ const bulkGeneratePayroll = async (req, res) => {
   const skipped = [];
 
   for (const structure of structures) {
+    if (employeesWithOpenFieldDuty.has(String(structure.employee))) {
+      skipped.push({ employee: structure.employee, reason: "unfinished or unsynced field attendance in the selected payroll period" });
+      continue;
+    }
+
     if ((workingStatusMap.get(String(structure.employee)) || "working") !== "working") {
       skipped.push({ employee: structure.employee, reason: "resigned/terminated/fired — settle via Full & Final (FnF) instead" });
       continue;

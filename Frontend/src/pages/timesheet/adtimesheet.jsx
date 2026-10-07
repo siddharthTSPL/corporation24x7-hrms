@@ -73,6 +73,7 @@ const STATUS_STYLE = {
   draft: { text: "text-gray-400", bg: "bg-gray-50", label: "Draft" },
   pending_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Manager" },
   pending_reporting_manager: { text: "text-amber-600", bg: "bg-amber-50", label: "Pending Review" },
+  pending_coadmin: { text: "text-purple-600", bg: "bg-purple-50", label: "Pending Co-Admin" },
   pending_admin: { text: "text-blue-600", bg: "bg-blue-50", label: "Pending Admin" },
   pending_superadmin: { text: "text-[#730042]", bg: "bg-[#730042]/[0.07]", label: "Pending SA" },
   approved: { text: "text-emerald-600", bg: "bg-emerald-50", label: "Approved" },
@@ -1435,7 +1436,7 @@ export default function AdminTimesheet() {
                       </div>
                       <div className="flex gap-2 flex-wrap shrink-0">
                         <Btn variant="success" onClick={() => approveTS.mutate({ timesheetId: ts._id, remarks: "Approved by Admin" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Approve</Btn>
-                        <Btn variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: "Forwarded to SuperAdmin" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">Forward to SA</Btn>
+                        <Btn variant="amber" onClick={() => forwardTS.mutate({ timesheetId: ts._id, remarks: ts.status === "pending_coadmin" ? "Forwarded to Main Admin" : "Forwarded to SuperAdmin" }, { onSuccess: refetchApprovals })} className="flex-1 sm:flex-none">{ts.status === "pending_coadmin" ? "Forward to Main Admin" : "Forward to SA"}</Btn>
                         <Btn variant="danger" onClick={() => setRejectModal({ open: true, ts })} className="flex-1 sm:flex-none">Reject</Btn>
                       </div>
                     </div>

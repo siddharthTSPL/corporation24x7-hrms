@@ -4,6 +4,8 @@ const FieldDutySession = require("../Models/fieldDutySession.model");
 const FieldLocation = require("../Models/fieldLocation.model");
 const FieldVisit = require("../Models/fieldVisit.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
+const Attendance = require("../Models/attendance.model");
+const Shift = require("../Models/shift.model");
 const User = require("../Models/user.model");
 const Admin = require("../Models/Admin.model");
 const Manager = require("../Models/manager.model");
@@ -38,6 +40,10 @@ const {
   resolveMinDurationMinutes,
 } = require("../utils/fieldWorkConstants");
 const { checkLocationPlausibility } = require("../utils/locationPlausibility.utils");
+const { startOfISTDay } = require("../utils/Istdate.utils");
+const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, calculateFaceStatus } = require("../utils/shift.utils");
+const { computeLateStanding, applyLatePenaltyToStatus } = require("../utils/Laterule.utils");
+const { updateSummary } = require("../automatic/monthattendanceupdate");
 
 const OPEN_STATUSES = ["active", "paused", "offline"];
 const STAFF_ROLES = ["SuperAdmin", "Admin", "Manager"];
@@ -442,6 +448,125 @@ async function assertEmployeeCanUseFieldOperations(req) {
   );
 }
 
+async function getFieldAttendance(session) {
+  return Attendance.findOne({
+    organisation_id: session.organisation_id,
+    employee: session.employee,
+    role: "employee",
+    date: startOfISTDay(session.startedAt),
+    fieldDutySession: session._id,
+    source: "field",
+  });
+}
+
+async function ensureFieldAttendance(session, employeeDoc) {
+  const existingLinked = await getFieldAttendance(session);
+  if (existingLinked) return existingLinked;
+
+  const date = startOfISTDay(session.startedAt);
+  const existing = await Attendance.findOne({
+    organisation_id: session.organisation_id,
+    employee: session.employee,
+    role: "employee",
+    date,
+  });
+  if (existing && existing.source !== "agent") {
+    throw httpError(
+      existing.source === "field"
+        ? "Today's field attendance is already complete. You can start field duty again tomorrow."
+        : "Today's attendance was recorded through another method. Contact your administrator before starting field duty.",
+      409,
+    );
+  }
+
+  const shift = await resolveEmployeeShift(employeeDoc, session.organisation_id);
+  const { isLate, lateMinutes } = evaluateCheckinWindow(shift, session.startedAt);
+  const lateStanding = await computeLateStanding({
+    organisation_id: session.organisation_id,
+    employee: session.employee,
+    role: "employee",
+    date,
+    isLate,
+  });
+  const values = {
+    organisation_id: session.organisation_id,
+    employee: session.employee,
+    onModel: "User",
+    role: "employee",
+    date,
+    checkIn: session.startedAt,
+    latitude: session.startLocation.latitude,
+    longitude: session.startLocation.longitude,
+    accuracy: session.startLocation.accuracy,
+    shift: shift._id,
+    isLate,
+    lateMinutes,
+    lateCountInMonth: lateStanding.lateCountInMonth || 0,
+    latePenalty: lateStanding.latePenalty || false,
+    activeMinutes: 0,
+    idleMinutes: 0,
+    lastUpdated: Date.now(),
+    source: "field",
+    fieldDutySession: session._id,
+    fieldSummarySyncedAt: null,
+  };
+
+  if (existing?.source === "agent") {
+    Object.assign(existing, values);
+    return existing.save();
+  }
+  try {
+    return await Attendance.create(values);
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    const raced = await getFieldAttendance(session);
+    if (raced) return raced;
+    throw httpError(
+      "Today's attendance was recorded at the same time through another method. Contact your administrator.",
+      409,
+    );
+  }
+}
+
+async function syncFieldAttendanceCheckout(session, employeeDoc, endedAt) {
+  let attendance = await getFieldAttendance(session);
+  if (!attendance) attendance = await ensureFieldAttendance(session, employeeDoc);
+
+  if (!attendance.checkOut) {
+    const durationMinutes = Math.max(
+      0,
+      Math.round((endedAt.getTime() - new Date(attendance.checkIn).getTime()) / 60000),
+    );
+    let shift = attendance.shift
+      ? await Shift.findOne({
+          _id: attendance.shift,
+          organisation_id: session.organisation_id,
+        }).lean()
+      : null;
+    if (!shift) shift = await resolveEmployeeShift(employeeDoc, session.organisation_id);
+    const checkoutWindow = evaluateCheckoutWindow(shift, endedAt, attendance.checkIn);
+
+    attendance.checkOut = endedAt;
+    attendance.activeMinutes = durationMinutes;
+    attendance.status = applyLatePenaltyToStatus(
+      attendance,
+      calculateFaceStatus(durationMinutes, shift),
+    );
+    attendance.checkoutRemark = checkoutWindow.remark;
+    attendance.overtimeMinutes = checkoutWindow.isOvertime
+      ? checkoutWindow.overtimeMinutes
+      : 0;
+    await attendance.save();
+  }
+
+  if (!attendance.fieldSummarySyncedAt) {
+    await updateSummary(attendance);
+    attendance.fieldSummarySyncedAt = new Date();
+    await attendance.save();
+  }
+  return attendance;
+}
+
 async function accessibleEmployeeIds(req) {
   const { actor, organisation_id } = actorContext(req);
   if (["SuperAdmin", "Admin"].includes(actor.model)) {
@@ -520,6 +645,8 @@ exports.startDuty = async (req, res) => {
       clientEventId,
     });
     if (existing)
+      await ensureFieldAttendance(existing, actor);
+    if (existing)
       return res
         .status(200)
         .json({
@@ -536,6 +663,8 @@ exports.startDuty = async (req, res) => {
     status: { $in: OPEN_STATUSES },
   }).sort({ startedAt: -1 });
   if (open)
+    await ensureFieldAttendance(open, actor);
+  if (open)
     return res.status(409).json({
       success: false,
       message: "You already have an open field-duty session",
@@ -548,11 +677,24 @@ exports.startDuty = async (req, res) => {
     selfieBase64: req.body.selfieBase64,
     required: true,
   });
+  const startedAt = new Date();
+  const priorAttendance = await Attendance.findOne({
+    organisation_id,
+    employee: actor.id,
+    role: "employee",
+    date: startOfISTDay(startedAt),
+  }).select("source checkOut").lean();
+  if (priorAttendance && priorAttendance.source !== "agent")
+    throw httpError(
+      "Today's attendance was already recorded. Field duty can only be started once attendance is resolved.",
+      409,
+    );
   const team = teamId ? await FieldTeam.findById(teamId).select("geofence").lean() : null;
   const session = await FieldDutySession.create({
     organisation_id,
     employee: actor.id,
     team: teamId,
+    startedAt,
     startLocation,
     lastLocation: startLocation,
     lastSeenAt: startLocation.capturedAt,
@@ -571,6 +713,13 @@ exports.startDuty = async (req, res) => {
         : null,
     },
   });
+  try {
+    await ensureFieldAttendance(session, actor);
+  } catch (error) {
+    if (error.statusCode === 409)
+      await FieldDutySession.deleteOne({ _id: session._id, organisation_id });
+    throw error;
+  }
   return res.status(201).json({
     success: true,
     session: withoutDeviceToken(session),
@@ -619,11 +768,19 @@ exports.myDuty = async (req, res) => {
   ]);
   const isAssigned = Boolean(team || individual);
 
-  const session = await FieldDutySession.findOne({
+  let session = await FieldDutySession.findOne({
     organisation_id,
     employee: actor.id,
     status: { $in: OPEN_STATUSES },
   }).sort({ startedAt: -1 });
+  if (!session) {
+    session = await FieldDutySession.findOne({
+      organisation_id,
+      employee: actor.id,
+      status: "checked_out",
+      startedAt: { $gte: startOfISTDay() },
+    }).sort({ startedAt: -1 });
+  }
   const checkpoint = computeCheckpointStatus(session);
   return res.json({
     success: true,
@@ -885,7 +1042,9 @@ exports.submitCheckIn = async (req, res) => {
 };
 
 exports.checkoutDuty = async (req, res) => {
-  const { actor } = await assertEmployeeCanUseFieldOperations(req);
+  const { actor } = actorContext(req);
+  if (actor.model !== "User")
+    throw httpError("Only field employees can check out of a duty session", 403);
   const session = await getOwnedSession(req, req.params.sessionId, {
     employeeOnly: true,
   });
@@ -893,8 +1052,10 @@ exports.checkoutDuty = async (req, res) => {
   if (!deviceCheck.ok) {
     rejectOtherDevice();
   }
-  if (session.status === "checked_out")
+  if (session.status === "checked_out") {
+    await syncFieldAttendanceCheckout(session, actor, session.endedAt || new Date());
     return res.json({ success: true, session: withoutDeviceToken(session), idempotent: true });
+  }
   // Nothing previously stopped checking out while a customer visit was
   // still "in_progress" — the visit was simply left stuck in the database
   // forever with no endedAt, and the frontend's own openVisit reference to
@@ -930,6 +1091,7 @@ exports.checkoutDuty = async (req, res) => {
     session.device.batteryAtEnd = Number(req.body.batteryLevel);
   }
   await session.save();
+  await syncFieldAttendanceCheckout(session, actor, endedAt);
   return res.json({ success: true, session: withoutDeviceToken(session) });
 };
 
