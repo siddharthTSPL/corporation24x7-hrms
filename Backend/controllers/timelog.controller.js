@@ -197,6 +197,10 @@ const logTime = async (req, res, next) => {
     );
   }
 
+  if (parseISTDateOnly(log_date) > endOfISTDay(new Date())) {
+    return next(httpError("Future dates par time log nahi kar sakte", 400));
+  }
+
   if (duration_minutes <= 0 || duration_minutes > 1440) {
     return next(
       httpError("duration_minutes must be between 1 and 1440", 400)
