@@ -262,6 +262,10 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
   // Only load the attendance window we are going to rebuild (with a couple
   // of days of slack for IST/UTC month-boundary records).
   const attendanceFilter = {};
+  // opts.organisationId: rebuild only this organisation (all its roles).
+  if (opts.organisationId) {
+    attendanceFilter.organisation_id = new mongoose.Types.ObjectId(String(opts.organisationId));
+  }
   if (scopeMonths) {
     const firstMonth = [...scopeMonths].map((k) => k.split("-").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1])[0];
     attendanceFilter.date = { $gte: new Date(Date.UTC(firstMonth[0], firstMonth[1] - 1, 1) - 2 * 24 * 60 * 60 * 1000) };
@@ -377,6 +381,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
     const employees = await Model.find({
       working_status: "working",
       ...(scopedIds ? { _id: { $in: scopedIds } } : {}),
+      ...(opts.organisationId ? { organisation_id: new mongoose.Types.ObjectId(String(opts.organisationId)) } : {}),
     })
       .select("_id organisation_id date_of_joining createdAt")
       .lean();
