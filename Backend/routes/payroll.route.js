@@ -8,6 +8,7 @@ const checkPermission = require("../middleware/auth/Checkpermission.middleware")
 const {
   getOrgOwner,
   setEmployeeCTC,
+  bulkSetEmployeeCTC,
   updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
@@ -28,6 +29,7 @@ const {
 payrollrouter.get("/org-owner", payrollManagementAuth, asyncHandler(getOrgOwner));
 
 payrollrouter.post("/structure", payrollManagementAuth, asyncHandler(setEmployeeCTC));
+payrollrouter.post("/structure/bulk", payrollManagementAuth, asyncHandler(bulkSetEmployeeCTC));
 payrollrouter.get("/structure", payrollManagementAuth, asyncHandler(listSalaryStructures));
 payrollrouter.get("/structure/:employee", payrollManagementAuth, asyncHandler(getSalaryStructure));
 payrollrouter.post("/structure/:employee/reapply-policy", payrollManagementAuth, asyncHandler(reapplyPolicy));
