@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
 import toast from "react-hot-toast";
 import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
 import {
@@ -9,7 +10,7 @@ import {
   useAssignableTargets,
   useUpdateJobStatus,
   useMyWeekLog,
-  useLogTime,
+  useLogTime, useMyDayStatus,
   useActiveTimer,
   useStartTimer,
   usePauseTimer,
@@ -634,6 +635,7 @@ function JobDetailModal({ jobId, open, onClose }) {
 function TimerWidget({ jobs }) {
   const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 30000 });
   const timer = timerData?.timer;
+  const { data: dayStatus } = useMyDayStatus();
   const startTimerMut = useStartTimer();
   const pauseTimerMut = usePauseTimer();
   const resumeTimerMut = useResumeTimer();
@@ -699,7 +701,7 @@ function TimerWidget({ jobs }) {
             {fmtSeconds(displaySecs)}
           </div>
           {!timer ? (
-            <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start Timer</Btn>
+            dayStatus?.isOff ? <OffDayTag info={dayStatus} /> : <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start Timer</Btn>
           ) : (
             <div className="flex gap-2 flex-wrap">
               {isRunning && <Btn variant="amber" onClick={() => pauseTimerMut.mutate({}, { onSuccess: refetchTimer })}>⏸ Pause</Btn>}
@@ -799,7 +801,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
                   ))}
                 </div>
               )}
-              {iso <= today && (<button
+              {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= today && (<button
                 onClick={() => onAddLog(iso)}
                 className="bg-transparent border-[1.5px] border-dashed border-gray-200 rounded-md py-1.5 px-2 cursor-pointer text-gray-400 text-[11px] font-semibold w-full transition-colors hover:border-[#730042] hover:text-[#730042] min-h-[36px]"
               >+ Add</button>)}
@@ -839,7 +841,7 @@ function CalendarWeekGrid({ weekStart, weekDays, onAddLog }) {
                     <div className={`text-[10px] font-semibold mt-0.5 ${log.billable ? "text-emerald-600" : "text-[#730042]"}`}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                {iso <= today && (<button
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= today && (<button
                   onClick={() => onAddLog(iso)}
                   className="mt-auto bg-transparent border-[1.5px] border-dashed border-gray-200 rounded-md py-1 px-1 cursor-pointer text-gray-400 text-[11px] font-semibold w-full transition-colors hover:border-[#730042] hover:text-[#730042]"
                 >+ Add</button>)}
@@ -1017,6 +1019,7 @@ export default function AdminTimesheet() {
   const updateJob = useUpdateJob();
   const updateJobStatus = useUpdateJobStatus();
   const logTime = useLogTime();
+  const { data: logDayStatus } = useMyDayStatus(logForm.log_date || undefined);
   const submitTS = useSubmitTimesheet();
   const approveTS = useApproveTimesheet();
   const rejectTS = useRejectTimesheet();
@@ -2051,6 +2054,7 @@ export default function AdminTimesheet() {
 
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
         <div className="flex flex-col gap-4">
+          <OffDayNotice status={logDayStatus} />
           <Sel label="Job" value={logForm.job} onChange={(e) => setLogForm((p) => ({ ...p, job: e.target.value }))}>
             <option value="">Select job…</option>
             {assignedJobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
@@ -2062,7 +2066,7 @@ export default function AdminTimesheet() {
           <Input label="Note" placeholder="What did you work on?" value={logForm.note} onChange={(e) => setLogForm((p) => ({ ...p, note: e.target.value }))} />
           <div className="flex flex-col sm:flex-row gap-2 justify-end">
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending || logDayStatus?.isOff} className="w-full sm:w-auto">
               {logTime.isPending ? "Logging…" : "Save Entry"}
             </Btn>
           </div>
