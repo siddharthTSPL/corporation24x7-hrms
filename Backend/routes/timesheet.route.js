@@ -145,6 +145,7 @@ const {
   logTime,
   getMyDayLog,
   getMyWeekLog,
+  getMyDayStatus,
   updateTimeLog,
   deleteTimeLog,
   getJobTimeLogs,
@@ -242,6 +243,7 @@ timesheetRouter.get(
 timesheetRouter.post("/time-logs", anyRole, asyncHandler(logTime));
 timesheetRouter.get("/time-logs/day", anyRole, asyncHandler(getMyDayLog));
 timesheetRouter.get("/time-logs/week", anyRole, asyncHandler(getMyWeekLog));
+timesheetRouter.get("/time-logs/day-status", anyRole, asyncHandler(getMyDayStatus));
 timesheetRouter.put("/time-logs/:id", anyRole, asyncHandler(updateTimeLog));
 timesheetRouter.delete("/time-logs/:id", anyRole, asyncHandler(deleteTimeLog));
 
