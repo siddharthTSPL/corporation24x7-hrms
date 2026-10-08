@@ -124,6 +124,11 @@ export const getMyWeekLog = async (week_start) => {
   return res.data;
 };
 
+export const getMyDayStatus = async (date) => {
+  const res = await api.get("timesheet/time-logs/day-status", { params: date ? { date } : {} });
+  return res.data;
+};
+
 export const updateTimeLog = async ({ id, data }) => {
   const res = await api.put(`timesheet/time-logs/${id}`, data);
   return res.data;
