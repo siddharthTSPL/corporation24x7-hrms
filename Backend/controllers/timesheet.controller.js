@@ -11,7 +11,7 @@ const User = require("../Models/user.model");
 const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
-const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
+const { getWeekOffMapForRange, getDayTypeMapForRange } = require("../automatic/weekoffcalendar");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -729,7 +729,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
     const activeProjectCache = new Map();
 
     for (const emp of employeesSeen.values()) {
-      const dayTypeMap = await getWeekOffMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
+      const dayTypeMap = await getDayTypeMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
       const activeProject = await resolveActiveProjectLabel(emp.id, emp.model, activeProjectCache);
       for (const [dateKey, info] of dayTypeMap.entries()) {
         if (!info.isOff) continue;
@@ -746,8 +746,9 @@ const getTimesheetDetailedReport = async (req, res, next) => {
           project: activeProject,
           job: null,
           date: dateKey,
-          day_type: "week_off",
-          day_label: "Weekend / Off",
+          day_type: info.type === "holiday" ? "holiday" : "week_off",
+          day_label: info.type === "holiday" ? "Holiday" : "Weekend / Off",
+          paid: true,
           required_hours: 0,
           serving_hours: 0,
           overtime_hours: 0,
@@ -756,7 +757,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
           timesheet_status: "off",
           approved_by: null,
           rejected_by: null,
-          remarks: "",
+          remarks: info.type === "holiday" ? info.name || "" : "",
         });
       }
     }
