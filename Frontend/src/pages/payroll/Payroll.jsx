@@ -475,7 +475,7 @@ function normalizeCTCEffectiveDate(value) {
 
 function downloadCTCTemplate(directory, structures) {
   const currentByEmployee = new Map(structures.map((structure) => [`${structure.employeeModel}:${structure.employee}`, structure.ctc]));
-  const rows = [["Employee Type", "Employee ID", "Employee Name", "Current Annual CTC", "New Annual CTC", "Effective From"]];
+  const rows = [["Employee Type", "Employee ID", "Employee Name", "Current Annual CTC", "New Annual CTC", "Effective From (YYYY-MM-DD)"]];
   for (const model of directory.visibleModels) {
     for (const person of directory.byModel[model] || []) {
       rows.push([model, person.empid, person.name, currentByEmployee.get(`${model}:${person._id}`) || "", "", ""]);
@@ -1282,7 +1282,7 @@ function StructuresTab({ notify, directory }) {
       const typeColumn = column("employeetype");
       const idColumn = column("employeeid");
       const ctcColumn = column("newannualctc");
-      const dateColumn = column("effectivefrom");
+      const dateColumn = headers.findIndex((header) => header === "effectivefrom" || header.startsWith("effectivefrom"));
       if ([typeColumn, idColumn, ctcColumn].some((index) => index < 0))
         throw new Error("Required columns: Employee Type, Employee ID, New Annual CTC");
 
@@ -1432,6 +1432,9 @@ function StructuresTab({ notify, directory }) {
         </div>
         <p style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
           Revised CTC becomes active immediately. Existing payroll records stay unchanged unless regenerated; a regenerated record uses the active CTC. Effective From is recorded on the salary structure.
+        </p>
+        <p style={{ marginTop: 4, fontSize: 12, color: C.muted }}>
+          Date format: YYYY-MM-DD (example: 2026-10-09). Excel dates like 09-Oct-26 are also accepted.
         </p>
         {bulkIssues.length > 0 && (
           <div role="alert" style={{ marginTop: 12, padding: 12, borderRadius: 8, background: C.redBg, color: C.red, fontSize: 12 }}>
