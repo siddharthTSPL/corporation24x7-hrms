@@ -59,6 +59,7 @@ const superAdminMenu = [
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "Review overtime requests from your team and send approved hours to payroll." },
+  { name: "Recruitment", path: "/superadmin-recruitment", icon: <FaUsersCog />, blurb: "Review hiring requisitions, manage candidates and interviews, and approve offer letters.", planFeature: "recruitment" },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
   { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
