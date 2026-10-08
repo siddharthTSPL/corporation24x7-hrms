@@ -90,7 +90,7 @@ const loadApprovedLeaveRanges = async () => {
   // isOnApprovedLeave() below still filters out that leave's own lwpDays
   // shortfall days.
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
+    Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("employee startDate endDate lwpDays").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("manager startDate endDate lwpDays").lean(),
@@ -140,7 +140,7 @@ const loadAllApprovedLeaveRangesWithType = async () => {
   };
 
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] } })
+    Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] } })
       .select("employee startDate endDate lwpDays leaveType").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] } })
       .select("manager startDate endDate lwpDays leaveType").lean(),
@@ -211,7 +211,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts 
     const sinceDate = startOfDay(new Date(Date.now() - (sinceDays - 1) * 24 * 60 * 60 * 1000));
     const [recentAttendance, recentEmpLeaves, recentMgrLeaves, recentAdminLeaves] = await Promise.all([
       Attendance.find({ date: { $gte: sinceDate }, checkOut: { $exists: true } }).select("employee role").lean(),
-      Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
+      Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
       ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("manager").lean(),
       AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] }, approvedAt: { $gte: sinceDate } }).select("admin").lean(),
     ]);

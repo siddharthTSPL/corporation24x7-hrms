@@ -18,7 +18,7 @@ const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 
 const ROLE_CONFIG = {
-  employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee", leaveApprovedStatuses: ["approved_manager", "approved_admin"] },
+  employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee", leaveApprovedStatuses: ["approved_manager", "approved_reporting_manager", "approved_admin"] },
   manager:  { Model: Manager, onModel: "Manager", LeaveModel: ManagerLeave, leaveField: "manager", leaveApprovedStatuses: ["approved_reporting_manager", "approved_admin"] },
   admin:    { Model: Admin, onModel: "Admin", LeaveModel: AdminLeave, leaveField: "admin", leaveApprovedStatuses: ["approved_reporting_manager", "approved_superadmin"] },
 };

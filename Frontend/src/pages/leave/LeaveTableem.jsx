@@ -144,6 +144,12 @@ const LEAVE_STATUS_META = {
     text: "text-[#92400E]",
     dot: "bg-[#F59E0B]",
   },
+  pending_coadmin: {
+    label: "Pending Co-Admin",
+    bg: "bg-[#F5F3FF]",
+    text: "text-[#6D28D9]",
+    dot: "bg-[#8B5CF6]",
+  },
   pending_superadmin: {
     label: "Pending Super Admin",
     bg: "bg-[#FFFBEB]",
@@ -395,7 +401,7 @@ const LeaveTypeBadge = ({ type }) => {
   );
 };
 
-const StatusBadge = ({ status, meta }) => {
+const StatusBadge = ({ status, meta, labelOverride }) => {
   const m = (meta || {})[status] || {
     label: humanize(status),
     ...META_FALLBACK,
@@ -405,7 +411,7 @@ const StatusBadge = ({ status, meta }) => {
       className={`inline-flex items-center gap-[5px] px-[10px] py-[3px] rounded-full text-[11px] font-semibold font-['DM_Sans'] whitespace-nowrap ${m.bg} ${m.text}`}
     >
       <span className={`w-[5px] h-[5px] rounded-full shrink-0 ${m.dot}`} />
-      {m.label}
+      {labelOverride || m.label}
     </span>
   );
 };
@@ -439,7 +445,23 @@ const SectionBox = ({ title, children, rightEl }) => (
   </div>
 );
 
-const getLeaveJourneyConfig = (status) => {
+const getLeaveJourneyConfig = (status, item) => {
+  const coAdminInvolved =
+    ["pending_coadmin", "forwarded_admin"].includes(status) ||
+    item?.approvedByRoleLabel === "Co-Admin" ||
+    (status !== "forwarded_admin" && !!item?.forwardedBy);
+
+  if (coAdminInvolved) {
+    const wasForwardedToAdmin = status === "forwarded_admin" || !!item?.forwardedBy;
+    return [
+      { key: "submitted", label: "Submitted" },
+      { key: "manager_review", label: "Manager Review" },
+      { key: "coadmin_review", label: "Co-Admin" },
+      ...(wasForwardedToAdmin ? [{ key: "admin_review", label: "Admin" }] : []),
+      { key: "final", label: "Final Decision" },
+    ];
+  }
+
   const isForwardedToReporting =
     status === "forwarded_reporting_manager" ||
     status === "approved_reporting_manager" ||
@@ -447,6 +469,8 @@ const getLeaveJourneyConfig = (status) => {
 
   const isAdminInvolved =
     status === "pending_admin" ||
+    status === "forwarded_admin" ||
+    status === "pending_coadmin" ||
     status === "approved_admin" ||
     status === "rejected_admin" ||
     status === "approved_superadmin" ||
@@ -503,6 +527,10 @@ const getWFHJourneyConfig = (status) => {
 const getJourneyActiveIdx = (status, steps) => {
   if (!status) return 0;
 
+  if (status === "pending_coadmin") return steps.findIndex((step) => step.key === "coadmin_review");
+  if (status === "forwarded_admin") return steps.findIndex((step) => step.key === "admin_review");
+  if (status.startsWith("approved") || status.startsWith("rejected")) return steps.length - 1;
+
   const keyMap = {
     pending_manager: { 3: 1, 4: 1 },
     forwarded_reporting_manager: { 4: 2 },
@@ -512,6 +540,8 @@ const getJourneyActiveIdx = (status, steps) => {
     approved_reporting_manager: { 4: 3 },
     rejected_reporting_manager: { 4: 3 },
     pending_admin: { 4: 2 },
+    pending_coadmin: { 4: 2 },
+    forwarded_admin: { 5: 3 },
     approved_admin: { 4: 3 },
     rejected_admin: { 4: 3 },
     pending_superadmin: { 4: 2 },
@@ -522,8 +552,6 @@ const getJourneyActiveIdx = (status, steps) => {
   const len = steps.length;
   if (keyMap[status] && keyMap[status][len] !== undefined)
     return keyMap[status][len];
-  if (status.startsWith("approved") || status.startsWith("rejected"))
-    return steps.length - 1;
   return 0;
 };
 
@@ -546,7 +574,7 @@ const JourneyTracker = ({
     ? "Work From Home"
     : leaveMeta.label || humanize(item.leaveType);
 
-  const steps = getJourneyConfig(item.status);
+  const steps = getJourneyConfig(item.status, item);
   const activeIdx = getJourneyActiveIdx(item.status, steps);
   const isRejected = (item.status || "").startsWith("rejected");
 
@@ -565,7 +593,16 @@ const JourneyTracker = ({
             {item.days !== 1 ? "s" : ""}
           </p>
         </div>
-        <StatusBadge status={item.status} meta={statusMeta} />
+        <StatusBadge
+          status={item.status}
+          meta={statusMeta}
+          labelOverride={
+            item.approvedByRoleLabel &&
+            (item.status === "approved_admin" || item.status === "rejected_admin")
+              ? `${item.status === "approved_admin" ? "Approved" : "Rejected"} by ${item.approvedByRoleLabel}`
+              : undefined
+          }
+        />
       </div>
 
       <div className="flex items-start overflow-x-auto pb-1">

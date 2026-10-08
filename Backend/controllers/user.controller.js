@@ -828,7 +828,26 @@ const getallleavehistory = async (req, res, next) => {
   })
     .sort({ createdAt: -1 })
     .lean();
-  res.status(200).json({ success: true, count: leaves.length, leaves });
+  const adminApproverIds = leaves
+    .filter((leave) => leave.approvedByModel === "Admin" && leave.approvedBy)
+    .map((leave) => leave.approvedBy);
+  const coAdminApproverIds = new Set(
+    (adminApproverIds.length
+      ? await Adminmodel.find({
+          _id: { $in: adminApproverIds },
+          organisation_id,
+          reporting_manager_model: "Admin",
+        }).distinct("_id")
+      : []
+    ).map(String),
+  );
+  const leavesWithApproverRole = leaves.map((leave) => ({
+    ...leave,
+    approvedByRoleLabel: leave.approvedByModel === "Admin"
+      ? coAdminApproverIds.has(String(leave.approvedBy)) ? "Co-Admin" : "Admin"
+      : leave.approvedByModel || null,
+  }));
+  res.status(200).json({ success: true, count: leaves.length, leaves: leavesWithApproverRole });
 };
 
 const showannouncements = async (req, res, next) => {

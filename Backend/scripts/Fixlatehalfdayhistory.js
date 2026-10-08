@@ -89,7 +89,7 @@ const fixLateRule = async (rangeStart, rangeEndExclusive) => {
 
 // ─────────── Step 2: half_day_el / half_day_sl balance (lwpDays) ───────────
 const LEAVE_SOURCES = [
-  { Model: Leave, field: "employee", approved: ["approved_manager", "approved_admin"], model: "User" },
+  { Model: Leave, field: "employee", approved: ["approved_manager", "approved_reporting_manager", "approved_admin"], model: "User" },
   { Model: ManagerLeave, field: "manager", approved: ["approved_reporting_manager", "approved_admin"], model: "Manager" },
   { Model: AdminLeave, field: "admin", approved: ["approved_reporting_manager", "approved_superadmin"], model: "Admin" },
 ];

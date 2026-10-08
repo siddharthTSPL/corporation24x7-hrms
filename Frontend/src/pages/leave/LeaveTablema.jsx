@@ -460,6 +460,12 @@ const LEAVE_STATUS_META = {
     color: "#92400E",
     dot: "#F59E0B",
   },
+  pending_coadmin: {
+    label: "Pending Co-Admin",
+    bg: "#F5F3FF",
+    color: "#6D28D9",
+    dot: "#8B5CF6",
+  },
   pending_superadmin: {
     label: "Pending Super Admin",
     bg: "#FFFBEB",
@@ -552,6 +558,7 @@ const WFH_STATUS_META = {
 const EMP_LEAVE_FILTERS = [
   { key: "all", label: "All" },
   { key: "pending_manager", label: "Pending" },
+  { key: "pending_coadmin", label: "Pending Co-Admin" },
   { key: "approved_manager", label: "Approved" },
   { key: "rejected_manager", label: "Rejected" },
   { key: "forwarded_reporting_manager", label: "Forwarded" },
@@ -560,6 +567,7 @@ const EMP_LEAVE_FILTERS = [
 const NON_ACTIONABLE = [
   "approved_manager",
   "rejected_manager",
+  "pending_coadmin",
   "forwarded_admin",
   "approved_admin",
   "rejected_admin",

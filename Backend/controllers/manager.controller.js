@@ -16,7 +16,7 @@ const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = re
 const imagekit = require("../utils/imagekit.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
-const { resolveCustomRouting, resolveDefaultAdminHandler } = require("../utils/approvalFlow.utils");
+const { resolveCustomRouting, resolveDefaultAdminRoute } = require("../utils/approvalFlow.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
 const { revokeSession } = require("../utils/singleSignIn.utils");
 const Attendance = require("../Models/attendance.model");
@@ -345,15 +345,14 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     if (!currentManager.reporting_manager)
       return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-    const nextHandlerId = currentManager.reporting_manager_model === "Admin"
-      ? await resolveDefaultAdminHandler(currentManager.reporting_manager, req.manager.organisation_id)
-      : currentManager.reporting_manager;
+    const adminRoute = currentManager.reporting_manager_model === "Admin"
+      ? await resolveDefaultAdminRoute(currentManager.reporting_manager, req.manager.organisation_id)
+      : null;
+    const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
 
     leave.directed_to = nextHandlerId;
     leave.directed_to_model = currentManager.reporting_manager_model;
-    leave.status = currentManager.reporting_manager_model === "Admin"
-      ? "pending_admin"
-      : "forwarded_reporting_manager";
+    leave.status = adminRoute?.status || "forwarded_reporting_manager";
 
     await leave.save();
 
@@ -408,15 +407,14 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  const nextHandlerId = currentManager.reporting_manager_model === "Admin"
-    ? await resolveDefaultAdminHandler(currentManager.reporting_manager, organisation_id)
-    : currentManager.reporting_manager;
+  const adminRoute = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(currentManager.reporting_manager, organisation_id)
+    : null;
+  const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
 
   leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
-  leave.status = currentManager.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "forwarded_reporting_manager";
+  leave.status = adminRoute?.status || "forwarded_reporting_manager";
 
   await leave.save();
 
@@ -566,16 +564,15 @@ const applyleavem = async (req, res, next) => {
     }
   }
 
+  const adminRoute = !customRouting && managerData.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(managerData.reporting_manager, organisation_id)
+    : null;
   const initialStatus = customRouting
     ? customRouting.status
-    : managerData.reporting_manager_model === "Admin"
-      ? "pending_admin"
-      : "pending_reporting_manager";
+    : adminRoute?.status || "pending_reporting_manager";
   const initialHandlerId = customRouting
     ? customRouting.primary
-    : managerData.reporting_manager_model === "Admin"
-      ? await resolveDefaultAdminHandler(managerData.reporting_manager, organisation_id)
-      : managerData.reporting_manager;
+    : adminRoute?.handler || managerData.reporting_manager;
 
   const leave = await managerLeaveModel.create({
     organisation_id,
@@ -635,7 +632,7 @@ const editleavem = async (req, res, next) => {
     );
 
   if (
-    !["pending_reporting_manager", "pending_admin"].includes(
+    !["pending_reporting_manager", "pending_admin", "pending_coadmin"].includes(
       leave.status
     )
   )
@@ -755,7 +752,7 @@ const deleteleavem = async (req, res, next) => {
   });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
- if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+ if (!["pending_reporting_manager", "pending_admin", "pending_coadmin"].includes(leave.status))
     return next(
       Object.assign(
         new Error("Cannot delete leave that is already processed or forwarded"),
@@ -831,15 +828,14 @@ const forwardLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  const nextHandlerId = currentManager.reporting_manager_model === "Admin"
-    ? await resolveDefaultAdminHandler(currentManager.reporting_manager, organisation_id)
-    : currentManager.reporting_manager;
+  const adminRoute = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(currentManager.reporting_manager, organisation_id)
+    : null;
+  const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
 
   leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
-  leave.status = currentManager.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "pending_reporting_manager";
+  leave.status = adminRoute?.status || "pending_reporting_manager";
 
   await leave.save();
 
@@ -1299,7 +1295,27 @@ const getmyleavehistory = async (req, res, next) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  res.status(200).json({ success: true, count: leave.length, leave });
+  const adminApproverIds = leave
+    .filter((item) => item.approvedByModel === "Admin" && item.approvedBy)
+    .map((item) => item.approvedBy);
+  const coAdminApproverIds = new Set(
+    (adminApproverIds.length
+      ? await AdminModel.find({
+          _id: { $in: adminApproverIds },
+          organisation_id: req.manager.organisation_id,
+          reporting_manager_model: "Admin",
+        }).distinct("_id")
+      : []
+    ).map(String),
+  );
+  const leaveWithApproverRole = leave.map((item) => ({
+    ...item,
+    approvedByRoleLabel: item.approvedByModel === "Admin"
+      ? coAdminApproverIds.has(String(item.approvedBy)) ? "Co-Admin" : "Admin"
+      : item.approvedByModel || null,
+  }));
+
+  res.status(200).json({ success: true, count: leave.length, leave: leaveWithApproverRole });
 };
 
 const reviewtoemployee = async (req, res, next) => {

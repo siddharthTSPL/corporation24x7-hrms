@@ -42,6 +42,7 @@ const STATUS_LABEL_MAP = {
   rejected_reporting_manager:  "Rejected by RM",
   pending_reporting_manager:   "Pending (Reporting Manager)",
   pending_admin:               "Pending (Admin)",
+  pending_coadmin:             "Pending (Co-Admin)",
   pending_superadmin:          "Pending (Super Admin)",
   approved_superadmin:         "Approved by Super Admin",
   rejected_superadmin:         "Rejected by Super Admin",
@@ -64,6 +65,7 @@ const LEAVE_STATUS_META = {
   rejected_reporting_manager:  { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_reporting_manager:   { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
   pending_admin:               { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  pending_coadmin:             { bg: "#F5F3FF", color: "#6D28D9", dot: "#8B5CF6" },
 };
 
 const WFH_STATUS_META = {
@@ -422,20 +424,26 @@ const buildTimeline = (leave) => {
   const steps = [];
   const status = leave.status || "";
   steps.push({ label: "Applied", desc: "Leave request submitted", date: leave.createdAt, done: true, color: "#8B3A8A" });
-  const isApprovedByManager = ["approved_manager","forwarded_admin","forwarded_reporting_manager","approved_admin","rejected_admin","approved_reporting_manager","rejected_reporting_manager"].includes(status);
+  const isApprovedByManager = ["approved_manager","forwarded_admin","forwarded_reporting_manager","pending_coadmin","approved_admin","rejected_admin","approved_reporting_manager","rejected_reporting_manager"].includes(status);
   const isRejectedByManager = status === "rejected_manager";
   const isPendingManager    = status === "pending_manager";
   if (isPendingManager) {
     steps.push({ label: "Manager Review", desc: "Awaiting manager decision", date: null, done: false, pending: true, color: "#F59E0B" });
   } else if (isRejectedByManager) {
     steps.push({ label: "Manager Review", desc: "Rejected by manager", date: leave.updatedAt, done: true, color: "#EF4444" });
-  } else if (isApprovedByManager) {
+  } else if (isApprovedByManager && leave.applicantRole !== "Manager") {
     steps.push({ label: "Manager Review", desc: "Approved by manager", date: leave.updatedAt, done: true, color: "#22C55E" });
   }
+  const isCoadminPending = status === "pending_coadmin";
   const isAdminPending  = ["forwarded_admin","forwarded_reporting_manager","pending_admin","pending_reporting_manager"].includes(status);
   const isAdminApproved = ["approved_admin","approved_reporting_manager"].includes(status);
   const isAdminRejected = ["rejected_admin","rejected_reporting_manager"].includes(status);
-  if (isAdminPending) {
+  if (isCoadminPending) {
+    steps.push({ label: "Co-Admin Review", desc: "Awaiting Co-Admin decision", date: null, done: false, pending: true, color: "#8B5CF6" });
+  } else if (status === "forwarded_admin") {
+    steps.push({ label: "Co-Admin Review", desc: "Forwarded to reporting Admin", date: leave.updatedAt, done: true, color: "#8B5CF6" });
+    steps.push({ label: "Admin Review", desc: "Awaiting Admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
+  } else if (isAdminPending) {
     steps.push({ label: "Admin Review", desc: "Awaiting admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
   } else if (isAdminApproved) {
     steps.push({ label: "Admin Review", desc: "Approved by admin", date: leave.updatedAt, done: true, color: "#22C55E" });
@@ -1258,6 +1266,7 @@ const AllLeavesPanel = ({ showToast, canForward }) => {
   const count          = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
   const isActionable   = (status) =>
   status === "pending_admin" ||
+  status === "pending_coadmin" ||
   status === "forwarded_admin" ||
   status === "forwarded_reporting_manager" ||
   status === "pending_manager";
@@ -1357,7 +1366,7 @@ const AllLeavesPanel = ({ showToast, canForward }) => {
           leave={leave}
           isProcessing={processingId === leave._id}
           showActions={isActionable(leave.status)}
-          showForward={canForward && leave.status === "pending_admin" && !leave.approverPool?.length}
+          showForward={canForward && ["pending_admin", "pending_coadmin"].includes(leave.status) && !leave.approverPool?.length}
           onApprove={() => handleAction(leave, "approve")}
           onReject={() => handleAction(leave, "reject")}
           onForward={() => handleAction(leave, "forward")}
@@ -1383,7 +1392,7 @@ const ManagerLeavesPanel = ({ showToast, canForward }) => {
   const forwardMut = useForwardLeaveToAdmin();
 
   const managerLeaves = Array.isArray(rawData?.managerLeaves?.leaves) ? rawData.managerLeaves.leaves : [];
-  const isActionable  = (status) => ["pending_reporting_manager", "pending_admin", "forwarded_admin"].includes(status);
+  const isActionable  = (status) => ["pending_reporting_manager", "pending_admin", "pending_coadmin", "forwarded_admin"].includes(status);
 
   const filtered = managerLeaves.filter((l) => {
     const person = l.manager || {};
@@ -1449,7 +1458,7 @@ const ManagerLeavesPanel = ({ showToast, canForward }) => {
           leave={leave}
           isProcessing={processingId === leave._id}
           showActions={isActionable(leave.status)}
-          showForward={canForward && leave.status === "pending_admin" && !leave.approverPool?.length}
+          showForward={canForward && ["pending_admin", "pending_coadmin"].includes(leave.status) && !leave.approverPool?.length}
           onApprove={() => handleAction(leave, "approve")}
           onReject={() => handleAction(leave, "reject")}
           onForward={() => handleAction(leave, "forward")}

@@ -2778,7 +2778,7 @@ const forwardAdminLeave = async (req, res, next) => {
       organisation_id,
       directed_to: req.admin._id,
       directed_to_model: "Admin",
-      status: "pending_admin",
+      status: { $in: ["pending_admin", "pending_coadmin"] },
     });
     if (!leave)
       return next(Object.assign(new Error("This leave request is not pending in your queue"), { statusCode: 404 }));
@@ -2853,7 +2853,7 @@ const acceptLeave = async (req, res, next) => {
             statusCode: 403,
           })
         );
-      if (!["pending_admin", "forwarded_admin"].includes(leave.status))
+      if (!["pending_admin", "pending_coadmin", "forwarded_admin"].includes(leave.status))
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
             statusCode: 400,
@@ -2931,7 +2931,7 @@ const acceptLeave = async (req, res, next) => {
           })
         );
       if (
-        !["pending_admin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
+        !["pending_admin", "pending_coadmin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
       )
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
@@ -3064,7 +3064,7 @@ const rejectLeave = async (req, res, next) => {
             statusCode: 403,
           })
         );
-      if (!["pending_admin", "forwarded_admin"].includes(leave.status))
+      if (!["pending_admin", "pending_coadmin", "forwarded_admin"].includes(leave.status))
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {
             statusCode: 400,
@@ -3120,7 +3120,7 @@ const rejectLeave = async (req, res, next) => {
           })
         );
       if (
-        !["pending_admin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
+        !["pending_admin", "pending_coadmin", "forwarded_admin", "pending_reporting_manager"].includes(leave.status)
       )
         return next(
           Object.assign(new Error("Leave is not pending for admin action"), {

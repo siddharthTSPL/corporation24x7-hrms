@@ -59,6 +59,7 @@ const leaveSchema = new mongoose.Schema({
       "approved_reporting_manager",
       "rejected_reporting_manager",
       "pending_admin",
+      "pending_coadmin",
       "forwarded_admin",
       "approved_admin",
       "rejected_admin",

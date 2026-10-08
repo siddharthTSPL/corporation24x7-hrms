@@ -21,7 +21,7 @@ const { isDateInLwpPortion } = require("./Leavelwpday.utils");
 const ROLE_CONFIG = {
   employee: {
     Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee",
-    approved: ["approved_manager", "approved_admin"],
+    approved: ["approved_manager", "approved_reporting_manager", "approved_admin"],
   },
   manager: {
     Model: Manager, onModel: "Manager", LeaveModel: ManagerLeave, leaveField: "manager",

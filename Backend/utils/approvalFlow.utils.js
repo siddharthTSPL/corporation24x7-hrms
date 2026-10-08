@@ -50,6 +50,20 @@ const resolveDefaultAdminHandler = async (adminId, organisation_id) => {
   return coAdmins.length === 1 ? coAdmins[0]._id : targetAdmin._id;
 };
 
+const resolveDefaultAdminRoute = async (adminId, organisation_id) => {
+  const handler = await resolveDefaultAdminHandler(adminId, organisation_id);
+  const target = handler
+    ? await Admin.findOne({ _id: handler, organisation_id })
+        .select("reporting_manager_model")
+        .lean()
+    : null;
+
+  return {
+    handler,
+    status: target?.reporting_manager_model === "Admin" ? "pending_coadmin" : "pending_admin",
+  };
+};
+
 const isInPool = (doc, adminId) =>
   !!doc?.approverPool?.some((id) => id.toString() === adminId.toString());
 
@@ -75,6 +89,7 @@ const isAdminHandlerCurrent = (doc, adminId) =>
 module.exports = {
   resolveCustomRouting,
   resolveDefaultAdminHandler,
+  resolveDefaultAdminRoute,
   isInPool,
   directedOrPooled,
   isAdminHandler,
