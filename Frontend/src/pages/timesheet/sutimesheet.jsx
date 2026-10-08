@@ -12,7 +12,7 @@ import {
   useRecallTimesheet, useMyProductivitySummary, useJobById,
   useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
-import { downloadReportCSV, TIMESHEET_REPORT_CSV_COLUMNS, buildReportTotalsRow } from "../utils/csvExport";
+import { generateCSV, downloadCSV, buildExportFilename } from "../utils/timesheetReportExport";
 import { useGetAllDepartmentsSuperAdmin } from "../../auth/server-state/superadmin/department/Sudepartment.hook";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -79,6 +79,40 @@ const monthRangeOf = (ym) => {
   return { from: `${ym}-01`, to: `${ym}-${String(last).padStart(2, "0")}` };
 };
 
+// "YYYY-MM-DD" helpers (pure string/UTC maths, so they never shift with the browser timezone)
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtYMD = (ymd) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd || "")) return "—";
+  const [y, m, d] = ymd.split("-").map(Number);
+  return `${String(d).padStart(2, "0")} ${MONTH_SHORT[m - 1]} ${y}`;
+};
+const addDaysYMD = (ymd, n) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+const mondayOfYMD = (ymd) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const day = dt.getUTCDay();
+  dt.setUTCDate(dt.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return dt.toISOString().slice(0, 10);
+};
+
+// Report types. "weekly" is the week-based report that used to be labelled "Detailed";
+// "detailed" is now the full date-range history (defaults to the last MONTHS_TO_SHOW months up to today).
+const REPORT_VIEWS = [
+  { id: "weekly",   label: "Weekly"   },
+  { id: "weekend",  label: "Weekend"  },
+  { id: "monthly",  label: "Monthly"  },
+  { id: "detailed", label: "Detailed" },
+];
+const REPORT_TITLES = {
+  weekly:   "Weekly Timesheet Report",
+  weekend:  "Weekend Timesheet",
+  monthly:  "Monthly Timesheet",
+  detailed: "Detailed Timesheet Report",
+};
+
 const isOffRow = (r) => r.day_type === "week_off" || r.day_type === "holiday";
 const round2 = (n) => Math.round(n * 100) / 100;
 const initialsOf = (name = "") =>
@@ -123,6 +157,9 @@ const STATUS_STYLE = {
   rejected:                  { tw: "text-red-600 bg-red-50 border-red-200",                  label: "Rejected" },
 };
 
+// status label used in the CSV (same wording as the on-screen badges)
+const reportStatusLabel = (s) => (s === "off" ? "Off" : STATUS_STYLE[s]?.label || s || "");
+
 const PRIORITY_TW = {
   low:    "text-gray-400 bg-gray-100 border-gray-200",
   medium: "text-amber-600 bg-amber-50 border-amber-200",
@@ -153,6 +190,16 @@ const NAV_TABS = [
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
+
+// Delays a fast-changing value (typed text) so the report API isn't hit on every keystroke.
+function useDebouncedValue(value, delay = 400) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
 
 const CURRENCY_SYMBOLS = { INR: "₹", USD: "$", EUR: "€" };
 function fmtRate(rate, currency) {
@@ -585,12 +632,110 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
 
 // ─── Time Sheet Report components ────────────────────────────────────────────
 
+// Inline icons (no new icon dependency — this file doesn't use an icon library)
+function DownloadIcon({ className = "" }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
+    </svg>
+  );
+}
+function SpinnerIcon({ className = "" }) {
+  return (
+    <svg className={cn("animate-spin", className)} width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+function SearchIcon({ className = "" }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+function ChevronIcon({ className = "" }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+// One export button used for both "Bulk CSV" (solid) and per-employee "Export Data" (subtle)
+function ExportButton({ label, loading, disabled, onClick, variant = "subtle", title, className = "" }) {
+  const styles = {
+    solid:  "bg-[#730042] text-white hover:bg-[#5c0034] border border-[#730042] px-4 min-h-[40px]",
+    subtle: "bg-white text-[#730042] border border-[#730042]/30 hover:bg-[#730042]/[0.06] hover:border-[#730042]/60 px-3 min-h-[34px]",
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || loading}
+      title={title}
+      aria-busy={loading || undefined}
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 rounded-lg text-[12px] sm:text-[13px] font-semibold whitespace-nowrap transition-colors",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#730042]/40 focus-visible:ring-offset-1",
+        "disabled:opacity-55 disabled:cursor-not-allowed",
+        styles[variant], className
+      )}
+    >
+      {loading ? <SpinnerIcon /> : <DownloadIcon />}
+      <span>{loading ? "Preparing CSV…" : label}</span>
+    </button>
+  );
+}
+
+const FILTER_LABEL = "text-[11px] font-semibold text-gray-500";
+const FILTER_CONTROL = "w-full min-w-0 rounded-lg border text-[13px] min-h-[40px] outline-none transition-colors hover:border-gray-400 focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/[0.15]";
+const FILTER_IDLE = "border-gray-300 bg-white text-gray-900 placeholder:text-gray-400";
+const FILTER_ACTIVE = "border-[#730042]/60 bg-[#730042]/[0.04] text-[#730042] font-semibold";
+const DATE_INPUT_CLS = cn(FILTER_CONTROL, FILTER_IDLE, "px-3 py-2 w-auto");
+const STEP_BTN = "w-9 h-10 flex items-center justify-center text-gray-500 text-lg leading-none hover:bg-gray-50 hover:text-[#730042] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#730042]/40 transition-colors";
+
+function FilterSelect({ label, active, children, className = "", ...props }) {
+  return (
+    <div className="flex flex-col gap-1.5 min-w-0">
+      <label className={FILTER_LABEL}>{label}</label>
+      <div className="relative">
+        <select aria-label={label} {...props} className={cn(FILTER_CONTROL, "appearance-none cursor-pointer pl-3 pr-9 py-2", active ? FILTER_ACTIVE : FILTER_IDLE, className)}>
+          {children}
+        </select>
+        <ChevronIcon className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      </div>
+    </div>
+  );
+}
+
+function FilterInput({ label, active, icon, onClear, className = "", ...props }) {
+  const hasValue = onClear && props.value;
+  return (
+    <div className="flex flex-col gap-1.5 min-w-0">
+      <label className={FILTER_LABEL}>{label}</label>
+      <div className="relative">
+        {icon && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{icon}</span>}
+        <input aria-label={label} {...props} className={cn(FILTER_CONTROL, "py-2", icon ? "pl-9" : "pl-3", hasValue ? "pr-9" : "pr-3", active ? FILTER_ACTIVE : FILTER_IDLE, className)} />
+        {hasValue && (
+          <button type="button" onClick={onClear} aria-label={`Clear ${label}`}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 text-base leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#730042]/40">
+            ×
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ReportStatusBadge({ status }) {
   const s = STATUS_STYLE[status === "off" ? "draft" : status] || STATUS_STYLE.draft;
   return <Badge tw={s.tw}>{s.label}</Badge>;
 }
 
-function ReportEmployeeCard({ group, view, onOpen }) {
+// Every card gets its own "Export" via onExport(group) — nothing is hardcoded per employee.
+function ReportEmployeeCard({ group, view, onOpen, onExport, exporting, exportDisabled }) {
   const single = group.statuses.length === 1 ? group.statuses[0] : null;
   return (
     <Card onClick={onOpen} className="p-4 sm:p-5 group">
@@ -626,13 +771,26 @@ function ReportEmployeeCard({ group, view, onOpen }) {
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-gray-400">
-        <span className="truncate">
+        <span className="truncate min-w-0">
           {group.workDays} working day{group.workDays === 1 ? "" : "s"} · {group.entries} entr{group.entries === 1 ? "y" : "ies"}
           {group.offDays > 0 && ` · ${group.offDays} off`}
         </span>
-        <span className="text-[#730042] font-semibold shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
-          {view === "weekend" ? "View weekend ›" : "View details ›"}
-        </span>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onExport(group); }}
+            disabled={exportDisabled || exporting}
+            title={`Export ${group.name}'s timesheet data`}
+            aria-label={`Export ${group.name}'s timesheet data`}
+            className="inline-flex items-center gap-1 text-[#730042] font-semibold hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#730042]/40 rounded"
+          >
+            {exporting ? <SpinnerIcon className="w-3 h-3" /> : <DownloadIcon className="w-3 h-3" />}
+            <span>{exporting ? "Preparing…" : "Export"}</span>
+          </button>
+          <span className="text-[#730042] font-semibold opacity-70 group-hover:opacity-100 transition-opacity">
+            {view === "weekend" ? "View weekend ›" : "View details ›"}
+          </span>
+        </div>
       </div>
     </Card>
   );
@@ -667,7 +825,7 @@ function ReportRowItem({ r }) {
   );
 }
 
-function ReportDetailModal({ group, view, periodLabel, onClose }) {
+function ReportDetailModal({ group, view, periodLabel, onClose, onExport, exporting, exportDisabled }) {
   useEffect(() => {
     if (!group) return;
     document.body.style.overflow = "hidden";
@@ -678,7 +836,7 @@ function ReportDetailModal({ group, view, periodLabel, onClose }) {
   const sortRows = (rows) => [...rows].sort((a, b) => a.date.localeCompare(b.date));
 
   // Weekend view: weekend/holiday rows first, then the rest of that week.
-  // Detailed / Monthly: the complete history in one list.
+  // Weekly / Monthly / Detailed: the complete history in one list.
   const sections =
     view === "weekend"
       ? [
@@ -703,7 +861,16 @@ function ReportDetailModal({ group, view, periodLabel, onClose }) {
               <div className="text-[11px] text-gray-400 truncate">{group.designation} · {group.department} · {periodLabel}</div>
             </div>
           </div>
-          <button onClick={onClose} className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
+          <div className="flex items-center gap-2 shrink-0">
+            <ExportButton
+              label="Export Data"
+              loading={exporting}
+              disabled={exportDisabled}
+              onClick={() => onExport(group)}
+              title={`Export only ${group.name}'s timesheet data for ${periodLabel}`}
+            />
+            <button onClick={onClose} aria-label="Close" className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
+          </div>
         </div>
 
         <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0 flex flex-col gap-4">
@@ -792,11 +959,18 @@ export default function SuperAdminTimesheet() {
   const { data: tsData, refetch: refetchTS } = useMyTimesheets();
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
-  // ─── Time Sheet Report (Detailed / Weekend / Monthly, filterable, org-wide) ──
-  const [reportWeek, setReportWeek] = useState(weekStart);
-  const [reportView, setReportView] = useState("detailed");
+  // ─── Time Sheet Report (Weekly / Weekend / Monthly / Detailed, filterable, org-wide) ──
   const monthOptions = useMemo(() => buildMonthOptions(), []);
+  const todayKey = todayISTKey();
+  const currentWeekMonday = mondayOfYMD(todayKey);
+  // Detailed default range: first day of the oldest month in the dropdown -> today
+  const detailedDefaultFrom = `${monthOptions[monthOptions.length - 1].value}-01`;
+
+  const [reportWeek, setReportWeek] = useState(() => mondayOfYMD(weekStart)); // always a Monday
+  const [reportView, setReportView] = useState("weekly");
   const [reportMonth, setReportMonth] = useState(() => buildMonthOptions()[0].value);
+  const [reportFrom, setReportFrom] = useState(detailedDefaultFrom);
+  const [reportTo, setReportTo] = useState(todayKey);
   const [selectedReportKey, setSelectedReportKey] = useState(null);
   const [reportEmployeeName, setReportEmployeeName] = useState("");
   const [reportEmployeeModel, setReportEmployeeModel] = useState("");
@@ -807,12 +981,29 @@ export default function SuperAdminTimesheet() {
   const [reportStatus, setReportStatus] = useState("");
   const [reportBillable, setReportBillable] = useState("");
 
+  // export UX state
+  const [exportingKey, setExportingKey] = useState(null); // "bulk" | employee key | null
+  const [toast, setToast] = useState(null);
+
+  // typed filters are debounced before they reach the API
+  const debouncedEmployeeName = useDebouncedValue(reportEmployeeName.trim());
+  const debouncedDesignation = useDebouncedValue(reportDesignation.trim());
+  const filtersPending =
+    reportEmployeeName.trim() !== debouncedEmployeeName || reportDesignation.trim() !== debouncedDesignation;
+
+  const reportWeekEnd = addDaysYMD(reportWeek, 6);
+
+  // Single source of truth: the screen AND both CSV exports read from this request.
   const reportParams = {
-    ...(reportView === "monthly" ? monthRangeOf(reportMonth) : { week_start: reportWeek }),
-    ...(reportEmployeeName.trim() ? { employee_name: reportEmployeeName.trim() } : {}),
+    ...(reportView === "monthly"
+      ? monthRangeOf(reportMonth)
+      : reportView === "detailed"
+        ? { from: reportFrom, to: reportTo }
+        : { week_start: reportWeek }),
+    ...(debouncedEmployeeName ? { employee_name: debouncedEmployeeName } : {}),
     ...(reportEmployeeModel ? { employee_model: reportEmployeeModel } : {}),
     ...(reportDepartment ? { department: reportDepartment } : {}),
-    ...(reportDesignation ? { designation: reportDesignation } : {}),
+    ...(debouncedDesignation ? { designation: debouncedDesignation } : {}),
     ...(reportProject ? { project_id: reportProject } : {}),
     ...(reportJob ? { job_id: reportJob } : {}),
     ...(reportStatus ? { status: reportStatus } : {}),
@@ -841,7 +1032,7 @@ export default function SuperAdminTimesheet() {
   }, [reportData, departmentNameMap]);
 
   const weekendReportRows = allReportRows.filter((r) => isOffRow(r));
-  // rows used for CSV export (unchanged behaviour)
+  // rows used for the Bulk CSV (Weekend view exports the weekend/holiday rows, as before)
   const reportRows = reportView === "weekend" ? weekendReportRows : allReportRows;
 
   // One card per employee. Weekend view lists everyone who filled a timesheet that
@@ -849,18 +1040,80 @@ export default function SuperAdminTimesheet() {
   const reportGroups = useMemo(() => groupReportRows(allReportRows), [allReportRows]);
   const selectedGroup = reportGroups.find((g) => g.key === selectedReportKey) || null;
   const monthLabel = monthOptions.find((m) => m.value === reportMonth)?.label || reportMonth;
-  const periodLabel = reportView === "monthly" ? monthLabel : `Week of ${fmtDate(reportWeek)}`;
+  const periodLabel =
+    reportView === "monthly"
+      ? monthLabel
+      : reportView === "detailed"
+        ? `${fmtYMD(reportFrom)} – ${fmtYMD(reportTo)}`
+        : `${fmtYMD(reportWeek)} – ${fmtYMD(reportWeekEnd)}`;
+
+  const reportTotals = useMemo(() => ({
+    required: round2(reportGroups.reduce((s, g) => s + g.required, 0)),
+    served: round2(reportGroups.reduce((s, g) => s + g.served, 0)),
+    overtime: round2(reportGroups.reduce((s, g) => s + g.overtime, 0)),
+  }), [reportGroups]);
+
+  const activeFilterCount = [
+    reportEmployeeName.trim(), reportEmployeeModel, reportDepartment, reportDesignation.trim(),
+    reportProject, reportJob, reportStatus, reportBillable,
+  ].filter(Boolean).length;
+
+  const clearReportFilters = () => {
+    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
+    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
+  };
 
   const { data: reportJobsData } = useOrgAllJobs(reportProject ? { project: reportProject } : {});
   const reportJobOptions = reportJobsData?.jobs ?? [];
 
-  const exportReportCSV = () => {
-    downloadReportCSV(
-      reportRows.length ? [...reportRows, buildReportTotalsRow(reportRows)] : reportRows,
-      TIMESHEET_REPORT_CSV_COLUMNS,
-      `${reportView}-timesheet-${reportView === "monthly" ? reportMonth : reportWeek}.csv`
-    );
+  // ─── Report period controls ───
+  const changeReportView = (id) => { setReportView(id); setSelectedReportKey(null); };
+  const shiftReportWeek = (dir) => setReportWeek((w) => addDaysYMD(w, dir * 7));
+  const monthIdx = monthOptions.findIndex((m) => m.value === reportMonth); // 0 = newest
+  const shiftReportMonth = (dir) => {
+    const next = monthOptions[monthIdx - dir]; // dir +1 = newer month
+    if (next) setReportMonth(next.value);
   };
+  const detailedIsDefault = reportFrom === detailedDefaultFrom && reportTo === todayKey;
+
+  // ─── Export (Bulk CSV + individual Export Data share one pipeline) ───
+  // Never export while the data on screen is still refreshing / filters are still settling.
+  const exportBlocked = reportLoading || filtersPending;
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const runExport = async (key, rows, owner) => {
+    if (exportingKey || exportBlocked) return;
+    if (!rows.length) {
+      setToast({ type: "info", message: "No timesheet data available for the selected period." });
+      return;
+    }
+    setExportingKey(key);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 50)); // let the "Preparing CSV…" state paint
+      const csv = generateCSV(rows, { statusLabel: reportStatusLabel });
+      downloadCSV(
+        csv,
+        buildExportFilename({ owner, view: reportView, monthLabel, weekStart: reportWeek, weekEnd: reportWeekEnd })
+      );
+      setToast({ type: "success", message: "CSV exported successfully." });
+    } catch (err) {
+      console.error("Timesheet CSV export failed:", err);
+      setToast({ type: "error", message: "Unable to export timesheet data. Please try again." });
+    } finally {
+      setExportingKey(null);
+    }
+  };
+
+  // All employees for the selected period (respects every active filter, same rows as the cards)
+  const exportBulkTimesheetCSV = () => runExport("bulk", reportRows);
+  // Only this employee, same period / view rules as the bulk export
+  const exportEmployeeTimesheetCSV = (group) =>
+    runExport(group.key, reportView === "weekend" ? group.rows.filter(isOffRow) : group.rows, group.name);
 
   const createProject   = useCreateProject();
   const updateProject   = useUpdateProject();
@@ -1571,119 +1824,252 @@ export default function SuperAdminTimesheet() {
 
         {tab === "report" && (
           <div className="min-w-0">
+            {/* ─── Header ─── */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">
-                  {reportView === "weekend" ? "Weekend Timesheet" : reportView === "monthly" ? "Monthly Timesheet" : "Time Sheet Report"}
-                </h1>
+                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">{REPORT_TITLES[reportView]}</h1>
                 <p className="text-xs text-gray-400 mt-1 mb-0">
                   {reportGroups.length} employee{reportGroups.length === 1 ? "" : "s"} · {reportRows.length} record{reportRows.length === 1 ? "" : "s"} · {periodLabel}
-                  {reportLoading && " · refreshing…"}
+                  {(reportLoading || filtersPending) && " · refreshing…"}
                 </p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                  {[
-                    { id: "detailed", label: "Detailed" },
-                    { id: "weekend", label: "Weekend" },
-                    { id: "monthly", label: "Monthly" },
-                  ].map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => { setReportView(v.id); setSelectedReportKey(null); }}
-                      className={cn("text-xs font-bold px-3 py-1.5 rounded-md border-none cursor-pointer", reportView === v.id ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500")}
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-
-                {reportView === "monthly" ? (
-                  <>
-                    <span className="text-xs text-gray-400 shrink-0">Month</span>
-                    <select
-                      value={reportMonth}
-                      onChange={(e) => setReportMonth(e.target.value)}
-                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none cursor-pointer w-full sm:w-auto"
-                    >
-                      {monthOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xs text-gray-400 shrink-0">Week of</span>
-                    <input
-                      type="date"
-                      value={reportWeek}
-                      onChange={(e) => setReportWeek(e.target.value)}
-                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 min-h-[36px] text-xs text-gray-900 outline-none w-full sm:w-auto"
-                    />
-                  </>
-                )}
-                <Btn variant="ghost" onClick={exportReportCSV} disabled={!reportRows.length} className="!min-h-[36px] !py-1.5">Export CSV</Btn>
-              </div>
+              <ExportButton
+                variant="solid"
+                label="Bulk CSV"
+                loading={exportingKey === "bulk"}
+                disabled={!reportRows.length || exportBlocked || (!!exportingKey && exportingKey !== "bulk")}
+                onClick={exportBulkTimesheetCSV}
+                title={reportRows.length
+                  ? `Download ${reportRows.length} record${reportRows.length === 1 ? "" : "s"} for ${reportGroups.length} employee${reportGroups.length === 1 ? "" : "s"} · ${periodLabel}`
+                  : "No timesheet data available for the selected period."}
+                className="w-full sm:w-auto"
+              />
             </div>
 
-            <Card className="px-4 sm:px-5 py-4 mb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2.5">
-                <Input label="Employee Name" placeholder="Search employee" value={reportEmployeeName} onChange={(e) => setReportEmployeeName(e.target.value)} />
-                <Select label="Role" value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
-                  <option value="">All Roles</option>
-                  <option value="User">Employee</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Admin">Admin</option>
-                </Select>
-                <Select label="Department" value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
-                  <option value="">All Departments</option>
-                  {reportDepartments.map((department) => (
-                    <option key={department._id} value={department.code || department.name}>{department.name}</option>
-                  ))}
-                </Select>
-                <Input label="Designation" placeholder="e.g. Software Engineer" value={reportDesignation} onChange={(e) => setReportDesignation(e.target.value)} />
-                <Select label="Project" value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
-                  <option value="">All Projects</option>
-                  {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-                </Select>
-                <Select label="Job" value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
-                  <option value="">All Jobs</option>
-                  {reportJobOptions.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
-                </Select>
-                <Select label="Status" value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
-                  <option value="">All Statuses</option>
-                  {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </Select>
-                <Select label="Billable" value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
-                  <option value="">All</option>
-                  <option value="true">Billable only</option>
-                  <option value="false">Non-billable only</option>
-                </Select>
+            {/* ─── Filters ─── */}
+            <Card className="mb-4">
+              {/* Report type + period */}
+              <div className="px-4 sm:px-5 py-4 bg-gray-50/70 border-b border-gray-100 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <span className={FILTER_LABEL}>Report type</span>
+                  <div className="inline-flex w-full sm:w-auto bg-gray-200/70 rounded-lg p-1 gap-1" role="group" aria-label="Report type">
+                    {REPORT_VIEWS.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => changeReportView(v.id)}
+                        aria-pressed={reportView === v.id}
+                        className={cn(
+                          "flex-1 sm:flex-none px-3.5 py-1.5 min-h-[34px] rounded-md text-[12px] sm:text-[13px] font-semibold transition-all border-none cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#730042]/40",
+                          reportView === v.id ? "bg-white text-[#730042] shadow-sm" : "bg-transparent text-gray-500 hover:text-gray-900"
+                        )}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  {reportView === "monthly" ? (
+                    <>
+                      <span className={FILTER_LABEL}>Month</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                          <button type="button" onClick={() => shiftReportMonth(-1)} disabled={monthIdx >= monthOptions.length - 1} aria-label="Previous month" className={STEP_BTN}>‹</button>
+                          <select
+                            aria-label="Month"
+                            value={reportMonth}
+                            onChange={(e) => setReportMonth(e.target.value)}
+                            className="h-10 px-2 text-[13px] font-semibold text-gray-900 bg-transparent outline-none cursor-pointer text-center border-x border-gray-200 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#730042]/40"
+                          >
+                            {monthOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
+                          <button type="button" onClick={() => shiftReportMonth(1)} disabled={monthIdx <= 0} aria-label="Next month" className={STEP_BTN}>›</button>
+                        </div>
+                        {monthIdx !== 0 && (
+                          <button type="button" onClick={() => setReportMonth(monthOptions[0].value)} className="text-[12px] font-semibold text-[#730042] hover:underline bg-transparent border-none cursor-pointer p-0">
+                            Current month
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  ) : reportView === "detailed" ? (
+                    <>
+                      <span className={FILTER_LABEL}>Date range (up to today)</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="date"
+                          aria-label="From date"
+                          value={reportFrom}
+                          max={reportTo}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!v) return;
+                            setReportFrom(v);
+                            if (v > reportTo) setReportTo(v);
+                          }}
+                          className={DATE_INPUT_CLS}
+                        />
+                        <span className="text-[12px] text-gray-400">to</span>
+                        <input
+                          type="date"
+                          aria-label="To date"
+                          value={reportTo}
+                          max={todayKey}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!v) return;
+                            setReportTo(v);
+                            if (v < reportFrom) setReportFrom(v);
+                          }}
+                          className={DATE_INPUT_CLS}
+                        />
+                        {!detailedIsDefault && (
+                          <button type="button" onClick={() => { setReportFrom(detailedDefaultFrom); setReportTo(todayKey); }} className="text-[12px] font-semibold text-[#730042] hover:underline bg-transparent border-none cursor-pointer p-0">
+                            Reset range
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className={FILTER_LABEL}>Week</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                          <button type="button" onClick={() => shiftReportWeek(-1)} aria-label="Previous week" className={STEP_BTN}>‹</button>
+                          <span className="px-3 text-[13px] font-semibold text-gray-900 whitespace-nowrap border-x border-gray-200 h-10 flex items-center">
+                            {fmtYMD(reportWeek)} – {fmtYMD(reportWeekEnd)}
+                          </span>
+                          <button type="button" onClick={() => shiftReportWeek(1)} disabled={reportWeek >= currentWeekMonday} aria-label="Next week" className={STEP_BTN}>›</button>
+                        </div>
+                        <input
+                          type="date"
+                          aria-label="Jump to a date (selects its week)"
+                          value={reportWeek}
+                          max={todayKey}
+                          onChange={(e) => { if (e.target.value) setReportWeek(mondayOfYMD(e.target.value)); }}
+                          className={DATE_INPUT_CLS}
+                        />
+                        {reportWeek !== currentWeekMonday && (
+                          <button type="button" onClick={() => setReportWeek(currentWeekMonday)} className="text-[12px] font-semibold text-[#730042] hover:underline bg-transparent border-none cursor-pointer p-0">
+                            This week
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-              {(reportEmployeeName || reportEmployeeModel || reportDepartment || reportDesignation || reportProject || reportJob || reportStatus || reportBillable) && (
-                <button
-                  onClick={() => {
-                    setReportEmployeeName(""); setReportEmployeeModel(""); setReportDepartment(""); setReportDesignation("");
-                    setReportProject(""); setReportJob(""); setReportStatus(""); setReportBillable("");
-                  }}
-                  className="mt-3 text-[11px] font-bold text-[#730042] bg-transparent border-none cursor-pointer p-0"
-                >
-                  Clear all filters
-                </button>
-              )}
+
+              {/* Filters */}
+              <div className="px-4 sm:px-5 py-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2 text-[13px] font-bold text-gray-900">
+                    Filters
+                    {activeFilterCount > 0 && (
+                      <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{activeFilterCount} active</Badge>
+                    )}
+                  </div>
+                  {activeFilterCount > 0 && (
+                    <button type="button" onClick={clearReportFilters} className="text-[12px] font-semibold text-[#730042] hover:underline bg-transparent border-none cursor-pointer p-0">
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <FilterInput
+                    label="Employee"
+                    placeholder="Search by name"
+                    icon={<SearchIcon />}
+                    value={reportEmployeeName}
+                    active={!!reportEmployeeName.trim()}
+                    onChange={(e) => setReportEmployeeName(e.target.value)}
+                    onClear={() => setReportEmployeeName("")}
+                  />
+                  <FilterSelect label="Role" active={!!reportEmployeeModel} value={reportEmployeeModel} onChange={(e) => setReportEmployeeModel(e.target.value)}>
+                    <option value="">All Roles</option>
+                    <option value="User">Employee</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Admin">Admin</option>
+                  </FilterSelect>
+                  <FilterSelect label="Department" active={!!reportDepartment} value={reportDepartment} onChange={(e) => setReportDepartment(e.target.value)}>
+                    <option value="">All Departments</option>
+                    {reportDepartments.map((department) => (
+                      <option key={department._id} value={department.code || department.name}>{department.name}</option>
+                    ))}
+                  </FilterSelect>
+                  <FilterInput
+                    label="Designation"
+                    placeholder="e.g. Software Engineer"
+                    value={reportDesignation}
+                    active={!!reportDesignation.trim()}
+                    onChange={(e) => setReportDesignation(e.target.value)}
+                    onClear={() => setReportDesignation("")}
+                  />
+                  <FilterSelect label="Project" active={!!reportProject} value={reportProject} onChange={(e) => { setReportProject(e.target.value); setReportJob(""); }}>
+                    <option value="">All Projects</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </FilterSelect>
+                  <FilterSelect label="Job" active={!!reportJob} value={reportJob} onChange={(e) => setReportJob(e.target.value)}>
+                    <option value="">All Jobs</option>
+                    {reportJobOptions.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)}
+                  </FilterSelect>
+                  <FilterSelect label="Status" active={!!reportStatus} value={reportStatus} onChange={(e) => setReportStatus(e.target.value)}>
+                    <option value="">All Statuses</option>
+                    {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </FilterSelect>
+                  <FilterSelect label="Billable" active={!!reportBillable} value={reportBillable} onChange={(e) => setReportBillable(e.target.value)}>
+                    <option value="">All</option>
+                    <option value="true">Billable only</option>
+                    <option value="false">Non-billable only</option>
+                  </FilterSelect>
+                </div>
+              </div>
             </Card>
 
+            {/* ─── Summary (same data as the cards + exports) ─── */}
+            {reportGroups.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mb-4">
+                {[
+                  { label: "Employees", value: reportGroups.length, c: "text-[#730042]" },
+                  { label: "Records", value: reportRows.length, c: "text-gray-900" },
+                  { label: "Required", value: `${reportTotals.required}h`, c: "text-gray-900" },
+                  { label: "Served", value: `${reportTotals.served}h`, c: "text-emerald-600" },
+                  { label: "Overtime", value: `${reportTotals.overtime}h`, c: "text-amber-600" },
+                ].map((s) => (
+                  <div key={s.label} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 min-w-0">
+                    <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 truncate">{s.label}</div>
+                    <div className={cn("text-[18px] font-extrabold leading-none truncate", s.c)}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ─── Employee cards ─── */}
             {reportGroups.length === 0 ? (
               <Card className="px-6 sm:px-8 py-12 sm:py-16 text-center">
                 <div className="font-bold text-base text-gray-900 mb-2">No entries found</div>
                 <div className="text-gray-400 text-[13px]">
                   {reportView === "monthly"
                     ? "No one has filled a timesheet in this month"
-                    : "Adjust the week or filters to view the report"}
+                    : reportView === "detailed"
+                      ? "No timesheet entries in this date range — adjust the range or filters"
+                      : "Adjust the week or filters to view the report"}
                 </div>
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {reportGroups.map((g) => (
-                  <ReportEmployeeCard key={g.key} group={g} view={reportView} onOpen={() => setSelectedReportKey(g.key)} />
+                  <ReportEmployeeCard
+                    key={g.key}
+                    group={g}
+                    view={reportView}
+                    onOpen={() => setSelectedReportKey(g.key)}
+                    onExport={exportEmployeeTimesheetCSV}
+                    exporting={exportingKey === g.key}
+                    exportDisabled={exportBlocked || (!!exportingKey && exportingKey !== g.key)}
+                  />
                 ))}
               </div>
             )}
@@ -1693,10 +2079,31 @@ export default function SuperAdminTimesheet() {
               view={reportView}
               periodLabel={periodLabel}
               onClose={() => setSelectedReportKey(null)}
+              onExport={exportEmployeeTimesheetCSV}
+              exporting={!!selectedGroup && exportingKey === selectedGroup.key}
+              exportDisabled={exportBlocked || (!!exportingKey && exportingKey !== selectedGroup?.key)}
             />
           </div>
         )}
       </main>
+
+      {/* Export toast (success / info / error) */}
+      {toast && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] sm:w-auto max-w-md pointer-events-none">
+          <div
+            role="status"
+            aria-live="polite"
+            className={cn(
+              "rounded-lg px-4 py-3 text-[13px] font-semibold shadow-lg border text-center",
+              toast.type === "success" && "bg-emerald-600 text-white border-emerald-700",
+              toast.type === "error" && "bg-red-600 text-white border-red-700",
+              toast.type === "info" && "bg-gray-900 text-white border-gray-800"
+            )}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
 
       <Modal open={!!approveModal} onClose={() => setApproveModal(null)} title="Approve Timesheet">
         <div className="flex flex-col gap-4">
