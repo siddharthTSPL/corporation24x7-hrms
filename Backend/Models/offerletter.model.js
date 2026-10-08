@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { approvalDefinition } = require("../utils/recruitment/approvalSchema.utils");
 
 const sectionSchema = new mongoose.Schema(
   {
@@ -21,7 +22,7 @@ const offerLetterSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["DRAFT", "REVIEW_DONE", "FINAL", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"],
+      enum: ["DRAFT", "REVIEW_DONE", "PENDING_APPROVAL", "FINAL", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"],
       default: "DRAFT",
       index: true,
     },
@@ -89,6 +90,8 @@ const offerLetterSchema = new mongoose.Schema(
       ],
       default: [],
     },
+
+    approval: { type: new mongoose.Schema(approvalDefinition, { _id: false }), default: () => ({}) },
 
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
     reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },

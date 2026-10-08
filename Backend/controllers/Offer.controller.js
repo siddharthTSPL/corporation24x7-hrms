@@ -24,7 +24,7 @@ const {
 const PORTAL_BASE = (process.env.TORCHX_TALENT_URL || "https://torchxsuite.com/talent").replace(/\/$/, "");
 
 const DEPT_LABELS = { OPR: "Operations", BPO: "BPO", ENG: "Engineering", HR: "Human Resources", MGMT: "Management" };
-const ACTIVE_OFFER_STATUSES = ["DRAFT", "REVIEW_DONE", "FINAL", "SENT", "ACCEPTED"];
+const ACTIVE_OFFER_STATUSES = ["DRAFT", "REVIEW_DONE", "PENDING_APPROVAL", "FINAL", "SENT", "ACCEPTED"];
 const REJECT_REASONS = ["Accepted a better offer", "Salary expectation not met", "Location or work mode", "Personal reasons", "Other"];
 const EDITABLE_STATUSES = ["DRAFT", "REVIEW_DONE"];
 
@@ -109,7 +109,7 @@ const buildPdf = ({ kind, letter, candidate, offer, watermark, acceptance }) => 
 };
 
 const offerWatermark = (status) => {
-  if (["DRAFT", "REVIEW_DONE"].includes(status)) return "DRAFT";
+  if (["DRAFT", "REVIEW_DONE", "PENDING_APPROVAL"].includes(status)) return "DRAFT";
   if (["EXPIRED", "REJECTED"].includes(status)) return "VOID";
   return null;
 };
@@ -139,7 +139,14 @@ const reviewIssues = (letter, candidate, offer, kind) => {
 const notifyHr = async ({ offer, candidate, action, reason, comment, message }) => {
   const ids = [...new Set([offer.created_by, candidate.added_by].filter(Boolean).map(String))];
   if (!ids.length) return;
-  const admins = await Admin.find({ _id: { $in: ids } }).select("f_name l_name work_email");
+  const found = await Admin.find({ _id: { $in: ids } }).select("f_name l_name work_email");
+  const foundIds = new Set(found.map((x) => String(x._id)));
+  // Letters can also be created by the SuperAdmin, who lives in a different collection.
+  const supers = await SuperAdmin.find({ _id: { $in: ids.filter((i) => !foundIds.has(i)) } }).select("f_name l_name email");
+  const admins = [
+    ...found.map((x) => ({ _id: x._id, f_name: x.f_name, work_email: x.work_email, model: "Admin" })),
+    ...supers.map((x) => ({ _id: x._id, f_name: x.f_name, work_email: x.email, model: "SuperAdmin" })),
+  ];
   const titles = {
     ACCEPTED: `Offer accepted by ${candidate.full_name}`,
     REJECTED: `Offer declined by ${candidate.full_name}`,
@@ -155,13 +162,13 @@ const notifyHr = async ({ offer, candidate, action, reason, comment, message }) 
   await Promise.all(
     admins.map(async (a) => {
       await createNotification({
-        recipientModel: "Admin",
+        recipientModel: a.model,
         recipientId: a._id,
         organisation_id: offer.organisation_id,
         type: "general",
         title: titles[action],
         message: messages[action],
-        link: "/recruitment-admin",
+        link: a.model === "SuperAdmin" ? "/superadmin-recruitment" : "/recruitment-admin",
         priority: action === "ACCEPTED" || action === "CHANGES" ? "high" : "medium",
         meta: { candidate_id: candidate._id, offer_id: offer._id, action },
       });
@@ -438,7 +445,7 @@ const uploadLetterAssets = (kind) => async (req, res) => {
   const doc = kind === "appointment" ? await AppointmentLetter.findOne({ _id: req.params.id, organisation_id: organisationId }) : await loadOffer(req.params.id, organisationId);
   if (!doc) throw fail(404, "Letter not found");
   if (kind === "offer" && !EDITABLE_STATUSES.includes(doc.status)) throw fail(400, "Reopen the offer before changing logo or signature");
-  if (kind === "appointment" && doc.status === "FINAL") throw fail(400, "Finalized appointment letters are locked");
+  if (kind === "appointment" && doc.status !== "DRAFT") throw fail(400, "Appointment letters that are pending approval or finalized are locked");
 
   const files = req.files || {};
   const upload = async (file, folder) => {
@@ -478,23 +485,24 @@ const reviewDone = async (req, res) => {
   return res.status(200).json({ success: true, message: "Offer marked as reviewed", data: serialize(offer) });
 };
 
-const finalizeOffer = async (req, res) => {
-  const offer = await loadOffer(req.params.id, req.admin.organisation_id);
-  if (offer.status !== "REVIEW_DONE") throw fail(400, "Mark the offer as reviewed before finalizing");
-  if (new Date(offer.valid_till) < new Date()) throw fail(400, "Offer validity date has passed. Update it before finalizing");
-  offer.status = "FINAL";
-  offer.finalized_at = new Date();
-  await offer.save();
-  return res.status(200).json({ success: true, message: "Offer finalized", data: serialize(offer) });
+// Offers are no longer finalized by the person who prepared them. The creator
+// sends the letter to a chosen Admin / SuperAdmin (see OfferApproval.controller)
+// and only that approver can finalize it, with their own signature.
+const finalizeOffer = async () => {
+  throw fail(403, "An offer can only be finalized by the approver you send it to. Use 'Send for approval' instead");
 };
 
 const reopenOffer = async (req, res) => {
   const offer = await loadOffer(req.params.id, req.admin.organisation_id);
   if (!["REVIEW_DONE", "FINAL"].includes(offer.status)) throw fail(400, "Only reviewed or final offers that are not yet sent can be reopened");
+  if (offer.approval?.status === "APPROVED" && offer.signature_url && offer.signature_url === offer.approval.signature_url) offer.signature_url = null;
   offer.status = "DRAFT";
   offer.reviewed_by = null;
   offer.reviewed_at = null;
   offer.finalized_at = null;
+  offer.approval.status = null;
+  offer.approval.decided_at = null;
+  offer.approval.signature_url = null;
   await offer.save();
   return res.status(200).json({ success: true, message: "Offer reopened for editing", data: serialize(offer) });
 };
@@ -855,7 +863,7 @@ const loadAppointment = async (id, organisationId, withToken = false) => {
 
 const updateAppointment = async (req, res) => {
   const doc = await loadAppointment(req.params.id, req.admin.organisation_id);
-  if (doc.status === "FINAL") throw fail(400, "Finalized appointment letters are locked");
+  if (doc.status !== "DRAFT") throw fail(400, "Appointment letters that are pending approval or finalized are locked");
   applyCommonEdits(doc, req.body);
   await doc.save();
   const candidate = await Candidate.findById(doc.candidate_id);
@@ -863,19 +871,8 @@ const updateAppointment = async (req, res) => {
   return res.status(200).json({ success: true, message: "Appointment letter updated", data: serialize(doc), issues: reviewIssues(doc, candidate, offer, "APPOINTMENT") });
 };
 
-const finalizeAppointment = async (req, res) => {
-  const doc = await loadAppointment(req.params.id, req.admin.organisation_id);
-  if (doc.status === "FINAL") throw fail(400, "Appointment letter is already finalized");
-  const candidate = await Candidate.findById(doc.candidate_id);
-  const offer = await OfferLetter.findById(doc.offer_id);
-  const { missing, unresolved } = reviewIssues(doc, candidate, offer, "APPOINTMENT");
-  if (missing.length) throw fail(400, `Please fill: ${missing.join(", ")}`);
-  if (unresolved.length) throw fail(400, `These placeholders are empty or unknown: ${unresolved.map((u) => `{{${u}}}`).join(", ")}`);
-  doc.status = "FINAL";
-  doc.finalized_by = req.admin._id;
-  doc.finalized_at = new Date();
-  await doc.save();
-  return res.status(200).json({ success: true, message: "Appointment letter finalized and locked", data: serialize(doc) });
+const finalizeAppointment = async () => {
+  throw fail(403, "An appointment letter can only be finalized by the approver you send it to. Use 'Send for approval' instead");
 };
 
 const appointmentPdf = async (doc, candidate) => {
@@ -954,6 +951,16 @@ const getPublicAppointmentPdf = async (req, res) => {
 };
 
 module.exports = {
+  // helpers shared with OfferApproval.controller
+  fail,
+  str,
+  serialize,
+  safeFileName,
+  loadOffer,
+  loadAppointment,
+  buildPdf,
+  appointmentPdf,
+  reviewIssues,
   getTemplatesMeta,
   previewCtc,
   generateOffer,

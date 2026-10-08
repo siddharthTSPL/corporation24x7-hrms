@@ -477,6 +477,8 @@ function App() {
             <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
             <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
+            <Route path="/superadmin-recruitment" element={<ProtectedRoute planFeature="recruitment"><Adminrecruitment /></ProtectedRoute>} />
+            <Route path="/superadmin-recruitment-approvals" element={<Navigate to="/superadmin-recruitment?tab=approvals" replace />} />
             <Route path="/superadmin-policy-management"   element={<PolicyManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
             <Route path="/superadmin-reimbursement"        element={<ProtectedRoute><ReimbursementSuperadmin /></ProtectedRoute>} />

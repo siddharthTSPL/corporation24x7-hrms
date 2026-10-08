@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   useGetAllRequisitions,
   useGetPendingRequisitions,
@@ -11,9 +12,14 @@ import {
   useUpdateCandidateStage,
   useScheduleInterview,
   useSubmitInterviewFeedback,
+  useResendInterviewInvite,
+  useInterviewers,
 } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import OfferTab from "./OfferTab";
+import OfferApprovals from "./OfferApprovals";
+import toast from "react-hot-toast";
+import { useApprovalPendingCount } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import {
   FaBriefcase, FaClock, FaCheckCircle, FaTimesCircle,
   FaSearch, FaPlus, FaTimes, FaUsers,
@@ -21,7 +27,7 @@ import {
   FaCalendarAlt,
   FaEdit, FaArrowRight,
   FaUserCheck, FaBuilding, FaChartLine,
-  FaFileExcel,
+  FaFileExcel, FaEnvelope, FaFileSignature,
 } from "react-icons/fa";
 
 const initials = (name = "") =>
@@ -465,42 +471,155 @@ const AddCandidateModal = ({ requisitionId, onClose }) => {
   );
 };
 
+const PLATFORMS = ["Google Meet", "Zoom", "Microsoft Teams", "Other"];
+const MODES = ["Online", "In-person", "Phone"];
+const fieldCls = "w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all";
+const fieldLabel = "block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5";
+
+const fmtDateTimeIst = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+  } catch {
+    return "—";
+  }
+};
+
 const ScheduleInterviewModal = ({ candidateId, onClose }) => {
   const schMut = useScheduleInterview();
-  const [form, setForm] = useState({ round_type: "Screening", scheduled_at: "" });
+  const { data: interviewerData } = useInterviewers();
+  const interviewers = interviewerData?.data || [];
+  const [form, setForm] = useState({
+    round_type: "Screening",
+    scheduled_at: "",
+    duration_minutes: 45,
+    mode: "Online",
+    meeting_platform: "Google Meet",
+    meeting_link: "",
+    location: "",
+    conducted_by: "",
+    instructions: "",
+  });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const linkOk = /^https?:\/\/\S+$/i.test(form.meeting_link.trim());
+  const valid =
+    !!form.scheduled_at &&
+    Number(form.duration_minutes) >= 5 &&
+    (form.mode !== "Online" || linkOk) &&
+    (form.mode !== "In-person" || form.location.trim());
+
   const handleSubmit = async () => {
-    await schMut.mutateAsync({ id: candidateId, data: form });
-    onClose();
+    try {
+      const res = await schMut.mutateAsync({
+        id: candidateId,
+        data: {
+          ...form,
+          // datetime-local has no timezone; the whole product runs on IST.
+          scheduled_at: new Date(`${form.scheduled_at}:00+05:30`).toISOString(),
+          duration_minutes: Number(form.duration_minutes),
+          conducted_by: form.conducted_by || undefined,
+        },
+      });
+      if (res?.mail && !res.mail.candidate) toast.error(res.message);
+      else toast.success(res?.message || "Round scheduled");
+      onClose();
+    } catch (err) {
+      toast.error(err?.message || "Could not schedule the round");
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-4">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Schedule Interview</h2>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Schedule Interview</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">An invitation with the meeting details is emailed to the candidate right away.</p>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg transition-colors"><FaTimes size={13} /></button>
         </div>
         <div className="p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={fieldLabel}>Round Type</label>
+              <select className={fieldCls} value={form.round_type} onChange={set("round_type")}>
+                {["Screening", "Technical", "HR Round", "Final Round", "Other"].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={fieldLabel}>Duration (minutes)</label>
+              <input type="number" min="5" max="480" className={fieldCls} value={form.duration_minutes} onChange={set("duration_minutes")} />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Round Type</label>
-            <select className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={form.round_type} onChange={set("round_type")}>
-              {["Screening", "Technical", "HR Round", "Final Round", "Other"].map((t) => (
-                <option key={t} value={t}>{t}</option>
+            <label className={fieldLabel}>Date and time (IST)</label>
+            <input type="datetime-local" className={fieldCls} value={form.scheduled_at} onChange={set("scheduled_at")} />
+          </div>
+
+          <div>
+            <label className={fieldLabel}>Interview mode</label>
+            <div className="flex gap-2">
+              {MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, mode: m }))}
+                  className={`flex-1 text-xs font-semibold px-3 py-2 rounded-xl border-2 transition-all ${form.mode === m ? "border-[#730042] bg-[#fdf5f9] text-[#730042]" : "border-gray-100 text-gray-500 hover:border-gray-300"}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.mode === "Online" && (
+            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
+              <div>
+                <label className={fieldLabel}>Platform</label>
+                <select className={fieldCls} value={form.meeting_platform} onChange={set("meeting_platform")}>
+                  {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={fieldLabel}>Meeting link</label>
+                <input type="url" placeholder="https://meet.google.com/abc-defg-hij" className={fieldCls} value={form.meeting_link} onChange={set("meeting_link")} />
+                {form.meeting_link && !linkOk && <p className="text-[11px] text-red-500 mt-1">Enter a full link starting with https://</p>}
+              </div>
+            </div>
+          )}
+
+          {form.mode === "In-person" && (
+            <div>
+              <label className={fieldLabel}>Venue / address</label>
+              <input type="text" placeholder="Office address, floor, landmark" className={fieldCls} value={form.location} onChange={set("location")} />
+            </div>
+          )}
+
+          <div>
+            <label className={fieldLabel}>Interviewer (optional)</label>
+            <select className={fieldCls} value={form.conducted_by} onChange={set("conducted_by")}>
+              <option value="">Not assigned</option>
+              {interviewers.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}{i.designation ? ` · ${i.designation}` : ""}</option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-400 mt-1">The interviewer also gets an email with the candidate and meeting details.</p>
           </div>
+
           <div>
-            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Scheduled At</label>
-            <input type="datetime-local" className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={form.scheduled_at} onChange={set("scheduled_at")} />
+            <label className={fieldLabel}>Instructions for the candidate (optional)</label>
+            <textarea rows={3} maxLength={2000} placeholder="Documents to carry, what to prepare, dress code…" className={`${fieldCls} resize-y`} value={form.instructions} onChange={set("instructions")} />
           </div>
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-[#730042] hover:text-[#730042] transition-colors">Cancel</button>
-          <button onClick={handleSubmit} disabled={schMut.isPending || !form.scheduled_at} className="flex items-center gap-2 px-5 py-2 bg-[#730042] text-white text-sm font-semibold rounded-xl hover:bg-[#4a0029] disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+          <button onClick={handleSubmit} disabled={schMut.isPending || !valid} className="flex items-center gap-2 px-5 py-2 bg-[#730042] text-white text-sm font-semibold rounded-xl hover:bg-[#4a0029] disabled:opacity-60 disabled:cursor-not-allowed transition-all">
             <FaCalendarAlt size={10} />
-            {schMut.isPending ? "Scheduling…" : "Schedule"}
+            {schMut.isPending ? "Scheduling…" : "Schedule and send invite"}
           </button>
         </div>
       </div>
@@ -514,6 +633,15 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
   const [feedbackForm, setFeedbackForm] = useState({ feedback: "", score: "", outcome: "Pending" });
   const [selectedRound, setSelectedRound] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const resendMut = useResendInterviewInvite();
+  const handleResend = async (roundId) => {
+    try {
+      const res = await resendMut.mutateAsync({ candidateId: candidate._id, roundId });
+      toast.success(res?.message || "Invite resent");
+    } catch (err) {
+      toast.error(err?.message || "Could not resend the invite");
+    }
+  };
 
   const allowed = (STAGE_ORDER[candidate.current_stage] || []).filter((s) => !OFFER_MANAGED_STAGES.includes(s));
   const offerHandled = (STAGE_ORDER[candidate.current_stage] || []).some((s) => OFFER_MANAGED_STAGES.includes(s));
@@ -705,7 +833,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="text-sm font-semibold text-gray-800">Round {round.round_number} · {round.round_type}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Scheduled: {fmtDate(round.scheduled_at)}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">Scheduled: {fmtDateTimeIst(round.scheduled_at)}{round.duration_minutes ? ` · ${round.duration_minutes} min` : ""}</div>
                         </div>
                         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                           round.outcome === "Passed" ? "bg-emerald-50 text-emerald-600" :
@@ -714,6 +842,25 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                           "bg-amber-50 text-amber-600"
                         }`}>{round.outcome}</span>
                       </div>
+                      <div className="bg-[#fdf5f9] rounded-lg px-3 py-2 mb-2 space-y-1 text-xs text-gray-600">
+                        <div><span className="text-gray-400">Mode:</span> <strong className="text-gray-700">{round.mode || "Online"}</strong>{round.mode !== "In-person" && round.mode !== "Phone" && round.meeting_platform ? ` · ${round.meeting_platform}` : ""}</div>
+                        {(round.mode || "Online") === "Online" && round.meeting_link && (
+                          <div className="break-all"><span className="text-gray-400">Link:</span> <a href={round.meeting_link} target="_blank" rel="noreferrer" className="font-semibold text-[#730042] underline">{round.meeting_link}</a></div>
+                        )}
+                        {round.mode === "In-person" && round.location && <div><span className="text-gray-400">Venue:</span> <strong className="text-gray-700">{round.location}</strong></div>}
+                        {round.conducted_by?.f_name && <div><span className="text-gray-400">Interviewer:</span> <strong className="text-gray-700">{round.conducted_by.f_name} {round.conducted_by.l_name}</strong></div>}
+                        {round.instructions && <div className="whitespace-pre-line"><span className="text-gray-400">Instructions:</span> {round.instructions}</div>}
+                        <div className="text-[11px] text-gray-400">{round.invite_sent_at ? `Invite emailed ${fmtDateTimeIst(round.invite_sent_at)}` : "Invite email not sent yet"}</div>
+                      </div>
+                      {canAddCandidate && round.outcome === "Pending" && (
+                        <button
+                          onClick={() => handleResend(round._id)}
+                          disabled={resendMut.isPending}
+                          className="mr-2 mb-1 inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:border-[#730042] hover:text-[#730042] disabled:opacity-60 transition-colors"
+                        >
+                          <FaEnvelope size={10} /> {round.invite_sent_at ? "Resend invite" : "Send invite"}
+                        </button>
+                      )}
                       {round.feedback && <p className="text-xs text-gray-500 mb-2 leading-relaxed">{round.feedback}</p>}
                       {round.score != null && <p className="text-xs text-gray-400">Score: <strong className="text-gray-700">{round.score}/10</strong></p>}
                       {canAddCandidate && (
@@ -1232,6 +1379,11 @@ const RecruitmentAdmin = () => {
   const [detailModal, setDetailModal] = useState(null);
   const [hiringModal, setHiringModal] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mainTab = searchParams.get("tab") === "approvals" ? "approvals" : "requisitions";
+  const setMainTab = (t) => setSearchParams(t === "approvals" ? { tab: "approvals" } : {}, { replace: true });
+  const { data: approvalCountData } = useApprovalPendingCount();
+  const approvalCount = approvalCountData?.data?.count || 0;
 
   const { data: requisitionData, isLoading } = useGetAllRequisitions();
   const { data: pendingData }                 = useGetPendingRequisitions();
@@ -1309,6 +1461,26 @@ const RecruitmentAdmin = () => {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+        {[
+          { key: "requisitions", label: "Requisitions", icon: <FaBriefcase size={11} /> },
+          { key: "approvals", label: "Offer Approvals", icon: <FaFileSignature size={11} />, badge: approvalCount },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setMainTab(t.key)}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition-all -mb-px whitespace-nowrap ${mainTab === t.key ? "border-[#730042] text-[#730042]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+          >
+            {t.icon} {t.label}
+            {t.badge > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#CD166E] text-white text-[10px] font-bold flex items-center justify-center">{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === "approvals" ? (
+        <OfferApprovals />
+      ) : (
+      <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
           { label: "Total Requisitions", val: stats.total,    icon: <FaBriefcase size={15} />, color: "#730042", bg: "#f7edf3", stripe: "#730042" },
@@ -1511,6 +1683,8 @@ const RecruitmentAdmin = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {manageModal && (
         <ManageModal

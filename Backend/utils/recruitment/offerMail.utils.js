@@ -118,7 +118,109 @@ const buildAppointmentEmail = ({ candidateName, companyName, accent, designation
   }),
 });
 
+const fmtDateTimeIst = (d) => {
+  if (!d) return "-";
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${date.toLocaleString("en-IN", { weekday: "short", day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })} IST`;
+};
+
+const p = (html) => `<p style="margin:0 0 12px 0;color:#2b2b2b;font-size:14px;line-height:1.65;">${html}</p>`;
+
+const buildApprovalRequestEmail = ({ approverName, companyName, requesterName, kindLabel, candidateName, designation, refNo, annualCtcText, reviewUrl }) => ({
+  subject: `Approval needed: ${kindLabel} for ${candidateName}`,
+  html: shell({
+    companyName,
+    title: `${kindLabel} waiting for your approval`,
+    bodyHtml: `${p(`Hi ${esc(approverName || "there")},`)}
+${p(`<strong>${esc(requesterName)}</strong> has sent a ${esc(kindLabel.toLowerCase())} to you for review and finalization. Please review it and approve with your signature, or reject it with a reason.`)}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">${row("Candidate", candidateName)}${row("Position", designation)}${row("Reference", refNo)}${row("Annual CTC", annualCtcText)}</table>
+${reviewUrl ? `<div style="margin:18px 0 6px 0;">${button(reviewUrl, "Review and Approve", "#730042")}</div>` : ""}
+${p(`<span style="color:#7a7a7a;font-size:12px;">You will find it under Recruitment, in the Offer Approvals section.</span>`)}`,
+  }),
+});
+
+const buildApprovalResultEmail = ({ requesterName, companyName, kindLabel, candidateName, designation, refNo, approverName, approved, reason }) => ({
+  subject: approved ? `${kindLabel} approved: ${candidateName}` : `${kindLabel} rejected: ${candidateName}`,
+  html: shell({
+    companyName,
+    title: approved ? `${kindLabel} approved and signed` : `${kindLabel} rejected`,
+    bodyHtml: `${p(`Hi ${esc(requesterName || "there")},`)}
+${p(
+  approved
+    ? `<strong>${esc(approverName)}</strong> has approved the ${esc(kindLabel.toLowerCase())} for <strong>${esc(candidateName)}</strong> and attached their signature. The letter is now finalized and ready to be sent to the candidate.`
+    : `<strong>${esc(approverName)}</strong> has rejected the ${esc(kindLabel.toLowerCase())} for <strong>${esc(candidateName)}</strong>. Please regenerate it with the requested changes and send it for approval again.`
+)}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">${row("Candidate", candidateName)}${row("Position", designation)}${row("Reference", refNo)}${approved ? "" : row("Reason", reason)}</table>`,
+  }),
+});
+
+const interviewRows = ({ roundLabel, scheduledAt, durationMinutes, mode, platform, location, interviewerName }) =>
+  `${row("Round", roundLabel)}${row("Date and time", fmtDateTimeIst(scheduledAt))}${row("Duration", durationMinutes ? `${durationMinutes} minutes` : "")}${row("Mode", mode)}${row("Platform", platform)}${row("Venue", location)}${row("Interviewer", interviewerName)}`;
+
+const buildInterviewInviteEmail = ({ candidateName, companyName, designation, roundLabel, scheduledAt, durationMinutes, mode, platform, meetingLink, location, instructions, interviewerName, hrName, hrEmail }) => ({
+  subject: `Interview scheduled: ${roundLabel} for ${designation} at ${companyName}`,
+  html: shell({
+    companyName,
+    title: "Your interview has been scheduled",
+    bodyHtml: `${p(`Dear ${esc(candidateName)},`)}
+${p(`Thank you for your interest in the <strong>${esc(designation)}</strong> position at ${esc(companyName)}. We are pleased to invite you for the following interview round.`)}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0;">${interviewRows({ roundLabel, scheduledAt, durationMinutes, mode, platform, location, interviewerName })}</table>
+${meetingLink ? `<div style="margin:16px 0 8px 0;">${button(meetingLink, "Join Meeting", "#730042")}</div>${p(`<span style="color:#7a7a7a;font-size:12px;">If the button does not work, copy this link into your browser:<br><span style="color:#2b2b2b;word-break:break-all;">${esc(meetingLink)}</span></span>`)}` : ""}
+${instructions ? `<div style="margin:12px 0;padding:12px 14px;background:#faf9f6;border-left:3px solid #730042;color:#2b2b2b;font-size:13px;line-height:1.6;white-space:pre-line;"><strong>Instructions</strong><br>${esc(instructions)}</div>` : ""}
+${p(`A calendar invite is attached, you can add it to your calendar with one click. Please join a few minutes early and keep a copy of your resume handy.`)}
+${hrName ? p(`For any questions, contact ${esc(hrName)}${hrEmail ? ` at <a href="mailto:${esc(hrEmail)}" style="color:#730042;">${esc(hrEmail)}</a>` : ""}.`) : ""}
+${p("Best of luck!")}`,
+  }),
+});
+
+const buildInterviewerInviteEmail = ({ interviewerName, companyName, candidateName, candidateEmail, designation, roundLabel, scheduledAt, durationMinutes, mode, platform, meetingLink, location, instructions }) => ({
+  subject: `You are the interviewer: ${candidateName} (${roundLabel})`,
+  html: shell({
+    companyName,
+    title: "You have an interview to conduct",
+    bodyHtml: `${p(`Hi ${esc(interviewerName || "there")},`)}
+${p(`You have been assigned to interview <strong>${esc(candidateName)}</strong> for the <strong>${esc(designation)}</strong> position.`)}
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:12px 0;">${row("Candidate", candidateName)}${row("Candidate email", candidateEmail)}${interviewRows({ roundLabel, scheduledAt, durationMinutes, mode, platform, location })}</table>
+${meetingLink ? `<div style="margin:16px 0 8px 0;">${button(meetingLink, "Open Meeting Link", "#730042")}</div>` : ""}
+${instructions ? `<div style="margin:12px 0;padding:12px 14px;background:#faf9f6;border-left:3px solid #730042;color:#2b2b2b;font-size:13px;line-height:1.6;white-space:pre-line;"><strong>Notes</strong><br>${esc(instructions)}</div>` : ""}
+${p("Please add your feedback and score from the Rounds tab after the interview.")}`,
+  }),
+});
+
+// Minimal RFC 5545 calendar event so the invite can be added to any calendar.
+const buildInterviewIcs = ({ uid, title, description, location, start, durationMinutes = 45, organizerEmail }) => {
+  const fmt = (d) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const esc2 = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  const startDate = new Date(start);
+  const end = new Date(startDate.getTime() + durationMinutes * 60000);
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//TorchX Talent//Interview//EN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}@torchx-talent`,
+    `DTSTAMP:${fmt(new Date())}`,
+    `DTSTART:${fmt(startDate)}`,
+    `DTEND:${fmt(end)}`,
+    `SUMMARY:${esc2(title)}`,
+    `DESCRIPTION:${esc2(description)}`,
+    location ? `LOCATION:${esc2(location)}` : null,
+    organizerEmail ? `ORGANIZER:mailto:${organizerEmail}` : null,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+};
+
 module.exports = {
+  buildApprovalRequestEmail,
+  buildApprovalResultEmail,
+  buildInterviewInviteEmail,
+  buildInterviewerInviteEmail,
+  buildInterviewIcs,
   buildOfferEmail,
   buildOfferReminderEmail,
   buildOfferConfirmationEmail,

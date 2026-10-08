@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { approvalDefinition } = require("../utils/recruitment/approvalSchema.utils");
 
 const sectionSchema = new mongoose.Schema(
   {
@@ -18,7 +19,7 @@ const appointmentLetterSchema = new mongoose.Schema(
     requisition_id: { type: mongoose.Schema.Types.ObjectId, ref: "HiringRequisition", required: true },
 
     ref_no: { type: String, required: true },
-    status: { type: String, enum: ["DRAFT", "FINAL"], default: "DRAFT" },
+    status: { type: String, enum: ["DRAFT", "PENDING_APPROVAL", "FINAL"], default: "DRAFT" },
 
     template_key: { type: String, default: "classic" },
     accent_color: { type: String, default: null },
@@ -56,8 +57,10 @@ const appointmentLetterSchema = new mongoose.Schema(
     sent_at: { type: Date, default: null },
     sent_via: { type: [String], default: [] },
 
+    approval: { type: new mongoose.Schema(approvalDefinition, { _id: false }), default: () => ({}) },
+
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
-    finalized_by: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+    finalized_by: { type: mongoose.Schema.Types.ObjectId, default: null },
     finalized_at: { type: Date, default: null },
   },
   { timestamps: true }

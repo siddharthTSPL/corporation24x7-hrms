@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
-import { FaFileAlt, FaEdit, FaCheckCircle, FaLock, FaEnvelope, FaWhatsapp, FaDownload, FaRedo, FaCalendarPlus, FaUserCheck, FaUndo, FaCommentDots } from "react-icons/fa";
+import { FaFileAlt, FaEdit, FaLock, FaEnvelope, FaWhatsapp, FaDownload, FaRedo, FaCalendarPlus, FaUserCheck, FaUndo, FaCommentDots } from "react-icons/fa";
 import {
   useOfferBundle,
   useGenerateOffer,
-  useMarkOfferReviewDone,
-  useFinalizeOffer,
   useReopenOffer,
   useSendOfferEmail,
   useSendOfferWhatsapp,
@@ -13,12 +11,12 @@ import {
   useExtendOfferValidity,
   useJoinCandidate,
   useGenerateAppointment,
-  useFinalizeAppointment,
   useSendAppointmentEmail,
   useSendAppointmentWhatsapp,
 } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import { fetchOfferPdf, fetchAppointmentPdf } from "../../auth/api/adminapi/recruitment/recruitment.api";
 import OfferEditor from "./OfferEditor";
+import ApprovalPanel from "./ApprovalPanel";
 
 const inputCls = "w-full px-3 py-2 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all";
 const labelCls = "block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5";
@@ -51,6 +49,7 @@ const saveBlob = (blob, filename) => {
 const STATUS_STYLE = {
   DRAFT: "bg-slate-100 text-slate-600",
   REVIEW_DONE: "bg-blue-50 text-blue-700",
+  PENDING_APPROVAL: "bg-blue-50 text-blue-700",
   FINAL: "bg-violet-50 text-violet-700",
   SENT: "bg-orange-50 text-orange-700",
   ACCEPTED: "bg-emerald-50 text-emerald-700",
@@ -58,11 +57,11 @@ const STATUS_STYLE = {
   EXPIRED: "bg-amber-50 text-amber-700",
 };
 
-const STATUS_LABEL = { DRAFT: "Draft", REVIEW_DONE: "Reviewed", FINAL: "Final", SENT: "Sent", ACCEPTED: "Accepted", REJECTED: "Rejected", EXPIRED: "Expired" };
+const STATUS_LABEL = { DRAFT: "Draft", REVIEW_DONE: "Draft", PENDING_APPROVAL: "Pending approval", FINAL: "Final", SENT: "Sent", ACCEPTED: "Accepted", REJECTED: "Rejected", EXPIRED: "Expired" };
 
 const OfferProgress = ({ status, joined }) => {
-  const steps = ["Draft", "Reviewed", "Final", "Sent", status === "REJECTED" ? "Rejected" : status === "EXPIRED" ? "Expired" : "Accepted", "Joined"];
-  const idxMap = { DRAFT: 0, REVIEW_DONE: 1, FINAL: 2, SENT: 3, ACCEPTED: 4, REJECTED: 4, EXPIRED: 4 };
+  const steps = ["Draft", "Approval", "Final", "Sent", status === "REJECTED" ? "Rejected" : status === "EXPIRED" ? "Expired" : "Accepted", "Joined"];
+  const idxMap = { DRAFT: 0, REVIEW_DONE: 0, PENDING_APPROVAL: 1, FINAL: 2, SENT: 3, ACCEPTED: 4, REJECTED: 4, EXPIRED: 4 };
   const current = joined ? 5 : idxMap[status] ?? 0;
   const bad = status === "REJECTED" || status === "EXPIRED";
   return (
@@ -158,7 +157,6 @@ const GenerateForm = ({ candidate, templates, onDone }) => {
 
 const AppointmentSection = ({ candidate, appointment, meta, canAct, onEdit }) => {
   const genMut = useGenerateAppointment();
-  const finMut = useFinalizeAppointment();
   const emailMut = useSendAppointmentEmail();
   const waMut = useSendAppointmentWhatsapp();
   const [waLink, setWaLink] = useState(null);
@@ -207,6 +205,7 @@ const AppointmentSection = ({ candidate, appointment, meta, canAct, onEdit }) =>
   }
 
   const isFinal = appointment.status === "FINAL";
+  const isPending = appointment.status === "PENDING_APPROVAL";
   return (
     <div className="border border-gray-100 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -214,22 +213,13 @@ const AppointmentSection = ({ candidate, appointment, meta, canAct, onEdit }) =>
           <div className="text-sm font-bold text-gray-800">Appointment letter</div>
           <div className="text-xs text-gray-400 mt-0.5">{appointment.ref_no}</div>
         </div>
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isFinal ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{isFinal ? "Final · Locked" : "Draft"}</span>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isFinal ? "bg-emerald-50 text-emerald-700" : isPending ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{isFinal ? "Final · Locked" : isPending ? "Pending approval" : "Draft"}</span>
       </div>
       {isFinal && appointment.sent_at && <p className="text-xs text-gray-500">Sent on {fmtDateTime(appointment.sent_at)} via {appointment.sent_via.join(", ").toLowerCase()}</p>}
       <div className="flex flex-wrap gap-2">
         <button onClick={download} className={ghostBtn}><FaDownload size={10} /> Download</button>
-        {canAct && !isFinal && (
-          <>
-            <button onClick={() => onEdit(appointment)} className={ghostBtn}><FaEdit size={10} /> Review and edit</button>
-            <button
-              disabled={finMut.isPending}
-              className={primaryBtn}
-              onClick={() => run(() => finMut.mutateAsync(appointment._id), "Finalized")}
-            >
-              <FaLock size={10} /> {finMut.isPending ? "Finalizing…" : "Finalize and lock"}
-            </button>
-          </>
+        {canAct && !isFinal && !isPending && (
+          <button onClick={() => onEdit(appointment)} className={ghostBtn}><FaEdit size={10} /> Review and edit</button>
         )}
         {canAct && isFinal && (
           <>
@@ -256,6 +246,7 @@ const AppointmentSection = ({ candidate, appointment, meta, canAct, onEdit }) =>
       {waLink && (
         <a href={waLink} target="_blank" rel="noreferrer" className="inline-block text-xs font-semibold text-emerald-700 underline">Open WhatsApp</a>
       )}
+      <ApprovalPanel kind="appointment" letter={appointment} canAct={canAct} showSend={!isFinal && !isPending} onRegenerate={() => onEdit(appointment)} />
       {!meta && null}
     </div>
   );
@@ -269,8 +260,6 @@ const OfferTab = ({ candidate, canAct }) => {
   const [showExtend, setShowExtend] = useState(false);
   const [waLink, setWaLink] = useState(null);
 
-  const reviewMut = useMarkOfferReviewDone();
-  const finMut = useFinalizeOffer();
   const reopenMut = useReopenOffer();
   const emailMut = useSendOfferEmail();
   const waMut = useSendOfferWhatsapp();
@@ -432,16 +421,6 @@ const OfferTab = ({ candidate, canAct }) => {
         {canAct && editable && (
           <button onClick={() => setEditor({ kind: "OFFER", letter: offer })} className={ghostBtn}><FaEdit size={10} /> Review and edit</button>
         )}
-        {canAct && status === "DRAFT" && (
-          <button disabled={reviewMut.isPending} className={primaryBtn} onClick={() => run(() => reviewMut.mutateAsync(offer._id), "Marked as reviewed")}>
-            <FaCheckCircle size={10} /> {reviewMut.isPending ? "Checking…" : "Mark review done"}
-          </button>
-        )}
-        {canAct && status === "REVIEW_DONE" && (
-          <button disabled={finMut.isPending} className={primaryBtn} onClick={() => run(() => finMut.mutateAsync(offer._id), "Offer finalized")}>
-            <FaLock size={10} /> {finMut.isPending ? "Finalizing…" : "Finalize offer"}
-          </button>
-        )}
         {canAct && ["REVIEW_DONE", "FINAL"].includes(status) && (
           <button disabled={reopenMut.isPending} className={ghostBtn} onClick={() => run(() => reopenMut.mutateAsync(offer._id), "Reopened")}>
             <FaUndo size={10} /> Reopen for editing
@@ -491,6 +470,8 @@ const OfferTab = ({ candidate, canAct }) => {
       </div>
 
       {waLink && <a href={waLink} target="_blank" rel="noreferrer" className="inline-block text-xs font-semibold text-emerald-700 underline">Open WhatsApp</a>}
+
+      <ApprovalPanel kind="offer" letter={offer} canAct={canAct} showSend={editable} onRegenerate={() => setEditor({ kind: "OFFER", letter: offer })} />
 
       {canAct && (showExtend || expired) && (status === "SENT" || expired) && (
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end p-4 bg-[#fdf5f9] rounded-xl border border-[#eedde8]">
