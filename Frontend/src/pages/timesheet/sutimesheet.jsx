@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
 import {
   useMyProjects, useCreateProject, useUpdateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
   useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
@@ -7,7 +8,7 @@ import {
   useOrgAllTimeLogs, useOrgAllTimesheets,
   useMyAssignedJobs, useActiveTimer, useStartTimer, usePauseTimer,
   useResumeTimer, useStopTimer, useDiscardTimer, useHeartbeatTimer,
-  useMyWeekLog, useLogTime, useSubmitTimesheet, useMyTimesheets,
+  useMyWeekLog, useLogTime, useMyDayStatus, useSubmitTimesheet, useMyTimesheets,
   useRecallTimesheet, useMyProductivitySummary, useJobById,
   useForwardTimesheet, useTimesheetDetailedReport, useOrgAllJobs,
 } from "../../auth/server-state/timesheet/timesheet.hook";
@@ -371,6 +372,7 @@ function JobDetailModal({ jobId, open, onClose }) {
 function TimerWidget({ assignedJobs }) {
   const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 30000 });
   const timer = timerData?.timer;
+  const { data: dayStatus } = useMyDayStatus();
   const startTimerMut = useStartTimer();
   const pauseTimerMut = usePauseTimer();
   const resumeTimerMut = useResumeTimer();
@@ -441,7 +443,7 @@ function TimerWidget({ assignedJobs }) {
           </div>
           <div className="flex gap-2 shrink-0 flex-wrap justify-center sm:justify-end">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start</Btn>
+              dayStatus?.isOff ? <OffDayTag info={dayStatus} /> : <Btn onClick={() => setStartModal(true)} className="w-full sm:w-auto">▶ Start</Btn>
             ) : (
               <>
                 {isRunning && (
@@ -529,7 +531,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
                     <div className={cn("text-[11px] font-bold shrink-0", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>)}
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="w-full border border-dashed border-gray-200 rounded-lg py-1.5 text-[11px] text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[32px]">+ Add</button>)}
               </div>
             </div>
           );
@@ -571,7 +573,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
                     <div className={cn("text-[9px] sm:text-[10px] font-bold mt-0.5", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
-                {iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>)}
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button onClick={() => onAddLog(iso)} className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors min-h-[28px]">+ Add</button>)}
               </div>
             );
           })}
@@ -870,6 +872,7 @@ export default function SuperAdminTimesheet() {
   const rejectTS        = useRejectTimesheet();
   const updateJobStatus = useUpdateJobStatus();
   const logTime         = useLogTime();
+  const { data: logDayStatus } = useMyDayStatus(logForm.log_date || undefined);
   const submitTS        = useSubmitTimesheet();
   const recallTS        = useRecallTimesheet();
 
@@ -1919,6 +1922,7 @@ export default function SuperAdminTimesheet() {
 
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
         <div className="flex flex-col gap-3.5">
+          <OffDayNotice status={logDayStatus} />
           <Select label="Job" value={logForm.job} onChange={e => setLogForm(p => ({ ...p, job: e.target.value }))}>
             <option value="">Select job…</option>
             {assignedJobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
@@ -1930,7 +1934,7 @@ export default function SuperAdminTimesheet() {
           <Input label="Note (optional)" placeholder="What did you work on?" value={logForm.note} onChange={e => setLogForm(p => ({ ...p, note: e.target.value }))} />
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-1">
             <Btn variant="ghost" onClick={() => setLogModal(false)} className="w-full sm:w-auto">Cancel</Btn>
-            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending} className="w-full sm:w-auto">
+            <Btn onClick={handleLogTime} disabled={!logForm.job || !logForm.duration_minutes || logTime.isPending || logDayStatus?.isOff} className="w-full sm:w-auto">
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>
           </div>
