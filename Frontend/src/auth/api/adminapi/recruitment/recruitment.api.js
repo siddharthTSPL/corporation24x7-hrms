@@ -201,3 +201,58 @@ export const sendAppointmentWhatsapp = async (id) => {
   const res = await api.post(`recruitment/admin/appointment/${id}/send-whatsapp`);
   return res.data;
 };
+
+export const resendInterviewInvite = async (candidateId, roundId) => {
+  const res = await api.post(`recruitment/admin/candidate/${candidateId}/round/${roundId}/resend-invite`);
+  return res.data;
+};
+
+export const getInterviewers = async () => {
+  const res = await api.get("recruitment/admin/interviewers");
+  return res.data;
+};
+
+// ---- Offer / appointment approval (creator side) ----
+export const getApprovers = async () => {
+  const res = await api.get("recruitment/admin/approvers");
+  return res.data;
+};
+
+export const submitForApproval = async ({ kind, id, approver_id, approver_model }) => {
+  const res = await api.patch(`recruitment/admin/approval/${kind}/${id}/submit`, { approver_id, approver_model });
+  return res.data;
+};
+
+export const withdrawApproval = async ({ kind, id }) => {
+  const res = await api.patch(`recruitment/admin/approval/${kind}/${id}/withdraw`);
+  return res.data;
+};
+
+// ---- Approver side (Admin or SuperAdmin) ----
+export const getMyApprovals = async () => {
+  const res = await api.get("recruitment/approvals/mine");
+  return res.data;
+};
+
+export const getApprovalPendingCount = async () => {
+  const res = await api.get("recruitment/approvals/pending-count");
+  return res.data;
+};
+
+export const fetchApprovalPreview = async ({ kind, id }) => {
+  const res = await api.get(`recruitment/approvals/${kind}/${id}/preview`, { responseType: "blob" });
+  return res.data;
+};
+
+export const approveLetter = async ({ kind, id, signatureFile, reuseSignatureUrl }) => {
+  const fd = new FormData();
+  if (signatureFile) fd.append("signature", signatureFile);
+  if (reuseSignatureUrl) fd.append("reuse_signature_url", reuseSignatureUrl);
+  const res = await api.patch(`recruitment/approvals/${kind}/${id}/approve`, fd);
+  return res.data;
+};
+
+export const rejectLetter = async ({ kind, id, reason }) => {
+  const res = await api.patch(`recruitment/approvals/${kind}/${id}/reject`, { reason });
+  return res.data;
+};
