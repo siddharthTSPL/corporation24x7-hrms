@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
 import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useMyWeekLog,
-  useLogTime,
+  useLogTime, useMyDayStatus,
   useUpdateTimeLog,
   useDeleteTimeLog,
   useActiveTimer,
@@ -320,6 +321,7 @@ function JobDetailModal({ jobId, open, onClose }) {
 function TimerSection({ assignedJobs, onTimerLog }) {
   const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 10000 });
   const timer = timerData?.timer;
+  const { data: dayStatus } = useMyDayStatus();
   const startTimer = useStartTimer();
   const pauseTimer = usePauseTimer();
   const resumeTimer = useResumeTimer();
@@ -400,7 +402,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
 
           <div className="flex gap-2 shrink-0 flex-wrap">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)}>
+              dayStatus?.isOff ? <OffDayTag info={dayStatus} /> : <Btn onClick={() => setStartModal(true)}>
                 ▶ Start
               </Btn>
             ) : (
@@ -551,7 +553,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     )}
                   </div>
                 ))}
-                {iso <= todayISO && (<button
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors"
                 >
@@ -634,7 +636,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     </div>
                   </div>
                 ))}
-                {iso <= todayISO && (<button
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors"
                 >
@@ -690,6 +692,7 @@ export default function EmployeeTimesheet() {
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
   const logTime = useLogTime();
+  const { data: logDayStatus } = useMyDayStatus(logForm.log_date || undefined);
   const updateTimeLog = useUpdateTimeLog();
   const deleteTimeLog = useDeleteTimeLog();
   const submitTS = useSubmitTimesheet();
@@ -1115,6 +1118,7 @@ export default function EmployeeTimesheet() {
 
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
         <div className="flex flex-col gap-3.5">
+          <OffDayNotice status={logDayStatus} />
           <Select
             label="Job"
             value={logForm.job}
@@ -1152,7 +1156,7 @@ export default function EmployeeTimesheet() {
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
             <Btn
               onClick={handleLogTime}
-              disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending}
+              disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending || logDayStatus?.isOff}
             >
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>
