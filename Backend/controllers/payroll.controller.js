@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const SalaryStructure = require("../Models/salarystructure.model");
 const Payroll = require("../Models/payroll.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
@@ -247,6 +248,116 @@ const setEmployeeCTC = async (req, res) => {
   });
 
   res.status(201).json({ success: true, structure, message: "Salary structure created" });
+};
+
+const bulkSetEmployeeCTC = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { rows } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0)
+    return res.status(400).json({ success: false, message: "At least one CTC row is required" });
+  if (rows.length > 1000)
+    return res.status(400).json({ success: false, message: "A maximum of 1,000 employees can be updated at once" });
+
+  const seen = new Set();
+  const normalized = [];
+  for (const [index, row] of rows.entries()) {
+    const employeeModel = row?.employeeModel;
+    const employee = String(row?.employee || "");
+    const ctc = Number(row?.ctc);
+    const effectiveFrom = row?.effectiveFrom ? new Date(row.effectiveFrom) : new Date();
+    const effectiveDateText = row?.effectiveFrom ? String(row.effectiveFrom).slice(0, 10) : "";
+    const key = `${employeeModel}:${employee}`;
+
+    if (!ALLOWED_EMPLOYEE_MODELS.includes(employeeModel) || !mongoose.isValidObjectId(employee))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: invalid employee or employee type` });
+    if (!Number.isFinite(ctc) || ctc <= 0)
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: annual CTC must be greater than 0` });
+    if (Number.isNaN(effectiveFrom.getTime()) || (effectiveDateText && effectiveFrom.toISOString().slice(0, 10) !== effectiveDateText))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: invalid effective date` });
+    if (seen.has(key))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: duplicate employee in upload` });
+    seen.add(key);
+    normalized.push({ employee, employeeModel, ctc, effectiveFrom });
+  }
+
+  const idsByModel = {};
+  for (const row of normalized) (idsByModel[row.employeeModel] ||= []).push(row.employee);
+  for (const [employeeModel, ids] of Object.entries(idsByModel)) {
+    if (employeeModel === "SuperAdmin") {
+      if (ids.some((id) => String(id) !== String(organisation_id)))
+        return res.status(400).json({ success: false, message: "The selected organisation owner is invalid" });
+      continue;
+    }
+    const Model = EMPLOYEE_MODEL_MAP[employeeModel];
+    const validEmployees = await Model.find({ _id: { $in: ids }, organisation_id }).select("_id").lean();
+    const validIds = new Set(validEmployees.map((employee) => String(employee._id)));
+    const invalid = ids.find((id) => !validIds.has(String(id)));
+    if (invalid)
+      return res.status(400).json({ success: false, message: "An employee in the upload does not belong to this organisation" });
+  }
+
+  const structures = await SalaryStructure.find({
+    organisation_id,
+    employee: { $in: normalized.map((row) => row.employee) },
+  });
+  const structuresByEmployee = new Map(structures.map((structure) => [String(structure.employee), structure]));
+  const mismatched = normalized.find((row) => {
+    const existing = structuresByEmployee.get(String(row.employee));
+    return existing && existing.employeeModel !== row.employeeModel;
+  });
+  if (mismatched)
+    return res.status(400).json({ success: false, message: "Employee type does not match the existing salary structure" });
+  const policy = await getOrCreatePolicy(organisation_id);
+  const policySnapshot = {
+    basic: policy.basic,
+    hra: policy.hra,
+    allowances: policy.allowances,
+    pf: policy.pf,
+    esi: policy.esi,
+    professionalTax: policy.professionalTax,
+    tds: policy.tds,
+  };
+  const operations = normalized.map((row) => {
+    const existing = structuresByEmployee.get(String(row.employee));
+    const set = {
+      organisation_id,
+      employeeModel: row.employeeModel,
+      ctc: row.ctc,
+      effectiveFrom: row.effectiveFrom,
+      breakup: calculateSalaryBreakup(row.ctc, policy),
+      policySnapshot,
+      setBy: req.admin._id,
+      setByModel: req.actorModel || "Admin",
+    };
+    if (existing) {
+      const update = { $set: set };
+      if (Number(existing.ctc) !== row.ctc) {
+        update.$push = { revisionHistory: {
+          ctc: existing.ctc,
+          effectiveFrom: existing.effectiveFrom,
+          changedBy: req.admin._id,
+          changedByModel: req.actorModel || "Admin",
+        } };
+      }
+      return { updateOne: { filter: { _id: existing._id, organisation_id }, update } };
+    }
+    return { insertOne: { document: {
+      ...set,
+      employee: row.employee,
+      annualTaxEstimate: 0,
+      attendanceBasis: "attendance",
+    } } };
+  });
+
+  if (operations.length) await SalaryStructure.bulkWrite(operations, { ordered: true });
+  const created = operations.filter((operation) => operation.insertOne).length;
+  res.status(200).json({
+    success: true,
+    created,
+    revised: operations.length - created,
+    message: `${created} salary structure${created === 1 ? "" : "s"} created and ${operations.length - created} revised`,
+  });
 };
 
 
@@ -983,7 +1094,7 @@ const listPayrolls = async (req, res) => {
   // Older payrolls (generated before bank details were added to the
   // snapshot) won't have bankName/accountNumber saved — backfill from each
   // employee's current bank details so existing payslips still show them.
-  const needsBankBackfill = payrolls.filter((p) => !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber);
+  const needsBankBackfill = payrolls.filter((p) => !p.employeeSnapshot?.bankName || !p.employeeSnapshot?.accountNumber);
   if (needsBankBackfill.length) {
     const cache = new Map();
     for (const p of needsBankBackfill) {
@@ -992,7 +1103,11 @@ const listPayrolls = async (req, res) => {
         cache.set(cacheKey, await getEmployeeSnapshot(p.employeeModel, p.employee));
       }
       const { bankName, accountNumber } = cache.get(cacheKey);
-      p.employeeSnapshot = { ...p.employeeSnapshot, bankName, accountNumber };
+      p.employeeSnapshot = {
+        ...p.employeeSnapshot,
+        bankName: p.employeeSnapshot?.bankName || bankName,
+        accountNumber: p.employeeSnapshot?.accountNumber || accountNumber,
+      };
     }
   }
 
@@ -1194,6 +1309,7 @@ const bulkDeletePayroll = async (req, res) => {
 module.exports = {
   getOrgOwner,
   setEmployeeCTC,
+  bulkSetEmployeeCTC,
   updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,

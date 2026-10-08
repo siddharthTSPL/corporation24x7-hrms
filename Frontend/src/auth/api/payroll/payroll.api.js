@@ -75,6 +75,11 @@ export const setEmployeeCTC = async (data) => {
   return res.data;
 };
 
+export const bulkSetEmployeeCTC = async (data) => {
+  const res = await api.post("admin/payroll/structure/bulk", data);
+  return res.data;
+};
+
 export const updateAttendanceBasis = async ({ employee, attendanceBasis }) => {
   const res = await api.patch(`admin/payroll/structure/${employee}/attendance-basis`, { attendanceBasis });
   return res.data;

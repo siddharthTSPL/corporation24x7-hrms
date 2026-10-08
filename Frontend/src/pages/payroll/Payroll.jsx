@@ -12,6 +12,7 @@ import {
   useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
+  useBulkSetEmployeeCTC,
   useUpdateAttendanceBasis,
   useReapplyPolicy,
   useGeneratePayroll,
@@ -388,6 +389,104 @@ function resolveName(directory, id, fallbackModel) {
   const person = directory.byId.get(String(id));
   if (person) return `${person.name} (${person.empid})`;
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
+}
+
+async function readCSVFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  return new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
+}
+
+function detectCSVDelimiter(text) {
+  const counts = { ",": 0, ";": 0, "\t": 0 };
+  let quoted = false;
+  for (let index = 0; index < text.length && text[index] !== "\n" && text[index] !== "\r"; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') index += 1;
+    else if (char === '"') quoted = !quoted;
+    else if (!quoted && Object.hasOwn(counts, char)) counts[char] += 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][1] ? Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] : ",";
+}
+
+function parseCSVRows(text, delimiter = ",") {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') {
+      value += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      row.push(value.trim());
+      value = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(value.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      value = "";
+    } else {
+      value += char;
+    }
+  }
+  row.push(value.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function expandEmbeddedTabRows(rows) {
+  if (!rows[0]?.[0]?.includes("\t")) return rows;
+  return rows.map((row) => {
+    const expanded = row[0].split("\t").map((cell) => cell.trim());
+    const trailingValues = row.slice(1).map((cell) => cell.trim()).filter(Boolean);
+    for (const value of trailingValues) {
+      const blankColumn = expanded.findIndex((cell, index) => index >= 4 && !cell);
+      if (blankColumn >= 0) expanded[blankColumn] = value;
+      else expanded.push(value);
+    }
+    return expanded;
+  });
+}
+
+function normalizeCTCEffectiveDate(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const parsed = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return parsed.toISOString().slice(0, 10) === trimmed ? trimmed : null;
+  }
+  const named = trimmed.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{2}|\d{4})$/);
+  if (!named) return null;
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const month = months.indexOf(named[2].toLowerCase());
+  const yearValue = Number(named[3]);
+  const year = named[3].length === 2 ? (yearValue <= 49 ? 2000 + yearValue : 1900 + yearValue) : yearValue;
+  const parsed = new Date(year, month, Number(named[1]));
+  if (month < 0 || parsed.getFullYear() !== year || parsed.getMonth() !== month || parsed.getDate() !== Number(named[1])) return null;
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(Number(named[1])).padStart(2, "0")}`;
+}
+
+function downloadCTCTemplate(directory, structures) {
+  const currentByEmployee = new Map(structures.map((structure) => [`${structure.employeeModel}:${structure.employee}`, structure.ctc]));
+  const rows = [["Employee Type", "Employee ID", "Employee Name", "Current Annual CTC", "New Annual CTC", "Effective From"]];
+  for (const model of directory.visibleModels) {
+    for (const person of directory.byModel[model] || []) {
+      rows.push([model, person.empid, person.name, currentByEmployee.get(`${model}:${person._id}`) || "", "", ""]);
+    }
+  }
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
+  link.download = "Salary CTC Bulk Template.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 
@@ -1150,14 +1249,100 @@ function ClaimsTab({ notify }) {
 function StructuresTab({ notify, directory }) {
   const [modelFilter, setModelFilter] = useState("");
   const { data, isLoading } = useListSalaryStructures(modelFilter ? { employeeModel: modelFilter } : undefined);
+  const { data: allStructuresData, isLoading: allStructuresLoading } = useListSalaryStructures();
   const { mutate: setCTC, isPending: saving } = useSetEmployeeCTC();
+  const { mutate: bulkSetCTC, isPending: bulkSaving } = useBulkSetEmployeeCTC();
   const { mutate: reapply } = useReapplyPolicy();
   const { mutate: changeBasis, isPending: changingBasis } = useUpdateAttendanceBasis();
 
   const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "", attendanceBasis: "attendance" });
+  const [bulkPreview, setBulkPreview] = useState([]);
+  const [bulkIssues, setBulkIssues] = useState([]);
+  const [bulkFileName, setBulkFileName] = useState("");
   const { data: formModelData } = useListSalaryStructures({ employeeModel: form.employeeModel });
 
   const people = directory.byModel[form.employeeModel] || [];
+
+  const handleBulkFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBulkFileName(file.name);
+    setBulkPreview([]);
+    setBulkIssues([]);
+    try {
+      let csvText = await readCSVFile(file);
+      const separatorDirective = csvText.match(/^sep=(.)\r?\n/i);
+      const delimiter = separatorDirective?.[1] || detectCSVDelimiter(csvText);
+      if (separatorDirective) csvText = csvText.slice(separatorDirective[0].length);
+      const rows = expandEmbeddedTabRows(parseCSVRows(csvText, delimiter));
+      if (rows.length < 2) throw new Error("CSV has no employee rows");
+      const headers = rows[0].map((header) => header.replace(/\u0000/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const column = (name) => headers.indexOf(name);
+      const typeColumn = column("employeetype");
+      const idColumn = column("employeeid");
+      const ctcColumn = column("newannualctc");
+      const dateColumn = column("effectivefrom");
+      if ([typeColumn, idColumn, ctcColumn].some((index) => index < 0))
+        throw new Error("Required columns: Employee Type, Employee ID, New Annual CTC");
+
+      const preview = [];
+      const issues = [];
+      const seen = new Set();
+      const allStructures = allStructuresData?.structures || [];
+      for (const [index, cells] of rows.slice(1).entries()) {
+        const newCtcValue = cells[ctcColumn] || "";
+        if (!newCtcValue.trim()) continue;
+        const line = index + 2;
+        const typeValue = (cells[typeColumn] || "").trim();
+        const employeeModel = Object.keys(MODEL_LABEL).find((model) => model.toLowerCase() === typeValue.toLowerCase() || MODEL_LABEL[model].toLowerCase() === typeValue.toLowerCase());
+        const employeeId = (cells[idColumn] || "").trim();
+        const person = employeeModel && (directory.byModel[employeeModel] || []).find((candidate) => String(candidate.empid).toLowerCase() === employeeId.toLowerCase());
+        const ctc = Number(newCtcValue.replace(/[,₹\s]/g, ""));
+        const effectiveFromValue = dateColumn >= 0 ? (cells[dateColumn] || "").trim() : "";
+        const effectiveFrom = normalizeCTCEffectiveDate(effectiveFromValue);
+        const key = `${employeeModel}:${person?._id || employeeId.toLowerCase()}`;
+        if (!employeeModel || !person) issues.push(`Row ${line}: employee type or ID was not found`);
+        else if (!Number.isFinite(ctc) || ctc <= 0) issues.push(`Row ${line}: enter a valid annual CTC greater than 0`);
+        else if (effectiveFromValue && !effectiveFrom) issues.push(`Row ${line}: invalid Effective From date`);
+        else if (seen.has(key)) issues.push(`Row ${line}: duplicate employee in CSV`);
+        else {
+          seen.add(key);
+          const current = allStructures.find((structure) => String(structure.employee) === String(person._id) && structure.employeeModel === employeeModel);
+          preview.push({
+            employee: person._id,
+            employeeModel,
+            employeeId: person.empid,
+            name: person.name,
+            currentCtc: current?.ctc || 0,
+            ctc,
+            effectiveFrom,
+          });
+        }
+      }
+      if (!preview.length && !issues.length) issues.push("Fill New Annual CTC for at least one employee");
+      setBulkPreview(preview);
+      setBulkIssues(issues);
+    } catch (error) {
+      setBulkIssues([error.message || "Could not read the CSV file"]);
+    }
+  };
+
+  const applyBulkCTC = () => {
+    if (!bulkPreview.length || bulkIssues.length) return;
+    bulkSetCTC(
+      { rows: bulkPreview.map(({ employee, employeeModel, ctc, effectiveFrom }) => ({ employee, employeeModel, ctc, effectiveFrom: effectiveFrom || undefined })) },
+      {
+        onSuccess: (res) => {
+          notify(res?.message || "Bulk salary structures saved", "success");
+          setBulkPreview([]);
+          setBulkIssues([]);
+          setBulkFileName("");
+        },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1232,6 +1417,56 @@ function StructuresTab({ notify, directory }) {
           </Field>
           <PrimaryButton type="submit" loading={saving} className="mb-6">Save Salary Structure</PrimaryButton>
         </form>
+      </Card>
+
+      <Card title="Bulk Set / Revise CTC" subtitle="Download the employee template, fill New Annual CTC, then upload the CSV to review all changes before applying them.">
+        <div className="flex flex-wrap items-center gap-3">
+          <GhostButton onClick={() => downloadCTCTemplate(directory, allStructuresData?.structures || [])} disabled={directory.loading || allStructuresLoading}>
+            <FaFileExcel size={12} /> Download CSV Template
+          </GhostButton>
+          <label className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer" style={{ background: C.brandLight, color: C.brand, opacity: allStructuresLoading ? 0.6 : 1 }}>
+            <FaFileExcel size={12} /> Upload Completed CSV
+            <input type="file" accept=".csv,text/csv" onChange={handleBulkFile} disabled={allStructuresLoading || bulkSaving} className="hidden" />
+          </label>
+          {bulkFileName && <span style={{ fontSize: 12, color: C.muted }}>{bulkFileName}</span>}
+        </div>
+        <p style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
+          Revised CTC becomes active immediately. Existing payroll records stay unchanged unless regenerated; a regenerated record uses the active CTC. Effective From is recorded on the salary structure.
+        </p>
+        {bulkIssues.length > 0 && (
+          <div role="alert" style={{ marginTop: 12, padding: 12, borderRadius: 8, background: C.redBg, color: C.red, fontSize: 12 }}>
+            <strong>Fix these CSV rows before applying:</strong>
+            <ul className="mt-1 list-disc pl-5">{bulkIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+          </div>
+        )}
+        {bulkPreview.length > 0 && (
+          <>
+            <div style={{ marginTop: 14, fontSize: 13, color: C.text, fontWeight: 700 }}>{bulkPreview.length} employee{bulkPreview.length === 1 ? "" : "s"} ready to update</div>
+            <div className="mt-2 max-h-72 overflow-auto">
+              <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 620 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", fontSize: 11, color: C.muted, textTransform: "uppercase" }}>
+                    <th style={{ padding: "7px 9px" }}>Employee</th><th style={{ padding: "7px 9px" }}>Type</th><th style={{ padding: "7px 9px" }}>Current CTC</th><th style={{ padding: "7px 9px" }}>New CTC</th><th style={{ padding: "7px 9px" }}>Effective From</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkPreview.map((row) => (
+                    <tr key={`${row.employeeModel}:${row.employee}`} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5, color: C.text }}>{row.name} ({row.employeeId})</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12, color: C.muted }}>{MODEL_LABEL[row.employeeModel]}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5 }}>{row.currentCtc ? fmtINR(row.currentCtc) : "Not set"}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5, fontWeight: 700 }}>{fmtINR(row.ctc)}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12, color: C.muted }}>{row.effectiveFrom || "Today"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <PrimaryButton type="button" loading={bulkSaving} disabled={bulkIssues.length > 0} onClick={applyBulkCTC} className="mt-4">
+              Apply {bulkPreview.length} CTC Update{bulkPreview.length === 1 ? "" : "s"}
+            </PrimaryButton>
+          </>
+        )}
       </Card>
 
       <Card
@@ -1881,6 +2116,8 @@ function buildPayrollExportRows(payrolls, directory) {
       employeeId: snap.employeeId || person?.empid || "—",
       department: departmentLabel(snap.department || person?.department || "—"),
       designation: snap.designation || person?.designation || "—",
+      bankName: snap.bankName || "",
+      accountNumber: snap.accountNumber || "",
       earnMap: Object.fromEntries(earnings.map((e) => [e.label, roundINR(e.amount)])),
       dedMap: Object.fromEntries(deductions.map((d) => [d.label, roundINR(d.amount)])),
       empMap: Object.fromEntries(employerContribution.map((c) => [c.label, roundINR(c.amount)])),
@@ -1894,7 +2131,7 @@ function buildPayrollExportRows(payrolls, directory) {
   const employerKeys = [...new Set(perRecord.flatMap((r) => r.employerContribution.map((c) => c.label)))];
 
   const header = [
-    "Employee", "Employee ID", "Department", "Designation", "Month", "Year", "Status",
+    "Employee", "Employee ID", "Bank Name", "Account Number", "Department", "Designation", "Month", "Year", "Status",
     ...earningKeys.map((k) => `Earning: ${k}`),
     "Gross Earnings",
     ...deductionKeys.map((k) => `Deduction: ${k}`),
@@ -1904,7 +2141,7 @@ function buildPayrollExportRows(payrolls, directory) {
   ];
 
   const rows = perRecord.map((r) => [
-    r.name, r.employeeId, r.department, r.designation,
+    r.name, r.employeeId, r.bankName, r.accountNumber, r.department, r.designation,
     MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
     ...earningKeys.map((k) => r.earnMap[k] ?? ""),
     roundINR(r.p.earnings?.totalEarnings),
@@ -1916,7 +2153,7 @@ function buildPayrollExportRows(payrolls, directory) {
 
   const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
   const totalsRow = [
-    "TOTAL", "", "", "", "", "", "",
+    "TOTAL", "", "", "", "", "", "", "", "",
     ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
     sumOf((r) => roundINR(r.p.earnings?.totalEarnings)),
     ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
