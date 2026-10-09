@@ -9,6 +9,10 @@ require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
 require('../automatic/Birthdaynotify');
 require('../automatic/Noticeperiodautoexit');
+require('../automatic/fieldOperationsRetention');
+require('../automatic/Subscriptionexpiryreminder');
+require('../automatic/Offerlifecycle');
+require('../automatic/Trainingreminders');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -74,6 +78,7 @@ const superadminrouter = require('../routes/superadmin.route');
 const ticketroute = require('../routes/ticket.routes');
 const recruitmentroute = require('../routes/Recruitment.route');
 const wfhroute = require('../routes/wfh.routes');
+const approvalFlowRoute = require('../routes/approvalFlow.route');
 const permissionroute = require('../routes/permission.route');
 const timesheetroute = require('../routes/timesheet.route');
 const kioskrouter = require('../routes/kiosk.routes');
@@ -90,6 +95,14 @@ const notificationrouter = require('../routes/Notification.routes');
 const reviewrouter = require('../routes/review.route');
 const analyticsrouter = require('../routes/Analytics.route');
 const planFeatureRouter = require('../routes/planFeature.route');
+const selfServiceRouter = require('../routes/selfService.route');
+const fieldOperationsRouter = require('../routes/fieldOperations.route');
+const singleSignInRouter = require('../routes/SingleSignIn.routes');
+const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
+const policyrouter = require('../routes/policy.route');
+const trainingRouter = require('../routes/training.routes');
+const overtimeRouter = require('../routes/overtime.routes');
+const orgTeamRouter = require('../routes/orgteam.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -101,6 +114,7 @@ app.use('/superadmin', superadminrouter);
 app.use('/ticket', ticketroute);
 app.use('/recruitment', recruitmentroute);
 app.use('/wfh', wfhroute);
+app.use('/approval-flow', approvalFlowRoute);
 app.use('/permission', permissionroute);
 app.use('/timesheet', timesheetroute);
 app.use('/kiosk', kioskrouter);
@@ -121,8 +135,19 @@ app.use('/reimbursement', reimbursementrouter);
 app.use('/notifications', notificationrouter);
 app.use('/review', reviewrouter);
 app.use('/plan-features', planFeatureRouter);
+app.use('/self-service', selfServiceRouter);
+app.use('/field-operations', fieldOperationsRouter);
+app.use('/single-sign-in', singleSignInRouter);
+app.use('/attendance-settings', attendanceSettingsRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
+// TorchX Policy — Policy Management (create/publish/report for
+// SuperAdmin+Admin under /policy/manage, viewer+acknowledgement for every
+// role under /policy/me). See routes/policy.route.js.
+app.use('/policy', policyrouter);
+app.use('/training', trainingRouter);
+app.use('/overtime', overtimeRouter);
+app.use('/org-teams', orgTeamRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

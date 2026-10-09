@@ -177,7 +177,7 @@ export default function FloatingHelp({ onTakeTour, onTechnicalSupport, onDocumen
             <FaHeadset className="text-[#730042] flex-shrink-0" />
             <span>
               <span className="block font-medium">Help</span>
-              <span className="block text-[11px] text-gray-400">Report a problem via email</span>
+              <span className="block text-[11px] text-gray-400">Report a problem </span>
             </span>
           </button>
         </div>

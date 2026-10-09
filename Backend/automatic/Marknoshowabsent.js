@@ -9,7 +9,7 @@ const AttendanceSummary = require("../Models/attendancesummary.model");
 const NoShowLog = require("../Models/noshowlog.model");
 const { classifyNonWorkingDay, startOfDay } = require("./weekoffcalendar");
 const { getISTDateParts } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion } = require("../utils/Leavelwpday.utils");
 
 // Same shape as monthattendanceupdate.js's hasApprovedLeave — kept local
 // so this file has no runtime dependency on that module's internals.
@@ -18,9 +18,9 @@ const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 
 const ROLE_CONFIG = {
-  employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee", leaveApprovedStatuses: ["approved_manager", "approved_admin"] },
+  employee: { Model: User, onModel: "User", LeaveModel: Leave, leaveField: "employee", leaveApprovedStatuses: ["approved_manager", "approved_reporting_manager", "approved_admin"] },
   manager:  { Model: Manager, onModel: "Manager", LeaveModel: ManagerLeave, leaveField: "manager", leaveApprovedStatuses: ["approved_reporting_manager", "approved_admin"] },
-  admin:    { Model: Admin, onModel: "Admin", LeaveModel: AdminLeave, leaveField: "admin", leaveApprovedStatuses: ["approved_superadmin"] },
+  admin:    { Model: Admin, onModel: "Admin", LeaveModel: AdminLeave, leaveField: "admin", leaveApprovedStatuses: ["approved_reporting_manager", "approved_superadmin"] },
 };
 
 /**
@@ -144,10 +144,28 @@ async function markNoShowAbsences(forDate = new Date(Date.now() - 24 * 60 * 60 *
             leaveType: { $ne: "lwp" },
             startDate: { $lte: date },
             endDate: { $gte: date },
-          }).select("startDate endDate lwpDays").lean()
+          }).select("startDate endDate lwpDays leaveType").lean()
         : null;
       const onPaidLeave = paidLeaveDoc && !isDateInLwpPortion(paidLeaveDoc, date);
-      if (isWorkingDay && onPaidLeave) continue;
+      if (isWorkingDay && onPaidLeave) {
+        // Compensatory Off: unlike other paid leave (which is just excused),
+        // an approved comp-off day is counted as a PRESENT day. NoShowLog
+        // guards against double counting, same as the absent path below.
+        if (paidLeaveDoc.leaveType === "comp_off") {
+          try {
+            await NoShowLog.create({ employee: emp._id, role, date });
+          } catch (err) {
+            if (err.code === 11000) continue;
+            throw err;
+          }
+          await AttendanceSummary.findOneAndUpdate(
+            { employee: emp._id, role, month, year },
+            { $inc: { presentDays: 1 }, $setOnInsert: { organisation_id: emp.organisation_id } },
+            { upsert: true }
+          );
+        }
+        continue;
+      }
 
       // Claim this employee/day before incrementing anything. If another
       // invocation (nightly cron overlapping a startup catch-up, or two

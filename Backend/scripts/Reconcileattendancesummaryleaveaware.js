@@ -9,7 +9,7 @@ const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, toISTKey } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion, resolveLeaveDayOverride } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion, resolveLeaveDayOverride } = require("../utils/Leavelwpday.utils");
 require("dotenv").config();
 
 const CLI_APPLY = process.argv.includes("--apply");
@@ -90,11 +90,11 @@ const loadApprovedLeaveRanges = async () => {
   // isOnApprovedLeave() below still filters out that leave's own lwpDays
   // shortfall days.
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
+    Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("employee startDate endDate lwpDays").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, leaveType: { $ne: "lwp" } })
       .select("manager startDate endDate lwpDays").lean(),
-    AdminLeave.find({ status: "approved_superadmin", leaveType: { $ne: "lwp" } })
+    AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] }, leaveType: { $ne: "lwp" } })
       .select("admin startDate endDate lwpDays").lean(),
   ]);
 
@@ -140,11 +140,11 @@ const loadAllApprovedLeaveRangesWithType = async () => {
   };
 
   const [empLeaves, mgrLeaves, adminLeaves] = await Promise.all([
-    Leave.find({ status: { $in: ["approved_manager", "approved_admin"] } })
+    Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] } })
       .select("employee startDate endDate lwpDays leaveType").lean(),
     ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] } })
       .select("manager startDate endDate lwpDays leaveType").lean(),
-    AdminLeave.find({ status: "approved_superadmin" })
+    AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] } })
       .select("admin startDate endDate lwpDays leaveType").lean(),
   ]);
 
@@ -164,8 +164,13 @@ const leaveOverrideForDate = (allLeaveMap, employeeId, role, date) => {
   if (!ranges) return null;
   const leave = ranges.find((r) => date >= r.startDate && date <= r.endDate);
   if (!leave) return null;
-  return resolveLeaveDayOverride(leave, date);
+  return { ...resolveLeaveDayOverride(leave, date), leaveType: leave.leaveType };
 };
+
+// How much of a calendar day an approved leave covers: half_day_el/half_day_sl
+// = 0.5, everything else (el/sl/ml/pl/lwp/comp_off) = 1.
+const leaveDayValue = (leaveType) =>
+  typeof leaveType === "string" && leaveType.startsWith("half_day") ? 0.5 : 1;
 
 const bucketKey = (employee, role, year, month) => `${employee}_${role}_${year}_${month}`;
 
@@ -174,13 +179,19 @@ const getOrCreateBucket = (buckets, employee, role, year, month, organisation_id
   if (!buckets.has(key)) {
     buckets.set(key, {
       employee, role, organisation_id, year, month,
-      presentDays: 0, halfDays: 0, absentDays: 0, weekOffHolidayDays: 0, totalWorkingMinutes: 0,
+      presentDays: 0, halfDays: 0, absentDays: 0, weekOffHolidayDays: 0, leaveDays: 0, totalWorkingMinutes: 0,
     });
   }
   return buckets.get(key);
 };
 
-const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
+// opts.currentAndPreviousMonth (used by the nightly cron): rebuild EVERY
+// employee's current IST month from day 1 through yesterday (plus the
+// previous month, for a leave approved in the first days of a new month).
+// A leave / half-day leave / comp off approved late is picked up the same
+// night, no matter how old its dates are, because the whole month is
+// always recomputed from scratch - never just the last few days.
+const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS, opts = {}) => {
   const yesterday = startOfDay(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
   // Scoping for --days=N: find employees who either (a) had a checkout in
@@ -200,9 +211,9 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
     const sinceDate = startOfDay(new Date(Date.now() - (sinceDays - 1) * 24 * 60 * 60 * 1000));
     const [recentAttendance, recentEmpLeaves, recentMgrLeaves, recentAdminLeaves] = await Promise.all([
       Attendance.find({ date: { $gte: sinceDate }, checkOut: { $exists: true } }).select("employee role").lean(),
-      Leave.find({ status: { $in: ["approved_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
+      Leave.find({ status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("employee").lean(),
       ManagerLeave.find({ status: { $in: ["approved_reporting_manager", "approved_admin"] }, approvedAt: { $gte: sinceDate } }).select("manager").lean(),
-      AdminLeave.find({ status: "approved_superadmin", approvedAt: { $gte: sinceDate } }).select("admin").lean(),
+      AdminLeave.find({ status: { $in: ["approved_reporting_manager", "approved_superadmin"] }, approvedAt: { $gte: sinceDate } }).select("admin").lean(),
     ]);
 
     scopeEmployeeRoles = new Set();
@@ -222,8 +233,46 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
     );
   }
 
+  if (!sinceDays && opts.currentAndPreviousMonth) {
+    const nowIst = getISTDateParts(new Date());
+    const prevIst = nowIst.month === 1
+      ? { year: nowIst.year - 1, month: 12 }
+      : { year: nowIst.year, month: nowIst.month - 1 };
+    scopeMonths = new Set([`${nowIst.year}-${nowIst.month}`, `${prevIst.year}-${prevIst.month}`]);
+    console.log(`Nightly rebuild: months ${[...scopeMonths].join(", ")} for all employees (day 1 -> yesterday)\n`);
+  }
+
+  // All employees, explicit months (e.g. ["2026-9"]) - used by the half-day /
+  // late-rule fix script to rebuild old months, not just current + previous.
+  if (opts.months && !opts.employeeId) {
+    scopeMonths = new Set(opts.months);
+  }
+
+  if (opts.employeeId) {
+    scopeEmployeeRoles = new Set([`${opts.employeeId}_${opts.role || "employee"}`]);
+    const nowIst = getISTDateParts(new Date());
+    const prevIst = nowIst.month === 1
+      ? { year: nowIst.year - 1, month: 12 }
+      : { year: nowIst.year, month: nowIst.month - 1 };
+    scopeMonths = opts.months
+      ? new Set(opts.months)
+      : new Set([`${nowIst.year}-${nowIst.month}`, `${prevIst.year}-${prevIst.month}`]);
+  }
+
+  // Only load the attendance window we are going to rebuild (with a couple
+  // of days of slack for IST/UTC month-boundary records).
+  const attendanceFilter = {};
+  // opts.organisationId: rebuild only this organisation (all its roles).
+  if (opts.organisationId) {
+    attendanceFilter.organisation_id = new mongoose.Types.ObjectId(String(opts.organisationId));
+  }
+  if (scopeMonths) {
+    const firstMonth = [...scopeMonths].map((k) => k.split("-").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1])[0];
+    attendanceFilter.date = { $gte: new Date(Date.UTC(firstMonth[0], firstMonth[1] - 1, 1) - 2 * 24 * 60 * 60 * 1000) };
+  }
+
   const [allRecords, leaveMap, allLeaveMap] = await Promise.all([
-    Attendance.find({}).select("employee role date checkOut status activeMinutes organisation_id source").lean(),
+    Attendance.find(attendanceFilter).select("employee role date checkOut status activeMinutes organisation_id source checkoutRemark").lean(),
     loadApprovedLeaveRanges(),
     loadAllApprovedLeaveRangesWithType(),
   ]);
@@ -260,7 +309,10 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       hasAnyRecord.add(`${r.employee}_${r.role}_${toISTKey(r.date)}`);
     }
 
-    if (!r.checkOut) return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
+    // A session auto-closed as "missed_checkout" (org has auto check-out OFF)
+    // deliberately has NO checkOut time but is already a counted Half Day -
+    // keep it in the rebuild or this nightly $set wipes that half day.
+    if (!r.checkOut && r.checkoutRemark !== "missed_checkout") return; // not checked out yet — handled by no-show sweep only if it's a genuinely empty day, otherwise ignored
 
     const { year, month } = getISTDateParts(r.date);
     if (scopeMonths && !scopeMonths.has(`${year}-${month}`)) return;
@@ -282,9 +334,17 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       if (r.status !== override.status) {
         statusCorrections.push({ _id: r._id, status: override.status });
       }
+      // Informational "Leave Days" for dashboards (any approved leave type).
+      b.leaveDays += leaveDayValue(override.leaveType);
+      // Half-day leave (half_day_el / half_day_sl): the day counts 0.5 no
+      // matter how long the person actually worked - even a full present
+      // day. The unpaid half (balance ran out) is handled just below.
       if (override.status === "half_day") {
         b.presentDays += 0.5;
         if (!override.isPaidForThisDate) b.halfDays += 1;
+      } else if (override.status === "present") {
+        // Compensatory Off day (see resolveLeaveDayOverride): counts as present.
+        b.presentDays += 1;
       } else if (!override.isPaidForThisDate) {
         b.absentDays += 1;
       }
@@ -321,6 +381,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
     const employees = await Model.find({
       working_status: "working",
       ...(scopedIds ? { _id: { $in: scopedIds } } : {}),
+      ...(opts.organisationId ? { organisation_id: new mongoose.Types.ObjectId(String(opts.organisationId)) } : {}),
     })
       .select("_id organisation_id date_of_joining createdAt")
       .lean();
@@ -339,7 +400,10 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       let cursor = scopeMonths
         ? (() => {
             const now = new Date();
-            const start = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+            const [fy, fm] = [...scopeMonths].map((k) => k.split("-").map(Number)).sort((x, y) => x[0] - y[0] || x[1] - y[1])[0];
+            const earliest = startOfDay(new Date(fy, fm - 1, 1));
+            const prevStart = startOfDay(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+            const start = earliest < prevStart ? earliest : prevStart;
             const join = startOfDay(effectiveJoinDate);
             return join > start ? join : start;
           })()
@@ -367,8 +431,17 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
             // week-off or a company holiday.
             b.weekOffHolidayDays += 1;
           } else if (nonWorking.type !== "unconfigured") {
+            const ov = leaveOverrideForDate(allLeaveMap, emp._id, role, cursor);
+            if (ov) b.leaveDays += leaveDayValue(ov.leaveType);
             if (!isOnApprovedLeave(leaveMap, emp._id, role, cursor)) {
               b.absentDays += 1;
+            } else if (ov?.status === "present") {
+              // Approved Compensatory Off with no check-in -> present day
+              // (matches Marknoshowabsent.js).
+              b.presentDays += 1;
+            } else if (ov?.status === "half_day") {
+              // Approved half-day leave with no check-in: counts 0.5.
+              b.presentDays += 0.5;
             }
           }
         }
@@ -390,6 +463,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
       && existing.halfDays === b.halfDays
       && existing.absentDays === b.absentDays
       && existing.weekOffHolidayDays === b.weekOffHolidayDays
+      && (existing.leaveDays ?? 0) === b.leaveDays
       && existing.totalWorkingMinutes === b.totalWorkingMinutes;
 
     if (!same) {
@@ -407,6 +481,7 @@ const recomputeSummaries = async (apply = CLI_APPLY, sinceDays = CLI_DAYS) => {
               organisation_id: b.organisation_id,
               presentDays: b.presentDays, halfDays: b.halfDays,
               absentDays: b.absentDays, weekOffHolidayDays: b.weekOffHolidayDays,
+              leaveDays: b.leaveDays,
               totalWorkingMinutes: b.totalWorkingMinutes,
             },
           },
@@ -471,7 +546,18 @@ module.exports = { recomputeSummaries };
 if (require.main === module) {
   mongoose.connect(process.env.LINK)
     .then(async () => {
-      await recomputeSummaries();
+      const empArg = process.argv.find((a) => a.startsWith("--employee="));
+      const roleArg = process.argv.find((a) => a.startsWith("--role="));
+      const monthsArg = process.argv.find((a) => a.startsWith("--months="));
+      if (empArg) {
+        await recomputeSummaries(CLI_APPLY, null, {
+          employeeId: empArg.split("=")[1],
+          role: roleArg ? roleArg.split("=")[1] : "employee",
+          months: monthsArg ? monthsArg.split("=")[1].split(",") : undefined,
+        });
+      } else {
+        await recomputeSummaries();
+      }
       process.exit(0);
     })
     .catch((err) => {

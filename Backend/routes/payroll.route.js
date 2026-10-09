@@ -1,11 +1,15 @@
 const express = require("express");
 const payrollrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
+const payrollManagementAuth = require("../middleware/auth/payrollManagement.middleware");
+const planFeatureAnyRole = require("../middleware/auth/Planfeatureanyrole.middleware");
+const checkPermission = require("../middleware/auth/Checkpermission.middleware");
 
 const {
   getOrgOwner,
   setEmployeeCTC,
+  bulkSetEmployeeCTC,
+  updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
   listSalaryStructures,
@@ -13,6 +17,7 @@ const {
   bulkGeneratePayroll,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,
@@ -21,27 +26,34 @@ const {
 
 
 
-payrollrouter.get("/org-owner", adminauthmiddleware, asyncHandler(getOrgOwner));
+payrollrouter.get("/org-owner", payrollManagementAuth, asyncHandler(getOrgOwner));
 
-payrollrouter.post("/structure", adminauthmiddleware, asyncHandler(setEmployeeCTC));
-payrollrouter.get("/structure", adminauthmiddleware, asyncHandler(listSalaryStructures));
-payrollrouter.get("/structure/:employee", adminauthmiddleware, asyncHandler(getSalaryStructure));
-payrollrouter.post("/structure/:employee/reapply-policy", adminauthmiddleware, asyncHandler(reapplyPolicy));
-
-
-payrollrouter.post("/generate", adminauthmiddleware, asyncHandler(generatePayroll));
-payrollrouter.post("/generate/bulk", adminauthmiddleware, asyncHandler(bulkGeneratePayroll));
+payrollrouter.post("/structure", payrollManagementAuth, asyncHandler(setEmployeeCTC));
+payrollrouter.post("/structure/bulk", payrollManagementAuth, asyncHandler(bulkSetEmployeeCTC));
+payrollrouter.get("/structure", payrollManagementAuth, asyncHandler(listSalaryStructures));
+payrollrouter.get("/structure/:employee", payrollManagementAuth, asyncHandler(getSalaryStructure));
+payrollrouter.post("/structure/:employee/reapply-policy", payrollManagementAuth, asyncHandler(reapplyPolicy));
+payrollrouter.patch("/structure/:employee/attendance-basis", payrollManagementAuth, asyncHandler(updateAttendanceBasis));
 
 
-payrollrouter.get("/", adminauthmiddleware, asyncHandler(listPayrolls));
-payrollrouter.get("/payslip", adminauthmiddleware, asyncHandler(getPayslip));
+payrollrouter.post("/generate", payrollManagementAuth, asyncHandler(generatePayroll));
+payrollrouter.post("/generate/bulk", payrollManagementAuth, asyncHandler(bulkGeneratePayroll));
+
+
+payrollrouter.get("/", payrollManagementAuth, asyncHandler(listPayrolls));
+payrollrouter.get("/payslip", payrollManagementAuth, asyncHandler(getPayslip));
+
+// Self-service: logged-in Employee/Manager/Admin fetching their OWN paid
+// payslips. Plan-independent by design — available on every plan (Basic
+// included), unlike Review/Timesheet/Recruitment/Asset/TorchX Voice.
+payrollrouter.get("/my-payslips", planFeatureAnyRole, checkPermission("payroll.can_view_own_payslips"), asyncHandler(getMyPayslips));
 
 
 
-payrollrouter.patch("/bulk/status", adminauthmiddleware, asyncHandler(bulkUpdatePayrollStatus));
-payrollrouter.post("/bulk/delete", adminauthmiddleware, asyncHandler(bulkDeletePayroll));
+payrollrouter.patch("/bulk/status", payrollManagementAuth, asyncHandler(bulkUpdatePayrollStatus));
+payrollrouter.post("/bulk/delete", payrollManagementAuth, asyncHandler(bulkDeletePayroll));
 
-payrollrouter.patch("/:id/status", adminauthmiddleware, asyncHandler(updatePayrollStatus));
-payrollrouter.delete("/:id", adminauthmiddleware, asyncHandler(deletePayroll));
+payrollrouter.patch("/:id/status", payrollManagementAuth, asyncHandler(updatePayrollStatus));
+payrollrouter.delete("/:id", payrollManagementAuth, asyncHandler(deletePayroll));
 
 module.exports = payrollrouter;

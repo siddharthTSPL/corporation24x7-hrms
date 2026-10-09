@@ -4,6 +4,7 @@ import {
   useGetForwardedLeaves,
   useAcceptLeave,
   useRejectLeave,
+  useForwardLeaveToAdmin,
   useAdminApplyLeave,
   useAdminEditLeave,
   useAdminDeleteLeave,
@@ -15,6 +16,7 @@ import {
   useAdminGetForwardedWFH,
   useAdminApproveForwardedWFH,
   useAdminRejectForwardedWFH,
+  useAdminForwardWFH,
 } from "../../auth/server-state/adminwfh/adminwfh.hook";
 
 const LEAVE_META = {
@@ -24,6 +26,7 @@ const LEAVE_META = {
   pl:          { label: "Paternity Leave", short: "PL",  bg: "#FEF3C7", color: "#92400E", accent: "#F59E0B", dot: "#D97706" },
   half_day_el: { label: "Half Day EL",     short: "½EL", bg: "#ECFDF5", color: "#065F46", accent: "#10B981", dot: "#059669" },
   half_day_sl: { label: "Half Day SL",     short: "½SL", bg: "#EFF6FF", color: "#1E40AF", accent: "#60A5FA", dot: "#3B82F6" },
+  comp_off: { label: "Compensatory Leave", short: "CO", bg: "#F3E8FF", color: "#6B21A8", accent: "#A855F7", dot: "#9333EA" },
   lwp:         { label: "Leave Without Pay", short: "LWP", bg: "#FCE7F3", color: "#9D174D", accent: "#DB2777", dot: "#DB2777" },
 };
 
@@ -39,6 +42,7 @@ const STATUS_LABEL_MAP = {
   rejected_reporting_manager:  "Rejected by RM",
   pending_reporting_manager:   "Pending (Reporting Manager)",
   pending_admin:               "Pending (Admin)",
+  pending_coadmin:             "Pending (Co-Admin)",
   pending_superadmin:          "Pending (Super Admin)",
   approved_superadmin:         "Approved by Super Admin",
   rejected_superadmin:         "Rejected by Super Admin",
@@ -57,12 +61,16 @@ const LEAVE_STATUS_META = {
   rejected_admin:              { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   approved_reporting_manager:  { bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
   rejected_reporting_manager:  { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
+  approved_reporting_manager:  { bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
+  rejected_reporting_manager:  { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_reporting_manager:   { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
   pending_admin:               { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  pending_coadmin:             { bg: "#F5F3FF", color: "#6D28D9", dot: "#8B5CF6" },
 };
 
 const WFH_STATUS_META = {
   pending_admin:               { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
+  forwarded_admin:             { bg: "#EFF6FF", color: "#1D4ED8", dot: "#3B82F6" },
   approved_admin:              { bg: "#F0FDF4", color: "#14803D", dot: "#22C55E" },
   rejected_admin:              { bg: "#FEF2F2", color: "#991B1B", dot: "#EF4444" },
   pending_superadmin:          { bg: "#FFFBEB", color: "#92400E", dot: "#F59E0B" },
@@ -84,6 +92,7 @@ const BASE_LEAVE_TYPES = [
   { value: "sl",          label: "Sick Leave"    },
   { value: "half_day_el", label: "Half Day EL"   },
   { value: "half_day_sl", label: "Half Day SL"   },
+  { value: "comp_off",    label: "Compensatory Leave" },
   { value: "lwp",         label: "Leave Without Pay" },
 ];
 
@@ -265,12 +274,14 @@ const Toast = ({ toast }) => {
   const c = colors[toast.type] || colors.info;
   return (
     <div
-      className="fixed bottom-3 left-3 right-3 xs:left-auto xs:right-4 sm:bottom-7 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-full xs:max-w-[calc(100vw-2rem)] sm:max-w-sm"
+      className="fixed top-3 left-3 right-3 xs:left-auto xs:right-4 sm:top-6 sm:right-7 z-[9999] flex items-center gap-2 sm:gap-2.5 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-xs sm:text-[13px] font-medium shadow-2xl backdrop-blur-md transition-all duration-300 max-w-full xs:max-w-[calc(100vw-2rem)] sm:max-w-sm"
       style={{
         background: c.bg,
         color: c.color,
         border: `1px solid ${c.border}`,
-        transform: toast.visible ? "translateY(0) scale(1)" : "translateY(24px) scale(0.94)",
+       transform: toast.visible
+  ? "translateY(0) scale(1)"
+  : "translateY(-24px) scale(0.94)",
         opacity: toast.visible ? 1 : 0,
         pointerEvents: toast.visible ? "auto" : "none",
       }}
@@ -413,20 +424,26 @@ const buildTimeline = (leave) => {
   const steps = [];
   const status = leave.status || "";
   steps.push({ label: "Applied", desc: "Leave request submitted", date: leave.createdAt, done: true, color: "#8B3A8A" });
-  const isApprovedByManager = ["approved_manager","forwarded_admin","forwarded_reporting_manager","approved_admin","rejected_admin","approved_reporting_manager","rejected_reporting_manager"].includes(status);
+  const isApprovedByManager = ["approved_manager","forwarded_admin","forwarded_reporting_manager","pending_coadmin","approved_admin","rejected_admin","approved_reporting_manager","rejected_reporting_manager"].includes(status);
   const isRejectedByManager = status === "rejected_manager";
   const isPendingManager    = status === "pending_manager";
   if (isPendingManager) {
     steps.push({ label: "Manager Review", desc: "Awaiting manager decision", date: null, done: false, pending: true, color: "#F59E0B" });
   } else if (isRejectedByManager) {
     steps.push({ label: "Manager Review", desc: "Rejected by manager", date: leave.updatedAt, done: true, color: "#EF4444" });
-  } else if (isApprovedByManager) {
+  } else if (isApprovedByManager && leave.applicantRole !== "Manager") {
     steps.push({ label: "Manager Review", desc: "Approved by manager", date: leave.updatedAt, done: true, color: "#22C55E" });
   }
+  const isCoadminPending = status === "pending_coadmin";
   const isAdminPending  = ["forwarded_admin","forwarded_reporting_manager","pending_admin","pending_reporting_manager"].includes(status);
   const isAdminApproved = ["approved_admin","approved_reporting_manager"].includes(status);
   const isAdminRejected = ["rejected_admin","rejected_reporting_manager"].includes(status);
-  if (isAdminPending) {
+  if (isCoadminPending) {
+    steps.push({ label: "Co-Admin Review", desc: "Awaiting Co-Admin decision", date: null, done: false, pending: true, color: "#8B5CF6" });
+  } else if (status === "forwarded_admin") {
+    steps.push({ label: "Co-Admin Review", desc: "Forwarded to reporting Admin", date: leave.updatedAt, done: true, color: "#8B5CF6" });
+    steps.push({ label: "Admin Review", desc: "Awaiting Admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
+  } else if (isAdminPending) {
     steps.push({ label: "Admin Review", desc: "Awaiting admin approval", date: null, done: false, pending: true, color: "#F59E0B" });
   } else if (isAdminApproved) {
     steps.push({ label: "Admin Review", desc: "Approved by admin", date: leave.updatedAt, done: true, color: "#22C55E" });
@@ -487,9 +504,55 @@ const LeaveTimeline = ({ leave }) => {
   );
 };
 
-const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, accentColor, personLabel, showTimeline }) => {
+const SupportingDocumentBox = ({ document }) =>
+  document?.url ? (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginTop: 8,
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: "#EFF6FF",
+        border: "1px solid #BFDBFE",
+        fontFamily: "'DM Sans',sans-serif",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 11,
+          color: "#1D4ED8",
+          fontWeight: 600,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {document.originalName || "Supporting document"}
+      </span>
+      <a
+        href={document.url}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          marginLeft: "auto",
+          flexShrink: 0,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#1D4ED8",
+          textDecoration: "none",
+        }}
+      >
+        View
+      </a>
+    </div>
+  ) : null;
+
+const LeaveCard = ({ leave, onApprove, onReject, onForward, isProcessing, showActions, showForward, accentColor, personLabel, showTimeline }) => {
   const [expanded, setExpanded] = useState(false);
-  const person = leave.employee || leave.manager || {};
+  const person = leave.employee || leave.manager || leave.admin || {};
   const hasLivePerson = !!(person.f_name || person.l_name);
   const roleGuess = leave.applicantRole || (leave.manager ? "Manager" : "Employee");
   const personName = hasLivePerson
@@ -549,24 +612,29 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             </div>
           </div>
 
-          {showActions && (
+          {(showActions || showForward) && (
             <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
-              <button
+              {showActions && <button
                 onClick={onApprove}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                 style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 Approve
-              </button>
-              <button
+              </button>}
+              {showActions && <button
                 onClick={onReject}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                 style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
                 Reject
-              </button>
+              </button>}
+              {showForward && <button
+                onClick={onForward}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
+                style={{ background: "#EFF6FF", color: "#1D4ED8", boxShadow: "0 2px 8px rgba(59,130,246,0.12)" }}
+              >Forward to Admin</button>}
             </div>
           )}
         </div>
@@ -597,6 +665,7 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
             <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
           </div>
         )}
+        <SupportingDocumentBox document={leave.supportingDocument} />
 
         {showTimeline && (
           <button
@@ -615,24 +684,29 @@ const LeaveCard = ({ leave, onApprove, onReject, isProcessing, showActions, acce
         )}
         {showTimeline && expanded && <LeaveTimeline leave={leave} />}
 
-        {showActions && (
+        {(showActions || showForward) && (
           <div className="flex gap-2 mt-3 sm:hidden">
-            <button
+            {showActions && <button
               onClick={onApprove}
               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
               style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Approve
-            </button>
-            <button
+            </button>}
+            {showActions && <button
               onClick={onReject}
               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
               style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
               Reject
-            </button>
+            </button>}
+            {showForward && <button
+              onClick={onForward}
+              className="flex-1 inline-flex items-center justify-center px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
+              style={{ background: "#EFF6FF", color: "#1D4ED8", boxShadow: "0 2px 8px rgba(59,130,246,0.12)" }}
+            >Forward</button>}
           </div>
         )}
       </div>
@@ -807,7 +881,7 @@ const MyBalancePanel = ({ admin, leaveBalance }) => {
 };
 
 const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
-  const [form, setForm]     = useState({ leaveType: "el", startDate: "", endDate: "", reason: "" });
+  const [form, setForm]     = useState({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null });
   const [errors, setErrors] = useState({});
   const [editTarget, setEditTarget] = useState(null);
   const [leaveDialog, setLeaveDialog] = useState(null);
@@ -843,6 +917,11 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
     if (!form.endDate)   e.endDate   = "Required";
     if ((form.reason || "").trim().length < 10) e.reason = "Minimum 10 characters";
     if (form.startDate && form.endDate && new Date(form.endDate) < new Date(form.startDate)) e.endDate = "End date cannot precede start date";
+    const selectedDays = daysDiff(form.startDate, form.endDate);
+    const needsDocument = form.leaveType === "sl" && selectedDays > 3;
+    if (needsDocument && !form.supportingDocument && !editTarget?.supportingDocument?.url) {
+      e.supportingDocument = "Supporting document is mandatory for Sick Leave of more than 3 days";
+    }
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -858,7 +937,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
         showToast("Leave request submitted", "success");
       }
       setLeaveDialog(null);
-      setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" });
+      setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null });
       setEditTarget(null);
       setErrors({});
       refetch();
@@ -879,6 +958,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
       startDate: new Date(leave.startDate).toISOString().split("T")[0],
       endDate:   new Date(leave.endDate).toISOString().split("T")[0],
       reason:    leave.reason,
+      supportingDocument: null,
     });
     requestAnimationFrame(() => {
       formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -968,10 +1048,28 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
           />
         </FormField>
         <p className="text-[10px] sm:text-[11px] text-[#9B8BAE] mt-1 mb-4">{form.reason.length}/500 chars (min 10)</p>
-        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5">
+        {form.leaveType === "sl" && days > 3 && (
+          <FormField label="Supporting Document *" error={errors.supportingDocument}>
+            <div className="rounded-[12px] p-4" style={{ background: "#EFF6FF", border: `1.5px dashed ${errors.supportingDocument ? "#DC2626" : "#93C5FD"}` }}>
+              <div className="text-[13px] font-semibold text-[#1E3A8A]">Upload Sick Leave supporting document</div>
+              <div className="text-[11px] text-[#475569] mt-1 mb-3">Attach a medical certificate or other supporting file. Required for requests longer than 3 days.</div>
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                onChange={(e) => set("supportingDocument", e.target.files?.[0] || null)}
+                className="w-full text-[12px] text-[#1C1028] file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-2 file:font-semibold file:text-[#1D4ED8]"
+              />
+              <div className="text-[10px] text-[#64748B] mt-1.5">PDF, PNG or JPG · Maximum 2 MB</div>
+              {editTarget?.supportingDocument?.url && !form.supportingDocument && (
+                <div className="text-[11px] text-[#1D4ED8] mt-2">Existing document: {editTarget.supportingDocument.originalName || "Supporting document"}</div>
+              )}
+            </div>
+          </FormField>
+        )}
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-2.5" style={{marginTop:"8px"}}>
           {editTarget && (
             <button
-              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setEditTarget(null); setErrors({}); }}
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null }); setEditTarget(null); setErrors({}); }}
               className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
               style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
             >
@@ -980,7 +1078,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
           )}
           {!editTarget && (
             <button
-              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "" }); setErrors({}); }}
+              onClick={() => { setForm({ leaveType: "el", startDate: "", endDate: "", reason: "", supportingDocument: null }); setErrors({}); }}
               className="w-full sm:w-auto px-5 sm:px-6 py-2.5 rounded-[12px] text-[13px] font-medium cursor-pointer transition-all hover:brightness-95 min-h-[44px]"
               style={{ background: "#F4EEF9", color: "#6B1A4A", border: "1.5px solid #DFD0EC" }}
             >
@@ -1029,7 +1127,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
             {pagedHistory.map((leave, idx) => {
               const d      = leave.days || daysDiff(leave.startDate, leave.endDate);
               const accent = (LEAVE_META[leave.leaveType] || { accent: "#8B3A8A" }).accent;
-              const canManageOwnLeave = leave.status === "pending_superadmin";
+              const canManageOwnLeave = ["pending_superadmin", "pending_reporting_manager"].includes(leave.status);
               return (
                 <div
                   key={leave._id || idx}
@@ -1063,6 +1161,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
                           <span className="font-semibold text-[#6B1A4A]">Reason — </span>{leave.reason}
                         </div>
                       )}
+                      <SupportingDocumentBox document={leave.supportingDocument} />
                       <LeaveTimeline leave={leave} />
                     </div>
                     <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 flex-shrink-0 w-full sm:w-auto">
@@ -1139,7 +1238,7 @@ const ApplyLeavePanel = ({ admin, leaveBalance, showToast }) => {
   );
 };
 
-const AllLeavesPanel = ({ showToast }) => {
+const AllLeavesPanel = ({ showToast, canForward }) => {
   const [filter, setFilter]         = useState("all");
   const [processingId, setProcessingId] = useState(null);
   const [search, setSearch]     = useState("");
@@ -1151,11 +1250,12 @@ const AllLeavesPanel = ({ showToast }) => {
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
+  const forwardMut = useForwardLeaveToAdmin();
 
   const employeeLeaves = Array.isArray(rawData?.employeeLeaves?.leaves) ? rawData.employeeLeaves.leaves : [];
 
   const isStatus = (leave, key) => {
-    if (key === "pending")   return leave.status?.includes("pending");
+    if (key === "pending")   return leave.status?.includes("pending") || leave.status === "forwarded_admin";
     if (key === "approved")  return leave.status?.includes("approved");
     if (key === "rejected")  return leave.status?.includes("rejected");
     if (key === "forwarded") return leave.status?.includes("forwarded");
@@ -1166,6 +1266,8 @@ const AllLeavesPanel = ({ showToast }) => {
   const count          = (key) => key === "all" ? employeeLeaves.length : employeeLeaves.filter((l) => isStatus(l, key)).length;
   const isActionable   = (status) =>
   status === "pending_admin" ||
+  status === "pending_coadmin" ||
+  status === "forwarded_admin" ||
   status === "forwarded_reporting_manager" ||
   status === "pending_manager";
 
@@ -1189,6 +1291,7 @@ const AllLeavesPanel = ({ showToast }) => {
     try {
       if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave approved", "success"); }
       if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave rejected", "error"); }
+      if (action === "forward") { await forwardMut.mutateAsync({ id: leave._id, leaveFor: "employee" }); showToast("Leave forwarded to Admin", "success"); }
       refetch();
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
@@ -1263,8 +1366,10 @@ const AllLeavesPanel = ({ showToast }) => {
           leave={leave}
           isProcessing={processingId === leave._id}
           showActions={isActionable(leave.status)}
+          showForward={canForward && ["pending_admin", "pending_coadmin"].includes(leave.status) && !leave.approverPool?.length}
           onApprove={() => handleAction(leave, "approve")}
           onReject={() => handleAction(leave, "reject")}
+          onForward={() => handleAction(leave, "forward")}
           showTimeline
         />
       ))}
@@ -1273,7 +1378,7 @@ const AllLeavesPanel = ({ showToast }) => {
   );
 };
 
-const ManagerLeavesPanel = ({ showToast }) => {
+const ManagerLeavesPanel = ({ showToast, canForward }) => {
   const [processingId, setProcessingId] = useState(null);
   const [search, setSearch]     = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -1284,9 +1389,10 @@ const ManagerLeavesPanel = ({ showToast }) => {
   const { data: rawData, isLoading, refetch } = useGetForwardedLeaves();
   const acceptMut = useAcceptLeave();
   const rejectMut = useRejectLeave();
+  const forwardMut = useForwardLeaveToAdmin();
 
   const managerLeaves = Array.isArray(rawData?.managerLeaves?.leaves) ? rawData.managerLeaves.leaves : [];
-  const isActionable  = (status) => status === "pending_reporting_manager" || status === "pending_admin";
+  const isActionable  = (status) => ["pending_reporting_manager", "pending_admin", "pending_coadmin", "forwarded_admin"].includes(status);
 
   const filtered = managerLeaves.filter((l) => {
     const person = l.manager || {};
@@ -1307,6 +1413,7 @@ const ManagerLeavesPanel = ({ showToast }) => {
     try {
       if (action === "approve") { await acceptMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave approved", "success"); }
       if (action === "reject")  { await rejectMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave rejected", "error"); }
+      if (action === "forward") { await forwardMut.mutateAsync({ id: leave._id, leaveFor: "manager" }); showToast("Leave forwarded to Admin", "success"); }
       refetch();
     } catch (err) {
       showToast(err?.response?.data?.message || err?.message || "Something went wrong", "error");
@@ -1351,14 +1458,59 @@ const ManagerLeavesPanel = ({ showToast }) => {
           leave={leave}
           isProcessing={processingId === leave._id}
           showActions={isActionable(leave.status)}
+          showForward={canForward && ["pending_admin", "pending_coadmin"].includes(leave.status) && !leave.approverPool?.length}
           onApprove={() => handleAction(leave, "approve")}
           onReject={() => handleAction(leave, "reject")}
+          onForward={() => handleAction(leave, "forward")}
           personLabel="Manager"
           accentColor="#A855F7"
           showTimeline
         />
       ))}
       <Pagination page={page} setPage={setPage} totalPages={totalPages} />
+    </div>
+  );
+};
+
+const AdminLeavesPanel = ({ showToast }) => {
+  const [processingId, setProcessingId] = useState(null);
+  const { data, isLoading, refetch } = useGetForwardedLeaves();
+  const acceptMut = useAcceptLeave();
+  const rejectMut = useRejectLeave();
+  const leaves = Array.isArray(data?.adminLeaves?.leaves) ? data.adminLeaves.leaves : [];
+
+  const handleAction = async (leave, action) => {
+    setProcessingId(leave._id);
+    try {
+      const mutate = action === "approve" ? acceptMut : rejectMut;
+      await mutate.mutateAsync({ id: leave._id, leaveFor: "admin" });
+      showToast(action === "approve" ? "Admin leave approved" : "Admin leave rejected", action === "approve" ? "success" : "error");
+      refetch();
+    } catch (err) {
+      showToast(err?.message || "Something went wrong", "error");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  if (isLoading) return <Spinner />;
+  if (!leaves.length) return <EmptyState msg="No admin leave requests found" />;
+
+  return (
+    <div className="w-full">
+      <p className="text-xs text-[#8B7FA0] mb-4">Leave requests from admins who report to you.</p>
+      {leaves.map((leave) => (
+        <LeaveCard
+          key={leave._id}
+          leave={leave}
+          personLabel="Admin"
+          isProcessing={processingId === leave._id}
+          showActions={leave.status === "pending_reporting_manager"}
+          onApprove={() => handleAction(leave, "approve")}
+          onReject={() => handleAction(leave, "reject")}
+          showTimeline
+        />
+      ))}
     </div>
   );
 };
@@ -1497,19 +1649,20 @@ const MyWFHPanel = ({ showToast }) => {
   );
 };
 
-const TeamWFHPanel = ({ showToast }) => {
+const TeamWFHPanel = ({ showToast, canForward }) => {
   const [processingId, setProcessingId] = useState(null);
   const [wfhFilter, setWfhFilter]       = useState("all");
 
   const { data: fwdData, isLoading, refetch } = useAdminGetForwardedWFH();
   const approveMut = useAdminApproveForwardedWFH();
   const rejectMut  = useAdminRejectForwardedWFH();
+  const forwardMut = useAdminForwardWFH();
 
   const raw     = fwdData?.wfhList || fwdData || [];
   const allList = Array.isArray(raw) ? raw : [];
 
   const isWfhStatus = (wfh, key) => {
-    if (key === "pending")  return wfh.status?.includes("pending");
+    if (key === "pending")  return wfh.status?.includes("pending") || wfh.status === "forwarded_admin";
     if (key === "approved") return wfh.status?.includes("approved");
     if (key === "rejected") return wfh.status?.includes("rejected");
     return true;
@@ -1517,13 +1670,14 @@ const TeamWFHPanel = ({ showToast }) => {
 
   const list      = wfhFilter === "all" ? allList : allList.filter((w) => isWfhStatus(w, wfhFilter));
   const wfhCount  = (key) => key === "all" ? allList.length : allList.filter((w) => isWfhStatus(w, key)).length;
-  const isActionable = (status) => status === "pending_admin" || status === "forwarded_reporting_manager";
+  const isActionable = (status) => ["pending_admin", "forwarded_admin", "forwarded_reporting_manager"].includes(status);
 
   const handleAction = async (wfhId, action) => {
     setProcessingId(wfhId);
     try {
       if (action === "approve") { await approveMut.mutateAsync({ wfhId }); showToast("WFH approved", "success"); }
       if (action === "reject")  { await rejectMut.mutateAsync({ wfhId });  showToast("WFH rejected", "error"); }
+      if (action === "forward") { await forwardMut.mutateAsync({ wfhId }); showToast("WFH forwarded to Admin", "success"); }
       refetch();
     } catch (err) {
       showToast(err?.message || "Something went wrong", "error");
@@ -1575,6 +1729,7 @@ const TeamWFHPanel = ({ showToast }) => {
         const d            = wfh.days || daysDiff(wfh.startDate, wfh.endDate);
         const isProcessing = processingId === wfh._id;
         const actionable   = isActionable(wfh.status);
+        const showForward  = canForward && wfh.status === "pending_admin" && !wfh.approverPool?.length;
         return (
           <div key={wfh._id}
             className="relative rounded-[14px] xs:rounded-[16px] sm:rounded-[20px] mb-3 sm:mb-3.5 overflow-hidden transition-all duration-[250ms] hover:-translate-y-px w-full"
@@ -1601,20 +1756,25 @@ const TeamWFHPanel = ({ showToast }) => {
                   </div>
                 </div>
 
-                {actionable && (
+                {(actionable || showForward) && (
                   <div className="hidden sm:flex flex-col gap-1.5 flex-shrink-0">
-                    <button onClick={() => handleAction(wfh._id, "approve")}
+                    {actionable && <button onClick={() => handleAction(wfh._id, "approve")}
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                       style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                       Approve
-                    </button>
-                    <button onClick={() => handleAction(wfh._id, "reject")}
+                    </button>}
+                    {actionable && <button onClick={() => handleAction(wfh._id, "reject")}
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
                       style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
                       Reject
-                    </button>
+                    </button>}
+                    {showForward && <button onClick={() => handleAction(wfh._id, "forward")}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all duration-[180ms] hover:-translate-y-px min-h-[40px]"
+                      style={{ background: "#EFF6FF", color: "#1D4ED8", boxShadow: "0 2px 8px rgba(59,130,246,0.12)" }}>
+                      Forward to Admin
+                    </button>}
                   </div>
                 )}
               </div>
@@ -1642,20 +1802,25 @@ const TeamWFHPanel = ({ showToast }) => {
 
               {wfh.createdAt && <div className="text-[9px] sm:text-[10px] text-[#C4AADA] mt-2">Applied {fmtDateTime(wfh.createdAt)}</div>}
 
-              {actionable && (
+              {(actionable || showForward) && (
                 <div className="flex gap-2 mt-3 sm:hidden">
-                  <button onClick={() => handleAction(wfh._id, "approve")}
+                  {actionable && <button onClick={() => handleAction(wfh._id, "approve")}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
                     style={{ background: "#F0FDF4", color: "#14803D", boxShadow: "0 2px 8px rgba(34,197,94,0.15)" }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l2.5 2.5 5.5-5" stroke="#14803D" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     Approve
-                  </button>
-                  <button onClick={() => handleAction(wfh._id, "reject")}
+                  </button>}
+                  {actionable && <button onClick={() => handleAction(wfh._id, "reject")}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
                     style={{ background: "#FFF1F2", color: "#991B1B", boxShadow: "0 2px 8px rgba(239,68,68,0.12)" }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="#991B1B" strokeWidth="1.8" strokeLinecap="round" /></svg>
                     Reject
-                  </button>
+                  </button>}
+                  {showForward && <button onClick={() => handleAction(wfh._id, "forward")}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2.5 rounded-[10px] text-[12px] font-semibold cursor-pointer border-none transition-all min-h-[44px]"
+                    style={{ background: "#EFF6FF", color: "#1D4ED8", boxShadow: "0 2px 8px rgba(59,130,246,0.12)" }}>
+                    Forward
+                  </button>}
                 </div>
               )}
             </div>
@@ -1675,6 +1840,7 @@ const TeamWFHPanel = ({ showToast }) => {
 const TABS = [
   { key: "allLeaves",     label: "Employee Leaves" },
   { key: "managerLeaves", label: "Manager Leaves"  },
+  { key: "adminLeaves",   label: "Admin Leaves"    },
   { key: "myBalance",     label: "My Balance"       },
   { key: "applyLeave",    label: "Apply Leave"      },
   { key: "myWFH",         label: "My WFH"           },
@@ -1688,6 +1854,7 @@ const AdminLeaveWFH = () => {
   const { data: meData, isLoading: meLoading } = useGetMeAdmin();
   const admin        = meData?.user  || meData;
   const leaveBalance = meData?.leaveBalance || null;
+  const canForwardToParentAdmin = admin?.reporting_manager_model === "Admin";
 
   const showToast = (message, type = "success") => {
     setToast({ visible: true, message, type });
@@ -1775,12 +1942,13 @@ const AdminLeaveWFH = () => {
 
         {meLoading && (tab === "myBalance" || tab === "applyLeave") ? <Spinner /> : (
           <>
-            {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast} />}
-            {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast} />}
+            {tab === "allLeaves"     && <AllLeavesPanel showToast={showToast} canForward={canForwardToParentAdmin} />}
+            {tab === "managerLeaves" && <ManagerLeavesPanel showToast={showToast} canForward={canForwardToParentAdmin} />}
+            {tab === "adminLeaves"   && <AdminLeavesPanel showToast={showToast} />}
             {tab === "myBalance"     && <MyBalancePanel admin={admin} leaveBalance={leaveBalance} />}
             {tab === "applyLeave"    && <ApplyLeavePanel admin={admin} leaveBalance={leaveBalance} showToast={showToast} />}
             {tab === "myWFH"         && <MyWFHPanel showToast={showToast} />}
-            {tab === "teamWFH"       && <TeamWFHPanel showToast={showToast} />}
+            {tab === "teamWFH"       && <TeamWFHPanel showToast={showToast} canForward={canForwardToParentAdmin} />}
           </>
         )}
       </div>

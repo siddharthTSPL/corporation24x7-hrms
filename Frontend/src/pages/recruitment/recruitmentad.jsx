@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   useGetAllRequisitions,
   useGetPendingRequisitions,
@@ -11,8 +12,14 @@ import {
   useUpdateCandidateStage,
   useScheduleInterview,
   useSubmitInterviewFeedback,
+  useResendInterviewInvite,
+  useInterviewers,
 } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
+import OfferTab from "./OfferTab";
+import OfferApprovals from "./OfferApprovals";
+import toast from "react-hot-toast";
+import { useApprovalPendingCount } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import {
   FaBriefcase, FaClock, FaCheckCircle, FaTimesCircle,
   FaSearch, FaPlus, FaTimes, FaUsers,
@@ -20,7 +27,7 @@ import {
   FaCalendarAlt,
   FaEdit, FaArrowRight,
   FaUserCheck, FaBuilding, FaChartLine,
-  FaFileExcel,
+  FaFileExcel, FaEnvelope, FaFileSignature,
 } from "react-icons/fa";
 
 const initials = (name = "") =>
@@ -37,8 +44,13 @@ const fmtDate = (iso) => {
 
 const PIPELINE_STAGES = [
   "APPLIED", "SCREENING", "SHORTLISTED", "INTERVIEW",
-  "HR_ROUND", "SELECTED", "OFFER_RELEASED", "JOINED",
+  "HR_ROUND", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "JOINED",
 ];
+
+const FILLED_STAGES = ["SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "JOINED"];
+const OFFER_STAGES = ["SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"];
+const OFFER_MANAGED_STAGES = ["OFFER_RELEASED", "OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"];
+const DEAD_STAGES = ["REJECTED", "OFFER_REJECTED"];
 
 const STAGE_ORDER = {
   APPLIED:        ["SCREENING", "REJECTED"],
@@ -47,7 +59,10 @@ const STAGE_ORDER = {
   INTERVIEW:      ["HR_ROUND", "SELECTED", "REJECTED"],
   HR_ROUND:       ["SELECTED", "REJECTED"],
   SELECTED:       ["OFFER_RELEASED"],
-  OFFER_RELEASED: ["JOINED"],
+  OFFER_RELEASED: ["OFFER_ACCEPTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED"],
+  OFFER_ACCEPTED: ["JOINED"],
+  OFFER_REJECTED: [],
+  OFFER_EXPIRED:  ["OFFER_RELEASED"],
   JOINED:         [],
   REJECTED:       [],
 };
@@ -61,6 +76,9 @@ const STAGE_META = {
   SELECTED:       { color: "bg-emerald-50 text-emerald-700",     dot: "bg-emerald-500",  label: "Selected" },
   REJECTED:       { color: "bg-red-50 text-red-600",             dot: "bg-red-400",      label: "Rejected" },
   OFFER_RELEASED: { color: "bg-orange-50 text-orange-700",       dot: "bg-orange-400",   label: "Offer Released" },
+  OFFER_ACCEPTED: { color: "bg-lime-50 text-lime-700",           dot: "bg-lime-500",     label: "Offer Accepted" },
+  OFFER_REJECTED: { color: "bg-red-50 text-red-600",             dot: "bg-red-400",      label: "Offer Declined" },
+  OFFER_EXPIRED:  { color: "bg-amber-50 text-amber-700",         dot: "bg-amber-400",    label: "Offer Expired" },
   JOINED:         { color: "bg-teal-50 text-teal-700",           dot: "bg-teal-500",     label: "Joined" },
 };
 
@@ -72,6 +90,9 @@ const STAGE_TIMELINE_META = {
   HR_ROUND:       { icon: "🤝", accent: "#6d28d9", light: "#f5f3ff" },
   SELECTED:       { icon: "✅", accent: "#059669", light: "#ecfdf5" },
   OFFER_RELEASED: { icon: "📄", accent: "#d97706", light: "#fff7ed" },
+  OFFER_ACCEPTED: { icon: "🤝", accent: "#65a30d", light: "#f7fee7" },
+  OFFER_REJECTED: { icon: "🚫", accent: "#dc2626", light: "#fef2f2" },
+  OFFER_EXPIRED:  { icon: "⏳", accent: "#d97706", light: "#fffbeb" },
   JOINED:         { icon: "🎉", accent: "#0d9488", light: "#f0fdfa" },
   REJECTED:       { icon: "❌", accent: "#dc2626", light: "#fef2f2" },
 };
@@ -181,6 +202,19 @@ const PriorityPill = ({ priority }) => (
 );
 
 const CandidateTimeline = ({ currentStage }) => {
+  if (currentStage === "OFFER_REJECTED" || currentStage === "OFFER_EXPIRED") {
+    const declined = currentStage === "OFFER_REJECTED";
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${declined ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
+        <span className="text-base">{declined ? "🚫" : "⏳"}</span>
+        <div>
+          <div className={`text-xs font-bold ${declined ? "text-red-600" : "text-amber-700"}`}>{declined ? "Offer declined by candidate" : "Offer expired"}</div>
+          <div className={`text-[10px] ${declined ? "text-red-400" : "text-amber-500"}`}>{declined ? "The opening is available again" : "No response was received before the validity date"}</div>
+        </div>
+      </div>
+    );
+  }
+
   if (currentStage === "REJECTED") {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-100">
@@ -253,7 +287,7 @@ const CandidateTimeline = ({ currentStage }) => {
 
 const RequisitionProgressHeader = ({ requisition, candidates }) => {
   const filledCount = candidates.filter((c) =>
-    ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage)
+    FILLED_STAGES.includes(c.current_stage)
   ).length;
   const remaining = Math.max(0, requisition.openings - filledCount);
   const pct = Math.min(100, Math.round((filledCount / requisition.openings) * 100));
@@ -437,42 +471,155 @@ const AddCandidateModal = ({ requisitionId, onClose }) => {
   );
 };
 
+const PLATFORMS = ["Google Meet", "Zoom", "Microsoft Teams", "Other"];
+const MODES = ["Online", "In-person", "Phone"];
+const fieldCls = "w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all";
+const fieldLabel = "block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5";
+
+const fmtDateTimeIst = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+  } catch {
+    return "—";
+  }
+};
+
 const ScheduleInterviewModal = ({ candidateId, onClose }) => {
   const schMut = useScheduleInterview();
-  const [form, setForm] = useState({ round_type: "Screening", scheduled_at: "" });
+  const { data: interviewerData } = useInterviewers();
+  const interviewers = interviewerData?.data || [];
+  const [form, setForm] = useState({
+    round_type: "Screening",
+    scheduled_at: "",
+    duration_minutes: 45,
+    mode: "Online",
+    meeting_platform: "Google Meet",
+    meeting_link: "",
+    location: "",
+    conducted_by: "",
+    instructions: "",
+  });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const linkOk = /^https?:\/\/\S+$/i.test(form.meeting_link.trim());
+  const valid =
+    !!form.scheduled_at &&
+    Number(form.duration_minutes) >= 5 &&
+    (form.mode !== "Online" || linkOk) &&
+    (form.mode !== "In-person" || form.location.trim());
+
   const handleSubmit = async () => {
-    await schMut.mutateAsync({ id: candidateId, data: form });
-    onClose();
+    try {
+      const res = await schMut.mutateAsync({
+        id: candidateId,
+        data: {
+          ...form,
+          // datetime-local has no timezone; the whole product runs on IST.
+          scheduled_at: new Date(`${form.scheduled_at}:00+05:30`).toISOString(),
+          duration_minutes: Number(form.duration_minutes),
+          conducted_by: form.conducted_by || undefined,
+        },
+      });
+      if (res?.mail && !res.mail.candidate) toast.error(res.message);
+      else toast.success(res?.message || "Round scheduled");
+      onClose();
+    } catch (err) {
+      toast.error(err?.message || "Could not schedule the round");
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl my-4">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Schedule Interview</h2>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Schedule Interview</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">An invitation with the meeting details is emailed to the candidate right away.</p>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2 rounded-lg transition-colors"><FaTimes size={13} /></button>
         </div>
         <div className="p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={fieldLabel}>Round Type</label>
+              <select className={fieldCls} value={form.round_type} onChange={set("round_type")}>
+                {["Screening", "Technical", "HR Round", "Final Round", "Other"].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={fieldLabel}>Duration (minutes)</label>
+              <input type="number" min="5" max="480" className={fieldCls} value={form.duration_minutes} onChange={set("duration_minutes")} />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Round Type</label>
-            <select className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={form.round_type} onChange={set("round_type")}>
-              {["Screening", "Technical", "HR Round", "Final Round", "Other"].map((t) => (
-                <option key={t} value={t}>{t}</option>
+            <label className={fieldLabel}>Date and time (IST)</label>
+            <input type="datetime-local" className={fieldCls} value={form.scheduled_at} onChange={set("scheduled_at")} />
+          </div>
+
+          <div>
+            <label className={fieldLabel}>Interview mode</label>
+            <div className="flex gap-2">
+              {MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, mode: m }))}
+                  className={`flex-1 text-xs font-semibold px-3 py-2 rounded-xl border-2 transition-all ${form.mode === m ? "border-[#730042] bg-[#fdf5f9] text-[#730042]" : "border-gray-100 text-gray-500 hover:border-gray-300"}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.mode === "Online" && (
+            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
+              <div>
+                <label className={fieldLabel}>Platform</label>
+                <select className={fieldCls} value={form.meeting_platform} onChange={set("meeting_platform")}>
+                  {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={fieldLabel}>Meeting link</label>
+                <input type="url" placeholder="https://meet.google.com/abc-defg-hij" className={fieldCls} value={form.meeting_link} onChange={set("meeting_link")} />
+                {form.meeting_link && !linkOk && <p className="text-[11px] text-red-500 mt-1">Enter a full link starting with https://</p>}
+              </div>
+            </div>
+          )}
+
+          {form.mode === "In-person" && (
+            <div>
+              <label className={fieldLabel}>Venue / address</label>
+              <input type="text" placeholder="Office address, floor, landmark" className={fieldCls} value={form.location} onChange={set("location")} />
+            </div>
+          )}
+
+          <div>
+            <label className={fieldLabel}>Interviewer (optional)</label>
+            <select className={fieldCls} value={form.conducted_by} onChange={set("conducted_by")}>
+              <option value="">Not assigned</option>
+              {interviewers.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}{i.designation ? ` · ${i.designation}` : ""}</option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-400 mt-1">The interviewer also gets an email with the candidate and meeting details.</p>
           </div>
+
           <div>
-            <label className="block text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-1.5">Scheduled At</label>
-            <input type="datetime-local" className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all" value={form.scheduled_at} onChange={set("scheduled_at")} />
+            <label className={fieldLabel}>Instructions for the candidate (optional)</label>
+            <textarea rows={3} maxLength={2000} placeholder="Documents to carry, what to prepare, dress code…" className={`${fieldCls} resize-y`} value={form.instructions} onChange={set("instructions")} />
           </div>
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:border-[#730042] hover:text-[#730042] transition-colors">Cancel</button>
-          <button onClick={handleSubmit} disabled={schMut.isPending || !form.scheduled_at} className="flex items-center gap-2 px-5 py-2 bg-[#730042] text-white text-sm font-semibold rounded-xl hover:bg-[#4a0029] disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+          <button onClick={handleSubmit} disabled={schMut.isPending || !valid} className="flex items-center gap-2 px-5 py-2 bg-[#730042] text-white text-sm font-semibold rounded-xl hover:bg-[#4a0029] disabled:opacity-60 disabled:cursor-not-allowed transition-all">
             <FaCalendarAlt size={10} />
-            {schMut.isPending ? "Scheduling…" : "Schedule"}
+            {schMut.isPending ? "Scheduling…" : "Schedule and send invite"}
           </button>
         </div>
       </div>
@@ -486,8 +633,18 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
   const [feedbackForm, setFeedbackForm] = useState({ feedback: "", score: "", outcome: "Pending" });
   const [selectedRound, setSelectedRound] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const resendMut = useResendInterviewInvite();
+  const handleResend = async (roundId) => {
+    try {
+      const res = await resendMut.mutateAsync({ candidateId: candidate._id, roundId });
+      toast.success(res?.message || "Invite resent");
+    } catch (err) {
+      toast.error(err?.message || "Could not resend the invite");
+    }
+  };
 
-  const allowed = STAGE_ORDER[candidate.current_stage] || [];
+  const allowed = (STAGE_ORDER[candidate.current_stage] || []).filter((s) => !OFFER_MANAGED_STAGES.includes(s));
+  const offerHandled = (STAGE_ORDER[candidate.current_stage] || []).some((s) => OFFER_MANAGED_STAGES.includes(s));
   const fbMut = useSubmitInterviewFeedback();
 
   const handleFeedback = async (roundId) => {
@@ -501,6 +658,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
     { key: "info", label: "Profile" },
     { key: "timeline", label: "Timeline" },
     { key: "rounds", label: `Rounds (${candidate.interview_rounds?.length || 0})` },
+    ...(OFFER_STAGES.includes(candidate.current_stage) ? [{ key: "offer", label: "Offer" }] : []),
     ...(canAddCandidate ? [{ key: "stage", label: "Move Stage" }] : []),
   ];
 
@@ -583,7 +741,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
               <div>
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-4">Recruitment Journey</div>
                 <div className="overflow-x-auto pb-2">
-                  <div className="min-w-[520px]">
+                  <div className="min-w-[600px]">
                     <CandidateTimeline currentStage={candidate.current_stage} />
                   </div>
                 </div>
@@ -675,7 +833,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="text-sm font-semibold text-gray-800">Round {round.round_number} · {round.round_type}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Scheduled: {fmtDate(round.scheduled_at)}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">Scheduled: {fmtDateTimeIst(round.scheduled_at)}{round.duration_minutes ? ` · ${round.duration_minutes} min` : ""}</div>
                         </div>
                         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                           round.outcome === "Passed" ? "bg-emerald-50 text-emerald-600" :
@@ -684,6 +842,25 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                           "bg-amber-50 text-amber-600"
                         }`}>{round.outcome}</span>
                       </div>
+                      <div className="bg-[#fdf5f9] rounded-lg px-3 py-2 mb-2 space-y-1 text-xs text-gray-600">
+                        <div><span className="text-gray-400">Mode:</span> <strong className="text-gray-700">{round.mode || "Online"}</strong>{round.mode !== "In-person" && round.mode !== "Phone" && round.meeting_platform ? ` · ${round.meeting_platform}` : ""}</div>
+                        {(round.mode || "Online") === "Online" && round.meeting_link && (
+                          <div className="break-all"><span className="text-gray-400">Link:</span> <a href={round.meeting_link} target="_blank" rel="noreferrer" className="font-semibold text-[#730042] underline">{round.meeting_link}</a></div>
+                        )}
+                        {round.mode === "In-person" && round.location && <div><span className="text-gray-400">Venue:</span> <strong className="text-gray-700">{round.location}</strong></div>}
+                        {round.conducted_by?.f_name && <div><span className="text-gray-400">Interviewer:</span> <strong className="text-gray-700">{round.conducted_by.f_name} {round.conducted_by.l_name}</strong></div>}
+                        {round.instructions && <div className="whitespace-pre-line"><span className="text-gray-400">Instructions:</span> {round.instructions}</div>}
+                        <div className="text-[11px] text-gray-400">{round.invite_sent_at ? `Invite emailed ${fmtDateTimeIst(round.invite_sent_at)}` : "Invite email not sent yet"}</div>
+                      </div>
+                      {canAddCandidate && round.outcome === "Pending" && (
+                        <button
+                          onClick={() => handleResend(round._id)}
+                          disabled={resendMut.isPending}
+                          className="mr-2 mb-1 inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:border-[#730042] hover:text-[#730042] disabled:opacity-60 transition-colors"
+                        >
+                          <FaEnvelope size={10} /> {round.invite_sent_at ? "Resend invite" : "Send invite"}
+                        </button>
+                      )}
                       {round.feedback && <p className="text-xs text-gray-500 mb-2 leading-relaxed">{round.feedback}</p>}
                       {round.score != null && <p className="text-xs text-gray-400">Score: <strong className="text-gray-700">{round.score}/10</strong></p>}
                       {canAddCandidate && (
@@ -723,12 +900,14 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
             </div>
           )}
 
+          {tab === "offer" && <OfferTab candidate={candidate} canAct={canAddCandidate} />}
+
           {tab === "stage" && canAddCandidate && (
             <div className="space-y-5">
               <div className="p-4 bg-[#fdf5f9] rounded-xl border border-[#eedde8]">
                 <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-3">Current Position in Pipeline</div>
                 <div className="overflow-x-auto pb-1">
-                  <div className="min-w-[480px]">
+                  <div className="min-w-[560px]">
                     <CandidateTimeline currentStage={candidate.current_stage} />
                   </div>
                 </div>
@@ -771,6 +950,10 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
                     <textarea rows={3} className="w-full px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all resize-y" value={stageForm.overall_feedback} onChange={(e) => setStageForm((f) => ({ ...f, overall_feedback: e.target.value }))} />
                   </div>
                 </>
+              ) : offerHandled ? (
+                <div className="p-4 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-600 leading-relaxed">
+                  The offer, candidate response and joining steps are handled from the <button onClick={() => setTab("offer")} className="font-semibold text-[#730042] underline">Offer tab</button>.
+                </div>
               ) : (
                 <p className="text-sm text-gray-400 py-4">No further stage transitions available.</p>
               )}
@@ -801,7 +984,7 @@ const CandidateDetailModal = ({ candidate, onClose, onStageUpdate, onFeedback, c
 
 const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   const [showAddCandidate, setShowAddCandidate] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState(null);
   const [stageFilter, setStageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -809,9 +992,10 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   const stageMut = useUpdateCandidateStage();
 
   const candidates = candidateData?.data || [];
+  const selectedCandidate = selectedCandidateId ? candidates.find((c) => c._id === selectedCandidateId) || null : null;
 
   const filledCount = useMemo(
-    () => candidates.filter((c) => ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage)).length,
+    () => candidates.filter((c) => FILLED_STAGES.includes(c.current_stage)).length,
     [candidates]
   );
   const remaining = Math.max(0, requisition.openings - filledCount);
@@ -875,9 +1059,9 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: "Total", val: candidates.length, icon: <FaUsers size={12} />, color: "text-[#730042]", bg: "bg-[#f7edf3]" },
-              { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "JOINED", "SELECTED", "OFFER_RELEASED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
               { label: "Selected / Offered", val: filledCount, icon: <FaCheckCircle size={12} />, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Rejected", val: candidates.filter((c) => c.current_stage === "REJECTED").length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
+              { label: "Rejected", val: candidates.filter((c) => DEAD_STAGES.includes(c.current_stage)).length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
             ].map(({ label, val, icon, color, bg }) => (
               <div key={label} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-lg ${bg} ${color} flex items-center justify-center flex-shrink-0`}>{icon}</div>
@@ -948,7 +1132,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
             </div>
           ) : (
             filtered.map((c) => {
-              const isFilled = ["SELECTED", "OFFER_RELEASED", "JOINED"].includes(c.current_stage);
+              const isFilled = FILLED_STAGES.includes(c.current_stage);
               return (
                 <div
                   key={c._id}
@@ -980,7 +1164,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
                     <StageBadge stage={c.current_stage} />
                     <span className="text-xs text-gray-400">{c.source}</span>
                     <button
-                      onClick={() => setSelectedCandidate(c)}
+                      onClick={() => setSelectedCandidateId(c._id)}
                       className="text-xs font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors"
                     >
                       View
@@ -1000,7 +1184,7 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
       {selectedCandidate && (
         <CandidateDetailModal
           candidate={selectedCandidate}
-          onClose={() => setSelectedCandidate(null)}
+          onClose={() => setSelectedCandidateId(null)}
           onStageUpdate={handleStageUpdate}
           onFeedback={refetch}
           canAddCandidate={canAddCandidate}
@@ -1195,6 +1379,11 @@ const RecruitmentAdmin = () => {
   const [detailModal, setDetailModal] = useState(null);
   const [hiringModal, setHiringModal] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mainTab = searchParams.get("tab") === "approvals" ? "approvals" : "requisitions";
+  const setMainTab = (t) => setSearchParams(t === "approvals" ? { tab: "approvals" } : {}, { replace: true });
+  const { data: approvalCountData } = useApprovalPendingCount();
+  const approvalCount = approvalCountData?.data?.count || 0;
 
   const { data: requisitionData, isLoading } = useGetAllRequisitions();
   const { data: pendingData }                 = useGetPendingRequisitions();
@@ -1228,6 +1417,65 @@ const RecruitmentAdmin = () => {
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
+  // Page-level horizontal scroll: the content keeps its natural width (as before) and the
+  // scrollbar is a sticky bar pinned to the bottom of this page's own area (never under the sidebar).
+  const pageRef = useRef(null);
+  const barRef = useRef(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const [clientWidth, setClientWidth] = useState(0);
+  const [barPos, setBarPos] = useState({ left: 0, width: 0 });
+  const sentinelRef = useRef(null);
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => setAtBottom(entry.isIntersecting),
+      { threshold: 0, rootMargin: "0px 0px 24px 0px" }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [canViewRequisitions]);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      setScrollWidth(el.scrollWidth);
+      setClientWidth(el.clientWidth);
+      const r = el.getBoundingClientRect();
+      setBarPos({ left: r.left, width: r.width });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const mo = new MutationObserver(measure);
+    mo.observe(el, { childList: true, subtree: true });
+    window.addEventListener("resize", measure);
+    const parent = el.parentElement && el.parentElement.parentElement;
+    if (parent) ro.observe(parent);
+    const t = setInterval(measure, 600); // follows sidebar collapse/expand animations
+    return () => {
+      clearInterval(t);
+      ro.disconnect();
+      mo.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [canViewRequisitions]);
+
+  const syncFromPage = () => {
+    if (barRef.current && pageRef.current && barRef.current.scrollLeft !== pageRef.current.scrollLeft) {
+      barRef.current.scrollLeft = pageRef.current.scrollLeft;
+    }
+  };
+  const syncFromBar = () => {
+    if (barRef.current && pageRef.current && pageRef.current.scrollLeft !== barRef.current.scrollLeft) {
+      pageRef.current.scrollLeft = barRef.current.scrollLeft;
+    }
+  };
+  const hasOverflow = scrollWidth > clientWidth + 1 && atBottom;
+
   if (!canViewRequisitions) {
     return (
       <div className="min-h-screen bg-[#fdf5f9] flex items-center justify-center p-4">
@@ -1241,7 +1489,13 @@ const RecruitmentAdmin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fdf5f9] p-4 sm:p-6 font-[Outfit,sans-serif]">
+    <div className="w-full max-w-full min-w-0 [contain:inline-size]">
+    <div
+      ref={pageRef}
+      onScroll={syncFromPage}
+      className="min-h-screen w-full max-w-full overflow-x-auto bg-[#fdf5f9] p-4 sm:p-6 pb-12 sm:pb-12 font-[Outfit,sans-serif] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+    <div className="min-w-[720px] xl:min-w-[900px]">
 
       <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#CD166E] rounded-2xl px-4 sm:px-8 py-6 sm:py-7 mb-6 relative overflow-hidden shadow-xl">
         <div className="absolute w-72 h-72 rounded-full -top-36 -right-16 bg-white/5 pointer-events-none" />
@@ -1272,6 +1526,26 @@ const RecruitmentAdmin = () => {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+        {[
+          { key: "requisitions", label: "Requisitions", icon: <FaBriefcase size={11} /> },
+          { key: "approvals", label: "Offer Approvals", icon: <FaFileSignature size={11} />, badge: approvalCount },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setMainTab(t.key)}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-semibold border-b-2 transition-all -mb-px whitespace-nowrap ${mainTab === t.key ? "border-[#730042] text-[#730042]" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+          >
+            {t.icon} {t.label}
+            {t.badge > 0 && <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#CD166E] text-white text-[10px] font-bold flex items-center justify-center">{t.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === "approvals" ? (
+        <OfferApprovals />
+      ) : (
+      <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
           { label: "Total Requisitions", val: stats.total,    icon: <FaBriefcase size={15} />, color: "#730042", bg: "#f7edf3", stripe: "#730042" },
@@ -1289,14 +1563,14 @@ const RecruitmentAdmin = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_250px] gap-4">
 
         <div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FaBriefcase className="text-[#730042]" size={14} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18 }}>All Requisitions</h2>
+                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>All Requisitions</h2>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
@@ -1328,11 +1602,11 @@ const RecruitmentAdmin = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px]">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="bg-[#fdf5f9]">
                     {["Job Role", "Department", "Openings (Filled/Total)", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
+                      <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1344,7 +1618,7 @@ const RecruitmentAdmin = () => {
                   ) : (
                     filtered.map((item) => (
                       <tr key={item._id} className="border-b border-gray-50 hover:bg-[#fdf5f9] transition-colors">
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5">
                           <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[11px] text-gray-400">{item.employment_type}</span>
@@ -1357,20 +1631,20 @@ const RecruitmentAdmin = () => {
                             </button>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
+                        <td className="px-3 py-2.5">
                           <div className="flex justify-center">
                             <OpeningsBadge requisition={item} />
                           </div>
                         </td>
-                        <td className="px-4 py-3.5"><PriorityPill priority={item.priority} /></td>
-                        <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5"><PriorityPill priority={item.priority} /></td>
+                        <td className="px-3 py-2.5"><StatusPill status={item.status} /></td>
+                        <td className="px-3 py-2.5">
                           <div className="text-xs font-semibold text-gray-700">{item.requested_by?.f_name} {item.requested_by?.l_name}</div>
                           <div className="text-[11px] text-gray-400">{item.requested_by?.designation}</div>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
+                        <td className="px-3 py-2.5">
                           {item.status === "PENDING" ? (
                             <button
                               onClick={() => setManageModal(item)}
@@ -1405,10 +1679,10 @@ const RecruitmentAdmin = () => {
 
         <div className="flex flex-col gap-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FaExclamationTriangle className="text-amber-500" size={13} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17 }}>Pending Requests</h2>
+                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Pending Requests</h2>
               </div>
               {pendingRequisitions.length > 0 && (
                 <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
@@ -1416,7 +1690,7 @@ const RecruitmentAdmin = () => {
                 </span>
               )}
             </div>
-            <div className="p-4 max-h-[420px] overflow-y-auto space-y-2">
+            <div className="p-3 max-h-[340px] overflow-y-auto space-y-2">
               {pendingRequisitions.length === 0 ? (
                 <div className="text-center py-10 text-gray-400">
                   <FaCheckCircle size={22} className="mx-auto mb-2 text-emerald-400" />
@@ -1424,7 +1698,7 @@ const RecruitmentAdmin = () => {
                 </div>
               ) : (
                 pendingRequisitions.map((item) => (
-                  <div key={item._id} className="border border-gray-100 rounded-xl p-3.5 hover:border-[#eedde8] hover:shadow-sm transition-all">
+                  <div key={item._id} className="border border-gray-100 rounded-xl p-3 hover:border-[#eedde8] hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
@@ -1449,11 +1723,11 @@ const RecruitmentAdmin = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
               <FaArrowRight className="text-[#730042]" size={12} />
-              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17 }}>Recruitment Flow</h2>
+              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Recruitment Flow</h2>
             </div>
-            <div className="p-4 space-y-0">
+            <div className="p-3 space-y-0">
               {[
                 { step: "PENDING",           color: "bg-amber-400",  desc: "Submitted by manager, awaits admin review" },
                 { step: "APPROVED",          color: "bg-emerald-500", desc: "Approved — candidates can be added" },
@@ -1462,8 +1736,8 @@ const RecruitmentAdmin = () => {
                 { step: "REVISION REQUIRED", color: "bg-blue-500",   desc: "Manager must revise and resubmit" },
                 { step: "REJECTED",          color: "bg-red-500",    desc: "Closed — requisition not accepted" },
               ].map((s, i) => (
-                <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-b-0">
-                  <div className={`w-7 h-7 rounded-full ${s.color} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>{i + 1}</div>
+                <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-b-0">
+                  <div className={`w-6 h-6 rounded-full ${s.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{i + 1}</div>
                   <div>
                     <div className="text-xs font-semibold text-gray-700">{s.step}</div>
                     <div className="text-[11px] text-gray-400 mt-0.5">{s.desc}</div>
@@ -1474,6 +1748,8 @@ const RecruitmentAdmin = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {manageModal && (
         <ManageModal
@@ -1493,6 +1769,18 @@ const RecruitmentAdmin = () => {
       {hiringModal && canViewCandidates && (
         <OpenHiringPanel requisition={hiringModal} onClose={() => setHiringModal(null)} canAddCandidate={canAddCandidate} />
       )}
+    </div>
+    </div>
+    <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+
+    <div
+      ref={barRef}
+      onScroll={syncFromBar}
+      className={`fixed bottom-0 z-30 overflow-x-auto overflow-y-hidden bg-[#fdf5f9] border-t border-[#eedde8] ${hasOverflow ? "block" : "hidden"}`}
+      style={{ height: 16, left: barPos.left, width: barPos.width }}
+    >
+      <div style={{ width: scrollWidth, height: 1 }} />
+    </div>
     </div>
   );
 };

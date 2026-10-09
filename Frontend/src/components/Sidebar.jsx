@@ -22,6 +22,10 @@ import {
   FaFileInvoiceDollar,  
   FaFileSignature,       
   FaClipboardCheck,
+  FaConciergeBell,
+  FaMapMarkedAlt,
+  FaFileContract,
+  FaBusinessTime,
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -32,13 +36,19 @@ import { usePermissionStore } from "../auth/store/permission/permissionStore";
 import { usePlanFeatures } from "../auth/server-state/planFeature/planFeature.hook";
 import { clearAgentToken } from "../pages/utils/Desktopagent";
 import HelpTour from "./help/HelpTour";
-import FloatingHelp from "./help/FloatingHelp";
+import FloatingHelp from "./help/Floatinghelp";
 import TechnicalSupportModal from "./help/TechnicalSupportModal";
-import DocumentationModal from "./help/DocumentationModal";
+import DocumentationModal from "./help/Documentationmodal";
+import {
+  checkoutFieldDuty,
+  getMyFieldDuty,
+} from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
+
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
+  { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Org-wide leave, reimbursement, document, and ticket activity in one place." },
   { name: "Announcements",  path: "/superadmin-announcements", icon: <FaBullhorn />, blurb: "Broadcast announcements across all organisations." },
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt />, blurb: "See and manage leave requests across every organisation." },
   { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations.", planFeature: "review" },
@@ -48,13 +58,24 @@ const superAdminMenu = [
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
+  { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "Review overtime requests from your team and send approved hours to payroll." },
+  { name: "Recruitment", path: "/superadmin-recruitment", icon: <FaUsersCog />, blurb: "Review hiring requisitions, manage candidates and interviews, and approve offer letters.", planFeature: "recruitment" },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
+  { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
+  // No "My Policies" here on purpose — a policy's audience can only be
+  // Employees / Managers / Admins (see CreatePolicyModal's ROLE_OPTIONS),
+  // never super_admin, so this page would always be empty for a superadmin.
+    { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
+     { name: "Training records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
 
 const adminMenu = [
+  
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
+  
   { name: "Onboarding",    path: "/employee",            icon: <FaUsers />, blurb: "Add and manage employees and managers." },
+  { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place.", permissionGroup: ["navigation.can_view_self_service"] },
   { name: "Announcement",  path: "/announcement",        icon: <FaBullhorn />, blurb: "Create and publish announcements for your organisation.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-create"]', title: "Creating an announcement", content: "Click here to write a new announcement. Once published, it's instantly visible to your managers and employees." } },
   { name: "Review",        path: "/review-admin",        icon: <FaClipboardCheck />, blurb: "Run and track performance reviews for your team.", planFeature: "review" },
@@ -70,42 +91,67 @@ const adminMenu = [
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets.", planFeature: "timesheet" },
   { name: "Payroll",       path: "/payroll",             icon: <FaFileInvoiceDollar />, blurb: "Run payroll and manage payslips." },
   { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaFileSignature />, blurb: "Review claims from employees and managers, and submit your own." },
+  { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File your own overtime, and review team overtime if you are the designated HR." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
+  { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
+  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
+  { name: "Training", path: "/training-admin", icon: <FaClipboardCheck />, blurb: "Assign training, manage stages and approve completion." },
 ];
 
 const managerMenu = [
+ 
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
+  
+  { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place.", permissionGroup: ["navigation.can_view_self_service"] },
   { name: "Leave",        path: "/leave-manager",        icon: <FaCalendarAlt />, blurb: "Approve or forward leave requests from your team.",
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review your team's leave requests, check your own balance, or apply for your own leave." } },
   { name: "Announcement", path: "/announcement-manager", icon: <FaBullhorn />, blurb: "View and share announcements with your team.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Announcements published by your admin show up here, newest first." } },
   { name: "Organisation", path: "/organisation-manager", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees.", planFeature: "review" },
-  { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets.", planFeature: "timesheet" },
-  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees.", permissionGroup: ["review.can_access"], planFeature: "review" },
+  { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets.", permissionGroup: ["timesheet.can_access"], planFeature: "timesheet" },
+  { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims.", permissionGroup: ["reimbursement.can_submit_claim"] },
+  { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File extra hours worked. HR approves, and approved hours are added to payroll." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
-  { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
+  { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+  { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager", permissionGroup: ["navigation.can_view_field_operations"] },
+  { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "Manage sessions for training assignments where you are the trainer." },
 ];
 
 const employeeMenu = [
-  { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates." },
-  { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.",
+  { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee", permissionGroup: ["navigation.can_view_field_operations"] },
+  { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates.", permissionGroup: ["navigation.can_view_dashboard"] },
+ 
+  { name: "Self Service Portal", path: "/self-service", icon: <FaConciergeBell />, blurb: "Apply leave, submit claims, manage documents, and raise tickets — all in one place.", permissionGroup: ["navigation.can_view_self_service"] },
+  { name: "Leave",        path: "/leave-employee",        icon: <FaCalendarAlt />, blurb: "Apply for leave and track your leave balance.", permissionGroup: ["leave.can_apply_leave"],
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Applying for leave", content: "Open the \"Apply Leave\" tab to submit a request, or \"Leave Balance\" to see how many days you have left." } },
   { name: "Announcement", path: "/announcement-employee", icon: <FaBullhorn />, blurb: "See company announcements.",  permissionGroup: ["announcements.can_view_announcements", "announcements.can_create_announcement", "announcements.can_edit_announcement", "announcements.can_delete_announcement"],
     pageStep: { selector: '[data-tour="announcement-view"]', title: "Reading announcements", content: "Every announcement your organisation publishes shows up here, newest first." } },
-  { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
-  { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet.", planFeature: "timesheet" },
-  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims." },
+  { name: "Organisation", path: "/organisation-employee", icon: <FaBuilding />, blurb: "View your organisation's structure and org chart.", permissionGroup: ["navigation.can_view_organisation"] },
+  { name: "Review",       path: "/review-employee",       icon: <FaClipboardCheck />, blurb: "See the performance reviews your manager has given you.", permissionGroup: ["review.can_access"], planFeature: "review" },
+  { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet.", permissionGroup: ["timesheet.can_access"], planFeature: "timesheet" },
+  { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims.", permissionGroup: ["reimbursement.can_submit_claim"] },
+  { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File extra hours worked. HR approves, and approved hours are added to payroll." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
-  { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences." },
+  { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+   { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "View your training assignments, schedules and certificates.", permissionGroup: ["navigation.can_view_training"] },
+  { name: "Payroll", path: "/payroll", icon: <FaFileInvoiceDollar />, blurb: "Manage organisation-wide payroll and salary details.", permissionGroup: ["payroll.can_manage_payroll"] },
+  { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track company policy acknowledgements.", permissionGroup: ["adminAccess.can_manage_policy_management"] },
+  { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage organisation settings such as shifts, holidays, and approvals.", permissionGroup: ["adminAccess.can_manage_torchx_management"] },
+  { name: "Onboarding", path: "/employee", icon: <FaUsers />, blurb: "Add and manage employees and managers.", permissionGroup: ["adminAccess.can_manage_onboarding"] },
+  { name: "Admin Timesheet", path: "/admin-timesheet", icon: <FaLock />, blurb: "Review and approve organisation timesheets.", permissionGroup: ["adminAccess.can_manage_timesheet_admin"], planFeature: "timesheet" },
+  { name: "Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", permissionGroup: ["adminAccess.can_manage_asset_management"], planFeature: "asset" },
 ];
 
 const menuByRole = {
@@ -125,6 +171,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
+  const isCoAdmin = role === "admin" && auth?.data?.user?.reporting_manager_model === "Admin";
 
   const can = usePermissionStore((state) => state.can);
   const permRole = usePermissionStore((state) => state.role);
@@ -142,9 +189,33 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const [showSupport, setShowSupport] = useState(false);
   const [showDocs,    setShowDocs]    = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [activeDutySession, setActiveDutySession] = useState(null);
+  const [checkingOutDuty, setCheckingOutDuty] = useState(false);
+  const [logoutDutyError, setLogoutDutyError] = useState("");
   const [upgradeFeatureName, setUpgradeFeatureName] = useState(null);
 
-  const menu = menuByRole[role] ?? employeeMenu;
+  // Field Operations isn't a plan upsell — it's an org-type toggle. Orgs
+  // that don't do field work should never see it, and within a field org
+  // only the admins who manage it and the employees/managers actually
+  // assigned to a field team should see it. So it's filtered out of the
+  // menu entirely here, rather than shown locked with an "Upgrade" badge
+  // the way review/timesheet/recruitment are.
+
+  //
+  // The master on/off switch lives in the Settings page (Settings nav has
+  // no fieldGate, so it stays visible even when Field Operations is off),
+  // so hiding this menu item when disabled does not cause a lockout.
+
+  const passesFieldGate = (item) => {
+    if (!item.fieldGate) return true;
+    if (!planFeatures?.features?.fieldOperations) return false;
+    if (item.fieldGate === "admin") return true;
+    if (item.fieldGate === "manager") return Boolean(planFeatures?.fieldAssignment?.isManager);
+    if (item.fieldGate === "employee") return Boolean(planFeatures?.fieldAssignment?.isMember);
+    return true;
+  };
+
+  const menu = (menuByRole[role] ?? employeeMenu).filter(passesFieldGate);
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
@@ -156,10 +227,13 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     return item.permissionGroup.some((p) => can(p));
   };
 
-  // Review / Timesheet / Recruitment are locked on the Basic plan and open
-  // on Advance/enterprise (or during the free trial). Until plan data has
-  // loaded we don't block on it — permission checks (isAllowed) already
-  // gate the item, and once planFeatures resolves this recomputes.
+  // Review / Timesheet / Recruitment / Asset Management / TorchX Voice (tickets)
+  // are locked on the Basic plan and open on Advance/enterprise (or during
+  // the free trial). The Self Service Portal and the individual Leave,
+  // Document, Reimbursement, and Payslip pages are always open, regardless
+  // of plan. Until plan data has loaded we don't block on it — permission
+  // checks (isAllowed) already gate the item, and once planFeatures
+  // resolves this recomputes.
   const isPlanLocked = (item) => {
     if (!item.planFeature) return false;
     if (!planFeatures) return false;
@@ -205,14 +279,28 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     setShowDocs(true);
   };
 
-  const openLogoutConfirm = () => {
+  const openLogoutConfirm = async () => {
     if (isPending) return;
+    setLogoutDutyError("");
+    setActiveDutySession(null);
+    // This is only a courtesy prompt. If the check cannot run, logout remains
+    // available; the server-side duty device lock remains the security bound.
+    if (role === "employee") {
+      try {
+        const result = await getMyFieldDuty();
+        if (result.session) setActiveDutySession(result.session);
+      } catch {
+        // A field-operations-disabled org or a temporary network failure must
+        // not prevent an employee from logging out.
+      }
+    }
     setShowLogoutConfirm(true);
   };
 
   const closeLogoutConfirm = () => {
     if (isPending) return;
     setShowLogoutConfirm(false);
+    setActiveDutySession(null);
   };
 
   const handleLogout = () => {
@@ -228,6 +316,22 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     else if (role === "admin")    logoutAdmin(undefined, { onSuccess });
     else if (role === "manager")  logoutManager(undefined, { onSuccess });
     else                          logoutEmployee(undefined, { onSuccess });
+  };
+
+  const checkoutThenLogout = async () => {
+    if (!activeDutySession?._id) return handleLogout();
+    setCheckingOutDuty(true);
+    setLogoutDutyError("");
+    try {
+      await checkoutFieldDuty(activeDutySession._id);
+      handleLogout();
+    } catch (error) {
+      setLogoutDutyError(
+        error?.response?.data?.message || "Could not check out your field duty.",
+      );
+    } finally {
+      setCheckingOutDuty(false);
+    }
   };
 
   return (
@@ -266,7 +370,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
       {role === "superadmin"
         ? "Super Admin"
         : role === "admin"
-        ? "Admin"
+        ? isCoAdmin ? "Co-Admin" : "Admin"
         : role === "manager"
         ? "Manager"
         : role === "employee"
@@ -395,29 +499,46 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
                 <FaSignOutAlt className="text-[#730042]" size={16} />
               </div>
-              <h3 className="text-center text-[15px] font-semibold text-[#730042]">Are you sure you want to logout?</h3>
+              <h3 className="text-center text-[15px] font-semibold text-[#730042]">
+                {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}
+              </h3>
               <p className="mt-1 text-center text-[12px] leading-relaxed text-[#993556]">
-                If you continue, your current session will be closed.
+                {activeDutySession
+                  ? "Logging out won't end it. Check out now, log out anyway, or cancel."
+                  : "If you continue, your current session will be closed."}
               </p>
             </div>
 
+            {logoutDutyError && (
+              <p className="px-6 pt-4 text-center text-[12px] text-rose-600">{logoutDutyError}</p>
+            )}
             <div className="flex gap-3 px-6 py-5">
               <button
                 type="button"
                 onClick={closeLogoutConfirm}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl border border-[#F4C0D1] py-2.5 text-[12px] font-medium text-[#730042] transition-colors hover:bg-[#FBEAF0] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
+              {activeDutySession && (
+                <button
+                  type="button"
+                  onClick={checkoutThenLogout}
+                  disabled={isPending || checkingOutDuty}
+                  className="flex-1 rounded-xl border border-[#730042] py-2.5 text-[12px] font-medium text-[#730042] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {checkingOutDuty ? "Checking out..." : "Check out now"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
-                disabled={isPending}
+                disabled={isPending || checkingOutDuty}
                 className="flex-1 rounded-xl py-2.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ background: "#730042" }}
               >
-                {isPending ? "Logging out..." : "Yes, Logout"}
+                {isPending ? "Logging out..." : activeDutySession ? "Log out anyway" : "Yes, Logout"}
               </button>
             </div>
           </div>

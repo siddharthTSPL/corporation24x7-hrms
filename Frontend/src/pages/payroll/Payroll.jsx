@@ -12,6 +12,8 @@ import {
   useGetOrgOwner,
   useListSalaryStructures,
   useSetEmployeeCTC,
+  useBulkSetEmployeeCTC,
+  useUpdateAttendanceBasis,
   useReapplyPolicy,
   useGeneratePayroll,
   useBulkGeneratePayroll,
@@ -389,6 +391,104 @@ function resolveName(directory, id, fallbackModel) {
   return `${MODEL_LABEL[fallbackModel] || fallbackModel} — ${String(id).slice(-6)}`;
 }
 
+async function readCSVFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  return new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
+}
+
+function detectCSVDelimiter(text) {
+  const counts = { ",": 0, ";": 0, "\t": 0 };
+  let quoted = false;
+  for (let index = 0; index < text.length && text[index] !== "\n" && text[index] !== "\r"; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') index += 1;
+    else if (char === '"') quoted = !quoted;
+    else if (!quoted && Object.hasOwn(counts, char)) counts[char] += 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][1] ? Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] : ",";
+}
+
+function parseCSVRows(text, delimiter = ",") {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') {
+      value += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      row.push(value.trim());
+      value = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(value.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      value = "";
+    } else {
+      value += char;
+    }
+  }
+  row.push(value.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
+}
+
+function expandEmbeddedTabRows(rows) {
+  if (!rows[0]?.[0]?.includes("\t")) return rows;
+  return rows.map((row) => {
+    const expanded = row[0].split("\t").map((cell) => cell.trim());
+    const trailingValues = row.slice(1).map((cell) => cell.trim()).filter(Boolean);
+    for (const value of trailingValues) {
+      const blankColumn = expanded.findIndex((cell, index) => index >= 4 && !cell);
+      if (blankColumn >= 0) expanded[blankColumn] = value;
+      else expanded.push(value);
+    }
+    return expanded;
+  });
+}
+
+function normalizeCTCEffectiveDate(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const parsed = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return parsed.toISOString().slice(0, 10) === trimmed ? trimmed : null;
+  }
+  const named = trimmed.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[-\s](\d{2}|\d{4})$/);
+  if (!named) return null;
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const month = months.indexOf(named[2].toLowerCase());
+  const yearValue = Number(named[3]);
+  const year = named[3].length === 2 ? (yearValue <= 49 ? 2000 + yearValue : 1900 + yearValue) : yearValue;
+  const parsed = new Date(year, month, Number(named[1]));
+  if (month < 0 || parsed.getFullYear() !== year || parsed.getMonth() !== month || parsed.getDate() !== Number(named[1])) return null;
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(Number(named[1])).padStart(2, "0")}`;
+}
+
+function downloadCTCTemplate(directory, structures) {
+  const currentByEmployee = new Map(structures.map((structure) => [`${structure.employeeModel}:${structure.employee}`, structure.ctc]));
+  const rows = [["Employee Type", "Employee ID", "Employee Name", "Current Annual CTC", "New Annual CTC", "Effective From (YYYY-MM-DD)"]];
+  for (const model of directory.visibleModels) {
+    for (const person of directory.byModel[model] || []) {
+      rows.push([model, person.empid, person.name, currentByEmployee.get(`${model}:${person._id}`) || "", "", ""]);
+    }
+  }
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" }));
+  link.download = "Salary CTC Bulk Template.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 
 function PayScheduleTab({ notify }) {
   const { data, isLoading } = useGetPaySchedule();
@@ -544,6 +644,7 @@ const STATUTORY_SUBTABS = [
   { key: "pt", label: "Professional Tax" },
   { key: "lwf", label: "Labour Welfare Fund" },
   { key: "bonus", label: "Statutory Bonus" },
+  { key: "timesheet", label: "Timesheet Overtime" },
 ];
 
 function StatutoryTab({ notify }) {
@@ -587,6 +688,7 @@ function StatutoryTab({ notify }) {
         tds: form.tds,
         lwf: form.lwf,
         statutoryBonus: form.statutoryBonus,
+        timesheetSync: form.timesheetSync,
       },
       {
         onSuccess: () => notify("Statutory components updated", "success"),
@@ -710,6 +812,28 @@ function StatutoryTab({ notify }) {
           <Field label="% of Basic" hint="8.33 – 20">
             <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 160 }} />
           </Field>
+        </div>
+      )}
+
+      {sub === "timesheet" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+            Pay overtime from <b>approved timesheets</b> automatically. Each month's payroll picks up the overtime hours logged in that month on approved timesheets and adds them to Earnings as Overtime.
+            Hourly rate = Monthly Gross ÷ (No. of Working Days × Standard hours per day). Overtime on timesheets that are not approved yet is never paid.
+            If you type an Overtime amount while generating payroll, that amount is used instead.
+          </p>
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Toggle checked={!!form.timesheetSync?.enabled} onChange={(v) => set("timesheetSync.enabled", v)} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sync approved timesheet overtime to payroll</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ maxWidth: 420 }}>
+            <Field label="Overtime rate multiplier" hint="e.g. 1.5 = time-and-a-half">
+              <TextInput type="number" step="0.1" min={0.1} max={10} value={form.timesheetSync?.overtimeMultiplier ?? 1.5} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
+            </Field>
+            <Field label="Standard hours per day" hint="Used for the hourly rate and for timesheet-basis day rules">
+              <TextInput type="number" step="0.5" min={1} max={24} value={form.timesheetSync?.standardHoursPerDay ?? 9} onChange={(e) => set("timesheetSync.standardHoursPerDay", Number(e.target.value))} />
+            </Field>
+          </div>
         </div>
       )}
 
@@ -1125,12 +1249,100 @@ function ClaimsTab({ notify }) {
 function StructuresTab({ notify, directory }) {
   const [modelFilter, setModelFilter] = useState("");
   const { data, isLoading } = useListSalaryStructures(modelFilter ? { employeeModel: modelFilter } : undefined);
+  const { data: allStructuresData, isLoading: allStructuresLoading } = useListSalaryStructures();
   const { mutate: setCTC, isPending: saving } = useSetEmployeeCTC();
+  const { mutate: bulkSetCTC, isPending: bulkSaving } = useBulkSetEmployeeCTC();
   const { mutate: reapply } = useReapplyPolicy();
+  const { mutate: changeBasis, isPending: changingBasis } = useUpdateAttendanceBasis();
 
-  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "" });
+  const [form, setForm] = useState({ employeeModel: "User", employee: "", ctc: "", effectiveFrom: "", attendanceBasis: "attendance" });
+  const [bulkPreview, setBulkPreview] = useState([]);
+  const [bulkIssues, setBulkIssues] = useState([]);
+  const [bulkFileName, setBulkFileName] = useState("");
+  const { data: formModelData } = useListSalaryStructures({ employeeModel: form.employeeModel });
 
   const people = directory.byModel[form.employeeModel] || [];
+
+  const handleBulkFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setBulkFileName(file.name);
+    setBulkPreview([]);
+    setBulkIssues([]);
+    try {
+      let csvText = await readCSVFile(file);
+      const separatorDirective = csvText.match(/^sep=(.)\r?\n/i);
+      const delimiter = separatorDirective?.[1] || detectCSVDelimiter(csvText);
+      if (separatorDirective) csvText = csvText.slice(separatorDirective[0].length);
+      const rows = expandEmbeddedTabRows(parseCSVRows(csvText, delimiter));
+      if (rows.length < 2) throw new Error("CSV has no employee rows");
+      const headers = rows[0].map((header) => header.replace(/\u0000/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""));
+      const column = (name) => headers.indexOf(name);
+      const typeColumn = column("employeetype");
+      const idColumn = column("employeeid");
+      const ctcColumn = column("newannualctc");
+      const dateColumn = headers.findIndex((header) => header === "effectivefrom" || header.startsWith("effectivefrom"));
+      if ([typeColumn, idColumn, ctcColumn].some((index) => index < 0))
+        throw new Error("Required columns: Employee Type, Employee ID, New Annual CTC");
+
+      const preview = [];
+      const issues = [];
+      const seen = new Set();
+      const allStructures = allStructuresData?.structures || [];
+      for (const [index, cells] of rows.slice(1).entries()) {
+        const newCtcValue = cells[ctcColumn] || "";
+        if (!newCtcValue.trim()) continue;
+        const line = index + 2;
+        const typeValue = (cells[typeColumn] || "").trim();
+        const employeeModel = Object.keys(MODEL_LABEL).find((model) => model.toLowerCase() === typeValue.toLowerCase() || MODEL_LABEL[model].toLowerCase() === typeValue.toLowerCase());
+        const employeeId = (cells[idColumn] || "").trim();
+        const person = employeeModel && (directory.byModel[employeeModel] || []).find((candidate) => String(candidate.empid).toLowerCase() === employeeId.toLowerCase());
+        const ctc = Number(newCtcValue.replace(/[,₹\s]/g, ""));
+        const effectiveFromValue = dateColumn >= 0 ? (cells[dateColumn] || "").trim() : "";
+        const effectiveFrom = normalizeCTCEffectiveDate(effectiveFromValue);
+        const key = `${employeeModel}:${person?._id || employeeId.toLowerCase()}`;
+        if (!employeeModel || !person) issues.push(`Row ${line}: employee type or ID was not found`);
+        else if (!Number.isFinite(ctc) || ctc <= 0) issues.push(`Row ${line}: enter a valid annual CTC greater than 0`);
+        else if (effectiveFromValue && !effectiveFrom) issues.push(`Row ${line}: invalid Effective From date`);
+        else if (seen.has(key)) issues.push(`Row ${line}: duplicate employee in CSV`);
+        else {
+          seen.add(key);
+          const current = allStructures.find((structure) => String(structure.employee) === String(person._id) && structure.employeeModel === employeeModel);
+          preview.push({
+            employee: person._id,
+            employeeModel,
+            employeeId: person.empid,
+            name: person.name,
+            currentCtc: current?.ctc || 0,
+            ctc,
+            effectiveFrom,
+          });
+        }
+      }
+      if (!preview.length && !issues.length) issues.push("Fill New Annual CTC for at least one employee");
+      setBulkPreview(preview);
+      setBulkIssues(issues);
+    } catch (error) {
+      setBulkIssues([error.message || "Could not read the CSV file"]);
+    }
+  };
+
+  const applyBulkCTC = () => {
+    if (!bulkPreview.length || bulkIssues.length) return;
+    bulkSetCTC(
+      { rows: bulkPreview.map(({ employee, employeeModel, ctc, effectiveFrom }) => ({ employee, employeeModel, ctc, effectiveFrom: effectiveFrom || undefined })) },
+      {
+        onSuccess: (res) => {
+          notify(res?.message || "Bulk salary structures saved", "success");
+          setBulkPreview([]);
+          setBulkIssues([]);
+          setBulkFileName("");
+        },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1141,12 +1353,23 @@ function StructuresTab({ notify, directory }) {
         employeeModel: form.employeeModel,
         ctc: Number(form.ctc),
         effectiveFrom: form.effectiveFrom || undefined,
+        attendanceBasis: form.attendanceBasis,
       },
       {
         onSuccess: (res) => {
           notify(res?.message || "Salary structure saved", "success");
-          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", effectiveFrom: "" });
+          setForm({ employeeModel: form.employeeModel, employee: "", ctc: "", effectiveFrom: "", attendanceBasis: "attendance" });
         },
+        onError: (err) => notify(getErrorMessage(err), "error"),
+      }
+    );
+  };
+
+  const handleBasisChange = (employeeId, attendanceBasis) => {
+    changeBasis(
+      { employee: employeeId, attendanceBasis },
+      {
+        onSuccess: (res) => notify(res?.message || "Attendance basis updated", "success"),
         onError: (err) => notify(getErrorMessage(err), "error"),
       }
     );
@@ -1166,12 +1389,16 @@ function StructuresTab({ notify, directory }) {
       <Card title="Set / Revise CTC" subtitle="Setting CTC auto-computes the monthly breakup from the current policy. Setting it again revises CTC and keeps history.">
         <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           <Field label="Employee Type">
-            <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "" }))}>
+            <Select value={form.employeeModel} onChange={(e) => setForm((p) => ({ ...p, employeeModel: e.target.value, employee: "", attendanceBasis: "attendance" }))}>
               {directory.visibleModels.map((m) => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
             </Select>
           </Field>
           <Field label="Employee">
-            <Select value={form.employee} onChange={(e) => setForm((p) => ({ ...p, employee: e.target.value }))} disabled={directory.loading}>
+            <Select value={form.employee} onChange={(e) => {
+              const id = e.target.value;
+              const existing = (formModelData?.structures || []).find((s) => String(s.employee) === String(id));
+              setForm((p) => ({ ...p, employee: id, attendanceBasis: existing?.attendanceBasis || "attendance" }));
+            }} disabled={directory.loading}>
               <option value="">{directory.loading ? "Loading…" : "Select employee"}</option>
               {people.map((p) => <option key={p._id} value={p._id}>{p.name} ({p.empid})</option>)}
             </Select>
@@ -1182,8 +1409,67 @@ function StructuresTab({ notify, directory }) {
           <Field label="Effective From" hint="Defaults to today">
             <TextInput type="date" value={form.effectiveFrom} onChange={(e) => setForm((p) => ({ ...p, effectiveFrom: e.target.value }))} />
           </Field>
+          <Field label="Payroll Attendance Basis" hint={form.attendanceBasis === "timesheet" ? "Approved timesheet hours: 85%+ = full day, 50–85% = half day, below 50% or no timesheet = absent (LOP). Approved overtime is paid too." : "Paid days come from attendance (default)"}>
+            <Select value={form.attendanceBasis} onChange={(e) => setForm((p) => ({ ...p, attendanceBasis: e.target.value }))} disabled={form.employeeModel === "SuperAdmin"}>
+              <option value="attendance">Attendance (default)</option>
+              <option value="timesheet" disabled={form.employeeModel === "SuperAdmin"}>Timesheet</option>
+            </Select>
+          </Field>
           <PrimaryButton type="submit" loading={saving} className="mb-6">Save Salary Structure</PrimaryButton>
         </form>
+      </Card>
+
+      <Card title="Bulk Set / Revise CTC" subtitle="Download the employee template, fill New Annual CTC, then upload the CSV to review all changes before applying them.">
+        <div className="flex flex-wrap items-center gap-3">
+          <GhostButton onClick={() => downloadCTCTemplate(directory, allStructuresData?.structures || [])} disabled={directory.loading || allStructuresLoading}>
+            <FaFileExcel size={12} /> Download CSV Template
+          </GhostButton>
+          <label className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold cursor-pointer" style={{ background: C.brandLight, color: C.brand, opacity: allStructuresLoading ? 0.6 : 1 }}>
+            <FaFileExcel size={12} /> Upload Completed CSV
+            <input type="file" accept=".csv,text/csv" onChange={handleBulkFile} disabled={allStructuresLoading || bulkSaving} className="hidden" />
+          </label>
+          {bulkFileName && <span style={{ fontSize: 12, color: C.muted }}>{bulkFileName}</span>}
+        </div>
+        <p style={{ marginTop: 10, fontSize: 12, color: C.muted }}>
+          Revised CTC becomes active immediately. Existing payroll records stay unchanged unless regenerated; a regenerated record uses the active CTC. Effective From is recorded on the salary structure.
+        </p>
+        <p style={{ marginTop: 4, fontSize: 12, color: C.muted }}>
+          Date format: YYYY-MM-DD (example: 2026-10-09). Excel dates like 09-Oct-26 are also accepted.
+        </p>
+        {bulkIssues.length > 0 && (
+          <div role="alert" style={{ marginTop: 12, padding: 12, borderRadius: 8, background: C.redBg, color: C.red, fontSize: 12 }}>
+            <strong>Fix these CSV rows before applying:</strong>
+            <ul className="mt-1 list-disc pl-5">{bulkIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+          </div>
+        )}
+        {bulkPreview.length > 0 && (
+          <>
+            <div style={{ marginTop: 14, fontSize: 13, color: C.text, fontWeight: 700 }}>{bulkPreview.length} employee{bulkPreview.length === 1 ? "" : "s"} ready to update</div>
+            <div className="mt-2 max-h-72 overflow-auto">
+              <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 620 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", fontSize: 11, color: C.muted, textTransform: "uppercase" }}>
+                    <th style={{ padding: "7px 9px" }}>Employee</th><th style={{ padding: "7px 9px" }}>Type</th><th style={{ padding: "7px 9px" }}>Current CTC</th><th style={{ padding: "7px 9px" }}>New CTC</th><th style={{ padding: "7px 9px" }}>Effective From</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bulkPreview.map((row) => (
+                    <tr key={`${row.employeeModel}:${row.employee}`} style={{ borderTop: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5, color: C.text }}>{row.name} ({row.employeeId})</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12, color: C.muted }}>{MODEL_LABEL[row.employeeModel]}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5 }}>{row.currentCtc ? fmtINR(row.currentCtc) : "Not set"}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12.5, fontWeight: 700 }}>{fmtINR(row.ctc)}</td>
+                      <td style={{ padding: "7px 9px", fontSize: 12, color: C.muted }}>{row.effectiveFrom || "Today"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <PrimaryButton type="button" loading={bulkSaving} disabled={bulkIssues.length > 0} onClick={applyBulkCTC} className="mt-4">
+              Apply {bulkPreview.length} CTC Update{bulkPreview.length === 1 ? "" : "s"}
+            </PrimaryButton>
+          </>
+        )}
       </Card>
 
       <Card
@@ -1211,6 +1497,7 @@ function StructuresTab({ notify, directory }) {
                   <th style={{ padding: "6px 10px" }}>Basic</th>
                   <th style={{ padding: "6px 10px" }}>HRA</th>
                   <th style={{ padding: "6px 10px" }}>Effective From</th>
+                  <th style={{ padding: "6px 10px" }}>Attendance Basis</th>
                   <th style={{ padding: "6px 10px" }}></th>
                 </tr>
               </thead>
@@ -1236,6 +1523,15 @@ function StructuresTab({ notify, directory }) {
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.basic)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 13 }}>{fmtINR(s.breakup?.hra)}</td>
                     <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>{s.effectiveFrom ? new Date(s.effectiveFrom).toLocaleDateString("en-IN") : "—"}</td>
+                    <td style={{ padding: "8px 10px", fontSize: 12.5, color: C.muted }}>
+                      <Select value={s.attendanceBasis || "attendance"} disabled={changingBasis} onChange={(e) => handleBasisChange(s.employee, e.target.value)} style={{ minWidth: 130 }}>
+                        <option value="attendance">Attendance</option>
+                        <option value="timesheet" disabled={s.employeeModel === "SuperAdmin"}>Timesheet</option>
+                      </Select>
+                      {s.attendanceBasis === "timesheet" && s.timesheetBasisFrom?.month && (
+                        <div style={{ marginTop: 2, fontSize: 10.5 }}>from {MONTH_NAMES[s.timesheetBasisFrom.month - 1]} {s.timesheetBasisFrom.year}</div>
+                      )}
+                    </td>
                     <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>
                       <GhostButton onClick={() => handleReapply(s.employee)}>Re-apply Policy</GhostButton>
                     </td>
@@ -1399,7 +1695,7 @@ setSingleResult(null);
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
             <Field label="Bonus (₹)"><TextInput type="number" min={0} value={single.bonus} onChange={(e) => setSingle((p) => ({ ...p, bonus: e.target.value }))} /></Field>
             <Field label="Incentive (₹)"><TextInput type="number" min={0} value={single.incentive} onChange={(e) => setSingle((p) => ({ ...p, incentive: e.target.value }))} /></Field>
-            <Field label="Overtime (₹)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
+            <Field label="Overtime (₹)" hint="Leave blank to use approved timesheet overtime (if sync is on)"><TextInput type="number" min={0} value={single.overtime} onChange={(e) => setSingle((p) => ({ ...p, overtime: e.target.value }))} /></Field>
             <Field label="Reimbursement (₹)"><TextInput type="number" min={0} value={single.reimbursement} onChange={(e) => setSingle((p) => ({ ...p, reimbursement: e.target.value }))} /></Field>
             <Field label="Other Earnings (₹)"><TextInput type="number" min={0} value={single.otherEarnings} onChange={(e) => setSingle((p) => ({ ...p, otherEarnings: e.target.value }))} /></Field>
             <Field label="Loan EMI (₹)"><TextInput type="number" min={0} value={single.loan} onChange={(e) => setSingle((p) => ({ ...p, loan: e.target.value }))} /></Field>
@@ -1562,7 +1858,7 @@ function getPayslipLineItems(payroll) {
 
 
 
-function downloadPayslip({ payroll, name, employeeId, department, designation, orgName }) {
+function downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
   const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
@@ -1602,6 +1898,8 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, o
     <div><span class="lbl">Employee ID: </span>${employeeId}</div>
     <div><span class="lbl">Department: </span>${departmentLabel(department)}</div>
     <div><span class="lbl">Designation: </span>${designation}</div>
+    <div><span class="lbl">Bank Name: </span>${bankName || "—"}</div>
+    <div><span class="lbl">Account Number: </span>${accountNumber || "—"}</div>
     <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
     <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
   </div>
@@ -1659,6 +1957,8 @@ function PayslipModal({ payroll, directory, onClose }) {
   const employeeId = snap.employeeId || person?.empid || "—";
   const department = snap.department || "—";
   const designation = snap.designation || "—";
+  const bankName = snap.bankName || "—";
+  const accountNumber = snap.accountNumber || "—";
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
 
@@ -1676,7 +1976,7 @@ function PayslipModal({ payroll, directory, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             {payroll.status === "paid" && (
-              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, orgName })}>
+              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
                 Download
               </GhostButton>
             )}
@@ -1689,6 +1989,8 @@ function PayslipModal({ payroll, directory, onClose }) {
           <PayslipRow label="Employee ID" value={employeeId} />
           <PayslipRow label="Department" value={departmentLabel(department)} />
           <PayslipRow label="Designation" value={designation} />
+          <PayslipRow label="Bank Name" value={bankName} />
+          <PayslipRow label="Account Number" value={accountNumber} />
           <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
         </div>
 
@@ -1817,6 +2119,8 @@ function buildPayrollExportRows(payrolls, directory) {
       employeeId: snap.employeeId || person?.empid || "—",
       department: departmentLabel(snap.department || person?.department || "—"),
       designation: snap.designation || person?.designation || "—",
+      bankName: snap.bankName || "",
+      accountNumber: snap.accountNumber || "",
       earnMap: Object.fromEntries(earnings.map((e) => [e.label, roundINR(e.amount)])),
       dedMap: Object.fromEntries(deductions.map((d) => [d.label, roundINR(d.amount)])),
       empMap: Object.fromEntries(employerContribution.map((c) => [c.label, roundINR(c.amount)])),
@@ -1830,7 +2134,7 @@ function buildPayrollExportRows(payrolls, directory) {
   const employerKeys = [...new Set(perRecord.flatMap((r) => r.employerContribution.map((c) => c.label)))];
 
   const header = [
-    "Employee", "Employee ID", "Department", "Designation", "Month", "Year", "Status",
+    "Employee", "Employee ID", "Bank Name", "Account Number", "Department", "Designation", "Month", "Year", "Status",
     ...earningKeys.map((k) => `Earning: ${k}`),
     "Gross Earnings",
     ...deductionKeys.map((k) => `Deduction: ${k}`),
@@ -1840,7 +2144,7 @@ function buildPayrollExportRows(payrolls, directory) {
   ];
 
   const rows = perRecord.map((r) => [
-    r.name, r.employeeId, r.department, r.designation,
+    r.name, r.employeeId, r.bankName, r.accountNumber, r.department, r.designation,
     MONTH_NAMES[r.p.month - 1], r.p.year, r.p.status,
     ...earningKeys.map((k) => r.earnMap[k] ?? ""),
     roundINR(r.p.earnings?.totalEarnings),
@@ -1852,7 +2156,7 @@ function buildPayrollExportRows(payrolls, directory) {
 
   const sumOf = (fn) => perRecord.reduce((s, r) => s + (Number(fn(r)) || 0), 0);
   const totalsRow = [
-    "TOTAL", "", "", "", "", "", "",
+    "TOTAL", "", "", "", "", "", "", "", "",
     ...earningKeys.map((k) => sumOf((r) => r.earnMap[k])),
     sumOf((r) => roundINR(r.p.earnings?.totalEarnings)),
     ...deductionKeys.map((k) => sumOf((r) => r.dedMap[k])),
@@ -2180,6 +2484,8 @@ function RecordsTab({ notify, directory }) {
                             employeeId: snap.employeeId || person?.empid || "—",
                             department: snap.department || "—",
                             designation: snap.designation || "—",
+                            bankName: snap.bankName || "—",
+                            accountNumber: snap.accountNumber || "—",
                             orgName: p.organisationSnapshot?.name || "",
                           });
                         }}

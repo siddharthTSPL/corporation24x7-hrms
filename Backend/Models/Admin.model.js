@@ -107,7 +107,7 @@ const adminSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["admin", "senior_admin", "official"],
+      enum: ["admin", "senior_admin", "official", "super_admin"],
       default: "admin",
     },
 
@@ -150,7 +150,7 @@ const adminSchema = new mongoose.Schema(
 
     reporting_manager_model: {
       type: String,
-      enum: ["SuperAdmin", "Manager"],
+      enum: ["SuperAdmin", "Manager", "Admin"],
       default: null,
     },
 
@@ -348,6 +348,19 @@ adminSchema.methods.resolveLeaveStatus = function ({
     ? pendingSuperAdminStatus
     : pendingManagerStatus;
 };
+
+
+// Onboarding hand-off: when a brand-new record is saved, tell the org's IT and
+// Accounts teams (if configured). See utils/Onboardingteams.utils.js.
+adminSchema.pre("save", function () {
+  this.$locals.__wasNew = this.isNew;
+});
+adminSchema.post("save", function (doc) {
+  if (doc.$locals && doc.$locals.__wasNew) {
+    doc.$locals.__wasNew = false;
+    require("../utils/Onboardingteams.utils").scheduleOnboardingTeamNotice("Admin", doc._id);
+  }
+});
 
 const AdminModel = mongoose.model("Admin", adminSchema);
 

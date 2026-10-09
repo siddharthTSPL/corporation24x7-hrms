@@ -9,7 +9,7 @@ import {
   useApproveReimbursement,
   useRejectReimbursement,
   useMarkReimbursementPaid,
-} from "../../auth/server-state/adminreimbursement/adminreimbursement.hook";
+} from "../../auth/server-state/adminreimbursement/Adminreimbursement.hook";
 
 export default function ReimbursementAdmin() {
   const myClaims = useGetMyReimbursements();

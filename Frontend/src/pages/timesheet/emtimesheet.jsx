@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
 import toast from "react-hot-toast";
 import {
   useMyAssignedJobs,
   useMyWeekLog,
-  useLogTime,
+  useLogTime, useMyDayStatus,
   useUpdateTimeLog,
   useDeleteTimeLog,
   useActiveTimer,
@@ -63,6 +64,7 @@ const STATUS_META = {
   draft:                     { label: "Draft",           color: "text-gray-500",    bg: "bg-gray-100",     dot: "bg-gray-400"    },
   pending_manager:           { label: "Pending Manager", color: "text-amber-600",   bg: "bg-amber-50",     dot: "bg-amber-500"   },
   pending_reporting_manager: { label: "Pending Review",  color: "text-amber-600",   bg: "bg-amber-50",     dot: "bg-amber-500"   },
+  pending_coadmin:           { label: "Pending Co-Admin", color: "text-purple-600", bg: "bg-purple-50",    dot: "bg-purple-500"  },
   pending_admin:             { label: "Pending Admin",   color: "text-blue-600",    bg: "bg-blue-50",      dot: "bg-blue-500"    },
   pending_superadmin:        { label: "Pending SA",      color: "text-purple-600",  bg: "bg-purple-50",    dot: "bg-purple-500"  },
   approved:                  { label: "Approved",        color: "text-emerald-600", bg: "bg-emerald-50",   dot: "bg-emerald-500" },
@@ -319,6 +321,7 @@ function JobDetailModal({ jobId, open, onClose }) {
 function TimerSection({ assignedJobs, onTimerLog }) {
   const { data: timerData, refetch: refetchTimer } = useActiveTimer({ refetchInterval: 10000 });
   const timer = timerData?.timer;
+  const { data: dayStatus } = useMyDayStatus();
   const startTimer = useStartTimer();
   const pauseTimer = usePauseTimer();
   const resumeTimer = useResumeTimer();
@@ -399,7 +402,7 @@ function TimerSection({ assignedJobs, onTimerLog }) {
 
           <div className="flex gap-2 shrink-0 flex-wrap">
             {!timer ? (
-              <Btn onClick={() => setStartModal(true)}>
+              dayStatus?.isOff ? <OffDayTag info={dayStatus} /> : <Btn onClick={() => setStartModal(true)}>
                 ▶ Start
               </Btn>
             ) : (
@@ -550,12 +553,12 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     )}
                   </div>
                 ))}
-                <button
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="w-full border border-dashed border-gray-200 rounded-lg py-2 text-[11px] font-semibold text-gray-400 hover:border-[#730042]/40 hover:text-[#730042]/70 transition-colors"
                 >
                   + Add entry
-                </button>
+                </button>)}
               </div>
             </div>
           );
@@ -633,12 +636,12 @@ function WeekGrid({ weekStart, weekDays, onAddLog, onEditLog, onDeleteLog }) {
                     </div>
                   </div>
                 ))}
-                <button
+                {isOffDay(weekDays[iso]) ? <OffDayTag info={weekDays[iso]} /> : iso <= todayISO && (<button
                   onClick={() => onAddLog(iso)}
                   className="mt-auto w-full border border-dashed border-gray-200 rounded-lg py-1 text-[10px] sm:text-[11px] text-gray-300 hover:border-[#730042]/40 hover:text-[#730042]/60 transition-colors"
                 >
                   + Add
-                </button>
+                </button>)}
               </div>
             );
           })}
@@ -689,6 +692,7 @@ export default function EmployeeTimesheet() {
   const { data: prodData } = useMyProductivitySummary(weekStart);
 
   const logTime = useLogTime();
+  const { data: logDayStatus } = useMyDayStatus(logForm.log_date || undefined);
   const updateTimeLog = useUpdateTimeLog();
   const deleteTimeLog = useDeleteTimeLog();
   const submitTS = useSubmitTimesheet();
@@ -767,7 +771,7 @@ export default function EmployeeTimesheet() {
   const canSubmit = !currentWeekSheet || ["draft", "rejected"].includes(currentWeekSheet?.status);
   const isPendingOrApproved = currentWeekSheet && !["draft", "rejected"].includes(currentWeekSheet?.status);
   const canRecall = currentWeekSheet &&
-    ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
+    ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"].includes(currentWeekSheet?.status);
 
   const openJobDetail = (jobId) => {
     setSelectedJobId(jobId);
@@ -1052,7 +1056,7 @@ export default function EmployeeTimesheet() {
               </div>
             ) : (
               timesheets.map((ts) => {
-                const isPending = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"].includes(ts.status);
+                const isPending = ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"].includes(ts.status);
                 return (
                   <div key={ts._id} className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
@@ -1114,6 +1118,7 @@ export default function EmployeeTimesheet() {
 
       <Modal open={logModal} onClose={() => setLogModal(false)} title="Log Time">
         <div className="flex flex-col gap-3.5">
+          <OffDayNotice status={logDayStatus} />
           <Select
             label="Job"
             value={logForm.job}
@@ -1128,7 +1133,7 @@ export default function EmployeeTimesheet() {
             <Input
               label="Date"
               type="date"
-              value={logForm.log_date}
+              value={logForm.log_date} max={todayISTKey()}
               onChange={(e) => setLogForm((p) => ({ ...p, log_date: e.target.value }))}
             />
             <Input
@@ -1151,7 +1156,7 @@ export default function EmployeeTimesheet() {
             <Btn variant="ghost" onClick={() => setLogModal(false)}>Cancel</Btn>
             <Btn
               onClick={handleLogTime}
-              disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending}
+              disabled={!logForm.job || !logForm.log_date || !logForm.duration_minutes || logTime.isPending || logDayStatus?.isOff}
             >
               {logTime.isPending ? "Saving…" : "Save Entry"}
             </Btn>

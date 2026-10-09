@@ -43,6 +43,7 @@ const LEAVE_TYPE_LABELS = {
   half_day_el: "Half Day - Earned Leave",
   half_day_sl: "Half Day - Sick Leave",
   lwp: "Leave Without Pay",
+  comp_off: "Compensatory Leave",
 };
 
 function leaveTypeLabel(code) {
@@ -445,7 +446,162 @@ function buildSupportAckEmail({ name, subject }) {
   });
 }
 
+// ---------------------------------------------------------------
+// Subscription expiry reminder (sent to the org's SuperAdmin)
+// ---------------------------------------------------------------
+
+const PRODUCT_LABELS = {
+  torchx_talent: "TorchX Talent (HRMS)",
+  torchx_engage: "TorchX Engage",
+  torchx_finance: "TorchX Finance",
+  torchx_inventory: "TorchX Inventory",
+  torchx_pay: "TorchX Pay",
+};
+
+function productLabel(code) {
+  return PRODUCT_LABELS[code] || code;
+}
+
+function planLabel(plan, planType) {
+  const parts = [];
+  if (plan) parts.push(plan.charAt(0).toUpperCase() + plan.slice(1));
+  if (planType) parts.push(`(${planType.charAt(0).toUpperCase() + planType.slice(1)})`);
+  return parts.join(" ");
+}
+
+// `licenses` — [{ product, plan, planType, expiresAt, daysLeft }], all
+// already filtered down to the ones due to be reminded about today.
+function buildSubscriptionExpiringEmail({ recipientName, orgName, licenses = [], portalLink }) {
+  if (licenses.length === 0) return "";
+
+  const soonest = Math.min(...licenses.map((l) => l.daysLeft));
+  const multiple = licenses.length > 1;
+
+  const rows = licenses
+    .map((l) =>
+      detailRow(
+        productLabel(l.product),
+        `Expires ${formatDate(l.expiresAt)} — ${l.daysLeft} day${l.daysLeft === 1 ? "" : "s"} left${
+          planLabel(l.plan, l.planType) ? ` · ${planLabel(l.plan, l.planType)}` : ""
+        }`
+      )
+    )
+    .join("");
+
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      This is a reminder that ${multiple ? "the following subscriptions" : "the subscription"} for
+      <strong>${escapeHtml(orgName)}</strong> ${multiple ? "are" : "is"} due to expire soon. To avoid
+      any interruption to your organisation's access, please renew before the expiry date.
+    </p>
+    <div style="margin-bottom:20px;">
+      <span style="display:inline-block;padding:6px 18px;border-radius:3px;background:${BRAND.approvedBg};color:${BRAND.approvedText};font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+        Expiring in ${soonest} day${soonest === 1 ? "" : "s"}
+      </span>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table>
+    <p style="margin:20px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      Once a subscription expires, access to the related product for your organisation's admins, managers,
+      and employees may be restricted until it is renewed. You will continue to receive this reminder once
+      a day until the subscription is renewed or it expires.
+    </p>
+    ${plainLink(portalLink, "Renew your subscription")}
+  `;
+
+  return emailShell({
+    preheader: `Your ${PRODUCT_NAME} subscription${multiple ? "s expire" : " expires"} in ${soonest} day${soonest === 1 ? "" : "s"}`,
+    headerTitle: "Subscription Expiring Soon",
+    bodyHtml: body,
+  });
+}
+
+// ---------------------------------------------------------------
+// New joiner onboarding - IT team / Accounts team handoff
+// ---------------------------------------------------------------
+
+function maskAccount(num) {
+  const v = String(num || "").replace(/\s+/g, "");
+  if (!v) return "";
+  return v.length <= 4 ? v : `${"X".repeat(Math.max(0, v.length - 4))}${v.slice(-4)}`;
+}
+
+function joinerRows(joiner = {}) {
+  return [
+    detailRow("Name", joiner.name),
+    detailRow("Employee ID", joiner.uid),
+    detailRow("Role", joiner.roleLabel),
+    detailRow("Designation", joiner.designation),
+    detailRow("Department", joiner.department),
+    detailRow("Work email", joiner.workEmail),
+    detailRow("Office location", joiner.officeLocation),
+    detailRow("Reporting to", joiner.reportingTo),
+    detailRow("Date of joining", joiner.dateOfJoining ? formatDate(joiner.dateOfJoining) : ""),
+  ].join("");
+}
+
+function checklist(items) {
+  return `<ul style="margin:0;padding-left:20px;color:${BRAND.text};font-size:14px;line-height:1.8;">${items
+    .map((i) => `<li>${escapeHtml(i)}</li>`)
+    .join("")}</ul>`;
+}
+
+function buildOnboardingItEmail({ recipientName, joiner = {}, portalLink }) {
+  const body = `
+    <p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      <strong>${escapeHtml(joiner.name)}</strong> has been onboarded${joiner.dateOfJoining ? ` and joins on <strong>${escapeHtml(formatDate(joiner.dateOfJoining))}</strong>` : ""}.
+      As a member of the IT team, please arrange the equipment and access they will need.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${joinerRows(joiner)}</table>
+    ${sectionLabel("Action required from IT")}
+    ${checklist([
+      "Prepare and assign the required assets (laptop, peripherals, accessories) and record them in Asset Management.",
+      "Confirm the work email account and any department-specific tool or system access.",
+      "Set up secure sign-in details and brief the employee on company IT policies.",
+      "Make sure everything is ready before the date of joining.",
+    ])}
+    ${plainLink(portalLink, "Open Asset Management")}
+  `;
+  return emailShell({
+    preheader: `${joiner.name || "A new team member"} has been onboarded - IT setup required`,
+    headerTitle: "New Joiner - IT Setup Required",
+    bodyHtml: body,
+  });
+}
+
+function buildOnboardingAccountsEmail({ recipientName, joiner = {}, bankDetailsAvailable = false, portalLink }) {
+  const bankRows = [
+    detailRow("Bank name", joiner.bankName),
+    detailRow("Account number", maskAccount(joiner.accountNumber)),
+  ].join("");
+  const body = `
+    <p style="margin:0 0 20px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      <strong>${escapeHtml(joiner.name)}</strong> has been onboarded${joiner.dateOfJoining ? ` with a joining date of <strong>${escapeHtml(formatDate(joiner.dateOfJoining))}</strong>` : ""}.
+      As a member of the Accounts team, please set up their payroll.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${joinerRows(joiner)}${bankRows}</table>
+    ${bankDetailsAvailable ? "" : `<p style="margin:16px 0 0;color:${BRAND.muted};font-size:13px;line-height:1.6;">Bank details have not been added yet. Please collect them before the first payroll run.</p>`}
+    ${sectionLabel("Action required from Accounts")}
+    ${checklist([
+      "Set the CTC and salary structure for the employee in Payroll.",
+      "Verify bank account details and statutory information (PF, ESI, PAN) as applicable.",
+      "Confirm the attendance basis and pay schedule that apply to this employee.",
+      "Include the employee in the upcoming payroll run.",
+    ])}
+    ${plainLink(portalLink, "Open Payroll")}
+  `;
+  return emailShell({
+    preheader: `${joiner.name || "A new team member"} has been onboarded - payroll setup required`,
+    headerTitle: "New Joiner - Payroll Setup Required",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
+  buildOnboardingItEmail,
+  buildOnboardingAccountsEmail,
   buildManagerEmail,
   buildEmployeeEmail,
   buildApprovalRequestEmail,
@@ -454,6 +610,7 @@ module.exports = {
   buildForgotPasswordOtpEmail,
   buildSupportRequestEmail,
   buildSupportAckEmail,
+  buildSubscriptionExpiringEmail,
   leaveTypeLabel,
   formatDate,
 };

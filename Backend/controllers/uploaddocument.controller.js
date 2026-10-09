@@ -10,9 +10,17 @@ const validateFile = (file) => {
   return null;
 };
 
-const uploadToImageKit = async (file) => {
+const uploadToImageKit = async (file, organisationId) => {
   const fileBase64 = file.buffer.toString("base64");
-  return imagekit.upload({ file: fileBase64, fileName: file.originalname, folder: "/documents", useUniqueFileName: true });
+  return imagekit.upload({
+    file: fileBase64,
+    fileName: file.originalname,
+    folder: "/documents",
+    useUniqueFileName: true,
+    // Tags the file with its owning org so /superadmin/storage-usage can
+    // sum real ImageKit storage per organisation via listFiles(tags).
+    tags: organisationId ? [String(organisationId)] : undefined,
+  });
 };
 
 const buildDocumentResponse = (doc) => ({
@@ -38,7 +46,7 @@ const uploadDocument = async (req, res) => {
     const fileError = validateFile(req.file);
     if (fileError) return res.status(400).json({ message: fileError });
 
-    const uploadResponse = await uploadToImageKit(req.file);
+    const uploadResponse = await uploadToImageKit(req.file, actor.organisation_id);
 
     const underManager = actorModel === "User" ? (actor.Under_manager || null) : null;
 
@@ -97,7 +105,7 @@ const editDocument = async (req, res) => {
     if (req.file) {
       const fileError = validateFile(req.file);
       if (fileError) return res.status(400).json({ message: fileError });
-      const uploadResponse = await uploadToImageKit(req.file);
+      const uploadResponse = await uploadToImageKit(req.file, actor.organisation_id);
       updateData.fileUrl = uploadResponse.url;
       updateData.fileId = uploadResponse.fileId;
       updateData.size = Math.round(uploadResponse.size / 1024);

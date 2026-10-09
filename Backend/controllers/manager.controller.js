@@ -1,4 +1,6 @@
 const managermodel = require("../Models/manager.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const usermodel = require("../Models/user.model");
 const Document = require("../Models/document.model");
 const leavemodel = require("../Models/leave.model");
@@ -11,9 +13,12 @@ const { processLeaveDeduction } = require("../automatic/calculateleave");
 const Review = require("../Models/review.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const { buildReviewFields, createReviewOrThrow, respondToReviewAsReviewee } = require("../utils/reviewWorkflow.utils");
+const imagekit = require("../utils/imagekit.utils");
 const jwt = require("jsonwebtoken");
 const managerLeaveModel = require("../Models/maleave.model");
+const { resolveCustomRouting, resolveDefaultAdminRoute } = require("../utils/approvalFlow.utils");
 const { parseISTDateOnly } = require("../utils/Istdate.utils");
+const { revokeSession } = require("../utils/singleSignIn.utils");
 const Attendance = require("../Models/attendance.model");
 const Ticket = require("../Models/ticket.model");
 const SuperAdminModel = require("../Models/superadmin.model");
@@ -89,42 +94,7 @@ const managerlogin = async (req, res, next) => {
     return next(Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 }));
   }
 
-  const trialValid = superAdmin.isTrialValid();
-  const hasTalentLicense = superAdmin.licenses?.some(
-    (license) => license.product === "torchx_talent" && license.isActive && new Date(license.expiresAt) > new Date(),
-  ) || false;
-
-  if (!trialValid && !hasTalentLicense) {
-    return next(Object.assign(
-      new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-      { statusCode: 403, code: "SERVICE_STOPPED" },
-    ));
-  }
-
-  if (manager.isFirstLogin) {
-    const resetToken = jwt.sign({ work_email: manager.work_email }, process.env.JWT_SECRET, { expiresIn: "15m" });
-    const link = `https://corporation24x7-hrms.onrender.com/manager/change-password?token=${resetToken}`;
-
-    await sendEmail({
-      to: manager.work_email,
-      subject: "Set Your Password",
-      html: `
-        <h2>Hello ${manager.f_name}</h2>
-        <p>This is your first login.</p>
-        <p>Please click the link below to set your password:</p>
-        <a href="${link}">Change Password</a>
-        <p>This link expires in 15 minutes.</p>
-      `,
-    });
-
-    return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
-  }
-
-  const token = jwt.sign(
-    { managerid: manager._id, work_email: manager.work_email, role: manager.role, organisation_id: organisationId },
-    process.env.JWT_SECRET,
-    { expiresIn: "15d" },
-  );
+  await assertOrgAccess(superAdmin, "manager");
 
   const isProduction = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
@@ -152,6 +122,11 @@ const managerlogout = async (req, res, next) => {
       return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
     // `status` = account state, checked on every request by the auth
     // middleware. Do not set it to "inactive" here — see adminlogout note.
+
+    // Single Sign-In: release this device's session slot (no-op if the
+    // feature was never active for this login, i.e. no `sid` on the token).
+    await revokeSession(req.tokenPayload?.sid);
+
     const isProduction = process.env.NODE_ENV === "production";
     res.clearCookie("token", { httpOnly: true, secure: isProduction, sameSite: isProduction ? "none" : "lax", path: "/" });
     res.status(200).json({ message: "Manager logout successful" });
@@ -370,11 +345,14 @@ const forwardedtoreportingmanager = async (req, res, next) => {
     if (!currentManager.reporting_manager)
       return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-    leave.directed_to = currentManager.reporting_manager;
+    const adminRoute = currentManager.reporting_manager_model === "Admin"
+      ? await resolveDefaultAdminRoute(currentManager.reporting_manager, req.manager.organisation_id)
+      : null;
+    const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
+
+    leave.directed_to = nextHandlerId;
     leave.directed_to_model = currentManager.reporting_manager_model;
-    leave.status = currentManager.reporting_manager_model === "Admin"
-      ? "pending_admin"
-      : "forwarded_reporting_manager";
+    leave.status = adminRoute?.status || "forwarded_reporting_manager";
 
     await leave.save();
 
@@ -383,7 +361,7 @@ const forwardedtoreportingmanager = async (req, res, next) => {
       requesterName: employeeDoc ? `${employeeDoc.f_name} ${employeeDoc.l_name}` : "An employee",
       forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
       handlerModel: currentManager.reporting_manager_model,
-      handlerId: currentManager.reporting_manager,
+      handlerId: nextHandlerId,
       leaveType: leave.leaveType,
       startDate: leave.startDate,
       endDate: leave.endDate,
@@ -429,11 +407,14 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  leave.directed_to = currentManager.reporting_manager;
+  const adminRoute = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(currentManager.reporting_manager, organisation_id)
+    : null;
+  const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
+
+  leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
-  leave.status = currentManager.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "forwarded_reporting_manager";
+  leave.status = adminRoute?.status || "forwarded_reporting_manager";
 
   await leave.save();
 
@@ -442,7 +423,7 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
     requesterName: employeeDocUpChain ? `${employeeDocUpChain.f_name} ${employeeDocUpChain.l_name}` : "An employee",
     forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
     handlerModel: currentManager.reporting_manager_model,
-    handlerId: currentManager.reporting_manager,
+    handlerId: nextHandlerId,
     leaveType: leave.leaveType,
     startDate: leave.startDate,
     endDate: leave.endDate,
@@ -456,35 +437,89 @@ const forwardEmployeeLeaveUpChain = async (req, res, next) => {
 
 const applyleavem = async (req, res, next) => {
   const { leaveType, startDate, endDate, reason } = req.body;
+
   if (!req.manager)
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
-  if (!startDate || !endDate || !leaveType)
-    return next(Object.assign(new Error("Required fields missing"), { statusCode: 400 }));
+
+  if (!startDate || !endDate || !leaveType || !reason)
+    return next(
+      Object.assign(
+        new Error("Required fields missing"),
+        { statusCode: 400 }
+      )
+    );
 
   const managerId = req.manager._id;
   const organisation_id = req.manager.organisation_id;
+
   const start = parseISTDateOnly(startDate);
   const end = parseISTDateOnly(endDate);
 
   if (end < start)
-    return next(Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error("End date cannot be before start date"),
+        { statusCode: 400 }
+      )
+    );
 
-  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const days =
+    Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-  const managerData = await managermodel.findById(managerId)
-    .select("reporting_manager reporting_manager_model").lean();
+  const requiresSupportingDocument =
+    leaveType === "sl" && days > 3;
 
-  if (!managerData.reporting_manager)
-    return next(Object.assign(new Error("You have no reporting manager assigned. Cannot apply leave."), { statusCode: 400 }));
+  if (requiresSupportingDocument && !req.file)
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days"
+        ),
+        { statusCode: 400 }
+      )
+    );
 
-  if (!["Manager", "Admin"].includes(managerData.reporting_manager_model))
-    return next(Object.assign(new Error("Invalid reporting manager configuration. Contact administrator."), { statusCode: 400 }));
+  const managerData = await managermodel
+    .findById(managerId)
+    .select("reporting_manager reporting_manager_model")
+    .lean();
+
+  const customRouting = await resolveCustomRouting({
+    organisation_id,
+    module: "leave",
+    requesterRole: "Manager",
+  });
+
+  if (!managerData.reporting_manager && !customRouting)
+    return next(
+      Object.assign(
+        new Error(
+          "You have no reporting manager assigned. Cannot apply leave."
+        ),
+        { statusCode: 400 }
+      )
+    );
+
+  if (!customRouting && !["Manager", "Admin"].includes(managerData.reporting_manager_model))
+    return next(
+      Object.assign(
+        new Error(
+          "Invalid reporting manager configuration. Contact administrator."
+        ),
+        { statusCode: 400 }
+      )
+    );
 
   const overlapping = await managerLeaveModel
     .findOne({
       manager: managerId,
       organisation_id,
-      status: { $nin: ["rejected_reporting_manager", "rejected_admin"] },
+      status: {
+        $nin: [
+          "rejected_reporting_manager",
+          "rejected_admin",
+        ],
+      },
       startDate: { $lte: end },
       endDate: { $gte: start },
     })
@@ -492,11 +527,52 @@ const applyleavem = async (req, res, next) => {
     .lean();
 
   if (overlapping)
-    return next(Object.assign(new Error("Leave already applied for these dates"), { statusCode: 400 }));
+    return next(
+      Object.assign(
+        new Error("Leave already applied for these dates"),
+        { statusCode: 400 }
+      )
+    );
 
-  const initialStatus = managerData.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "pending_reporting_manager";
+  let supportingDocument = null;
+
+  if (req.file) {
+    try {
+      const uploaded = await imagekit.upload({
+        file: req.file.buffer.toString("base64"),
+        fileName: req.file.originalname,
+        folder: "/leave-documents",
+        useUniqueFileName: true,
+      });
+
+      supportingDocument = {
+        url: uploaded.url,
+        fileId: uploaded.fileId,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeKb: Math.round(uploaded.size / 1024),
+      };
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`
+          ),
+          { statusCode: 500 }
+        )
+      );
+    }
+  }
+
+  const adminRoute = !customRouting && managerData.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(managerData.reporting_manager, organisation_id)
+    : null;
+  const initialStatus = customRouting
+    ? customRouting.status
+    : adminRoute?.status || "pending_reporting_manager";
+  const initialHandlerId = customRouting
+    ? customRouting.primary
+    : adminRoute?.handler || managerData.reporting_manager;
 
   const leave = await managerLeaveModel.create({
     organisation_id,
@@ -509,23 +585,33 @@ const applyleavem = async (req, res, next) => {
     endDate: end,
     days,
     reason,
+    supportingDocument,
     status: initialStatus,
-    directed_to: managerData.reporting_manager,
-    directed_to_model: managerData.reporting_manager_model,
+    directed_to: initialHandlerId,
+    directed_to_model: customRouting ? "Admin" : managerData.reporting_manager_model,
+    ...(customRouting && { approverPool: customRouting.pool }),
   });
 
-  notifyLeaveApplied({
-    requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
-    handlerModel: managerData.reporting_manager_model,
-    handlerId: managerData.reporting_manager,
-    leaveType,
-    startDate: start,
-    endDate: end,
-    days,
-    reason,
-  });
+  const mgrLeaveHandlers = customRouting
+    ? customRouting.pool.map((id) => ({ model: "Admin", id }))
+    : [{ model: managerData.reporting_manager_model, id: initialHandlerId }];
+  for (const h of mgrLeaveHandlers) {
+    notifyLeaveApplied({
+      requesterName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
+      handlerModel: h.model,
+      handlerId: h.id,
+      leaveType,
+      startDate: start,
+      endDate: end,
+      days,
+      reason,
+    });
+  }
 
-  res.status(200).json({ message: "Leave request submitted to your reporting manager", leave });
+  res.status(200).json({
+    message: "Leave request submitted to your reporting manager",
+    leave,
+  });
 };
 
 const editleavem = async (req, res, next) => {
@@ -539,32 +625,118 @@ const editleavem = async (req, res, next) => {
     organisation_id,
     manager: req.manager._id,
   });
+
   if (!leave)
-    return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
-  if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+    return next(
+      Object.assign(new Error("Leave not found"), { statusCode: 404 })
+    );
+
+  if (
+    !["pending_reporting_manager", "pending_admin", "pending_coadmin"].includes(
+      leave.status
+    )
+  )
     return next(
       Object.assign(
-        new Error("Cannot edit leave that is already processed or forwarded"),
-        { statusCode: 400 },
-      ),
+        new Error(
+          "Cannot edit leave that is already processed or forwarded"
+        ),
+        { statusCode: 400 }
+      )
     );
 
   const { leaveType, startDate, endDate, reason } = req.body;
+
+  let nextStart = leave.startDate;
+  let nextEnd = leave.endDate;
+  let nextLeaveType = leave.leaveType;
+
   if (startDate && endDate) {
     const start = parseISTDateOnly(startDate);
     const end = parseISTDateOnly(endDate);
+
     if (end < start)
       return next(
-        Object.assign(new Error("End date cannot be before start date"), { statusCode: 400 }),
+        Object.assign(
+          new Error("End date cannot be before start date"),
+          { statusCode: 400 }
+        )
       );
-    leave.startDate = start;
-    leave.endDate = end;
-    leave.days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    nextStart = start;
+    nextEnd = end;
   }
-  if (leaveType) leave.leaveType = leaveType;
-  if (reason) leave.reason = reason;
+
+  if (leaveType)
+    nextLeaveType = leaveType;
+
+  const nextDays =
+    Math.round((nextEnd - nextStart) / (1000 * 60 * 60 * 24)) + 1;
+
+  const requiresSupportingDocument =
+    nextLeaveType === "sl" && nextDays > 3;
+
+  if (
+    requiresSupportingDocument &&
+    !req.file &&
+    !leave.supportingDocument?.url
+  )
+    return next(
+      Object.assign(
+        new Error(
+          "Supporting document is mandatory for Sick Leave of more than 3 days"
+        ),
+        { statusCode: 400 }
+      )
+    );
+
+  if (startDate && endDate) {
+    leave.startDate = nextStart;
+    leave.endDate = nextEnd;
+    leave.days = nextDays;
+  }
+
+  if (leaveType)
+    leave.leaveType = leaveType;
+
+  if (reason)
+    leave.reason = reason;
+
+  if (req.file) {
+    try {
+      const uploaded = await imagekit.upload({
+        file: req.file.buffer.toString("base64"),
+        fileName: req.file.originalname,
+        folder: "/leave-documents",
+        useUniqueFileName: true,
+      });
+
+      leave.supportingDocument = {
+        url: uploaded.url,
+        fileId: uploaded.fileId,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeKb: Math.round(uploaded.size / 1024),
+      };
+    } catch (uploadError) {
+      return next(
+        Object.assign(
+          new Error(
+            `Supporting document upload failed: ${uploadError.message}`
+          ),
+          { statusCode: 500 }
+        )
+      );
+    }
+  }
+
   await leave.save();
-  res.status(200).json({ success: true, message: "Leave updated successfully", leave });
+
+  res.status(200).json({
+    success: true,
+    message: "Leave updated successfully",
+    leave,
+  });
 };
 
 const deleteleavem = async (req, res, next) => {
@@ -580,7 +752,7 @@ const deleteleavem = async (req, res, next) => {
   });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
- if (!["pending_reporting_manager", "pending_admin"].includes(leave.status))
+ if (!["pending_reporting_manager", "pending_admin", "pending_coadmin"].includes(leave.status))
     return next(
       Object.assign(
         new Error("Cannot delete leave that is already processed or forwarded"),
@@ -656,11 +828,14 @@ const forwardLeaveUpChain = async (req, res, next) => {
   if (!currentManager.reporting_manager)
     return next(Object.assign(new Error("You have no reporting manager assigned. Cannot forward leave."), { statusCode: 400 }));
 
-  leave.directed_to = currentManager.reporting_manager;
+  const adminRoute = currentManager.reporting_manager_model === "Admin"
+    ? await resolveDefaultAdminRoute(currentManager.reporting_manager, organisation_id)
+    : null;
+  const nextHandlerId = adminRoute?.handler || currentManager.reporting_manager;
+
+  leave.directed_to = nextHandlerId;
   leave.directed_to_model = currentManager.reporting_manager_model;
-  leave.status = currentManager.reporting_manager_model === "Admin"
-    ? "pending_admin"
-    : "pending_reporting_manager";
+  leave.status = adminRoute?.status || "pending_reporting_manager";
 
   await leave.save();
 
@@ -669,7 +844,7 @@ const forwardLeaveUpChain = async (req, res, next) => {
     requesterName: originalManagerDoc ? `${originalManagerDoc.f_name} ${originalManagerDoc.l_name}` : "A manager",
     forwardedByName: `${req.manager.f_name} ${req.manager.l_name || ""}`.trim(),
     handlerModel: currentManager.reporting_manager_model,
-    handlerId: currentManager.reporting_manager,
+    handlerId: nextHandlerId,
     leaveType: leave.leaveType,
     startDate: leave.startDate,
     endDate: leave.endDate,
@@ -1120,7 +1295,27 @@ const getmyleavehistory = async (req, res, next) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  res.status(200).json({ success: true, count: leave.length, leave });
+  const adminApproverIds = leave
+    .filter((item) => item.approvedByModel === "Admin" && item.approvedBy)
+    .map((item) => item.approvedBy);
+  const coAdminApproverIds = new Set(
+    (adminApproverIds.length
+      ? await AdminModel.find({
+          _id: { $in: adminApproverIds },
+          organisation_id: req.manager.organisation_id,
+          reporting_manager_model: "Admin",
+        }).distinct("_id")
+      : []
+    ).map(String),
+  );
+  const leaveWithApproverRole = leave.map((item) => ({
+    ...item,
+    approvedByRoleLabel: item.approvedByModel === "Admin"
+      ? coAdminApproverIds.has(String(item.approvedBy)) ? "Co-Admin" : "Admin"
+      : item.approvedByModel || null,
+  }));
+
+  res.status(200).json({ success: true, count: leave.length, leave: leaveWithApproverRole });
 };
 
 const reviewtoemployee = async (req, res, next) => {
@@ -1479,6 +1674,7 @@ const editprofilemanager = async (req, res, next) => {
         date_of_birth: manager.date_of_birth,
       },
     });
+    invalidateUserCache(manager._id);
   } catch (error) {
     return next(Object.assign(new Error(error.message), { statusCode: 500 }));
   }

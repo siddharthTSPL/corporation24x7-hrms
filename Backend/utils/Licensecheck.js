@@ -1,6 +1,5 @@
 const SuperAdminModel = require("../Models/superadmin.model");
-
-const TRIAL_USER_LIMIT = 5;
+const { TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("./planAccess");
 
 const canOnboardUser = async (organisation_id) => {
   const superAdmin = await SuperAdminModel.findById(organisation_id)
@@ -30,14 +29,11 @@ const canOnboardUser = async (organisation_id) => {
       new Date(l.expiresAt) > new Date()
   );
 
-  if (!license)
-    return {
-      allowed: false,
-      message:
-        "Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue.",
-    };
-
-  const allowedUsers = license.users || 0;
+  // No paid license after the trial ends → the org is on the free tier.
+  // This no longer blocks onboarding by itself; the free tier still allows
+  // up to FREE_USER_LIMIT users. Only the storage cap (see utils/planAccess)
+  // stops the organisation from being used further.
+  const allowedUsers = license ? license.users || 0 : FREE_USER_LIMIT;
 
   if (activeCount >= allowedUsers)
     return {

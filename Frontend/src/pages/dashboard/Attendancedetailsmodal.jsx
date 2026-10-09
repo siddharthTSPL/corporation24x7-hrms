@@ -4,9 +4,9 @@ import {
   FaUserTie, FaBuilding, FaCalendarAlt, FaClock, FaDownload,
   FaFilter, FaCheckCircle, FaUserClock, FaBan, FaLayerGroup, FaUsers,
 } from "react-icons/fa";
-import AttendanceHistoryModal from "./AttendanceHistoryModal";
-import AttendanceBulkHistoryModal from "./AttendanceBulkHistoryModal";
-import { downloadCsv } from "./exportCsv";
+import AttendanceHistoryModal from "./Attendancehistorymodal";
+import AttendanceBulkHistoryModal from "./Attendancebulkhistorymodal";
+import { downloadCsv } from "./Exportcsv";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -199,7 +199,7 @@ function TodayRow({ p }) {
         </span>
       </td>
       <td className="py-2.5 pr-3 pl-2 text-[11px] text-gray-400 whitespace-nowrap">
-        {p.source === "face" ? "🤳 Face" : p.source === "live" ? "📍 System" : "—"}
+        {p.source === "face" ? "🤳 Face" : p.source === "field" ? "📍 Field Duty" : p.source === "live" ? "📍 System" : "—"}
       </td>
     </tr>
   );
@@ -233,6 +233,12 @@ function MonthlyRow({ p, onHistoryClick }) {
       <td className="py-2.5 px-2 text-[12px] text-center text-amber-700 font-semibold">{p.halfDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-red-600 font-semibold">{p.absentDays}</td>
       <td className="py-2.5 px-2 text-[12px] text-center text-gray-500 font-semibold">{p.weekOffHolidayDays ?? 0}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center text-purple-700 font-semibold">{p.leaveDays ?? 0}</td>
+      <td className="py-2.5 px-2 text-[12px] text-center font-bold whitespace-nowrap" style={{ color: "#730042" }} title={`Present + Week Off + Paid Leave + Holiday + Half Day (0.5)${p.timesheetDays ? ` — ${p.timesheetDays} day(s) counted from timesheet logs` : ""}`}>
+        {p.paidDays ?? "—"}
+        {p.paidDays != null && p.totalDays ? <span className="text-gray-400 font-medium"> / {p.totalDays}</span> : null}
+        {p.timesheetDays ? <span className="ml-1 text-[9px] font-semibold rounded px-1 py-0.5" style={{ color: "#7C3AED", background: "#F3E8FF" }}>TS {p.timesheetDays}</span> : null}
+      </td>
       <td className="py-2.5 px-2 text-[12px] text-gray-600 font-mono whitespace-nowrap">{fmtMinutes(p.totalWorkingMinutes)}</td>
       <td className="py-2.5 px-2">
         <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: pctColor }}>
@@ -289,7 +295,14 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   );
 
   const activeQuery = tab === "today" ? todayQuery : monthlyQuery;
-  const rows = activeQuery.data?.data ?? [];
+
+  // Employment status gate — same convention as EmployeeTable.jsx /
+  // sudashboard.jsx (`working_status`: "working" | "resigned" | "fired" |
+  // "terminated", missing/undefined treated as "working"). Anyone whose
+  // working_status isn't "working" must never appear in this directory —
+  // no name, no attendance data — regardless of tab, filters, or search.
+  const isActiveEmployee = (p) => (p?.working_status || "working").toLowerCase() === "working";
+  const rows = (activeQuery.data?.data ?? []).filter(isActiveEmployee);
 
   const STATUS_FILTER_OPTIONS = [
     { value: "all", label: "All Status" },
@@ -345,12 +358,13 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
 
   const monthlyStats = useMemo(() => {
     if (tab !== "monthly") return null;
-    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalHours: "0h 0m" };
+    if (!filtered.length) return { avgPercent: 0, totalPresent: 0, totalAbsent: 0, totalPaid: 0, totalHours: "0h 0m" };
     const totalPresent = filtered.reduce((s, p) => s + (p.presentDays || 0), 0);
     const totalAbsent = filtered.reduce((s, p) => s + (p.absentDays || 0), 0);
+    const totalPaid = filtered.reduce((s, p) => s + (p.paidDays || 0), 0);
     const totalMins = filtered.reduce((s, p) => s + (p.totalWorkingMinutes || 0), 0);
     const avgPercent = Math.round(filtered.reduce((s, p) => s + (p.attendancePercent || 0), 0) / filtered.length);
-    return { avgPercent, totalPresent, totalAbsent, totalHours: fmtMinutes(totalMins) };
+    return { avgPercent, totalPresent, totalAbsent, totalPaid, totalHours: fmtMinutes(totalMins) };
   }, [filtered, tab]);
 
   const exportCsv = () => {
@@ -369,7 +383,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
           { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
           { key: "status", label: "Status", format: (r) => resolveTodayMeta(r).label },
-          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "live" ? "System" : "—") },
+          { key: "source", label: "Via", format: (r) => (r.source === "face" ? "Face" : r.source === "field" ? "Field Duty" : r.source === "live" ? "System" : "—") },
           { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
           { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
         ],
@@ -390,6 +404,9 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           { key: "halfDays", label: "Half Days" },
           { key: "absentDays", label: "Absent Days" },
           { key: "weekOffHolidayDays", label: "Weekoff/Holiday Days" },
+          { key: "leaveDays", label: "Leave Days" },
+          { key: "paidDays", label: "Total Paid Days", format: (r) => r.paidDays ?? "" },
+          { key: "totalDays", label: "Total Days", format: (r) => r.totalDays ?? "" },
           { key: "totalWorkingMinutes", label: "Total Hours", format: (r) => fmtMinutes(r.totalWorkingMinutes) },
           { key: "attendancePercent", label: "Attendance %", format: (r) => `${r.attendancePercent ?? 0}%` },
         ],
@@ -538,6 +555,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
             <StatChip icon={<FaCheckCircle size={11} />} label="Avg Attendance" value={`${monthlyStats.avgPercent}%`} color="#16A34A" bg="#DCFCE7" />
             <StatChip icon={<FaUserClock size={11} />} label="Total Present Days" value={monthlyStats.totalPresent} color="#0D9E6E" bg="#E8F7F1" />
             <StatChip icon={<FaBan size={11} />} label="Total Absent Days" value={monthlyStats.totalAbsent} color="#DC2626" bg="#FEE2E2" />
+            <StatChip icon={<FaCheckCircle size={11} />} label="Total Paid Days" value={monthlyStats.totalPaid} color="#730042" bg="#fdf2f7" />
             <StatChip icon={<FaClock size={11} />} label="Total Hours" value={monthlyStats.totalHours} color="#730042" bg="#fdf2f7" />
           </div>
         )}
@@ -574,6 +592,8 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Half Day</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Absent</th>
                       <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Weekoff/Holiday</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Leave</th>
+                      <th className="text-center text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Paid Days</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Total Hours</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Attendance %</th>
                       <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Actions</th>

@@ -75,6 +75,16 @@ export const setEmployeeCTC = async (data) => {
   return res.data;
 };
 
+export const bulkSetEmployeeCTC = async (data) => {
+  const res = await api.post("admin/payroll/structure/bulk", data);
+  return res.data;
+};
+
+export const updateAttendanceBasis = async ({ employee, attendanceBasis }) => {
+  const res = await api.patch(`admin/payroll/structure/${employee}/attendance-basis`, { attendanceBasis });
+  return res.data;
+};
+
 export const listSalaryStructures = async (params) => {
   const res = await api.get("admin/payroll/structure", { params });
   return res.data;
@@ -111,6 +121,13 @@ export const listPayrolls = async (params) => {
 
 export const getPayslip = async (params) => {
   const res = await api.get("admin/payroll/payslip", { params });
+  return res.data;
+};
+
+// Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
+// Available on every plan (Basic included) — no plan-feature gate.
+export const getMyPayslips = async () => {
+  const res = await api.get("admin/payroll/my-payslips");
   return res.data;
 };
 

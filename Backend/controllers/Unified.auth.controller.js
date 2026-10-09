@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus } = require("../utils/planAccess");
 const SuperAdminModel = require("../Models/superadmin.model");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
@@ -6,6 +7,144 @@ const Usermodel = require("../Models/user.model");
 const OtpModel = require("../Models/otpbasedlogin.model");
 const generateOTP = require("../automatic/otpgenerator");
 const { sendEmail } = require("../utils/nodemailer.utils");
+const { isSingleSignInActive, evaluateSingleSignIn } = require("../utils/singleSignIn.utils");
+const { logAudit } = require("../utils/auditLog.utils");
+const Session = require("../Models/Session.model");
+const { createBulkNotifications } = require("../utils/Notification.utils");
+
+async function notifyLoginSecurity({ organisation_id, accountId, accountModel, accountName, previousLocation, currentLocation, speedKph, elapsedMinutes }) {
+  try {
+    const [organisation, admins] = await Promise.all([
+      SuperAdminModel.findById(organisation_id).select("field_operations").lean(),
+      AdminModel.find({ organisation_id, working_status: { $nin: ["resigned", "fired", "terminated"] } }).select("_id").lean(),
+    ]);
+    if (organisation?.field_operations?.security_alerts_enabled === false) return;
+    const recipients = [
+      { recipientModel: "SuperAdmin", recipientId: organisation_id },
+      ...admins.map((admin) => ({ recipientModel: "Admin", recipientId: admin._id })),
+    ];
+    await createBulkNotifications({
+      recipients,
+      organisation_id,
+      type: "login_security",
+      priority: "high",
+      title: `Unusual login location — ${accountName || accountModel}`,
+      message: `Login changed from ${previousLocation.city || previousLocation.country || "an earlier location"} to ${currentLocation.city || currentLocation.country || "a new location"} in about ${elapsedMinutes} minutes (${speedKph} km/h).`,
+      link: "/field-operations/login-anomalies",
+      meta: { accountId, accountModel, previousLocation, currentLocation, speedKph, elapsedMinutes },
+    });
+  } catch (err) {
+    console.error("[login-anomaly] notification failed:", err?.stack || err);
+  }
+}
+
+// Shared by every login path (unifiedLogin's 4 blocks + the OTP-login flow
+// in buildLoginToken). Returns { sid } to merge into the JWT payload when
+// login should proceed, or null after it has already written the HTTP
+// response itself (challenge raised, or another session blocked it) — in
+// that case the caller must return immediately without signing a token.
+const applySingleSignInGate = async ({ organisation, role, accountId, req, res }) => {
+  if (!isSingleSignInActive(organisation)) return { sid: null, handled: false };
+
+  const result = await evaluateSingleSignIn({ organisation, role, accountId, req });
+
+  if (result.outcome === "rejected") {
+    res.status(409).json({ success: false, message: result.message, code: "ANOTHER_SESSION_ACTIVE" });
+    return { sid: null, handled: true };
+  }
+  if (result.outcome === "pending") {
+    res.status(200).json({
+      success: true,
+      challenge: true,
+      sessionId: result.sessionId,
+      expiresAt: result.expiresAt,
+      message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
+    });
+    return { sid: null, handled: true };
+  }
+  return { sid: result.sessionId, handled: false };
+};
+
+async function handleLoginGeoCheck({ accountId, accountModel, accountName, organisation_id, req }) {
+  try {
+    const { getIp, locateIp, checkImpossibleTravel } = require("../utils/loginAnomaly.utils");
+    const clientIp = getIp(req);
+    const currentGeo = locateIp(clientIp);
+    if (!currentGeo || !Number.isFinite(currentGeo.latitude) || !Number.isFinite(currentGeo.longitude))
+      return null;
+    const previousSession = await Session.findOne({
+      account_id: accountId,
+      account_model: accountModel,
+      status: "active",
+    })
+      .sort({ last_seen_at: -1 })
+      .lean();
+    if (!previousSession?.device_info?.geo?.at) return null;
+    if (
+      !Number.isFinite(previousSession.device_info.geo.latitude) ||
+      !Number.isFinite(previousSession.device_info.geo.longitude)
+    ) return null;
+    const plausibility = checkImpossibleTravel(
+      {
+        latitude: previousSession.device_info.geo.latitude,
+        longitude: previousSession.device_info.geo.longitude,
+        at: previousSession.device_info.geo.at,
+      },
+      {
+        latitude: currentGeo.latitude,
+        longitude: currentGeo.longitude,
+        at: currentGeo.at,
+      },
+    );
+    if (!plausibility.isMocked) return null;
+    await logAudit({
+      organisation_id,
+      module: "auth",
+      action: "login_impossible_travel",
+      actor: {
+        id: accountId,
+        model: accountModel,
+        name: previousSession.device_info.label || "",
+      },
+      target: {
+        id: accountId,
+        model: accountModel,
+        name: previousSession.device_info.label || "",
+      },
+      meta: {
+        previousLocation: {
+          latitude: previousSession.device_info.geo.latitude,
+          longitude: previousSession.device_info.geo.longitude,
+          city: previousSession.device_info.geo.city,
+          country: previousSession.device_info.geo.country,
+        },
+        currentLocation: {
+          latitude: currentGeo.latitude,
+          longitude: currentGeo.longitude,
+          city: currentGeo.city,
+          country: currentGeo.country,
+        },
+        speedKph: plausibility.speedKph,
+        distanceMeters: plausibility.distanceMeters,
+        ip: clientIp,
+      },
+    });
+    void notifyLoginSecurity({
+      organisation_id,
+      accountId,
+      accountModel,
+      accountName,
+      previousLocation: previousSession.device_info.geo,
+      currentLocation: currentGeo,
+      speedKph: plausibility.speedKph,
+      elapsedMinutes: Math.max(1, Math.round((currentGeo.at - new Date(previousSession.device_info.geo.at)) / 60000)),
+    });
+    return plausibility;
+  } catch (err) {
+    console.error("[login-anomaly] geo check failed:", err?.stack || err);
+    return null;
+  }
+}
 
 const cookieOpts = () => {
   const isProduction = process.env.NODE_ENV === "production";
@@ -37,13 +176,31 @@ const findAccountByEmail = async (email) => {
   return null;
 };
 
-const buildLoginToken = async (role, account) => {
+const buildLoginToken = async (role, account, req) => {
   if (account.working_status && account.working_status !== "working") {
     throw Object.assign(
       new Error(role === "employee" ? "Your account is not active. Please contact your admin." : "Your account is not active. Please contact super admin."),
       { statusCode: 403 }
     );
   }
+
+  // Same Single Sign-In gate as unifiedLogin — used here too so the
+  // forgot-password OTP route can't be used to sidestep it. Rejected →
+  // throws (caller already wraps this in try/catch and forwards to
+  // next()). Pending → returns the challenge object instead of a token
+  // string; the caller must check for that shape.
+  const gateSingleSignIn = async (organisation, accountId) => {
+    if (!isSingleSignInActive(organisation)) return null;
+    const result = await evaluateSingleSignIn({ organisation, role, accountId, req });
+    if (result.outcome === "rejected") {
+      throw Object.assign(new Error(result.message), { statusCode: 409, code: "ANOTHER_SESSION_ACTIVE" });
+    }
+    if (result.outcome === "pending") {
+      return { challenge: true, sessionId: result.sessionId, expiresAt: result.expiresAt };
+    }
+    return { sid: result.sessionId };
+  };
+
   if (role === "superadmin") {
     // Mirror unifiedLogin: logout sets status to "inactive", so the OTP
     // path must reactivate the account too, or the very next authenticated
@@ -52,8 +209,10 @@ const buildLoginToken = async (role, account) => {
       account.status = "active";
       await account.save();
     }
+    const gate = await gateSingleSignIn(account, account._id);
+    if (gate?.challenge) return gate;
     return jwt.sign(
-      { superadminid: account._id, role: account.role, email: account.email, company_domain: account.company_domain },
+      { superadminid: account._id, role: account.role, email: account.email, company_domain: account.company_domain, ...(gate?.sid ? { sid: gate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
@@ -63,21 +222,15 @@ const buildLoginToken = async (role, account) => {
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "admin");
 
     if (account.status !== "active") {
       await AdminModel.findByIdAndUpdate(account._id, { status: "active" });
     }
+    const gate = await gateSingleSignIn(orgSuperAdmin, account._id);
+    if (gate?.challenge) return gate;
     return jwt.sign(
-      { adminid: account._id, role: account.role, email: account.work_email, created_by: account.created_by, organisation_id: account.organisation_id },
+      { adminid: account._id, role: account.role, email: account.work_email, created_by: account.created_by, organisation_id: account.organisation_id, ...(gate?.sid ? { sid: gate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
@@ -96,39 +249,29 @@ const buildLoginToken = async (role, account) => {
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "manager");
 
     await Managermodel.findByIdAndUpdate(account._id, { status: "active", organisation_id: organisationId });
 
+    const gate = await gateSingleSignIn(orgSuperAdmin, account._id);
+    if (gate?.challenge) return gate;
     return jwt.sign(
-      { managerid: account._id, work_email: account.work_email, role: account.role, organisation_id: organisationId },
+      { managerid: account._id, work_email: account.work_email, role: account.role, organisation_id: organisationId, ...(gate?.sid ? { sid: gate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
   }
   // employee
+  let employeeGate = null;
   {
     const orgSuperAdmin = await SuperAdminModel.findById(account.organisation_id);
     if (!orgSuperAdmin)
       throw Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 });
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      throw Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      );
+    await assertOrgAccess(orgSuperAdmin, "employee");
+
+    employeeGate = await gateSingleSignIn(orgSuperAdmin, account._id);
+    if (employeeGate?.challenge) return employeeGate;
   }
   Usermodel.findByIdAndUpdate(account._id, { status: "active", last_login: new Date() }).exec();
   return jwt.sign(
@@ -139,6 +282,7 @@ const buildLoginToken = async (role, account) => {
       department: account.department ?? null,
       designation: account.designation ?? null,
       Under_manager: account.Under_manager ?? null,
+      ...(employeeGate?.sid ? { sid: employeeGate.sid } : {}),
     },
     process.env.JWT_SECRET,
     { expiresIn: "15d" }
@@ -167,21 +311,17 @@ const unifiedLogin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    const trialValid = superAdmin.isTrialValid();
-    const hasTalentLicense = superAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Your trial has expired. Please upgrade your plan at torchxsuite.com to continue."),
-        { statusCode: 403, code: "PLAN_EXPIRED" }
-      ));
+    await assertOrgAccess(superAdmin, "superadmin");
 
     // if (superAdmin.isFirstLogin)
     //   return next(Object.assign(new Error("First login detected. Check your email to set password."), { statusCode: 403 }));
 
+    void handleLoginGeoCheck({ accountId: superAdmin._id, accountModel: "SuperAdmin", accountName: superAdmin.name || superAdmin.email, organisation_id: superAdmin._id, req });
+    const ssoGate = await applySingleSignInGate({ organisation: superAdmin, role: "superadmin", accountId: superAdmin._id, req, res });
+    if (ssoGate.handled) return;
+
     const token = jwt.sign(
-      { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email, company_domain: superAdmin.company_domain },
+      { superadminid: superAdmin._id, role: superAdmin.role, email: superAdmin.email, company_domain: superAdmin.company_domain, ...(ssoGate.sid ? { sid: ssoGate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
@@ -214,18 +354,14 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "admin");
+
+    void handleLoginGeoCheck({ accountId: admin._id, accountModel: "Admin", accountName: `${admin.f_name || ""} ${admin.l_name || ""}`.trim() || admin.work_email, organisation_id: admin.organisation_id, req });
+    const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "admin", accountId: admin._id, req, res });
+    if (ssoGate.handled) return;
 
     const token = jwt.sign(
-      { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id },
+      { adminid: admin._id, role: admin.role, email: admin.work_email, created_by: admin.created_by, organisation_id: admin.organisation_id, ...(ssoGate.sid ? { sid: ssoGate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
@@ -263,18 +399,14 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact administrator."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "manager");
+
+    void handleLoginGeoCheck({ accountId: manager._id, accountModel: "Manager", accountName: `${manager.f_name || ""} ${manager.l_name || ""}`.trim() || manager.work_email, organisation_id: organisationId, req });
+    const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "manager", accountId: manager._id, req, res });
+    if (ssoGate.handled) return;
 
     const token = jwt.sign(
-      { managerid: manager._id, work_email: manager.work_email, role: manager.role, organisation_id: organisationId },
+      { managerid: manager._id, work_email: manager.work_email, role: manager.role, organisation_id: organisationId, ...(ssoGate.sid ? { sid: ssoGate.sid } : {}) },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
     );
@@ -301,15 +433,11 @@ const unifiedLogin = async (req, res, next) => {
     if (!orgSuperAdmin)
       return next(Object.assign(new Error("Organisation not found. Please contact support."), { statusCode: 404 }));
 
-    const trialValid = orgSuperAdmin.isTrialValid();
-    const hasTalentLicense = orgSuperAdmin.licenses?.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
-    );
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance."),
-        { statusCode: 403, code: "SERVICE_STOPPED" }
-      ));
+    await assertOrgAccess(orgSuperAdmin, "employee");
+
+    void handleLoginGeoCheck({ accountId: user._id, accountModel: "User", accountName: `${user.f_name || ""} ${user.l_name || ""}`.trim() || user.work_email, organisation_id: user.organisation_id, req });
+    const ssoGate = await applySingleSignInGate({ organisation: orgSuperAdmin, role: "employee", accountId: user._id, req, res });
+    if (ssoGate.handled) return;
 
     const token = jwt.sign(
       {
@@ -319,6 +447,7 @@ const unifiedLogin = async (req, res, next) => {
         department: user.department ?? null,
         designation: user.designation ?? null,
         Under_manager: user.Under_manager ?? null,
+        ...(ssoGate.sid ? { sid: ssoGate.sid } : {}),
       },
       process.env.JWT_SECRET,
       { expiresIn: "15d" }
@@ -434,9 +563,25 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
 
   let token;
   try {
-    token = await buildLoginToken(accountType, account);
+    token = await buildLoginToken(accountType, account, req);
   } catch (err) {
     return next(err);
+  }
+
+  await OtpModel.deleteOne({ email: normalizedEmail });
+
+  // Single Sign-In in approval mode: buildLoginToken returns a challenge
+  // object instead of a token string when another device already holds the
+  // active session. No cookies get set yet — the client polls/waits, same
+  // as the password-login path.
+  if (token && typeof token === "object" && token.challenge) {
+    return res.status(200).json({
+      success: true,
+      challenge: true,
+      sessionId: token.sessionId,
+      expiresAt: token.expiresAt,
+      message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
+    });
   }
 
   // Short-lived token that authorizes setting a new password, independent of
@@ -448,7 +593,6 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
     { expiresIn: "15m" }
   );
 
-  await OtpModel.deleteOne({ email: normalizedEmail });
   res.cookie("token", token, cookieOpts());
   res.cookie("resetToken", resetToken, {
     httpOnly: true,

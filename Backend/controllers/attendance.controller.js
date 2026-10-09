@@ -1,8 +1,14 @@
 const Attendance = require("../Models/attendance.model");
 const AdminModel = require("../Models/Admin.model");
 const Shift = require("../Models/shift.model");
+const SuperAdmin = require("../Models/superadmin.model");
+
+const FieldTeam = require("../Models/fieldTeam.model");
+const FieldAssignment = require("../Models/fieldAssignment.model");
+
 const { calculateStatus, updateSummary } = require("../automatic/monthattendanceupdate");
 const { resolveEmployeeShift, evaluateCheckinWindow, evaluateCheckoutWindow, getShiftThresholds, getForceCheckoutInstant, calculateFaceStatus } = require("../utils/shift.utils");
+const { computeLateStanding, applyLatePenaltyToStatus, refreshLateStanding, lateForgiveMinutes } = require("../utils/Laterule.utils");
 const { isHoliday, isWeekOff, startOfDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
 const { getISTDateParts, istDateFromYMD, toISTKey } = require("../utils/Istdate.utils");
 
@@ -44,6 +50,24 @@ const resolveOrganisationId = async (user) => {
   return null;
 };
 
+
+// Spec §10 — a field employee's presence is recorded through Field Duty, not
+// normal attendance. If this person is on an active Field Team or has an
+// active individual assignment, block the normal check-in channel at the
+// backend so the two systems can never create conflicting attendance rows for
+// the same employee/day. (The face kiosk already does an equivalent guard in
+// faceattendance.controller.js; this extends the same rule to the manual/system
+// channel and also covers individually-assigned field workers.) Non-field
+// employees and non-employee roles are unaffected.
+const assertNotFieldEmployee = async (organisation_id, userId) => {
+  if (!organisation_id || !userId) return true;
+  const [onTeam, onIndividual] = await Promise.all([
+    FieldTeam.exists({ organisation_id, members: userId, active: true }),
+    FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+  ]);
+  return !(onTeam || onIndividual);
+};
+
 const displayMinutes = (mins) => Math.round(mins || 0);
 
 // A channel's last-known status stays "valid" for this long after its own
@@ -81,6 +105,20 @@ const checkin = async (req, res) => {
     const user = req.user;
     const userId = getUserId(user);
     const organisation_id = await resolveOrganisationId(user);
+
+
+    // Field employees record presence via Field Duty, not normal attendance.
+    const isAllowedAttendance = await assertNotFieldEmployee(
+      organisation_id,
+      userId,
+    );
+    if (!isAllowedAttendance)
+      return res.status(409).json({
+        message:
+          "This employee is assigned to field work. Open the Field Duty app to record presence — normal attendance is disabled for field employees.",
+        reason: "field_work_assigned",
+      });
+
 
     if (!latitude || !longitude)
       return res.status(400).json({ message: "Location required" });
@@ -139,6 +177,24 @@ const checkin = async (req, res) => {
 
     const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id });
 
+    // Late rule: which late check-in of the month is this, and does it cross
+    // the org's free limit? (Stays false/0 when the rule is off.)
+    const { lateCountInMonth, latePenalty, rule: lateRule } = await computeLateStanding({
+      organisation_id,
+      employee: userId,
+      role: normalizeRole(user.role),
+      date: today,
+      isLate,
+      lateMinutes,
+    });
+    const lateNote = !isLate || !lateRule?.enabled
+      ? ""
+      : latePenalty
+        ? (lateCountInMonth
+            ? ` This is late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}), so today will be counted as a Half Day.`
+            : ` You are more than 1 hour late, so today will be counted as a Half Day.`)
+        : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
+
     if (attendance) {
       if (attendance.checkOut)
         return res.status(400).json({ message: "You have already completed your attendance for today.", alreadyDone: true });
@@ -152,11 +208,14 @@ const checkin = async (req, res) => {
         attendance.onModel = getOnModel(user.role);
         attendance.shift = shift._id;
         attendance.isLate = isLate;
+        attendance.lateMinutes = lateMinutes;
+        attendance.lateCountInMonth = lateCountInMonth;
+        attendance.latePenalty = latePenalty;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
         attendance.lastUpdated = Date.now();
         await attendance.save();
-        return res.json({ message: "Check-in successful", attendance, isLate });
+        return res.json({ message: `Check-in successful${lateNote}`, attendance, isLate, lateCountInMonth, latePenalty });
       }
       // One channel per day: whichever system checked you in owns the
       // whole day, including checkout. The other channel must not act on
@@ -188,6 +247,9 @@ const checkin = async (req, res) => {
         selfie,
         shift: shift._id,
         isLate,
+        lateMinutes,
+        lateCountInMonth,
+        latePenalty,
         activeMinutes: 0,
         idleMinutes: 0,
         lastUpdated: Date.now(),
@@ -205,9 +267,9 @@ const checkin = async (req, res) => {
     }
 
     const message = isLate
-      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.`
+      ? `You are a bit late (by ${Math.round(lateMinutes)} min), but welcome! Check-in successful.${lateNote}`
       : "Check-in successful";
-    res.json({ message, attendance: newAttendance, isLate, lateMinutes });
+    res.json({ message, attendance: newAttendance, isLate, lateMinutes, lateCountInMonth, latePenalty });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -429,6 +491,11 @@ const checkout = async (req, res) => {
         message: "You checked in via Face Attendance. Please use Face Attendance to check out too.",
         reason: "checked_in_by_face",
       });
+    if (attendance.source === "field")
+      return res.status(400).json({
+        message: "You checked in through Field Duty. Please check out from the Field Duty page too.",
+        reason: "checked_in_by_field_duty",
+      });
     if (attendance.checkOut)
       return res.status(400).json({ message: "Already checked out" });
 
@@ -451,6 +518,10 @@ const checkout = async (req, res) => {
       });
     }
 
+    // Already counted as Half Day by autoCheckoutAll() while auto check-out was
+    // OFF - don't add it to AttendanceSummary a second time on a late checkout.
+    const alreadyCountedAsMissed = attendance.checkoutRemark === "missed_checkout";
+
     attendance.checkOut = now;
     const elapsedSessionMinutes = attendance.checkIn
       ? (now.getTime() - new Date(attendance.checkIn).getTime()) / 60000
@@ -458,19 +529,26 @@ const checkout = async (req, res) => {
     // checkout() only ever runs for source "manual" (agent/face are blocked
     // above), so this always judges by real, measured activeMinutes - no
     // duration fallback. See resolveSessionStatus for why.
+    // Fresh monthly late count (not the check-in stamp). A FREE late day
+    // (late #1..#N of the month) gets its late time added back, so being late
+    // never turns a full day into a half day - only the (N+1)th late does.
+    const lateStanding = await refreshLateStanding(attendance);
+    const forgive = lateForgiveMinutes(attendance, shiftDoc, lateStanding);
     const status = resolveSessionStatus({
       source: attendance.source,
-      activeMinutes: attendance.activeMinutes,
-      elapsedSessionMinutes,
+      activeMinutes: (attendance.activeMinutes || 0) + forgive,
+      elapsedSessionMinutes: elapsedSessionMinutes + forgive,
       thresholds,
       shift: shiftDoc,
     });
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
-    attendance.status = status;
+    // Keep the Half Day already counted for a missed check-out so the record
+    // and AttendanceSummary (incremental + nightly rebuild) stay consistent.
+    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, status);
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
-    await updateSummary(attendance);
+    if (!alreadyCountedAsMissed) await updateSummary(attendance);
 
     const message =
       remark === "auto_overtime"
@@ -479,7 +557,7 @@ const checkout = async (req, res) => {
 
     res.json({
       message,
-      status,
+      status: attendance.status,
       checkoutRemark: remark,
       overtimeMinutes: attendance.overtimeMinutes,
       activeMinutes: displayMinutes(attendance.activeMinutes),
@@ -498,10 +576,21 @@ const getToday = async (req, res) => {
 
     const today = startOfDay(new Date()); // IST-based day boundary (see automatic/weekoffcalendar.js)
 
+    const [onFieldTeam, individualFieldAssignment] = user.role === "employee"
+      ? await Promise.all([
+          FieldTeam.exists({ organisation_id, members: userId, active: true }),
+          FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+        ])
+      : [null, null];
     const attendance = await Attendance.findOne({ employee: userId, role: normalizeRole(user.role), date: today, organisation_id }).lean();
+    const fieldDutyOnly = Boolean(
+      onFieldTeam ||
+      individualFieldAssignment ||
+      (attendance?.source === "field" && !attendance?.checkOut),
+    );
 
     if (!attendance)
-      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false });
+      return res.json({ attendance: null, isCheckedIn: false, isCheckedOut: false, fieldDutyOnly });
 
     res.json({
       attendance: {
@@ -511,6 +600,7 @@ const getToday = async (req, res) => {
       },
       isCheckedIn: !attendance.checkOut && !!attendance.checkIn && attendance.source !== "agent",
       isCheckedOut: !!attendance.checkOut,
+      fieldDutyOnly,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -533,9 +623,19 @@ const autoCheckoutAll = async () => {
       source: { $in: ["manual", "face"] },
       checkIn: { $exists: true },
       checkOut: { $exists: false },
-    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn").lean();
+      // Already handled once while the org had auto check-out OFF.
+      checkoutRemark: { $ne: "missed_checkout" },
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn isLate lateMinutes latePenalty").lean();
 
     if (!openSessions.length) return;
+
+    const orgIds = [...new Set(openSessions.map((s) => String(s.organisation_id)))];
+    const orgSettings = await SuperAdmin.find({ _id: { $in: orgIds } })
+      .select("attendanceSettings")
+      .lean();
+    const autoCheckoutByOrg = new Map(
+      orgSettings.map((o) => [String(o._id), o.attendanceSettings?.autoCheckoutEnabled !== false])
+    );
 
     const shiftCache = new Map();
     const getShiftFor = async (session) => {
@@ -567,13 +667,15 @@ const autoCheckoutAll = async () => {
       const elapsedSessionMinutes = a.checkIn
         ? (forceCheckoutAt.getTime() - new Date(a.checkIn).getTime()) / 60000
         : 0;
-      const status = resolveSessionStatus({
+      const lateStanding = await refreshLateStanding(a); // fresh monthly late count (see checkout())
+      const forgive = lateForgiveMinutes(a, shift, lateStanding);
+      const status = applyLatePenaltyToStatus(a, resolveSessionStatus({
         source: a.source,
-        activeMinutes: a.activeMinutes,
-        elapsedSessionMinutes,
+        activeMinutes: (a.activeMinutes || 0) + forgive,
+        elapsedSessionMinutes: elapsedSessionMinutes + forgive,
         thresholds,
         shift,
-      });
+      }));
       const checkoutWindow = evaluateCheckoutWindow(shift, forceCheckoutAt, a.checkIn);
 
       // scanFace() stores durationMinutes into activeMinutes for a manual
@@ -585,6 +687,28 @@ const autoCheckoutAll = async () => {
       const activeMinutesUpdate =
         a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
 
+      if (autoCheckoutByOrg.get(String(a.organisation_id)) === false) {
+        // Auto check-out is OFF for this org: do NOT write a checkOut time.
+        // The member forgot to check out, so the day is just marked Half Day
+        // + "missed_checkout" and the session stays without a checkOut.
+        ops.push({
+          updateOne: {
+            filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
+            update: {
+              $set: {
+                status: "half_day",
+                checkoutRemark: "missed_checkout",
+                overtimeMinutes: 0,
+                autoCheckedOut: false,
+                ...activeMinutesUpdate,
+              },
+            },
+          },
+        });
+        summaryPayloads.push({ ...a, status: "half_day" });
+        continue;
+      }
+
       ops.push({
         updateOne: {
           filter: { _id: a._id, organisation_id: a.organisation_id, checkOut: { $exists: false } },
@@ -592,6 +716,8 @@ const autoCheckoutAll = async () => {
             $set: {
               checkOut: forceCheckoutAt,
               status,
+              lateCountInMonth: a.lateCountInMonth || 0,
+              latePenalty: !!a.latePenalty,
               checkoutRemark: "auto_overtime",
               overtimeMinutes: checkoutWindow.overtimeMinutes ?? 0,
               autoCheckedOut: true,
@@ -707,10 +833,22 @@ const getCalendarMeta = async (req, res) => {
       date: today0,
       organisation_id,
     }).select("source checkOut checkIn").lean();
+    const [onFieldTeam, individualFieldAssignment] = user.role === "employee"
+      ? await Promise.all([
+          FieldTeam.exists({ organisation_id, members: userId, active: true }),
+          FieldAssignment.exists({ organisation_id, employee: userId, active: true }),
+        ])
+      : [null, null];
+    const fieldDutyOnly = Boolean(
+      onFieldTeam ||
+      individualFieldAssignment ||
+      (todayAttendance?.source === "field" && !todayAttendance?.checkOut),
+    );
     const checkedInByFace = todayAttendance?.source === "face" && !todayAttendance?.checkOut;
 
     let disabledReason = null;
-    if (todayHoliday.isHoliday) disabledReason = "holiday";
+    if (fieldDutyOnly) disabledReason = "field_duty_only";
+    else if (todayHoliday.isHoliday) disabledReason = "holiday";
     else if (todayWeekOff.isOff) disabledReason = "weekoff";
     else if (checkedInByFace) disabledReason = "checked_in_by_face";
     else if (!withinShiftWindow || checkinTooLate) disabledReason = "outside_shift";
@@ -734,7 +872,8 @@ const getCalendarMeta = async (req, res) => {
         },
         withinShiftWindow,
         isVeryLate: checkinTooLate,
-        canCheckIn: !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
+        fieldDutyOnly,
+        canCheckIn: !fieldDutyOnly && !todayHoliday.isHoliday && !todayWeekOff.isOff && !checkedInByFace && withinShiftWindow && !checkinTooLate,
         disabledReason,
         checkedInByFace,
         faceCheckInTime: checkedInByFace ? todayAttendance.checkIn : null,

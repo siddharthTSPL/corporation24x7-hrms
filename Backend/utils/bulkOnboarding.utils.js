@@ -12,6 +12,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const { sendEmail } = require("./nodemailer.utils");
 const { incrementActiveUserCount } = require("./Licensecheck");
+const { TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("./planAccess");
 const { assignDefaultPermissions } = require("./onboardingDefaults.utils");
 
 const LEGACY_DEPARTMENT_CODES = ["OPR", "BPO", "ENG", "HR", "MGMT"];
@@ -291,12 +292,14 @@ const validateBulkRows = async (rows, organisation_id, type) => {
     const trialActive = superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
     let remainingSeats = null;
     if (trialActive) {
-      remainingSeats = 5 - activeCount;
+      remainingSeats = TRIAL_USER_LIMIT - activeCount;
     } else {
       const license = (superAdmin.licenses || []).find(
         (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date()
       );
-      remainingSeats = license ? (license.users || 0) - activeCount : 0;
+      // No paid license after trial ends → free tier, still allows up to
+      // FREE_USER_LIMIT seats (storage, not seats, is what stops the org).
+      remainingSeats = license ? (license.users || 0) - activeCount : FREE_USER_LIMIT - activeCount;
     }
     if (remainingSeats < rows.length) {
       errors.push({

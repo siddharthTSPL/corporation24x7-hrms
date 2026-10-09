@@ -1,12 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  enrollEmployeeFace,
-  listEnrolledFaces,
+  getEnrolledFaces,
+  enrollFace,
   removeEnrolledFace,
-  kioskLogin,
-  kioskLogout,
-  kioskMe,
   scanFace,
+  loginKiosk,
+  logoutKiosk,
+  getKioskMe,
 } from "../../api/faceattendance/faceattendance.api";
 
 // -------------------------
@@ -24,7 +24,10 @@ export const FACE_KEYS = {
 export const useEnrolledFaces = () => {
   return useQuery({
     queryKey: FACE_KEYS.enrolled,
-    queryFn: listEnrolledFaces,
+    queryFn: getEnrolledFaces,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -32,7 +35,7 @@ export const useEnrollFace = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: enrollEmployeeFace,
+    mutationFn: enrollFace,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: FACE_KEYS.enrolled,
@@ -60,7 +63,7 @@ export const useRemoveFace = () => {
 
 export const useKioskLogin = () => {
   return useMutation({
-    mutationFn: kioskLogin,
+    mutationFn: loginKiosk,
   });
 };
 
@@ -68,7 +71,7 @@ export const useKioskLogout = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: kioskLogout,
+    mutationFn: logoutKiosk,
     onSuccess: () => {
       queryClient.removeQueries({
         queryKey: FACE_KEYS.kioskMe,
@@ -80,9 +83,10 @@ export const useKioskLogout = () => {
 export const useKioskMe = () => {
   return useQuery({
     queryKey: FACE_KEYS.kioskMe,
-    queryFn: kioskMe,
-    retry: false,
-    enabled: false, // fetch manually using queryClient.fetchQuery()
+    queryFn: getKioskMe,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 

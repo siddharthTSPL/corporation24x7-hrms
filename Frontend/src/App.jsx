@@ -3,10 +3,18 @@ import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
+import Guide from './components/Guide';
+
+const AboutPage = lazy(() => import("./pages/AboutPage"));
+const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
+const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const BlogPage = lazy(() => import("./pages/BlogPage"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
-const Signup = lazy(() => import("./pages/auth/Signup"));
+const Signup = lazy(() => import("./pages/auth/signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
+const TalentPricingCalculator = lazy(() => import("./components/marketing/TalentPricingCalculator"));
+const FieldOperations = lazy(() => import("./pages/field-operations/FieldOperations"));
 
 const ComingSoon = lazy(() => import("./components/ComingSoon"));
 
@@ -48,6 +56,7 @@ const Organisationma = lazy(() => import("./pages/organisation/organisationma"))
 
 const Reviewad = lazy(() => import("./pages/review/reviewad"));
 const Reviewma = lazy(() => import("./pages/review/reviewma"));
+const Reviewem = lazy(() => import("./pages/review/MyReviews"));
 
 const Attendancepage = lazy(() => import("./pages/attendance/attendancepage"));
 
@@ -64,6 +73,7 @@ const EmployeeComplaints = lazy(() => import("./pages/ticketpage/emticket"));
 const ManagerComplaints = lazy(() => import("./pages/ticketpage/maticket"));
 const Managerrecruitment = lazy(() => import("./pages/recruitment/recruitmentma"));
 const Adminrecruitment = lazy(() => import("./pages/recruitment/recruitmentad"));
+const OfferResponse = lazy(() => import("./pages/recruitment/OfferResponse"));
 const Managerdocument = lazy(() => import("./pages/document/managerdocument"));
 const Admindocument = lazy(() => import("./pages/document/admindocument"));
 const Adminteamdocument = lazy(() => import("./pages/document/adminteamdocument"));
@@ -79,6 +89,7 @@ const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/Reimburse
 const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
 const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
 const ReimbursementSuperadmin = lazy(() => import("./pages/reimbursement/ReimbursementSuperadmin"));
+const Overtime = lazy(() => import("./pages/overtime/Overtime"));
 
 // NOTE: renamed to PascalCase — lowercase-first identifiers are
 // interpreted by JSX as native DOM tags (e.g. <adminmanagement />
@@ -88,6 +99,10 @@ const SuperAdminManagement = lazy(() => import("./pages/torchx-management/supera
 
 const HelpCenter = lazy(() => import("./components/help/Helpcenter"));
 const NotificationsPage = lazy(() => import("./pages/notifications/NotificationsPage"));
+const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
+const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
+const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
+const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -171,6 +186,16 @@ function App() {
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/platform-features" element={<PlatformFeaturesPage />} />
+          <Route path="/documentation" element={<DocumentationPage />} />
+          {/* Public — same as Documentation. Moved out of the protected
+              admin/manager/employee block below so visitors who click
+              "Guide" in the footer (logged in or not) land here instead
+              of being redirected to /login. */}
+          <Route path="/guide" element={<Guide />} />
+          <Route path="/blog" element={<BlogPage />} /> 
+          <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/coming-soon" element={<ComingSoon />} /> 
@@ -181,6 +206,7 @@ function App() {
               land here; it creates one on THIS browser via the link's
               short-lived token. */}
           <Route path="/companion-login" element={<CompanionLogin />} />
+          <Route path="/offer-response/:token" element={<OfferResponse />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
               It authenticates itself with its own long-lived kiosk token,
@@ -211,49 +237,51 @@ function App() {
             }
           >
             <Route path="/dashboard"                element={<Dashboard />} />
-            <Route path="/employee-dashboard"       element={<EmployeeDashboard />} />
+            <Route path="/training-admin" element={<ProtectedRoute allowedRoles={["admin"]}><TrainingPage /></ProtectedRoute>} />
+            <Route path="/training" element={<ProtectedRoute permission="navigation.can_view_training"><TrainingPage /></ProtectedRoute>} />
+            <Route path="/employee-dashboard"       element={<ProtectedRoute permission="navigation.can_view_dashboard"><EmployeeDashboard /></ProtectedRoute>} />
             <Route path="/manager-dashboard"        element={<Managerdashboard />} />
-            <Route path="/employee"                 element={<EmployeeTable />} />
-            <Route path="/leave-manager"            element={<LeaveTablema />} />
-            <Route path="/leave-employee"           element={<LeaveTableem />} />
-            <Route path="/leave-admin"              element={<LeaveTablead />} />
+            <Route path="/employee"                 element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_onboarding"><EmployeeTable /></ProtectedRoute>} />
+            <Route path="/leave-manager"            element={<ProtectedRoute><LeaveTablema /></ProtectedRoute>} />
+            <Route path="/leave-employee"           element={<ProtectedRoute permission="leave.can_apply_leave"><LeaveTableem /></ProtectedRoute>} />
+            <Route path="/leave-admin"              element={<ProtectedRoute><LeaveTablead /></ProtectedRoute>} />
             <Route path="/leave"                    element={<LeaveTable />} />
             <Route path="/file"                     element={<File />} />
-            <Route path="/file-employee"            element={<Fileem />} />
-            <Route path="/file-manager"             element={<Filema />} />
+            <Route path="/file-employee"            element={<ProtectedRoute><Fileem /></ProtectedRoute>} />
+            <Route path="/file-manager"             element={<ProtectedRoute><Filema /></ProtectedRoute>} />
             <Route path="/settings"                 element={<Set />} />
-            <Route path="/settings-employee"        element={<Setem />} />
-            <Route path="/settings-manager"         element={<Setma />} />
+            <Route path="/settings-employee"        element={<ProtectedRoute permission="navigation.can_view_settings"><Setem /></ProtectedRoute>} />
+            <Route path="/settings-manager"         element={<ProtectedRoute permission="navigation.can_view_settings"><Setma /></ProtectedRoute>} />
             <Route path="/organisation"             element={<Organisation />} />
-            <Route path="/organisation-employee"    element={<Organisationem />} />
-            <Route path="/organisation-manager"     element={<Organisationma />} />
+            <Route path="/organisation-employee"    element={<ProtectedRoute permission="navigation.can_view_organisation"><Organisationem /></ProtectedRoute>} />
+            <Route path="/organisation-manager"     element={<ProtectedRoute permission="navigation.can_view_organisation"><Organisationma /></ProtectedRoute>} />
             <Route path="/review-admin"             element={<ProtectedRoute planFeature="review"><Reviewad /></ProtectedRoute>} />
-            <Route path="/review-manager"           element={<ProtectedRoute planFeature="review"><Reviewma /></ProtectedRoute>} />
+            <Route path="/review-manager"           element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewma /></ProtectedRoute>} />
+            <Route path="/review-employee"          element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewem /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
-            <Route path="/admin-timesheet"          element={<ProtectedRoute planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
-            <Route path="/manager-timesheet"        element={<ProtectedRoute planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
-            <Route path="/employee-timesheet"       element={<ProtectedRoute planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
-            <Route path="/admin-asset-management"   element={<ProtectedRoute planFeature="asset"><Adminasset /></ProtectedRoute>} />
-
+            <Route path="/admin-timesheet"          element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_timesheet_admin" planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
+            <Route path="/manager-timesheet"        element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
+            <Route path="/employee-timesheet"       element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_asset_management" planFeature="asset"><Adminasset /></ProtectedRoute>} />
             <Route
               path="/reimbursement-admin"
-              element={<ReimbursementAdmin />}
+              element={<ProtectedRoute><ReimbursementAdmin /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-manager"
-              element={<ReimbursementManager />}
+              element={<ProtectedRoute permission="reimbursement.can_submit_claim"><ReimbursementManager /></ProtectedRoute>}
             />
             <Route
               path="/reimbursement-employee"
-              element={<ReimbursementEmployee />}
+              element={<ProtectedRoute permission="reimbursement.can_submit_claim"><ReimbursementEmployee /></ProtectedRoute>}
             />
 
-            {/* Restricted to admins only — payroll policy, CTC and payslips
-                are sensitive financial data */}
+            {/* Employees receive this page only when explicitly granted full
+                payroll management permission by their organisation admin. */}
             <Route
               path="/payroll"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="payroll.can_manage_payroll">
                   <Payroll />
                 </ProtectedRoute>
               }
@@ -275,8 +303,19 @@ function App() {
             <Route
               path="/admin-management"
               element={
-                <ProtectedRoute allowedRoles={["admin"]}>
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_torchx_management">
                   <AdminManagement />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* TorchX Policy — creation/publish/report page, Admin only.
+                SuperAdmin has its own copy at /superadmin-policy-management. */}
+            <Route
+              path="/admin-policy-management"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_policy_management">
+                  <PolicyManagement />
                 </ProtectedRoute>
               }
             />
@@ -427,18 +466,22 @@ function App() {
             }
           >
             <Route path="/superadmin-dashboard"          element={<SuperAdminDashboard />} />
+            <Route path="/superadmin-training" element={<TrainingPage superAdminView />} />
             <Route path="/superadmin-organisations"      element={<SuperAdminOrganisations />} />
             <Route path="/superadmin-announcements"      element={<SuperAdminAnnouncements />} />
-            <Route path="/superadmin-leaves"              element={<SuperAdminLeaves />} />
+            <Route path="/superadmin-leaves"              element={<ProtectedRoute><SuperAdminLeaves /></ProtectedRoute>} />
             <Route path="/superadmin-reviews"             element={<ProtectedRoute planFeature="review"><SuperAdminReviews /></ProtectedRoute>} />
             <Route path="/superadmin-settings"            element={<SuperAdminSettings />} />
-            <Route path="/superadmin-documents"           element={<SuperAdminDocuments />} />
+            <Route path="/superadmin-documents"           element={<ProtectedRoute><SuperAdminDocuments /></ProtectedRoute>} />
             <Route path="/superadmin-complaints"          element={<ProtectedRoute planFeature="tickets"><SuperAdminComplaints /></ProtectedRoute>} />
             <Route path="/superadmin-timesheet"           element={<ProtectedRoute planFeature="timesheet"><SuperAdmintimesheet /></ProtectedRoute>} />
             <Route path="/superadmin-asset-management"    element={<ProtectedRoute planFeature="asset"><Superadminasset /></ProtectedRoute>} />
             <Route path="/superadmin-management"          element={<SuperAdminManagement />} />
+            <Route path="/superadmin-recruitment" element={<ProtectedRoute planFeature="recruitment"><Adminrecruitment /></ProtectedRoute>} />
+            <Route path="/superadmin-recruitment-approvals" element={<Navigate to="/superadmin-recruitment?tab=approvals" replace />} />
+            <Route path="/superadmin-policy-management"   element={<PolicyManagement />} />
             <Route path="/superadmin-payroll"              element={<Payroll />} />
-            <Route path="/superadmin-reimbursement"        element={<ReimbursementSuperadmin />} />
+            <Route path="/superadmin-reimbursement"        element={<ProtectedRoute><ReimbursementSuperadmin /></ProtectedRoute>} />
           </Route>
 
           {/* Shared across every logged-in role. These previously lived duplicated
@@ -456,8 +499,12 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="/field-operations" element={<ProtectedRoute permission="navigation.can_view_field_operations"><FieldOperations /></ProtectedRoute>} />
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
+            <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
+            <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
+            <Route path="/overtime"       element={<Overtime />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

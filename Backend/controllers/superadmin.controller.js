@@ -1,4 +1,6 @@
 const SuperAdminModel = require("../Models/superadmin.model");
+const { assertOrgAccess, findActiveTalentLicense, peekStorageStatus, TRIAL_USER_LIMIT, FREE_USER_LIMIT } = require("../utils/planAccess");
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
 const AdminModel = require("../Models/Admin.model");
 const Managermodel = require("../Models/manager.model");
 const Usermodel = require("../Models/user.model");
@@ -18,6 +20,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
+const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
@@ -30,6 +33,11 @@ const { canOnboardUser, incrementActiveUserCount, decrementActiveUserCount } = r
 const AssetModel = require("../Models/asset.model");
 const { isEmailTaken , isEmpidTaken} = require("../utils/emailAvailability.utils");
 const { notifyLeaveDecision, notifyAssetAssigned } = require("../utils/notify.utils");
+const { revokeSession } = require("../utils/singleSignIn.utils");
+const {
+  getOrganisationStorageUsage,
+  getOrganisationStorageFiles,
+} = require("../utils/storageUsage.utils");
 
 const EXCLUDE =
   "-password -__v -isverified -status -createdAt -updatedAt -isFirstLogin -passwordupdatedAt";
@@ -149,13 +157,14 @@ const USER_MODEL_MAP = {
   admin: "Admin",
   senior_admin: "Admin",
   official: "Admin",
+  super_admin: "Admin",
   manager: "Manager",
   senior_manager: "Manager",
   employee: "User",
 };
 
 const mergePermissions = (role, overrides) => {
-  const permissionRole = ["admin", "senior_admin", "official"].includes(role)
+  const permissionRole = ["admin", "senior_admin", "official", "super_admin"].includes(role)
     ? "admin"
     : ["manager", "senior_manager"].includes(role)
     ? "manager"
@@ -462,16 +471,7 @@ const loginSuperAdmin = async (req, res, next) => {
     if (!isMatch)
       return next(Object.assign(new Error("Invalid credentials"), { statusCode: 401 }));
 
-    const trialValid = superAdmin.isTrialValid();
-    const hasTalentLicense = superAdmin.licenses.some(
-      (l) => l.product === "torchx_talent" && l.isActive && new Date(l.expiresAt) > new Date(),
-    );
-
-    if (!trialValid && !hasTalentLicense)
-      return next(Object.assign(
-        new Error("Your trial has expired and you have no active license for TorchX Talent. Please upgrade your plan at torchxsuite.com to continue."),
-        { statusCode: 403, code: "PLAN_EXPIRED" },
-      ));
+    await assertOrgAccess(superAdmin, "superadmin");
 
     const isProduction = process.env.NODE_ENV === "production";
     const cookieOpts = {
@@ -534,9 +534,9 @@ const loginSuperAdmin = async (req, res, next) => {
         organisation_name: superAdmin.organisation_name,
         company_domain: superAdmin.company_domain,
         role: superAdmin.role,
-        is_trial_active: trialValid,
+        is_trial_active: superAdmin.isTrialValid(),
         trial_expires_at: superAdmin.trial_expires_at,
-        has_talent_license: hasTalentLicense,
+        has_talent_license: !!findActiveTalentLicense(superAdmin),
       },
     });
   } catch (err) {
@@ -556,12 +556,19 @@ const getMe = async (req, res, next) => {
         f_name: superAdmin.f_name,
         l_name: superAdmin.l_name,
         email: superAdmin.email,
+        empid: superAdmin.empid,
+        designation: superAdmin.designation,
+        department: superAdmin.department,
         phone: superAdmin.phone,
         profile_image: superAdmin.profile_image,
         organisation_name: superAdmin.organisation_name,
         company_address: superAdmin.company_address,
         company_size: superAdmin.company_size,
         industry: superAdmin.industry,
+        bank_name: superAdmin.bank_name,
+        account_holder_name: superAdmin.account_holder_name,
+        account_number: superAdmin.account_number,
+        ifsc_code: superAdmin.ifsc_code,
         plan: superAdmin.plan,
         role: superAdmin.role,
         status: superAdmin.status,
@@ -590,6 +597,11 @@ const logoutSuperAdmin = async (req, res, next) => {
   // `status` = account state, checked on every request by the auth
   // middleware (and gates every admin/manager/employee under this org).
   // Do not set it to "inactive" here — see adminlogout note.
+
+  // Single Sign-In: release this device's session slot (no-op if the
+  // feature was never active for this login, i.e. no `sid` on the token).
+  await revokeSession(req.tokenPayload?.sid);
+
   const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("token", {
     httpOnly: true,
@@ -605,16 +617,24 @@ const updateSuperAdmin = async (req, res, next) => {
   [
     "f_name",
     "l_name",
+    "empid",
+    "designation",
+    "department",
     "phone",
     "profile_image",
     "company_address",
     "company_size",
     "industry",
     "organisation_name",
+    "bank_name",
+    "account_holder_name",
+    "account_number",
+    "ifsc_code",
   ].forEach((field) => {
     if (req.body[field] !== undefined) superAdmin[field] = req.body[field];
   });
   await superAdmin.save();
+  invalidateUserCache(superAdmin._id);
   res.status(200).json({
     success: true,
     message: "Profile updated successfully",
@@ -623,12 +643,19 @@ const updateSuperAdmin = async (req, res, next) => {
       f_name: superAdmin.f_name,
       l_name: superAdmin.l_name,
       email: superAdmin.email,
+      empid: superAdmin.empid,
+      designation: superAdmin.designation,
+      department: superAdmin.department,
       phone: superAdmin.phone,
       profile_image: superAdmin.profile_image,
       organisation_name: superAdmin.organisation_name,
       company_address: superAdmin.company_address,
       company_size: superAdmin.company_size,
       industry: superAdmin.industry,
+      bank_name: superAdmin.bank_name,
+      account_holder_name: superAdmin.account_holder_name,
+      account_number: superAdmin.account_number,
+      ifsc_code: superAdmin.ifsc_code,
     },
   });
 };
@@ -926,6 +953,29 @@ const createAdmin = async (req, res, next) => {
       resolvedReportingManagerModel = "SuperAdmin";
     }
 
+    if (resolvedReportingManagerModel === "Admin") {
+      const reportingAdmin = await AdminModel.findOne({
+        _id: resolvedReportingManager,
+        organisation_id,
+        working_status: "working",
+      }).select("_id").lean();
+      if (!reportingAdmin)
+        return next(Object.assign(new Error("Reporting admin was not found in this organisation"), { statusCode: 400 }));
+    } else if (resolvedReportingManagerModel === "SuperAdmin") {
+      if (String(resolvedReportingManager) !== String(organisation_id))
+        return next(Object.assign(new Error("Invalid Super Admin reporting manager"), { statusCode: 400 }));
+    } else if (resolvedReportingManagerModel === "Manager") {
+      const reportingManager = await Managermodel.findOne({
+        _id: resolvedReportingManager,
+        organisation_id,
+        working_status: "working",
+      }).select("_id").lean();
+      if (!reportingManager)
+        return next(Object.assign(new Error("Reporting manager was not found in this organisation"), { statusCode: 400 }));
+    } else {
+      return next(Object.assign(new Error("Choose a valid reporting manager"), { statusCode: 400 }));
+    }
+
     const admin = await AdminModel.create({
       organisation_id, empid, uid, f_name, l_name, work_email: email, password, gender,
       designation, department, office_location, personal_contact, e_contact,
@@ -1133,6 +1183,45 @@ const updateAdmin = async (req, res, next) => {
       if (req.body[field] !== undefined) admin[field] = req.body[field];
     },
   );
+  if (req.body.reporting_manager !== undefined || req.body.reporting_manager_model !== undefined) {
+    const managerId = req.body.reporting_manager;
+    const managerModel = req.body.reporting_manager_model;
+    if (managerModel === "Admin") {
+      if (String(managerId) === String(id))
+        return next(Object.assign(new Error("An admin cannot report to themselves"), { statusCode: 400 }));
+      const allAdmins = await AdminModel.find({ organisation_id })
+        .select("_id reporting_manager reporting_manager_model")
+        .lean();
+      const descendantIds = new Set();
+      let frontier = [String(id)];
+      while (frontier.length) {
+        const next = allAdmins
+          .filter((candidate) => candidate.reporting_manager_model === "Admin" && frontier.includes(String(candidate.reporting_manager)))
+          .map((candidate) => String(candidate._id))
+          .filter((candidateId) => candidateId !== String(id) && !descendantIds.has(candidateId));
+        next.forEach((candidateId) => descendantIds.add(candidateId));
+        frontier = next;
+      }
+      if (descendantIds.has(String(managerId)))
+        return next(Object.assign(new Error("An admin cannot report to one of their own reporting admins"), { statusCode: 400 }));
+      const reportingAdmin = await AdminModel.findOne({ _id: managerId, organisation_id, working_status: "working" }).select("_id").lean();
+      if (!reportingAdmin)
+        return next(Object.assign(new Error("Reporting admin was not found in this organisation"), { statusCode: 400 }));
+      admin.reporting_manager = reportingAdmin._id;
+      admin.reporting_manager_model = "Admin";
+    } else if (managerModel === "Manager") {
+      const reportingManager = await Managermodel.findOne({ _id: managerId, organisation_id, working_status: "working" }).select("_id").lean();
+      if (!reportingManager)
+        return next(Object.assign(new Error("Reporting manager was not found in this organisation"), { statusCode: 400 }));
+      admin.reporting_manager = reportingManager._id;
+      admin.reporting_manager_model = "Manager";
+    } else if (managerModel === "SuperAdmin" && String(managerId) === String(organisation_id)) {
+      admin.reporting_manager = organisation_id;
+      admin.reporting_manager_model = "SuperAdmin";
+    } else {
+      return next(Object.assign(new Error("Choose a valid reporting manager"), { statusCode: 400 }));
+    }
+  }
   await admin.save();
   res.status(200).json({
     success: true,
@@ -1175,6 +1264,197 @@ const deleteAdmin = async (req, res, next) => {
     .json({ success: true, message: "Admin deleted successfully" });
 };
 
+const promoteAdminToSuperAdmin = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  if (admin.role === "super_admin")
+    return next(
+      Object.assign(new Error("Admin is already a Super Admin"), { statusCode: 400 }),
+    );
+
+  const previousRole = admin.role;
+  admin.role = "super_admin";
+  await admin.save();
+
+  await assignPermissions(admin._id, "super_admin", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been promoted to Super Admin`,
+    admin: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: admin.role,
+      previous_role: previousRole,
+    },
+  });
+};
+
+const demoteSuperAdminToAdmin = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id });
+  if (!admin)
+    return next(
+      Object.assign(new Error("Admin not found"), { statusCode: 404 }),
+    );
+
+  if (admin.role !== "super_admin")
+    return next(
+      Object.assign(new Error("Admin is not a Super Admin"), { statusCode: 400 }),
+    );
+
+  const previousRole = admin.role;
+  admin.role = "manager";
+  await admin.save();
+
+  await assignPermissions(admin._id, "manager", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been demoted from Super Admin to Manager`,
+    admin: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: admin.role,
+      previous_role: previousRole,
+    },
+  });
+};
+
+const demoteAdminToManager = async (req, res, next) => {
+  const { id } = req.params;
+  const organisation_id = req.superAdmin._id;
+
+  const admin = await AdminModel.findOne({ _id: id, organisation_id }).lean();
+  if (!admin)
+    return next(Object.assign(new Error("Admin not found"), { statusCode: 404 }));
+
+  if (admin.role === "super_admin")
+    return next(
+      Object.assign(new Error("Use the demote Super Admin option for Super Admins"), { statusCode: 400 }),
+    );
+
+  if ((admin.working_status || "working") !== "working")
+    return next(
+      Object.assign(new Error("Cannot demote an admin who is not currently working"), { statusCode: 400 }),
+    );
+
+  // Manager collection mein duplicate check (empid global unique, uid/email org ke andar)
+  const clash = await Managermodel.findOne({
+    $or: [
+      { _id: admin._id },
+      { empid: admin.empid },
+      { uid: admin.uid, organisation_id },
+      { work_email: admin.work_email, organisation_id },
+    ],
+  }).lean();
+  if (clash)
+    return next(
+      Object.assign(new Error("A Manager with the same ID, UID or email already exists"), { statusCode: 409 }),
+    );
+
+  const ROLE_MAP = { admin: "manager", senior_admin: "senior_manager", official: "official" };
+  const newRole = ROLE_MAP[admin.role] || "manager";
+
+  // Manager schema ka reporting_manager_model sirf "Admin" ya "Manager" allow karta hai
+  const keepReporting = admin.reporting_manager_model === "Manager" && admin.reporting_manager;
+
+  const managerDoc = {
+    _id: admin._id, // same _id: leaves, attendance, assets ke references na tootein
+    empid: admin.empid,
+    organisation_id,
+    profile_image: admin.profile_image,
+    uid: admin.uid,
+    department: admin.department,
+    f_name: admin.f_name,
+    l_name: admin.l_name,
+    work_email: admin.work_email,
+    password: admin.password, // already hashed, isliye raw insert (pre-save hook double hash karta)
+    gender: admin.gender,
+    marital_status: admin.marital_status,
+    personal_contact: admin.personal_contact,
+    e_contact: admin.e_contact,
+    aadhaar_number: admin.aadhaar_number,
+    pan_number: admin.pan_number,
+    address: admin.address,
+    city: admin.city,
+    state: admin.state,
+    pincode: admin.pincode,
+    country: admin.country,
+    role: newRole,
+    designation: admin.designation,
+    office_location: admin.office_location,
+    shift: admin.shift || null,
+    reporting_manager: keepReporting ? admin.reporting_manager : null,
+    reporting_manager_model: keepReporting ? "Manager" : null,
+    is_fresher: admin.is_fresher,
+    total_experience: admin.total_experience,
+    previous_company: admin.previous_company,
+    previous_designation: admin.previous_designation,
+    bank_name: admin.bank_name,
+    account_holder_name: admin.account_holder_name,
+    account_number: admin.account_number,
+    ifsc_code: admin.ifsc_code,
+    resume: admin.resume,
+    aadhaar_card: admin.aadhaar_card,
+    pan_card: admin.pan_card,
+    experience_letter: admin.experience_letter,
+    status: admin.status === "active" ? "active" : "inactive", // Manager enum mein "suspended" nahi hai
+    working_status: "working",
+    noticePeriod: admin.noticePeriod,
+    isVerified: admin.isVerified,
+    isFirstLogin: admin.isFirstLogin,
+    date_of_joining: admin.date_of_joining,
+    date_of_birth: admin.date_of_birth,
+    lastBirthdayWishYear: admin.lastBirthdayWishYear,
+    createdAt: admin.createdAt,
+    updatedAt: new Date(),
+  };
+
+  // undefined fields hata do
+  Object.keys(managerDoc).forEach((k) => managerDoc[k] === undefined && delete managerDoc[k]);
+
+  // Pehle Manager banao, phir Admin delete. Insert fail hua to Admin safe rahega.
+  await Managermodel.collection.insertOne(managerDoc);
+  await AdminModel.deleteOne({ _id: admin._id, organisation_id });
+
+  // Jo Managers is person ko "Admin" ke roop mein report karte the, unka model update karo
+  await Managermodel.updateMany(
+    { reporting_manager: admin._id, reporting_manager_model: "Admin" },
+    { $set: { reporting_manager_model: "Manager" } },
+  );
+
+  await assignPermissions(admin._id, "manager", organisation_id, req.superAdmin._id, "SuperAdmin");
+
+  res.status(200).json({
+    success: true,
+    message: `${admin.f_name} ${admin.l_name} has been demoted from Admin to Manager`,
+    manager: {
+      _id: admin._id,
+      empid: admin.empid,
+      f_name: admin.f_name,
+      l_name: admin.l_name,
+      work_email: admin.work_email,
+      role: newRole,
+      previous_role: admin.role,
+    },
+  });
+};
 const getAllAdmins = async (req, res, next) => {
   try {
     if (!req.superAdmin) {
@@ -1536,7 +1816,7 @@ const acceptleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.superAdmin._id;
  
-  const leave = await AdminLeave.findOne({ _id: id, organisation_id });
+  const leave = await AdminLeave.findOne({ _id: id, organisation_id, status: "pending_superadmin" });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
  
@@ -1560,6 +1840,7 @@ const acceptleavebyadmin = async (req, res, next) => {
  
   leave.status = "approved_superadmin";
   leave.approvedBy = req.superAdmin._id;
+  leave.approvedByModel = "SuperAdmin";
   leave.approvedAt = new Date();
   await leave.save();
 
@@ -1582,7 +1863,7 @@ const rejectleavebyadmin = async (req, res, next) => {
   const { id } = req.params;
   const organisation_id = req.superAdmin._id;
  
-  const leave = await AdminLeave.findOne({ _id: id, organisation_id });
+  const leave = await AdminLeave.findOne({ _id: id, organisation_id, status: "pending_superadmin" });
   if (!leave)
     return next(Object.assign(new Error("Leave not found"), { statusCode: 404 }));
  
@@ -1591,6 +1872,7 @@ const rejectleavebyadmin = async (req, res, next) => {
  
   leave.status = "rejected_superadmin";
   leave.rejectedBy = req.superAdmin._id;
+  leave.rejectedByModel = "SuperAdmin";
   leave.rejectedAt = new Date();
   leave.deleteAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   await leave.save();
@@ -1941,21 +2223,21 @@ const getAttendanceOverview = async (req, res, next) => {
     const organisation_id = req.superAdmin._id;
     const type = req.query.type === "monthly" ? "monthly" : "today";
 
-    // Every Admin reports to this Superadmin by default (there's no
-    // reporting_manager field on the Admin model) - show their actual
-    // name here instead of the literal word "Superadmin".
+    // Use the assigned reporting manager for admins with a configured chain;
+    // older admins without one still display the organisation Super Admin.
     const superAdminName =
       [req.superAdmin.f_name, req.superAdmin.l_name].filter(Boolean).join(" ") || "Superadmin";
 
     const [admins, managers, employees] = await Promise.all([
-      AdminModel.find({ organisation_id })
-        .select("empid f_name l_name work_email role designation department office_location profile_image")
-        .lean(),
-      Managermodel.find({ organisation_id })
+    AdminModel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
         .populate({ path: "reporting_manager", select: "f_name l_name empid" })
         .lean(),
-      Usermodel.find({ organisation_id })
+     Managermodel.find({ organisation_id, working_status: "working" })
+        .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
+        .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+        .lean(),
+     Usermodel.find({ organisation_id, working_status: "working" })
         .select("empid f_name l_name work_email role designation department office_location profile_image Under_manager")
         .populate({ path: "Under_manager", select: "f_name l_name empid" })
         .lean(),
@@ -1964,6 +2246,7 @@ const getAttendanceOverview = async (req, res, next) => {
     const people = [
       ...admins.map((a) => ({
         id: String(a._id),
+        roleKey: "admin",
         empid: a.empid,
         name: [a.f_name, a.l_name].filter(Boolean).join(" "),
         email: a.work_email,
@@ -1972,10 +2255,13 @@ const getAttendanceOverview = async (req, res, next) => {
         department: a.department,
         office_location: a.office_location,
         avatar: a.profile_image || null,
-        reportingManager: superAdminName,
+        reportingManager: a.reporting_manager
+          ? [a.reporting_manager.f_name, a.reporting_manager.l_name].filter(Boolean).join(" ")
+          : superAdminName,
       })),
       ...managers.map((m) => ({
         id: String(m._id),
+        roleKey: "manager",
         empid: m.empid,
         name: [m.f_name, m.l_name].filter(Boolean).join(" "),
         email: m.work_email,
@@ -1990,6 +2276,7 @@ const getAttendanceOverview = async (req, res, next) => {
       })),
       ...employees.map((u) => ({
         id: String(u._id),
+        roleKey: "employee",
         empid: u.empid,
         name: [u.f_name, u.l_name].filter(Boolean).join(" "),
         email: u.work_email,
@@ -2062,12 +2349,16 @@ const getAttendanceOverview = async (req, res, next) => {
     }).lean();
     const summaryByEmp = new Map(summaries.map((s) => [String(s.employee), s]));
 
-    const data = people.map((p) => {
+    const paidByEmp = await computeMonthPaidDays({ organisation_id, people, month, year });
+
+    const data = people.map(({ roleKey, ...p }) => {
       const s = summaryByEmp.get(p.id);
+      const paid = paidByEmp.get(p.id);
       const presentDays = s?.presentDays ?? 0;
       const halfDays = s?.halfDays ?? 0;
       const absentDays = s?.absentDays ?? 0;
       const weekOffHolidayDays = s?.weekOffHolidayDays ?? 0;
+      const leaveDays = s?.leaveDays ?? 0;
       const totalWorkingMinutes = s?.totalWorkingMinutes ?? 0;
       const markedDays = presentDays + halfDays + absentDays;
       return {
@@ -2076,6 +2367,10 @@ const getAttendanceOverview = async (req, res, next) => {
         halfDays,
         absentDays,
         weekOffHolidayDays,
+        leaveDays,
+        paidDays: paid?.paidDays ?? null,
+        totalDays: paid?.totalDays ?? null,
+        timesheetDays: paid?.timesheetDays ?? 0,
         markedDays,
         totalWorkingMinutes,
         attendancePercent: markedDays > 0 ? Math.round(((presentDays + halfDays * 0.5) / markedDays) * 100) : 0,
@@ -2131,7 +2426,7 @@ const getAttendanceHistory = async (req, res, next) => {
       employee: employeeId,
       date: { $gte: rangeStart, $lte: rangeEnd },
     })
-      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes overtimeMinutes checkoutRemark checkInGate checkOutGate")
+      .select("date checkIn checkOut source status activeMinutes idleMinutes isLate lateMinutes lateCountInMonth latePenalty overtimeMinutes checkoutRemark checkInGate checkOutGate")
       .sort({ date: -1 })
       .lean();
 
@@ -2146,11 +2441,23 @@ const getAttendanceHistory = async (req, res, next) => {
       idleMinutes: r.idleMinutes ?? 0,
       isLate: !!r.isLate,
       lateMinutes: r.lateMinutes ?? 0,
+      lateCountInMonth: r.lateCountInMonth ?? 0,
+      latePenalty: !!r.latePenalty,
       overtimeMinutes: r.overtimeMinutes ?? 0,
       checkoutRemark: r.checkoutRemark || null,
       checkInGate: r.checkInGate || null,
       checkOutGate: r.checkOutGate || null,
     }));
+
+    const roleKey = admin ? "admin" : manager ? "manager" : "employee";
+    const filled = await fillHistoryGaps({
+      organisation_id,
+      personId: person._id,
+      roleKey,
+      rows: data,
+      rangeStart,
+      rangeEnd,
+    });
 
     return res.json({
       success: true,
@@ -2166,8 +2473,8 @@ const getAttendanceHistory = async (req, res, next) => {
       },
       startDate: rangeStart,
       endDate: rangeEnd,
-      total: data.length,
-      data,
+      total: filled.length,
+      data: filled,
     });
   } catch (error) {
     next(error);
@@ -2794,7 +3101,7 @@ const getActiveUserCount = async (req, res, next) => {
       new Date() < new Date(superAdmin.trial_expires_at);
 
     const activeCount = superAdmin.active_user_count || 0;
-    const allowedUsers = trialActive ? 4 : license?.users || 0;
+    const allowedUsers = trialActive ? TRIAL_USER_LIMIT : (license?.users || FREE_USER_LIMIT);
 
     // false  → activeCount < allowedUsers  (can still add more)
     // true   → activeCount >= allowedUsers (limit reached, cannot add)
@@ -2891,6 +3198,48 @@ const getperticularadmin = async (req, res, next) => {
   });
 };
 
+// Powers the "Storage" tab in SuperAdmin Settings — how much MongoDB data
+// and ImageKit file storage THIS organisation is using, broken down by
+// collection / folder so nothing is a black box.
+const getStorageUsage = async (req, res, next) => {
+  try {
+    if (!req.superAdmin) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const usage = await getOrganisationStorageUsage(req.superAdmin, {
+      force: req.query.refresh === "1",
+    });
+
+    return res.status(200).json({
+      success: true,
+      ...usage,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getStorageFiles = async (req, res, next) => {
+  try {
+    if (!req.superAdmin) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { module = "", search = "", page = 1, limit = 10 } = req.query;
+    const result = await getOrganisationStorageFiles(req.superAdmin, {
+      module,
+      search,
+      page,
+      limit,
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -2908,6 +3257,9 @@ module.exports = {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addmanager,
   addemployee,
   findallmanagers,
@@ -2936,12 +3288,14 @@ module.exports = {
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
-   updatePermissions,
+  updatePermissions,
   getPermissions,
   setAdminWorkingStatus,
   getInactiveUsers,
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
-  getperticularadmin
-};  
+  getperticularadmin,
+  getStorageUsage,
+  getStorageFiles,
+};

@@ -15,14 +15,17 @@ const leaveSchema = new mongoose.Schema({
   manager: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Manager",
-    required: true,
+    // Not required when a custom approval flow routes straight to an admin pool.
+    required: function () {
+      return !(this.approverPool && this.approverPool.length);
+    },
   },
   applicantName: { type: String },
   applicantEmail: { type: String },
   applicantRole: { type: String, default: "Employee" },
   leaveType: {
     type: String,
-    enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp"],
+    enum: ["el", "sl", "ml", "pl", "half_day_el", "half_day_sl", "lwp", "comp_off"],
     required: true,
   },
   startDate: { type: Date, required: true },
@@ -39,6 +42,13 @@ const leaveSchema = new mongoose.Schema({
   // and Reconcileattendancesummaryleaveaware.js.
   lwpDays: { type: Number, default: 0 },
   reason: { type: String, required: true },
+  supportingDocument: {
+    url: { type: String },
+    fileId: { type: String },
+    originalName: { type: String },
+    mimeType: { type: String },
+    sizeKb: { type: Number },
+  },
   status: {
     type: String,
     enum: [
@@ -49,6 +59,8 @@ const leaveSchema = new mongoose.Schema({
       "approved_reporting_manager",
       "rejected_reporting_manager",
       "pending_admin",
+      "pending_coadmin",
+      "forwarded_admin",
       "approved_admin",
       "rejected_admin",
     ],
@@ -62,6 +74,10 @@ const leaveSchema = new mongoose.Schema({
     type: String,
     enum: ["Manager", "Admin"],
   },
+  // Custom approval flow: admins allowed to act on this request (any one).
+  approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+  forwardedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin", default: null },
+  forwardedByModel: { type: String, enum: ["Admin"], default: null },
   approvedBy: { type: mongoose.Schema.Types.ObjectId },
   approvedByModel: { type: String, enum: ["Manager", "Admin"] },
   rejectedBy: { type: mongoose.Schema.Types.ObjectId },
@@ -75,6 +91,7 @@ leaveSchema.index({ employee: 1, status: 1 });
 leaveSchema.index({ employee: 1, startDate: 1, endDate: 1 });
 leaveSchema.index({ manager: 1, status: 1 });
 leaveSchema.index({ directed_to: 1, status: 1 });
+leaveSchema.index({ approverPool: 1, status: 1 });
 leaveSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.Leave || mongoose.model("Leave", leaveSchema);

@@ -3,13 +3,16 @@ const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
 // Advance/enterprise (or during the free trial). The SuperAdmin document IS
 // the organisation record, so the SuperAdmin's own plan gates these too.
 const reviewPlanGate = restrictPlanFeature("review");
-const assetPlanGate = restrictPlanFeature("asset");
+// Self Service Portal — Leave, Reimbursements, and Document/File
+// self-management — is likewise fully locked on Basic and fully open on
+// Advance/enterprise (or during the free trial).
 const supportUpload = require("../middleware/upload/supportAttachments.middleware");
 const { sendSupportRequest } = require("../controllers/support.controller");
 const {
@@ -29,6 +32,9 @@ const {
   updateAdmin,
   deleteAdmin,
   getAllAdmins,
+  promoteAdminToSuperAdmin,
+  demoteSuperAdminToAdmin,
+  demoteAdminToManager,
   addmanager,
   addemployee,
   findallmanagers,
@@ -64,7 +70,9 @@ const {
   getActiveUserCount,
   getLeavePolicy,
   setLeavePolicy,
-  getperticularadmin
+  getperticularadmin,
+  getStorageUsage,
+  getStorageFiles,
 
 } = require("../controllers/superadmin.controller");
 
@@ -89,7 +97,12 @@ superAdminRouter.post("/forgot-password", asyncHandler(forgotPassword));
 superAdminRouter.post("/verify-otp", asyncHandler(verifyOtp));
 superAdminRouter.post("/resetpassword", asyncHandler(resetPassword));
 
-superAdminRouter.get("/me", superAdminAuth, asyncHandler(getMe));
+superAdminRouter.get(
+  "/me",
+  superAdminAuth,
+  cacheRoute(30_000, (req) => `user:${req.superAdmin._id}:${req.originalUrl}`),
+  asyncHandler(getMe)
+);
 superAdminRouter.put("/update-profile", superAdminAuth, asyncHandler(updateSuperAdmin));
 superAdminRouter.put(
   "/changepassword",
@@ -112,6 +125,8 @@ superAdminRouter.get(
   asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
+superAdminRouter.get("/storage-usage", superAdminAuth, asyncHandler(getStorageUsage));
+superAdminRouter.get("/storage-usage/files", superAdminAuth, asyncHandler(getStorageFiles));
 
 superAdminRouter.post(
   "/admin/create",
@@ -128,6 +143,21 @@ superAdminRouter.delete(
   "/admin/delete/:id",
   superAdminAuth,
   asyncHandler(deleteAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/promote/super-admin",
+  superAdminAuth,
+  asyncHandler(promoteAdminToSuperAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/super-admin",
+  superAdminAuth,
+  asyncHandler(demoteSuperAdminToAdmin),
+);
+superAdminRouter.post(
+  "/admin/:id/demote/manager",
+  superAdminAuth,
+  asyncHandler(demoteAdminToManager),
 );
 
 superAdminRouter.post("/addmanager", superAdminAuth, asyncHandler(addmanager));
@@ -320,22 +350,21 @@ superAdminRouter.get("/getperticularadmin/:uid", superAdminAuth, asyncHandler(ge
 
 
 // asset route — plan-gated: locked on Basic
-superAdminRouter.post("/assets", superAdminAuth, assetPlanGate, asyncHandler(createAssetSuperAdmin));
-superAdminRouter.get("/assets", superAdminAuth, assetPlanGate, asyncHandler(getAllAssetsSuperAdmin));
+superAdminRouter.post("/assets", superAdminAuth, asyncHandler(createAssetSuperAdmin));
+superAdminRouter.get("/assets", superAdminAuth, asyncHandler(getAllAssetsSuperAdmin));
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-superAdminRouter.get("/assets/employees", superAdminAuth, assetPlanGate, asyncHandler(getEmployeesWithAssets));
+superAdminRouter.get("/assets/employees", superAdminAuth, asyncHandler(getEmployeesWithAssets));
 superAdminRouter.get(
   "/assets/employees/:person_id/:person_model/history",
   superAdminAuth,
-  assetPlanGate,
   asyncHandler(getEmployeeAssetHistory)
 );
-superAdminRouter.get("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(getAssetByIdSuperAdmin));
-superAdminRouter.put("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(updateAssetSuperAdmin));
-superAdminRouter.delete("/assets/:id", superAdminAuth, assetPlanGate, asyncHandler(deleteAssetSuperAdmin));
-superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, assetPlanGate, asyncHandler(assignAssetToAdminSuperAdmin));
-superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, assetPlanGate, asyncHandler(revokeAssetFromAdminSuperAdmin));
-superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, assetPlanGate, asyncHandler(getAssetsOfPerson));
+superAdminRouter.get("/assets/:id", superAdminAuth, asyncHandler(getAssetByIdSuperAdmin));
+superAdminRouter.put("/assets/:id", superAdminAuth, asyncHandler(updateAssetSuperAdmin));
+superAdminRouter.delete("/assets/:id", superAdminAuth, asyncHandler(deleteAssetSuperAdmin));
+superAdminRouter.patch("/assets/:id/assign-admin", superAdminAuth, asyncHandler(assignAssetToAdminSuperAdmin));
+superAdminRouter.patch("/assets/:id/revoke", superAdminAuth, asyncHandler(revokeAssetFromAdminSuperAdmin));
+superAdminRouter.get("/assets/person/:person_id/:person_model", superAdminAuth, asyncHandler(getAssetsOfPerson));
 
 // Help & Support form — no permission gate, super admin can reach support too.
 superAdminRouter.post("/contact-support", superAdminAuth, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
