@@ -1746,7 +1746,7 @@ export default function SuperAdminManagement() {
           </p>
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit mb-6 overflow-x-auto overscroll-x-contain max-w-full">
+        <div className="flex flex-wrap gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full max-w-full mb-6">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -1754,7 +1754,7 @@ export default function SuperAdminManagement() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   active ? 'bg-[#730042] text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >

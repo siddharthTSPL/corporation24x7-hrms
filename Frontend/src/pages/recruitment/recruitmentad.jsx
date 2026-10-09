@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   useGetAllRequisitions,
@@ -1417,6 +1417,65 @@ const RecruitmentAdmin = () => {
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
+  // Page-level horizontal scroll: the content keeps its natural width (as before) and the
+  // scrollbar is a sticky bar pinned to the bottom of this page's own area (never under the sidebar).
+  const pageRef = useRef(null);
+  const barRef = useRef(null);
+  const [scrollWidth, setScrollWidth] = useState(0);
+  const [clientWidth, setClientWidth] = useState(0);
+  const [barPos, setBarPos] = useState({ left: 0, width: 0 });
+  const sentinelRef = useRef(null);
+  const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => setAtBottom(entry.isIntersecting),
+      { threshold: 0, rootMargin: "0px 0px 24px 0px" }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [canViewRequisitions]);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      setScrollWidth(el.scrollWidth);
+      setClientWidth(el.clientWidth);
+      const r = el.getBoundingClientRect();
+      setBarPos({ left: r.left, width: r.width });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const mo = new MutationObserver(measure);
+    mo.observe(el, { childList: true, subtree: true });
+    window.addEventListener("resize", measure);
+    const parent = el.parentElement && el.parentElement.parentElement;
+    if (parent) ro.observe(parent);
+    const t = setInterval(measure, 600); // follows sidebar collapse/expand animations
+    return () => {
+      clearInterval(t);
+      ro.disconnect();
+      mo.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [canViewRequisitions]);
+
+  const syncFromPage = () => {
+    if (barRef.current && pageRef.current && barRef.current.scrollLeft !== pageRef.current.scrollLeft) {
+      barRef.current.scrollLeft = pageRef.current.scrollLeft;
+    }
+  };
+  const syncFromBar = () => {
+    if (barRef.current && pageRef.current && pageRef.current.scrollLeft !== barRef.current.scrollLeft) {
+      pageRef.current.scrollLeft = barRef.current.scrollLeft;
+    }
+  };
+  const hasOverflow = scrollWidth > clientWidth + 1 && atBottom;
+
   if (!canViewRequisitions) {
     return (
       <div className="min-h-screen bg-[#fdf5f9] flex items-center justify-center p-4">
@@ -1430,7 +1489,13 @@ const RecruitmentAdmin = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fdf5f9] p-4 sm:p-6 font-[Outfit,sans-serif]">
+    <div className="w-full max-w-full min-w-0 [contain:inline-size]">
+    <div
+      ref={pageRef}
+      onScroll={syncFromPage}
+      className="min-h-screen w-full max-w-full overflow-x-auto bg-[#fdf5f9] p-4 sm:p-6 pb-12 sm:pb-12 font-[Outfit,sans-serif] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+    <div className="min-w-[720px] xl:min-w-[900px]">
 
       <div className="bg-gradient-to-br from-[#2e0019] via-[#4a0029] to-[#CD166E] rounded-2xl px-4 sm:px-8 py-6 sm:py-7 mb-6 relative overflow-hidden shadow-xl">
         <div className="absolute w-72 h-72 rounded-full -top-36 -right-16 bg-white/5 pointer-events-none" />
@@ -1498,14 +1563,14 @@ const RecruitmentAdmin = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_250px] gap-4">
 
         <div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FaBriefcase className="text-[#730042]" size={14} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18 }}>All Requisitions</h2>
+                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>All Requisitions</h2>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
@@ -1537,11 +1602,11 @@ const RecruitmentAdmin = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px]">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="bg-[#fdf5f9]">
                     {["Job Role", "Department", "Openings (Filled/Total)", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
-                      <th key={h} className="text-left px-4 py-3 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
+                      <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -1553,7 +1618,7 @@ const RecruitmentAdmin = () => {
                   ) : (
                     filtered.map((item) => (
                       <tr key={item._id} className="border-b border-gray-50 hover:bg-[#fdf5f9] transition-colors">
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5">
                           <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[11px] text-gray-400">{item.employment_type}</span>
@@ -1566,20 +1631,20 @@ const RecruitmentAdmin = () => {
                             </button>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
+                        <td className="px-3 py-2.5">
                           <div className="flex justify-center">
                             <OpeningsBadge requisition={item} />
                           </div>
                         </td>
-                        <td className="px-4 py-3.5"><PriorityPill priority={item.priority} /></td>
-                        <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5"><PriorityPill priority={item.priority} /></td>
+                        <td className="px-3 py-2.5"><StatusPill status={item.status} /></td>
+                        <td className="px-3 py-2.5">
                           <div className="text-xs font-semibold text-gray-700">{item.requested_by?.f_name} {item.requested_by?.l_name}</div>
                           <div className="text-[11px] text-gray-400">{item.requested_by?.designation}</div>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-2.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
+                        <td className="px-3 py-2.5">
                           {item.status === "PENDING" ? (
                             <button
                               onClick={() => setManageModal(item)}
@@ -1614,10 +1679,10 @@ const RecruitmentAdmin = () => {
 
         <div className="flex flex-col gap-5">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <FaExclamationTriangle className="text-amber-500" size={13} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17 }}>Pending Requests</h2>
+                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Pending Requests</h2>
               </div>
               {pendingRequisitions.length > 0 && (
                 <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
@@ -1625,7 +1690,7 @@ const RecruitmentAdmin = () => {
                 </span>
               )}
             </div>
-            <div className="p-4 max-h-[420px] overflow-y-auto space-y-2">
+            <div className="p-3 max-h-[340px] overflow-y-auto space-y-2">
               {pendingRequisitions.length === 0 ? (
                 <div className="text-center py-10 text-gray-400">
                   <FaCheckCircle size={22} className="mx-auto mb-2 text-emerald-400" />
@@ -1633,7 +1698,7 @@ const RecruitmentAdmin = () => {
                 </div>
               ) : (
                 pendingRequisitions.map((item) => (
-                  <div key={item._id} className="border border-gray-100 rounded-xl p-3.5 hover:border-[#eedde8] hover:shadow-sm transition-all">
+                  <div key={item._id} className="border border-gray-100 rounded-xl p-3 hover:border-[#eedde8] hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
@@ -1658,11 +1723,11 @@ const RecruitmentAdmin = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
               <FaArrowRight className="text-[#730042]" size={12} />
-              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17 }}>Recruitment Flow</h2>
+              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Recruitment Flow</h2>
             </div>
-            <div className="p-4 space-y-0">
+            <div className="p-3 space-y-0">
               {[
                 { step: "PENDING",           color: "bg-amber-400",  desc: "Submitted by manager, awaits admin review" },
                 { step: "APPROVED",          color: "bg-emerald-500", desc: "Approved — candidates can be added" },
@@ -1671,8 +1736,8 @@ const RecruitmentAdmin = () => {
                 { step: "REVISION REQUIRED", color: "bg-blue-500",   desc: "Manager must revise and resubmit" },
                 { step: "REJECTED",          color: "bg-red-500",    desc: "Closed — requisition not accepted" },
               ].map((s, i) => (
-                <div key={i} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-b-0">
-                  <div className={`w-7 h-7 rounded-full ${s.color} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>{i + 1}</div>
+                <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-b-0">
+                  <div className={`w-6 h-6 rounded-full ${s.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{i + 1}</div>
                   <div>
                     <div className="text-xs font-semibold text-gray-700">{s.step}</div>
                     <div className="text-[11px] text-gray-400 mt-0.5">{s.desc}</div>
@@ -1704,6 +1769,18 @@ const RecruitmentAdmin = () => {
       {hiringModal && canViewCandidates && (
         <OpenHiringPanel requisition={hiringModal} onClose={() => setHiringModal(null)} canAddCandidate={canAddCandidate} />
       )}
+    </div>
+    </div>
+    <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+
+    <div
+      ref={barRef}
+      onScroll={syncFromBar}
+      className={`fixed bottom-0 z-30 overflow-x-auto overflow-y-hidden bg-[#fdf5f9] border-t border-[#eedde8] ${hasOverflow ? "block" : "hidden"}`}
+      style={{ height: 16, left: barPos.left, width: barPos.width }}
+    >
+      <div style={{ width: scrollWidth, height: 1 }} />
+    </div>
     </div>
   );
 };
