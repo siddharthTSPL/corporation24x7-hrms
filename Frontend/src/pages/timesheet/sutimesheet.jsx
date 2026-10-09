@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
 import {
   useMyProjects, useCreateProject, useUpdateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
@@ -219,7 +219,7 @@ function Card({ children, className = "", onClick }) {
   return (
     <div
       onClick={onClick}
-      className={cn("bg-white border border-gray-200 rounded-lg min-w-0 overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/40 transition-colors", className)}
+      className={cn("bg-white border border-gray-200 rounded-lg shadow-sm min-w-0 overflow-hidden", onClick && "cursor-pointer hover:border-[#730042]/40 transition-colors", className)}
     >
       {children}
     </div>
@@ -300,8 +300,48 @@ function SectionHeader({ title, sub, action }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4 sm:mb-5 min-w-0">
       <div className="min-w-0">
-        <div className="text-[15px] sm:text-[16px] font-bold text-gray-900 truncate tracking-tight">{title}</div>
+        <div className="text-[14px] sm:text-[15px] font-semibold text-gray-900 truncate tracking-tight">{title}</div>
         {sub && <div className="text-[12px] text-gray-400 mt-0.5 truncate">{sub}</div>}
+      </div>
+      {action && <div className="shrink-0 w-full sm:w-auto min-w-0">{action}</div>}
+    </div>
+  );
+}
+
+// Small line icons for the page headings (no icon dependency)
+function TabIcon({ name }) {
+  const paths = {
+    overview:  <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
+    projects:  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+    jobs:      <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /></>,
+    approvals: <><circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" /></>,
+    mywork:    <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+    logs:      <><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></>,
+    sheets:    <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
+    analytics: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
+    report:    <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></>,
+  };
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  );
+}
+
+// Light page-level heading: soft icon tile + medium-weight title + quiet subtitle
+function PageHeading({ title, sub, action, icon, flush = false }) {
+  return (
+    <div className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0", !flush && "mb-4 sm:mb-5")}>
+      <div className="flex items-center gap-3 min-w-0">
+        {icon && (
+          <span aria-hidden="true" className="hidden sm:flex w-10 h-10 shrink-0 items-center justify-center rounded-xl bg-[#730042]/[0.06] text-[#730042] ring-1 ring-inset ring-[#730042]/10">
+            {icon}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h1 className="m-0 text-[18px] sm:text-[20px] font-semibold tracking-[-0.01em] leading-tight text-gray-900 break-words">{title}</h1>
+          {sub && <p className="m-0 mt-0.5 text-[12px] sm:text-[13px] leading-snug text-gray-500">{sub}</p>}
+        </div>
       </div>
       {action && <div className="shrink-0 w-full sm:w-auto min-w-0">{action}</div>}
     </div>
@@ -551,7 +591,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return d; });
   const todayISO = todayISTKey();
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-0">
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden min-w-0">
       {/* Mobile: stacked day-by-day list — no horizontal scroll needed */}
       <div className="flex flex-col divide-y divide-gray-100 sm:hidden">
         {days.map((d, i) => {
@@ -574,7 +614,7 @@ function WeekGrid({ weekStart, weekDays, onAddLog }) {
                     className={cn("border rounded-lg px-2.5 py-2 flex items-center justify-between gap-2 min-w-0",
                       log.billable ? "bg-emerald-50 border-emerald-200 border-l-[3px] border-l-emerald-500"
                         : "bg-[#730042]/[0.06] border-[#730042]/20 border-l-[3px] border-l-[#730042]")}>
-                    <div className="text-[12px] font-semibold text-gray-900 truncate min-w-0">{log.job?.title || "—"}</div>
+                    <div className="text-[12px] font-semibold text-gray-900 truncate min-w-0" title={log.job?.title || "—"}>{log.job?.title || "—"}</div>
                     <div className={cn("text-[11px] font-bold shrink-0", log.billable ? "text-emerald-600" : "text-[#730042]")}>{fmtDuration(log.duration_minutes)}</div>
                   </div>
                 ))}
@@ -694,7 +734,9 @@ const FILTER_CONTROL = "w-full min-w-0 rounded-lg border text-[13px] min-h-[40px
 const FILTER_IDLE = "border-gray-300 bg-white text-gray-900 placeholder:text-gray-400";
 const FILTER_ACTIVE = "border-[#730042]/60 bg-[#730042]/[0.04] text-[#730042] font-semibold";
 const DATE_INPUT_CLS = cn(FILTER_CONTROL, FILTER_IDLE, "px-3 py-2 w-auto");
-const STEP_BTN = "w-9 h-10 flex items-center justify-center text-gray-500 text-lg leading-none hover:bg-gray-50 hover:text-[#730042] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#730042]/40 transition-colors";
+const STEP_BTN = "w-9 h-10 shrink-0 flex items-center justify-center text-gray-500 text-lg leading-none hover:bg-gray-50 hover:text-[#730042] disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#730042]/40 transition-colors";
+// Period steppers (week / month): scroll inside themselves instead of being clipped on very narrow screens
+const STEPPER_WRAP = "ts-scroll inline-flex items-center max-w-full overflow-x-auto rounded-lg border border-gray-300 bg-white";
 
 function FilterSelect({ label, active, children, className = "", ...props }) {
   return (
@@ -744,8 +786,8 @@ function ReportEmployeeCard({ group, view, onOpen, onExport, exporting, exportDi
           {initialsOf(group.name)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-bold text-[14px] text-gray-900 truncate group-hover:text-[#730042] transition-colors">{group.name}</div>
-          <div className="text-[11px] text-gray-400 truncate">{group.designation} · {group.department}</div>
+          <div className="font-bold text-[14px] text-gray-900 truncate group-hover:text-[#730042] transition-colors" title={group.name}>{group.name}</div>
+          <div className="text-[11px] text-gray-400 truncate" title={`${group.designation} · ${group.department}`}>{group.designation} · {group.department}</div>
           <div className="mt-1.5 flex gap-1.5 flex-wrap">
             <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">
               {group.employee_model === "User" ? "Employee" : group.employee_model}
@@ -805,7 +847,7 @@ function ReportRowItem({ r }) {
         {off ? <Badge>{r.day_label}</Badge> : <ReportStatusBadge status={r.timesheet_status} />}
       </div>
       {(r.job || r.project) && (
-        <div className="text-[12px] text-gray-700 mb-1.5 truncate">
+        <div className="text-[12px] text-gray-700 mb-1.5 truncate" title={`${r.job?.title || ""}${r.job && r.project ? " · " : ""}${r.project?.name || ""}`}>
           {r.job?.title}{r.job && r.project ? " · " : ""}{r.project?.name}
         </div>
       )}
@@ -857,8 +899,8 @@ function ReportDetailModal({ group, view, periodLabel, onClose, onExport, export
               {initialsOf(group.name)}
             </div>
             <div className="min-w-0">
-              <div className="font-bold text-[15px] text-gray-900 truncate">{group.name}</div>
-              <div className="text-[11px] text-gray-400 truncate">{group.designation} · {group.department} · {periodLabel}</div>
+              <div className="font-bold text-[15px] text-gray-900 truncate" title={group.name}>{group.name}</div>
+              <div className="text-[11px] text-gray-400 truncate" title={`${group.designation} · ${group.department} · ${periodLabel}`}>{group.designation} · {group.department} · {periodLabel}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -906,8 +948,185 @@ function ReportDetailModal({ group, view, periodLabel, onClose, onExport, export
   );
 }
 
+// ─── All Timesheets: one card per person, click to see each timesheet they filled ───
+const sheetOwnerKey = (ts) =>
+  `${ts.owner_model || ""}:${ts.owner?._id || ts.owner?.work_email || `${ts.owner?.f_name || ""} ${ts.owner?.l_name || ""}`.trim()}`;
+const sheetOwnerName = (ts) => `${ts.owner?.f_name || ""} ${ts.owner?.l_name || ""}`.trim() || "—";
+
+const groupSheetsByOwner = (sheets) => {
+  const map = new Map();
+  sheets.forEach((ts) => {
+    const key = sheetOwnerKey(ts);
+    if (!map.has(key)) {
+      map.set(key, { key, name: sheetOwnerName(ts), email: ts.owner?.work_email || "", model: ts.owner_model, sheets: [] });
+    }
+    map.get(key).sheets.push(ts);
+  });
+  return [...map.values()]
+    .map((g) => {
+      const list = [...g.sheets].sort((a, b) => new Date(b.week_start) - new Date(a.week_start)); // newest first
+      const statusCounts = {};
+      list.forEach((ts) => { statusCounts[ts.status] = (statusCounts[ts.status] || 0) + 1; });
+      const sum = (k) => list.reduce((acc, ts) => acc + (ts[k] || 0), 0);
+      return {
+        ...g,
+        sheets: list,
+        total: sum("total_minutes"),
+        billable: sum("billable_minutes"),
+        overtime: sum("overtime_minutes"),
+        statusCounts,
+        latest: list[0],
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+};
+
+function SheetPersonCard({ person, onOpen }) {
+  return (
+    <Card onClick={onOpen} className="p-4 sm:p-5 group">
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#730042] to-[#94005a] text-white flex items-center justify-center text-[13px] font-bold shrink-0 shadow-sm shadow-[#730042]/30">
+          {initialsOf(person.name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-[14px] text-gray-900 truncate group-hover:text-[#730042] transition-colors" title={person.name}>{person.name}</div>
+          <div className="text-[11px] text-gray-400 truncate" title={person.email}>{person.email || "—"}</div>
+          <div className="mt-1.5 flex gap-1.5 flex-wrap">
+            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{person.model === "User" ? "Employee" : person.model}</Badge>
+            {Object.entries(person.statusCounts).map(([st, n]) => {
+              const ss = STATUS_STYLE[st] || STATUS_STYLE.draft;
+              return <Badge key={st} tw={ss.tw}>{ss.label}{person.sheets.length > 1 ? ` · ${n}` : ""}</Badge>;
+            })}
+          </div>
+        </div>
+        <span className="text-gray-300 group-hover:text-[#730042] transition-colors text-lg leading-none shrink-0">›</span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-4 pt-3.5 border-t border-gray-100">
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Timesheets</div>
+          <div className="text-[15px] font-extrabold text-gray-900 truncate">{person.sheets.length}</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Total</div>
+          <div className="text-[15px] font-extrabold text-[#730042] truncate">{fmtDuration(person.total)}</div>
+        </div>
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400">Billable</div>
+          <div className="text-[15px] font-extrabold text-emerald-600 truncate">{fmtDuration(person.billable)}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-gray-400">
+        <span className="truncate min-w-0">
+          {person.latest ? `Latest: ${fmtShort(person.latest.week_start)} – ${fmtShort(person.latest.week_end)}` : ""}
+        </span>
+        <span className="text-[#730042] font-semibold opacity-70 group-hover:opacity-100 transition-opacity shrink-0">View timesheets ›</span>
+      </div>
+    </Card>
+  );
+}
+
+function SheetDetailModal({ person, onClose }) {
+  useEffect(() => {
+    if (!person) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [person]);
+  if (!person) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-gray-900/45 overflow-hidden" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white border border-gray-200 sm:rounded-xl w-full h-full sm:h-auto sm:w-[95vw] lg:max-w-[760px] max-h-full sm:max-h-[90vh] flex flex-col min-w-0 overflow-hidden shadow-xl"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 shrink-0 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#730042] to-[#94005a] text-white flex items-center justify-center text-[12px] font-bold shrink-0">
+              {initialsOf(person.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-[15px] text-gray-900 truncate" title={person.name}>{person.name}</div>
+              <div className="text-[11px] text-gray-400 truncate" title={person.email}>
+                {person.email ? `${person.email} · ` : ""}{person.model === "User" ? "Employee" : person.model}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors text-xl leading-none shrink-0">×</button>
+        </div>
+
+        <div className="p-4 sm:p-6 overflow-y-auto overflow-x-hidden min-w-0 flex flex-col gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { label: "Timesheets", value: person.sheets.length, c: "text-gray-900" },
+              { label: "Total", value: fmtDuration(person.total), c: "text-[#730042]" },
+              { label: "Billable", value: fmtDuration(person.billable), c: "text-emerald-600" },
+              { label: "Overtime", value: fmtDuration(person.overtime), c: "text-amber-600" },
+            ].map((t) => (
+              <div key={t.label} className="bg-gray-50/80 ring-1 ring-gray-100 rounded-xl p-3 min-w-0">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{t.label}</div>
+                <div className={cn("text-[18px] font-extrabold leading-none truncate", t.c)}>{t.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+              Timesheets · {person.sheets.length} filled
+            </div>
+            {person.sheets.map((ts) => {
+              const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
+              return (
+                <div key={ts._id} className="rounded-lg border border-gray-200 bg-white px-3.5 py-3 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+                    <span className="text-[12px] font-bold text-gray-900">{fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</span>
+                    <Badge tw={ss.tw}>{ss.label}</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 flex-wrap text-[11px]">
+                    <span className="text-gray-500">Total <span className="font-bold text-[#730042]">{fmtDuration(ts.total_minutes)}</span></span>
+                    <span className="text-gray-500">Billable <span className="font-bold text-emerald-600">{fmtDuration(ts.billable_minutes)}</span></span>
+                    {ts.overtime_minutes > 0 && <span className="text-gray-500">Overtime <span className="font-bold text-amber-600">{fmtDuration(ts.overtime_minutes)}</span></span>}
+                  </div>
+                  {ts.remarks && (
+                    <div className="mt-2 text-[12px] text-gray-500 px-3 py-2 bg-gray-50/80 rounded-lg border-l-[3px] border-l-[#730042] break-words">{ts.remarks}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SuperAdminTimesheet() {
   const [tab, setTab] = useState("overview");
+
+  // The app shell's scroll container has its own padding, so `top-0` would leave a gap above the
+  // sticky header where scrolled content shows through. Pull the header up by exactly that padding.
+  const headerRef = useRef(null);
+  const [stickyTop, setStickyTop] = useState(0);
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return undefined;
+    const measure = () => {
+      let node = el.parentElement;
+      while (node && node !== document.body && node !== document.documentElement) {
+        const cs = window.getComputedStyle(node);
+        if (/(auto|scroll|overlay)/.test(cs.overflowY)) {
+          setStickyTop(-(parseFloat(cs.paddingTop) || 0));
+          return;
+        }
+        node = node.parentElement;
+      }
+      setStickyTop(0);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [editProject, setEditProject] = useState(null);
   const [editProjectName, setEditProjectName] = useState("");
@@ -932,6 +1151,7 @@ export default function SuperAdminTimesheet() {
   const [logsWeek, setLogsWeek] = useState(getMonday());
   const [sheetsStatus, setSheetsStatus] = useState("");
   const [sheetsOwnerModel, setSheetsOwnerModel] = useState("");
+  const [selectedSheetKey, setSelectedSheetKey] = useState(null);
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -1138,6 +1358,8 @@ export default function SuperAdminTimesheet() {
   const targets     = targetsData?.targets        ?? [];
   const orgLogs     = orgLogsData?.logs           ?? [];
   const orgSheets   = orgSheetsData?.timesheets   ?? [];
+  const sheetPeople = useMemo(() => groupSheetsByOwner(orgSheets), [orgSheets]);
+  const selectedSheetPerson = sheetPeople.find((x) => x.key === selectedSheetKey) || null;
   const assignedJobs = assignedJobsData?.jobs     ?? [];
   const weekDays    = weekData?.days              ?? {};
   const totalWeekMins = weekData?.totalMinutes    ?? 0;
@@ -1284,9 +1506,9 @@ export default function SuperAdminTimesheet() {
   const currentTabLabel = NAV_TABS.find(t => t.id === tab)?.label ?? "";
 
   return (
-    <div className="min-h-screen w-full max-w-full bg-gray-50 overflow-x-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="ts-root min-h-screen w-full max-w-full min-w-0 bg-gray-50 overflow-x-clip" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-20 min-w-0 max-w-full">
+      <header ref={headerRef} style={{ top: stickyTop }} className="bg-white border-b border-gray-200 sticky z-20 min-w-0 max-w-full shadow-[0_10px_24px_-18px_rgba(115,0,66,0.35)]">
         <div className="max-w-[1280px] mx-auto px-3 sm:px-6 min-w-0">
           <div className="flex items-center justify-between gap-3 py-2.5 sm:py-3 min-w-0">
             <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -1308,23 +1530,29 @@ export default function SuperAdminTimesheet() {
             </div>
           </div>
 
-          <div className="pb-2.5 sm:pb-3">
-            <nav className="flex flex-wrap items-center gap-1 bg-gray-50 border border-gray-100 rounded-xl p-1 min-w-0">
-              {NAV_TABS.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={cn("flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-lg text-[12px] lg:text-[13px] font-semibold whitespace-nowrap transition-all",
-                    tab === t.id
-                      ? "bg-[#730042] text-white shadow-sm shadow-[#730042]/30"
-                      : "text-gray-500 hover:text-gray-900 hover:bg-white")}>
-                  {t.label}
-                  {t.id === "approvals" && approvals.length > 0 && (
-                    <span className={cn("inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black",
-                      tab === t.id ? "bg-white/25 text-white" : "bg-red-500 text-white")}>
-                      {approvals.length}
-                    </span>
-                  )}
-                </button>
-              ))}
+          <div className="min-w-0">
+            {/* Tabs scroll inside their own region when they don't fit — they never widen the page */}
+            <nav aria-label="Timesheet sections"
+              className="ts-scroll flex flex-nowrap items-end gap-0.5 overflow-x-auto border-t border-gray-100 min-w-0 max-w-full">
+              {NAV_TABS.map(t => {
+                const active = tab === t.id;
+                return (
+                  <button key={t.id} onClick={() => setTab(t.id)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn("group relative flex items-center gap-1.5 shrink-0 px-3.5 sm:px-4 py-3 text-[12.5px] lg:text-[13px] whitespace-nowrap transition-colors focus:outline-none focus-visible:bg-[#730042]/[0.06]",
+                      active ? "text-[#730042] font-bold" : "text-gray-500 font-semibold hover:text-gray-900")}>
+                    {t.label}
+                    {t.id === "approvals" && approvals.length > 0 && (
+                      <span className={cn("inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-[9px] font-black",
+                        active ? "bg-[#730042] text-white" : "bg-red-500 text-white")}>
+                        {approvals.length}
+                      </span>
+                    )}
+                    <span aria-hidden="true" className={cn("absolute left-2.5 right-2.5 bottom-0 h-[3px] rounded-t-full transition-colors",
+                      active ? "bg-[#730042]" : "bg-transparent group-hover:bg-gray-200")} />
+                  </button>
+                );
+              })}
             </nav>
           </div>
         </div>
@@ -1339,6 +1567,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "overview" && (
           <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+            <PageHeading flush icon={<TabIcon name="overview" />} title="Overview" sub="Projects, jobs, approvals and team workload across the organisation" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <StatTile label="Total Projects"  value={projects.length}                                     sub="Across all teams"           colorClass="text-[#730042]"    />
               <StatTile label="Active Jobs"     value={jobs.filter(j => j.status === "in_progress").length} sub={`${completedJobs} completed`} colorClass="text-blue-600"  />
@@ -1357,7 +1586,7 @@ export default function SuperAdminTimesheet() {
                       <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-gray-50/80 border border-gray-200 rounded-xl min-w-0">
                         <span className="text-[12px] font-black text-red-600 min-w-[36px] shrink-0">{job.riskPercent}%</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-[12px] font-semibold truncate">{job.title}</div>
+                          <div className="text-[12px] font-semibold truncate" title={job.title}>{job.title}</div>
                           <div className="text-[11px] text-gray-400">{job.logged_hours_cache}h / {job.estimated_hours}h est.</div>
                         </div>
                         <div className="w-12 sm:w-16 h-1 bg-gray-100 rounded-full overflow-hidden shrink-0">
@@ -1379,7 +1608,7 @@ export default function SuperAdminTimesheet() {
                       <div key={job._id} className="flex items-center gap-3 px-3 sm:px-3.5 py-2.5 bg-gray-50/80 border border-gray-200 rounded-xl min-w-0">
                         <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-[12px] font-semibold truncate">{job.title}</div>
+                          <div className="text-[12px] font-semibold truncate" title={job.title}>{job.title}</div>
                           <div className="text-[11px] text-gray-400">Last: {fmtDate(job.updatedAt)}</div>
                         </div>
                         <Badge tw={JOB_STATUS_TW[job.status] ? `${JOB_STATUS_TW[job.status]} bg-gray-50 border-gray-200` : "text-gray-400 bg-gray-50 border-gray-200"}>
@@ -1410,8 +1639,8 @@ export default function SuperAdminTimesheet() {
                       const memberMeta = [row.empid, row.department, row.designation].filter(Boolean).join(" • ");
                       return (
                         <div key={i} className="min-w-0">
-                          <div className="text-[12px] font-semibold text-gray-700 truncate">{memberName}</div>
-                          {memberMeta && <div className="text-[10px] text-gray-400 truncate mb-1.5">{memberMeta}</div>}
+                          <div className="text-[12px] font-semibold text-gray-700 truncate" title={memberName}>{memberName}</div>
+                          {memberMeta && <div className="text-[10px] text-gray-400 truncate mb-1.5" title={memberMeta}>{memberMeta}</div>}
                           <div className="grid grid-cols-7 gap-1">
                             {days.map((day, j) => {
                               const pct = day?.loadPercent ?? 0;
@@ -1431,9 +1660,9 @@ export default function SuperAdminTimesheet() {
                     })}
                   </div>
 
-                  {/* lg+: full table, fits the container width — no forced min-width */}
-                  <div className="hidden lg:block min-w-0">
-                    <table className="w-full border-collapse text-[12px] table-fixed">
+                  {/* lg+: full table inside its own horizontal scroller */}
+                  <div className="hidden lg:block min-w-0 ts-scroll overflow-x-auto">
+                    <table className="w-full min-w-[720px] border-collapse text-[12px] table-fixed">
                       <thead>
                         <tr>
                           <th className="text-left py-2 pr-4 pl-1 text-gray-400 font-semibold w-[24%]">Member</th>
@@ -1454,8 +1683,8 @@ export default function SuperAdminTimesheet() {
                           return (
                             <tr key={i} className="border-t border-gray-100">
                               <td className="py-2.5 pr-4 pl-1 text-gray-700 min-w-0">
-                                <div className="font-medium truncate">{memberName}</div>
-                                {memberMeta && <div className="text-[10px] text-gray-400 truncate">{memberMeta}</div>}
+                                <div className="font-medium truncate" title={memberName}>{memberName}</div>
+                                {memberMeta && <div className="text-[10px] text-gray-400 truncate" title={memberMeta}>{memberMeta}</div>}
                               </td>
                               {days.map((day, j) => {
                                 const pct = day?.loadPercent ?? 0;
@@ -1482,7 +1711,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "projects" && (
           <div className="min-w-0">
-            <SectionHeader title="All Projects" sub={`${projects.length} total`} action={<Btn onClick={() => setCreateProjectOpen(true)} className="w-full sm:w-auto">＋ New Project</Btn>} />
+            <PageHeading icon={<TabIcon name="projects" />} title="All Projects" sub={`${projects.length} total`} action={<Btn onClick={() => setCreateProjectOpen(true)} className="w-full sm:w-auto">＋ New Project</Btn>} />
             {projects.length === 0 ? (
               <Card><EmptyState icon="⬡" title="No projects yet" sub="Create your first project" action={<Btn onClick={() => setCreateProjectOpen(true)}>Create Project</Btn>} /></Card>
             ) : (
@@ -1492,7 +1721,7 @@ export default function SuperAdminTimesheet() {
                     <div className="flex items-center gap-3 mb-3 min-w-0">
                       <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] shrink-0 border-2" style={{ background: (p.color_tag || "#730042") + "22", borderColor: p.color_tag || "#730042" }} />
                       <div className="min-w-0">
-                        <div className="font-bold text-[14px] truncate text-gray-900">{p.name}</div>
+                        <div className="font-bold text-[14px] truncate text-gray-900" title={p.name}>{p.name}</div>
                         <div className="text-[11px] text-gray-400 truncate">{p.code || "—"} · {p.billing_type}</div>
                       </div>
                     </div>
@@ -1515,7 +1744,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "jobs" && (
           <div className="min-w-0">
-            <SectionHeader title="Jobs Created by Me" sub={`${jobs.length} total`} action={<Btn onClick={() => setCreateJobOpen(true)} className="w-full sm:w-auto">＋ New Job</Btn>} />
+            <PageHeading icon={<TabIcon name="jobs" />} title="Jobs Created by Me" sub={`${jobs.length} total`} action={<Btn onClick={() => setCreateJobOpen(true)} className="w-full sm:w-auto">＋ New Job</Btn>} />
             <div className="flex flex-col gap-2.5">
               {jobs.length === 0 ? (
                 <Card><EmptyState icon="⬢" title="No jobs yet" sub="Create a job to assign work" action={<Btn onClick={() => setCreateJobOpen(true)}>Create Job</Btn>} /></Card>
@@ -1571,7 +1800,7 @@ export default function SuperAdminTimesheet() {
 
         {tab === "approvals" && (
           <div className="min-w-0">
-            <SectionHeader title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
+            <PageHeading icon={<TabIcon name="approvals" />} title="Pending Timesheets" sub={`${approvals.length} awaiting your review`} />
             {approvals.length === 0 ? (
               <Card><EmptyState icon="✦" title="All clear" sub="No timesheets pending review" /></Card>
             ) : (
@@ -1605,7 +1834,7 @@ export default function SuperAdminTimesheet() {
         {tab === "my-work" && (
           <div className="flex flex-col gap-4 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">My Work</h1>
+              <PageHeading flush icon={<TabIcon name="mywork" />} title="My Work" sub="Track time, log work and submit your weekly timesheet" />
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-md px-2.5 py-1.5">
                   <button onClick={() => shiftWeek(-1)} className="bg-transparent border-none cursor-pointer text-gray-700 text-base flex w-6 h-6 items-center justify-center shrink-0">‹</button>
@@ -1634,7 +1863,7 @@ export default function SuperAdminTimesheet() {
             <WeekGrid weekStart={weekStart} weekDays={weekDays}
               onAddLog={(date) => { setLogForm({ job: "", log_date: date, duration_minutes: "", note: "" }); setLogModal(true); }} />
 
-            <div className="bg-white border border-gray-200 rounded-lg p-4 min-w-0">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-gray-900">Week of {fmtShort(weekStart)} – {fmtShort(weekEnd)}</div>
@@ -1662,8 +1891,8 @@ export default function SuperAdminTimesheet() {
 
         {tab === "org-logs" && (
           <div className="min-w-0">
-            <SectionHeader
-              title="All Time Logs — Organisation"
+            <PageHeading
+              icon={<TabIcon name="logs" />} title="All Time Logs — Organisation"
               sub={`${orgLogs.length} entries · ${fmtDuration(orgLogsData?.totalMinutes || 0)} total`}
               action={
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1678,36 +1907,39 @@ export default function SuperAdminTimesheet() {
             ) : (
               <>
                 <Card className="hidden lg:block">
-                  <table className="w-full border-collapse text-[13px] table-fixed">
-                    <thead>
-                      <tr className="bg-gray-50/80 border-b border-gray-100">
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[16%]">Member</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[12%]">Role</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[26%]">Job</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[14%]">Date</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[12%]">Duration</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[10%]">Mode</th>
-                        <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider w-[10%]">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orgLogs.map(log => (
-                        <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
-                          <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
-                          <td className="px-4 py-3 truncate text-gray-700">{log.job?.title || "—"}</td>
-                          <td className="px-4 py-3 text-gray-400 truncate">{fmtDate(log.log_date)}</td>
-                          <td className="px-4 py-3 font-semibold text-emerald-600 truncate">{fmtDuration(log.duration_minutes)}</td>
-                          <td className="px-4 py-3">
-                            <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
-                          </td>
+                  {/* The table owns its horizontal scroll; the page never widens */}
+                  <div className="ts-scroll overflow-x-auto">
+                    <table className="w-full min-w-[960px] border-collapse text-[13px]">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Member</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Role</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Job</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Duration</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Mode</th>
+                          <th className="text-left px-4 py-3 text-[11px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {orgLogs.map(log => (
+                          <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</td>
+                            <td className="px-4 py-3"><Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge></td>
+                            <td className="px-4 py-3 text-gray-700 max-w-[280px] truncate" title={log.job?.title || "—"}>{log.job?.title || "—"}</td>
+                            <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{fmtDate(log.log_date)}</td>
+                            <td className="px-4 py-3 font-semibold text-emerald-600 whitespace-nowrap">{fmtDuration(log.duration_minutes)}</td>
+                            <td className="px-4 py-3">
+                              <Badge tw={log.entry_mode === "timer" ? "text-blue-600 bg-blue-50 border-blue-200" : "text-gray-400 bg-gray-100 border-gray-200"}>{log.entry_mode}</Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge tw={(STATUS_STYLE[log.status] || STATUS_STYLE.draft).tw}>{(STATUS_STYLE[log.status] || STATUS_STYLE.draft).label}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </Card>
 
                 <div className="flex flex-col gap-2.5 lg:hidden">
@@ -1716,7 +1948,7 @@ export default function SuperAdminTimesheet() {
                       <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
                         <div className="min-w-0">
                           <div className="font-bold text-[13px] text-gray-900 truncate">{log.logged_by?.f_name || "—"} {log.logged_by?.l_name || ""}</div>
-                          <div className="text-[11px] text-gray-400 truncate">{log.job?.title || "—"}</div>
+                          <div className="text-[11px] text-gray-400 truncate" title={log.job?.title || "—"}>{log.job?.title || "—"}</div>
                         </div>
                         <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{log.logged_by_model === "User" ? "Employee" : log.logged_by_model}</Badge>
                       </div>
@@ -1738,9 +1970,9 @@ export default function SuperAdminTimesheet() {
 
         {tab === "org-sheets" && (
           <div className="min-w-0">
-            <SectionHeader
-              title="All Timesheets — Organisation"
-              sub={`${orgSheets.length} timesheets`}
+            <PageHeading
+              icon={<TabIcon name="sheets" />} title="All Timesheets — Organisation"
+              sub={`${sheetPeople.length} employee${sheetPeople.length === 1 ? "" : "s"} · ${orgSheets.length} timesheet${orgSheets.length === 1 ? "" : "s"}`}
               action={
                 <div className="flex gap-2 flex-wrap">
                   <select value={sheetsStatus} onChange={e => setSheetsStatus(e.target.value)}
@@ -1761,44 +1993,20 @@ export default function SuperAdminTimesheet() {
             {orgSheets.length === 0 ? (
               <Card><EmptyState icon="📄" title="No timesheets found" sub="Adjust filters to view timesheets" /></Card>
             ) : (
-              <div className="flex flex-col gap-2.5">
-                {orgSheets.map(ts => {
-                  const ss = STATUS_STYLE[ts.status] || STATUS_STYLE.draft;
-                  return (
-                    <Card key={ts._id} className="p-4 sm:p-5">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-bold text-[14px] text-gray-900 truncate">{ts.owner?.f_name} {ts.owner?.l_name}</span>
-                            <Badge tw="text-[#730042] bg-[#730042]/[0.07] border-[#730042]/20">{ts.owner_model === "User" ? "Employee" : ts.owner_model}</Badge>
-                            <Badge tw={ss.tw}>{ss.label}</Badge>
-                          </div>
-                          <div className="text-[12px] text-gray-400 truncate">{ts.owner?.work_email} · Week: {fmtDate(ts.week_start)} — {fmtDate(ts.week_end)}</div>
-                        </div>
-                        <div className="flex gap-4 sm:gap-5 shrink-0">
-                          <div className="text-right">
-                            <div className="text-[15px] sm:text-[16px] font-extrabold text-[#730042]">{fmtDuration(ts.total_minutes)}</div>
-                            <div className="text-[11px] text-gray-400">total</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-[15px] sm:text-[16px] font-extrabold text-emerald-600">{fmtDuration(ts.billable_minutes)}</div>
-                            <div className="text-[11px] text-gray-400">billable</div>
-                          </div>
-                        </div>
-                      </div>
-                      {ts.remarks && (
-                        <div className="mt-3 text-[12px] text-gray-500 px-3 py-2 bg-gray-50/80 rounded-lg border-l-[3px] border-l-[#730042] break-words">{ts.remarks}</div>
-                      )}
-                    </Card>
-                  );
-                })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {sheetPeople.map((person) => (
+                  <SheetPersonCard key={person.key} person={person} onOpen={() => setSelectedSheetKey(person.key)} />
+                ))}
               </div>
             )}
+
+            <SheetDetailModal person={selectedSheetPerson} onClose={() => setSelectedSheetKey(null)} />
           </div>
         )}
 
         {tab === "analytics" && (
           <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+            <PageHeading flush icon={<TabIcon name="analytics" />} title="Analytics" sub="Hours, billing and job health at a glance" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
               <StatTile label="Total Hours"   value={`${totalHours.toFixed(0)}h`} sub="All time logged"       colorClass="text-[#730042]"   />
               <StatTile label="Billable Jobs" value={billableJobs}                sub={`of ${jobs.length} total`} colorClass="text-emerald-600" />
@@ -1826,13 +2034,11 @@ export default function SuperAdminTimesheet() {
           <div className="min-w-0">
             {/* ─── Header ─── */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-5 gap-3">
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-xl font-extrabold text-gray-900 m-0">{REPORT_TITLES[reportView]}</h1>
-                <p className="text-xs text-gray-400 mt-1 mb-0">
-                  {reportGroups.length} employee{reportGroups.length === 1 ? "" : "s"} · {reportRows.length} record{reportRows.length === 1 ? "" : "s"} · {periodLabel}
-                  {(reportLoading || filtersPending) && " · refreshing…"}
-                </p>
-              </div>
+              <PageHeading
+                flush
+                icon={<TabIcon name="report" />} title={REPORT_TITLES[reportView]}
+                sub={`${reportGroups.length} employee${reportGroups.length === 1 ? "" : "s"} · ${reportRows.length} record${reportRows.length === 1 ? "" : "s"} · ${periodLabel}${(reportLoading || filtersPending) ? " · refreshing…" : ""}`}
+              />
               <ExportButton
                 variant="solid"
                 label="Bulk CSV"
@@ -1874,8 +2080,8 @@ export default function SuperAdminTimesheet() {
                   {reportView === "monthly" ? (
                     <>
                       <span className={FILTER_LABEL}>Month</span>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <div className={STEPPER_WRAP}>
                           <button type="button" onClick={() => shiftReportMonth(-1)} disabled={monthIdx >= monthOptions.length - 1} aria-label="Previous month" className={STEP_BTN}>‹</button>
                           <select
                             aria-label="Month"
@@ -1897,7 +2103,7 @@ export default function SuperAdminTimesheet() {
                   ) : reportView === "detailed" ? (
                     <>
                       <span className={FILTER_LABEL}>Date range (up to today)</span>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
                         <input
                           type="date"
                           aria-label="From date"
@@ -1935,8 +2141,8 @@ export default function SuperAdminTimesheet() {
                   ) : (
                     <>
                       <span className={FILTER_LABEL}>Week</span>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white overflow-hidden">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <div className={STEPPER_WRAP}>
                           <button type="button" onClick={() => shiftReportWeek(-1)} aria-label="Previous week" className={STEP_BTN}>‹</button>
                           <span className="px-3 text-[13px] font-semibold text-gray-900 whitespace-nowrap border-x border-gray-200 h-10 flex items-center">
                             {fmtYMD(reportWeek)} – {fmtYMD(reportWeekEnd)}
@@ -2038,7 +2244,7 @@ export default function SuperAdminTimesheet() {
                   { label: "Served", value: `${reportTotals.served}h`, c: "text-emerald-600" },
                   { label: "Overtime", value: `${reportTotals.overtime}h`, c: "text-amber-600" },
                 ].map((s) => (
-                  <div key={s.label} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 min-w-0">
+                  <div key={s.label} className="bg-white border border-gray-200 rounded-lg shadow-sm px-3.5 py-3 min-w-0">
                     <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 truncate">{s.label}</div>
                     <div className={cn("text-[18px] font-extrabold leading-none truncate", s.c)}>{s.value}</div>
                   </div>
@@ -2350,12 +2556,20 @@ export default function SuperAdminTimesheet() {
 
       <JobDetailModal jobId={selectedJobId} open={jobDetailOpen} onClose={() => setJobDetailOpen(false)} />
 
+      {/*
+        Scoped styles only. The previous global rules (`* { min-width: 0; word-break: break-word }` and
+        `html, body { overflow-x: hidden !important }`) leaked into the whole app, collapsed controls,
+        broke sticky positioning and only hid horizontal overflow instead of fixing it.
+        Overflow is now handled by overflow-x-clip on the root + dedicated `.ts-scroll` wrappers.
+      */}
       <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        html, body { overflow-x: hidden !important; max-width: 100%; }
-        * { box-sizing: border-box; min-width: 0; word-break: break-word; }
-        table, img, svg { max-width: 100%; }
+        .ts-root { overflow-wrap: break-word; }
+        .ts-root table, .ts-root img { max-width: 100%; }
+        .ts-scroll { scrollbar-width: thin; scrollbar-color: #d1b3c4 #f3f4f6; -webkit-overflow-scrolling: touch; }
+        .ts-scroll::-webkit-scrollbar { height: 8px; }
+        .ts-scroll::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 9999px; }
+        .ts-scroll::-webkit-scrollbar-thumb { background: #d1b3c4; border-radius: 9999px; }
+        .ts-scroll::-webkit-scrollbar-thumb:hover { background: #730042; }
       `}</style>
     </div>
   );
