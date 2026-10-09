@@ -710,107 +710,6 @@ export default function SuperAdminAssets() {
   const [showFilters, setShowFilters] = useState(false);
   const [exportDone, setExportDone] = useState(false);
   const [activeTab, setActiveTab] = useState("assets"); // "assets" | "employees"
-  const pageRef = useRef(null);
-  const rootRef = useRef(null);
-
-  // ── Page layout: no browser-level scrollbars ─────────────────────────────────
-  // 1) Lock html/body/parent layout wrappers so the BROWSER never shows a horizontal scrollbar
-  //    (and the sidebar/layout can never be scrolled sideways).
-  // 2) Fit this page exactly to the visible area (right of the sidebar, below the top bar), so
-  //    nothing runs past the right edge of the screen.
-  // 3) The page scrolls INSIDE itself: a horizontal scrollbar at the bottom of the page appears
-  //    only when content is really wider than the screen.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-
-    const locked = [];
-    const lock = (el) => {
-      if (!el) return;
-      locked.push({
-        el,
-        overflow: el.style.overflow,
-        height: el.style.height,
-        maxHeight: el.style.maxHeight,
-        maxWidth: el.style.maxWidth,
-        margin: el.style.margin,
-      });
-      el.style.overflow = "hidden";
-      el.style.height = "100%";
-      el.style.maxHeight = "100%";
-      el.style.maxWidth = "100%";
-    };
-    const prevBodyMargin = document.body.style.margin;
-
-    // reset any existing scroll offset on the layout wrappers before measuring
-    let node = root.parentElement;
-    while (node && node !== document.body) {
-      node.scrollTop = 0;
-      node.scrollLeft = 0;
-      node = node.parentElement;
-    }
-
-    lock(document.documentElement);
-    lock(document.body);
-    document.body.style.margin = "0";
-
-    node = root.parentElement;
-    while (node && node !== document.body) {
-      const cs = window.getComputedStyle(node);
-      const scrollable =
-        node.scrollHeight > node.clientHeight + 1 ||
-        ["auto", "scroll"].includes(cs.overflowY) ||
-        ["auto", "scroll"].includes(cs.overflow);
-      if (scrollable) lock(node);
-      node = node.parentElement;
-    }
-
-    const resetters = [];
-    locked.forEach(({ el }) => {
-      if (el === document.documentElement || el === document.body) return;
-      const reset = () => {
-        if (el.scrollLeft !== 0) el.scrollLeft = 0;
-        if (el.scrollTop !== 0) el.scrollTop = 0;
-      };
-      el.addEventListener("scroll", reset);
-      resetters.push([el, reset]);
-    });
-
-    const fit = () => {
-      const r = root.getBoundingClientRect();
-      const vw = document.documentElement.clientWidth || window.innerWidth;
-      const vh = window.innerHeight;
-      const w = Math.max(280, Math.floor(vw - r.left));
-      const h = Math.max(320, Math.floor(vh - r.top));
-      root.style.width = `${w}px`;
-      root.style.maxWidth = `${w}px`;
-      root.style.height = `${h}px`;
-      root.style.maxHeight = `${h}px`;
-      root.style.flex = "none";
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
-    let p = root.parentElement;
-    while (p && ro) { ro.observe(p); p = p.parentElement; }
-    const timer = setInterval(fit, 500); // catches sidebar collapse/expand animations
-
-    return () => {
-      window.removeEventListener("resize", fit);
-      if (ro) ro.disconnect();
-      clearInterval(timer);
-      resetters.forEach(([el, reset]) => el.removeEventListener("scroll", reset));
-      ["width", "maxWidth", "height", "maxHeight", "flex"].forEach((k) => { root.style[k] = ""; });
-      locked.forEach(({ el, overflow, height, maxHeight, maxWidth, margin }) => {
-        el.style.overflow = overflow;
-        el.style.height = height;
-        el.style.maxHeight = maxHeight;
-        el.style.maxWidth = maxWidth;
-        if (margin !== undefined) el.style.margin = margin;
-      });
-      document.body.style.margin = prevBodyMargin;
-    };
-  }, []);
 
   const { data, isLoading } = useGetAllAssetsSuperAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -900,17 +799,17 @@ export default function SuperAdminAssets() {
   }
 
   return (
-    <div ref={rootRef} className="sa-assets-root h-full w-full min-w-0 overflow-auto bg-[#F9F8F2] p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif] text-[#0d0209]">
+    <div className="sa-assets-root w-full max-w-full min-w-0 min-h-full [contain:inline-size] bg-[#F9F8F2] p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif] text-[#0d0209]">
       <style>{`
         @keyframes modalUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-        .sa-assets-root { scrollbar-width: thin; scrollbar-color: #d1b3c4 #f3f4f6; }
-        .sa-assets-root::-webkit-scrollbar { height: 10px; width: 10px; }
-        .sa-assets-root::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 9999px; }
-        .sa-assets-root::-webkit-scrollbar-thumb { background: #d1b3c4; border-radius: 9999px; }
-        .sa-assets-root::-webkit-scrollbar-thumb:hover { background: #730042; }
+        .sa-assets-table-scroll { scrollbar-width: thin; scrollbar-color: #b98aa3 #f3e8ee; overscroll-behavior-x: contain; }
+        .sa-assets-table-scroll::-webkit-scrollbar { height: 12px; }
+        .sa-assets-table-scroll::-webkit-scrollbar-track { background: #f3e8ee; border-top: 1px solid #e8d5e2; }
+        .sa-assets-table-scroll::-webkit-scrollbar-thumb { background: #b98aa3; border-radius: 9999px; border: 2px solid #f3e8ee; }
+        .sa-assets-table-scroll::-webkit-scrollbar-thumb:hover { background: #730042; }
       `}</style>
 
-      <div className="max-w-7xl mx-auto w-full lg:min-w-[900px]" ref={pageRef}>
+      <div className="max-w-7xl mx-auto w-full min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">Asset Management</h1>
@@ -1038,8 +937,8 @@ export default function SuperAdminAssets() {
             </div>
           ) : (
             <>
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
+              <div className="sa-assets-table-scroll hidden lg:block overflow-x-auto overflow-y-hidden">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead>
                     <tr className="border-b border-[#F4C0D1] bg-[#F9F8F2]">
                       {["Asset", "Type", "Brand / Serial", "Condition", "Quantity", "Status", "Assigned To", "Actions"].map((h) => (

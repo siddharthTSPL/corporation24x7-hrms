@@ -185,7 +185,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
           </button>
         </div>
 
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto overflow-x-hidden">
           {isLoading && (
             <div className="flex justify-center pt-16">
               <Spinner />
@@ -502,7 +502,7 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
           })}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {list.length === 0 ? (
             <EmptyState message={`No ${tab} documents from this person.`} />
           ) : (
@@ -586,7 +586,7 @@ function UploaderTableRow({ group, onClick }) {
 
   return (
     <tr onClick={onClick} className="border-b border-[#ede5e0] hover:bg-[#f9f8f2] cursor-pointer transition-colors group">
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-8 h-8 rounded-full bg-[#730042] flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
             {getInitials(group.name)}
@@ -597,40 +597,40 @@ function UploaderTableRow({ group, onClick }) {
           </div>
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         <Badge className="bg-[#730042]/8 text-[#730042] capitalize">{fmtRole(group.role)}</Badge>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
       <p className="text-xs text-[#b0948a] truncate max-w-[120px] xl:max-w-xs">{fmtDept(group.department)}</p>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         <p className="text-xs text-[#b0948a] truncate max-w-[120px] xl:max-w-xs">{group.designation || "—"}</p>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         {group.personalCount > 0 ? (
           <Badge className="bg-[#730042]/10 text-[#730042]">{group.personalCount}</Badge>
         ) : (
           <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         {group.expenseCount > 0 ? (
           <Badge className="bg-blue-50 text-blue-700">{group.expenseCount}</Badge>
         ) : (
           <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         <span className="text-sm font-semibold text-[#2a1a16]">{total}</span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         {group.unviewedCount > 0 ? (
           <Badge className="bg-amber-50 text-amber-700">{group.unviewedCount} new</Badge>
         ) : (
           <Badge className="bg-green-50 text-green-700">All viewed</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3 overflow-hidden">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform">
           <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -716,7 +716,7 @@ export default function SuperAdminDocuments() {
   const selectedGroup = groups.find((g) => g.id === selectedUploaderId) || null;
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-3 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
+    <div className="min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-[#f9f8f2] p-3 sm:p-6 lg:p-8 font-[DM_Sans,ui-sans-serif,system-ui,sans-serif] text-[#2a1a16]">
       <div className="mb-5 sm:mb-6">
         <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight">Documents</h1>
         <p className="text-xs sm:text-sm text-[#b0948a] mt-1">
@@ -787,7 +787,7 @@ export default function SuperAdminDocuments() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden min-w-0">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[#ede5e0]">
           <p className="text-sm font-medium text-[#2a1a16]">Uploaders</p>
           <span className="text-[11px] text-[#b0948a]">
@@ -814,14 +814,25 @@ export default function SuperAdminDocuments() {
 
         {!loading && filteredGroups.length > 0 && (
           <>
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full min-w-full">
+            <div className="hidden xl:block overflow-hidden">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col style={{ width: "24%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "7%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "5%" }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[#ede5e0]">
-                    {["Uploader", "Role", "Department", "Designation", "Personal", "Expense", "Total", "Status", ""].map((h) => (
+                    {["Uploader", "Role", "Department", "Designation", "Personal", "Expense", "Total", "Status", ""].map((h, i) => (
                       <th
-                        key={h}
-                        className="px-4 py-3 text-left text-[10px] font-semibold text-[#c9bab5] uppercase tracking-wider whitespace-nowrap"
+                        key={`${h}-${i}`}
+                        className="px-3 py-3 text-left text-[10px] font-semibold text-[#c9bab5] uppercase tracking-wider truncate"
                       >
                         {h}
                       </th>
@@ -836,7 +847,7 @@ export default function SuperAdminDocuments() {
               </table>
             </div>
 
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               {filteredGroups.map((g) => (
                 <UploaderCard key={g.id} group={g} onClick={() => setSelectedUploaderId(g.id)} />
               ))}
