@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   useGetAllPersonalDocuments,
   useGetAllExpenseDocuments,
@@ -58,6 +58,18 @@ function getInitials(name = "") {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+// Keeps the browser-level horizontal scrollbar from appearing while this page is mounted
+function useNoPageXScroll() {
+  useEffect(() => {
+    const body = document.body;
+    const prev = body.style.overflowX;
+    body.style.overflowX = "hidden";
+    return () => {
+      body.style.overflowX = prev;
+    };
+  }, []);
 }
 
 function getExt(url = "") {
@@ -557,51 +569,51 @@ function UploaderTableRow({ group, onClick }) {
       onClick={onClick}
       className="border-b border-[#ede5e0] hover:bg-[#f9f8f2] cursor-pointer transition-colors group last:border-b-0"
     >
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-full bg-[#730042] flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
             {getInitials(group.name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[150px] xl:max-w-xs">{group.name}</p>
-            <p className="text-[10px] text-[#b0948a] truncate max-w-[150px] xl:max-w-xs">{group.email}</p>
+            <p className="text-sm font-medium text-[#2a1a16] truncate">{group.name}</p>
+            <p className="text-[10px] text-[#b0948a] truncate">{group.email}</p>
           </div>
         </div>
       </td>
-      <td className="px-4 py-3">
-        <Badge className="bg-[#730042]/8 text-[#730042]">{fmtRole(group.role)}</Badge>
+      <td className="px-3 py-3">
+        <Badge className="bg-[#730042]/8 text-[#730042] max-w-full truncate">{fmtRole(group.role)}</Badge>
       </td>
-      <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a] truncate max-w-[150px]">{fmtDepartment(group.department)}</p>
+      <td className="px-3 py-3">
+        <p className="text-xs text-[#b0948a] truncate">{fmtDepartment(group.department)}</p>
       </td>
-      <td className="px-4 py-3">
-        <p className="text-xs text-[#b0948a] truncate max-w-[110px]">{group.designation || "—"}</p>
+      <td className="px-3 py-3">
+        <p className="text-xs text-[#b0948a] truncate">{group.designation || "—"}</p>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         {group.personalDocs.length > 0 ? (
           <Badge className="bg-[#730042]/10 text-[#730042]">{group.personalDocs.length}</Badge>
         ) : (
           <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         {group.expenseDocs.length > 0 ? (
           <Badge className="bg-blue-50 text-blue-700">{group.expenseDocs.length}</Badge>
         ) : (
           <Badge className="bg-[#f9f8f2] text-[#c9bab5] border border-[#ede5e0]">0</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         <span className="text-sm font-bold text-[#2a1a16]">{total}</span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         {group.unviewedCount > 0 ? (
           <Badge className="bg-amber-50 text-amber-700">{group.unviewedCount} new</Badge>
         ) : (
           <Badge className="bg-green-50 text-green-700">All viewed</Badge>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-3">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#c9bab5] group-hover:translate-x-0.5 transition-transform">
           <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -611,6 +623,8 @@ function UploaderTableRow({ group, onClick }) {
 }
 
 export default function ManagerTeamDocument() {
+  useNoPageXScroll();
+
   const can = usePermissionStore((s) => s.can);
   const canView = can("documents.can_view_all_documents");
 
@@ -688,7 +702,7 @@ export default function ManagerTeamDocument() {
   const selectedGroup = groups.find((g) => g.id === selectedUploaderId) || null;
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-sans text-[#2a1a16]">
+    <div className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden bg-[#f9f8f2] p-4 sm:p-6 lg:p-8 font-sans text-[#2a1a16]">
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#730042]">Team Documents</h1>
         <p className="text-sm text-[#b0948a] mt-1">
@@ -756,7 +770,7 @@ export default function ManagerTeamDocument() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden w-full min-w-0 max-w-full">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[#ede5e0]">
           <p className="text-sm font-semibold text-[#2a1a16]">Uploaders</p>
           <span className="text-[11px] text-[#b0948a]">
@@ -783,14 +797,25 @@ export default function ManagerTeamDocument() {
 
         {!loading && filteredGroups.length > 0 && (
           <>
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full min-w-full">
+            <div className="hidden xl:block w-full max-w-full overflow-hidden">
+              <table className="w-full max-w-full table-fixed">
+                <colgroup>
+                  <col style={{ width: "22%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "8%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "5%" }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[#ede5e0] bg-[#f9f8f2]/60">
                     {["Uploader", "Role", "Department", "Designation", "Personal", "Expense", "Total", "Status", ""].map((h) => (
                       <th
                         key={h}
-                        className="px-4 py-3 text-left text-[10px] font-bold text-[#c9bab5] uppercase tracking-wider whitespace-nowrap"
+                        className="px-3 py-3 text-left text-[10px] font-bold text-[#c9bab5] uppercase tracking-wider truncate"
                       >
                         {h}
                       </th>
@@ -809,7 +834,7 @@ export default function ManagerTeamDocument() {
               </table>
             </div>
 
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               {filteredGroups.map((g) => (
                 <UploaderCard
                   key={g.id}
