@@ -937,75 +937,73 @@ export default function TrainingPage({ superAdminView = false }) {
                   Export department report
                 </button>
               </SectionTitle>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <div
-                  className="flex items-center gap-4 rounded-2xl p-3.5"
-                  style={{ background: BRAND.pale }}
-                >
-                  <div
-                    className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
-                    style={{
-                      background: `conic-gradient(${BRAND.pink} ${
-                        (Number(report.summary.completionRate) || 0) * 3.6
-                      }deg, #F1DCE5 0deg)`,
-                    }}
-                  >
-                    <div
-                      className="flex h-[3.1rem] w-[3.1rem] items-center justify-center rounded-full bg-white text-xs font-bold"
-                      style={{ color: BRAND.pink }}
-                    >
-                      {report.summary.completionRate}%
-                    </div>
-                  </div>
-                  <p
-                    className="text-sm font-semibold"
-                    style={{ color: BRAND.text }}
-                  >
-                    Completion rate
-                  </p>
-                </div>
-                {[
-                  ["Mandatory", report.summary.mandatory, BookOpen],
-                  ["Overdue", report.summary.overdue, Clock3],
-                  [
-                    "Awaiting approval",
-                    report.summary.awaitingApproval,
-                    ShieldCheck,
-                  ],
-                  [
-                    "Certificates expiring · 30 days",
-                    report.summary.certificatesExpiring,
-                    Award,
-                  ],
-                ].map(([label, value, Icon]) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-3 rounded-2xl p-3.5"
-                    style={{ background: BRAND.pale }}
-                  >
-                    <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white"
-                      style={{ color: BRAND.pink }}
-                    >
-                      <Icon size={19} />
-                    </div>
-                    <div className="min-w-0">
-                      <p
-                        className="text-xl font-bold leading-none"
-                        style={{ color: BRAND.maroon }}
-                      >
-                        {value}
-                      </p>
-                      <p
-                        className="mt-1 text-[11px] font-medium leading-4"
-                        style={{ color: BRAND.muted }}
-                      >
-                        {label}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+  {/* Completion rate */}
+  <div
+    className="flex min-w-0 items-center gap-3 rounded-2xl p-3.5"
+    style={{ background: BRAND.pale }}
+  >
+    <div
+      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
+      style={{
+        background: `conic-gradient(${BRAND.pink} ${
+          (Number(report.summary.completionRate) || 0) * 3.6
+        }deg, #F1DCE5 0deg)`,
+      }}
+    >
+      <div
+        className="flex h-[3.1rem] w-[3.1rem] items-center justify-center rounded-full bg-white text-xs font-bold"
+        style={{ color: BRAND.pink }}
+      >
+        {report.summary.completionRate}%
+      </div>
+    </div>
+    <p
+      className="min-w-0 text-[12px] font-semibold leading-tight"
+      style={{ color: BRAND.text }}
+    >
+      Completion Rate
+    </p>
+  </div>
+
+  {[
+    ["Mandatory", report.summary.mandatory, BookOpen],
+    ["Overdue", report.summary.overdue, Clock3],
+    ["Awaiting approval", report.summary.awaitingApproval, ShieldCheck],
+    [
+      "Certificates expiring · 30 days",
+      report.summary.certificatesExpiring,
+      Award,
+    ],
+  ].map(([label, value, Icon]) => (
+    <div
+      key={label}
+      className="flex min-w-0 items-center gap-3 rounded-2xl p-3.5"
+      style={{ background: BRAND.pale }}
+    >
+      <div
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white"
+        style={{ color: BRAND.pink }}
+      >
+        <Icon size={19} />
+      </div>
+      <div className="min-w-0">
+        <p
+          className="text-xl font-bold leading-none"
+          style={{ color: BRAND.maroon }}
+        >
+          {value}
+        </p>
+        <p
+          className="mt-1 text-[11px] font-medium leading-4"
+          style={{ color: BRAND.muted }}
+        >
+          {label}
+        </p>
+      </div>
+    </div>
+  ))}
+</div>
             </section>
 
             <div className="mb-5 grid gap-4 lg:grid-cols-2">
