@@ -842,10 +842,10 @@ export default function TrainingPage({ superAdminView = false }) {
                 style={{ color: BRAND.text }}
               >
                 {superAdminView
-                  ? "Training records"
+                  ? "Training Records"
                   : admin
-                    ? "Training management"
-                    : "My learning"}
+                    ? "Training Management"
+                    : "My Learning"}
               </h1>
               <p className="mt-0.5 text-xs sm:text-sm" style={{ color: BRAND.muted }}>
                 {admin

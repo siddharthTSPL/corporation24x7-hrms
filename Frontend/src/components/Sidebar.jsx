@@ -67,7 +67,7 @@ const superAdminMenu = [
   // Employees / Managers / Admins (see CreatePolicyModal's ROLE_OPTIONS),
   // never super_admin, so this page would always be empty for a superadmin.
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
-     { name: "Training records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
+     { name: "Training Records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
 
 const adminMenu = [
