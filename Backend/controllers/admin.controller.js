@@ -390,7 +390,6 @@ const addmanager = async (req, res, next) => {
     if (
       !empid ||
       !f_name ||
-      !l_name ||
       !work_email ||
       !password ||
       !department ||
@@ -582,7 +581,6 @@ const addemployee = async (req, res, next) => {
     if (
       !empid ||
       !f_name ||
-      !l_name ||
       !work_email ||
       !password ||
       !department ||
