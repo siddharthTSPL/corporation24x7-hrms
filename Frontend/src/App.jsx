@@ -241,7 +241,7 @@ function App() {
             <Route path="/training" element={<ProtectedRoute permission="navigation.can_view_training"><TrainingPage /></ProtectedRoute>} />
             <Route path="/employee-dashboard"       element={<ProtectedRoute permission="navigation.can_view_dashboard"><EmployeeDashboard /></ProtectedRoute>} />
             <Route path="/manager-dashboard"        element={<Managerdashboard />} />
-            <Route path="/employee"                 element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_onboarding"><EmployeeTable /></ProtectedRoute>} />
+            <Route path="/employee"                 element={<ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="adminAccess.can_manage_onboarding"><EmployeeTable /></ProtectedRoute>} />
             <Route path="/leave-manager"            element={<ProtectedRoute><LeaveTablema /></ProtectedRoute>} />
             <Route path="/leave-employee"           element={<ProtectedRoute permission="leave.can_apply_leave"><LeaveTableem /></ProtectedRoute>} />
             <Route path="/leave-admin"              element={<ProtectedRoute><LeaveTablead /></ProtectedRoute>} />
@@ -259,10 +259,10 @@ function App() {
             <Route path="/review-manager"           element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewma /></ProtectedRoute>} />
             <Route path="/review-employee"          element={<ProtectedRoute permission="review.can_access" planFeature="review"><Reviewem /></ProtectedRoute>} />
             <Route path="/mark-attendance"          element={<Attendancepage />} />
-            <Route path="/admin-timesheet"          element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_timesheet_admin" planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
+            <Route path="/admin-timesheet"          element={<ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="adminAccess.can_manage_timesheet_admin" planFeature="timesheet"><Adminrimesheet /></ProtectedRoute>} />
             <Route path="/manager-timesheet"        element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Managertimesheet /></ProtectedRoute>} />
             <Route path="/employee-timesheet"       element={<ProtectedRoute permission="timesheet.can_access" planFeature="timesheet"><Employeetimesheet /></ProtectedRoute>} />
-            <Route path="/admin-asset-management"   element={<ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_asset_management" planFeature="asset"><Adminasset /></ProtectedRoute>} />
+            <Route path="/admin-asset-management"   element={<ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="adminAccess.can_manage_asset_management" planFeature="asset"><Adminasset /></ProtectedRoute>} />
             <Route
               path="/reimbursement-admin"
               element={<ProtectedRoute><ReimbursementAdmin /></ProtectedRoute>}
@@ -281,7 +281,7 @@ function App() {
             <Route
               path="/payroll"
               element={
-                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="payroll.can_manage_payroll">
+                <ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="payroll.can_manage_payroll">
                   <Payroll />
                 </ProtectedRoute>
               }
@@ -303,7 +303,7 @@ function App() {
             <Route
               path="/admin-management"
               element={
-                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_torchx_management">
+                <ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="adminAccess.can_manage_torchx_management">
                   <AdminManagement />
                 </ProtectedRoute>
               }
@@ -314,7 +314,7 @@ function App() {
             <Route
               path="/admin-policy-management"
               element={
-                <ProtectedRoute allowedRoles={["admin", "employee"]} permission="adminAccess.can_manage_policy_management">
+                <ProtectedRoute allowedRoles={["admin", "employee", "manager"]} permission="adminAccess.can_manage_policy_management">
                   <PolicyManagement />
                 </ProtectedRoute>
               }

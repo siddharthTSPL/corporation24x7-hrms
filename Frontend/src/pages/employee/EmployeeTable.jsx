@@ -1146,14 +1146,6 @@ function getDisabledKeys(roleType) {
       documents: ["can_view_all_documents"],
       tickets: ["can_resolve_ticket", "can_rate_ticket"],
       recruitment: ["can_view_candidates", "can_add_candidate"],
-      payroll: ["can_manage_payroll"],
-      adminAccess: [
-        "can_manage_policy_management",
-        "can_manage_torchx_management",
-        "can_manage_onboarding",
-        "can_manage_timesheet_admin",
-        "can_manage_asset_management",
-      ],
     };
   }
   return {};

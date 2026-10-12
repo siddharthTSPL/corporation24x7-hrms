@@ -3,14 +3,13 @@ const checkPermission = require("./Checkpermission.middleware");
 
 const payrollManagement = checkPermission("payroll.can_manage_payroll");
 
-// Admins and SuperAdmins retain their existing payroll access. An employee
-// can use the organisation-wide payroll APIs only after an Admin explicitly
-// grants payroll.can_manage_payroll. Managers remain excluded.
+// Admins and SuperAdmins retain their existing payroll access. Employees and
+// managers need payroll.can_manage_payroll granted by their organisation Admin.
 const payrollManagementAuth = (req, res, next) => {
   anyRoleAuth(req, res, (err) => {
     if (err) return next(err);
 
-    const role = req.user?.role || req.admin?.role || req.employee?.role;
+    const role = req.user?.role || req.admin?.role || req.employee?.role || req.manager?.role;
     if (role === "super_admin") {
       // Payroll controllers use req.admin.organisation_id for tenant scope.
       // A SuperAdmin's organisation_id is the ORG-* display code, so use the
@@ -27,7 +26,7 @@ const payrollManagementAuth = (req, res, next) => {
       return next();
     }
 
-    if (role !== "employee") {
+    if (role !== "employee" && role !== "manager") {
       return res.status(403).json({ success: false, message: "Payroll management access required." });
     }
 
@@ -37,9 +36,8 @@ const payrollManagementAuth = (req, res, next) => {
 
       // Existing payroll controllers scope every query through req.admin's
       // organisation_id. Reuse that shape for the explicitly authorised user.
-      req.admin = req.employee || req.user;
-      req.admin.organisation_id = req.employee?.organisation_id || req.user?.organisation_id;
-      req.actorModel = "User";
+      req.admin = role === "manager" ? (req.manager || req.user) : (req.employee || req.user);
+      req.actorModel = role === "manager" ? "Manager" : "User";
       return next();
     });
   });
