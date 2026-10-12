@@ -23,18 +23,20 @@ const adminDelegatedAccess = (permissionNames) => {
         return next();
       }
 
-      const role = req.user?.role || req.admin?.role || req.employee?.role;
+      const role = req.user?.role || req.admin?.role || req.employee?.role || req.manager?.role;
       if (ADMIN_ROLES.has(role) || (role === "official" && req.admin) || req.superAdmin) return next();
-      if (role !== "employee") {
+      if (role !== "employee" && role !== "manager") {
         return res.status(403).json({ success: false, message: "Admin feature access required." });
       }
 
-      const { _id, organisation_id } = req.user || req.employee;
+      const actor = role === "manager" ? (req.manager || req.user) : (req.employee || req.user);
+      const { _id, organisation_id } = actor;
+      const userModel = role === "manager" ? "Manager" : "User";
       const checkPermissions = async () => {
         try {
           const permissionDoc = await PermissionModel.findOne({
             user_id: _id,
-            user_model: "User",
+            user_model: userModel,
             organisation_id,
           }).lean();
           const granted = permissions.some((path) => getPermission(permissionDoc, path) === true);
@@ -45,9 +47,9 @@ const adminDelegatedAccess = (permissionNames) => {
             });
           }
 
-          req.admin = req.employee || req.user;
-          req.admin.organisation_id = req.employee?.organisation_id || req.user?.organisation_id;
-          req.actorModel = "User";
+          req.admin = actor;
+          req.admin.organisation_id = organisation_id;
+          req.actorModel = userModel;
           return next();
         } catch (err) {
           return next(err);
