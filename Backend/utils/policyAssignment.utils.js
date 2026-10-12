@@ -85,6 +85,10 @@ const resolveAssignmentMatch = (policy, actor) => {
   const assignment = policy.assignment || {};
   const roles = assignment.roles && assignment.roles.length ? assignment.roles : ["employee", "manager", "admin"];
 
+  if (actor.roleGroup === "super_admin") {
+    return policy.publishedByModel === "Admin" || roles.includes("super_admin");
+  }
+
   if (!roles.includes(actor.roleGroup)) return false;
 
   switch (assignment.type) {

@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 
+// Rounds to 2 decimals and turns -0 / NaN into a plain 0,
+// so the DB never stores -0 or tiny float remainders like -0.0000001.
+const money = (v) => Math.round((Number(v) || 0) * 100) / 100 || 0;
 
 const fnfSchema = new mongoose.Schema(
   {
@@ -48,34 +51,34 @@ const fnfSchema = new mongoose.Schema(
     ctc: { type: Number, default: 0 },
 
     income: {
-      basic: { type: Number, default: 0 },
-      hra: { type: Number, default: 0 },
-      allowances: [{ name: String, amount: Number, _id: false }],
-      total: { type: Number, default: 0 },
+      basic: { type: Number, default: 0, set: money },
+      hra: { type: Number, default: 0, set: money },
+      allowances: [{ name: String, amount: { type: Number, set: money }, _id: false }],
+      total: { type: Number, default: 0, set: money },
     },
 
     otherIncome: {
-      items: [{ particular: String, amount: Number, _id: false }], // e.g. leave encashment
-      total: { type: Number, default: 0 },
+      items: [{ particular: String, amount: { type: Number, set: money }, _id: false }], // e.g. leave encashment
+      total: { type: Number, default: 0, set: money },
     },
 
     holding: {
-      salaryOnHold: { type: Number, default: 0 },
-      reimbursementOnHold: { type: Number, default: 0 },
-      assetRecovery: { type: Number, default: 0 },
-      total: { type: Number, default: 0 },
+      salaryOnHold: { type: Number, default: 0, set: money },
+      reimbursementOnHold: { type: Number, default: 0, set: money },
+      assetRecovery: { type: Number, default: 0, set: money },
+      total: { type: Number, default: 0, set: money },
     },
 
     deductions: {
-      pf: { type: Number, default: 0 },
-      professionalTax: { type: Number, default: 0 },
-      tds: { type: Number, default: 0 },
-      recoveries: { type: Number, default: 0 },
-      other: { type: Number, default: 0 },
-      total: { type: Number, default: 0 },
+      pf: { type: Number, default: 0, set: money },
+      professionalTax: { type: Number, default: 0, set: money },
+      tds: { type: Number, default: 0, set: money },
+      recoveries: { type: Number, default: 0, set: money },
+      other: { type: Number, default: 0, set: money },
+      total: { type: Number, default: 0, set: money },
     },
 
-    netPayable: { type: Number, default: 0 },
+    netPayable: { type: Number, default: 0, set: money },
 
     status: {
       type: String,
@@ -95,7 +98,6 @@ const fnfSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 
 fnfSchema.index({ employee: 1 }, { unique: true });
 fnfSchema.index({ organisation_id: 1, status: 1 });

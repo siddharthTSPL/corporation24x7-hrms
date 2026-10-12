@@ -6,6 +6,7 @@ const PolicyAcknowledgement = require("../Models/policyAcknowledgement.model");
 const Usermodel = require("../Models/user.model");
 const Managermodel = require("../Models/manager.model");
 const AdminModel = require("../Models/Admin.model");
+const SuperAdminModel = require("../Models/superadmin.model");
 
 const imagekit = require("../utils/imagekit.utils");
 const { logAudit } = require("../utils/auditLog.utils");
@@ -99,6 +100,26 @@ const resolveAudienceForPolicy = async (policy) => {
       }
     }
   }
+
+  const superAdminActor = {
+    id: policy.organisation_id,
+    model: "SuperAdmin",
+    roleGroup: "super_admin",
+  };
+  if (resolveAssignmentMatch(policy, superAdminActor)) {
+    const superAdmin = await SuperAdminModel.findOne({ _id: policy.organisation_id, working_status: "working" })
+      .select("f_name l_name empid department office_location email")
+      .lean();
+    if (superAdmin) {
+      audience.push({
+        ...superAdmin,
+        work_email: superAdmin.email,
+        roleGroup: "super_admin",
+        model: "SuperAdmin",
+      });
+    }
+  }
+
   return audience;
 };
 
