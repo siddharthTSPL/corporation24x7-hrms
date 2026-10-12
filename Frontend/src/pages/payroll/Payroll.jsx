@@ -102,16 +102,16 @@ function daysInMonthClient(month, year) {
 }
 
 function fmtINR(n) {
-  const num = Number(n) || 0;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(num);
+  }).format(roundINR(n));
 }
 
 function roundINR(n) {
-  return Math.round(Number(n) || 0);
+  // `|| 0` turns -0 and NaN into a plain 0
+  return Math.round(Number(n) || 0) || 0;
 }
 
 function getErrorMessage(err) {
