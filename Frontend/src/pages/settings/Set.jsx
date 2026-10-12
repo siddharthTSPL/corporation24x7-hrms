@@ -5,6 +5,7 @@ import {
   useChangeAdminPassword,
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
+import { prepareUploadFile } from "../../lib/prepareUploadFile";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
@@ -135,7 +136,8 @@ function FileUploadField({
     setUploadError("");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      const prepared = await prepareUploadFile(file);
+      formData.append("file", prepared);
       formData.append("title", label);
       formData.append("fileType", "personal");
       const res = await uploadDocument(formData);
