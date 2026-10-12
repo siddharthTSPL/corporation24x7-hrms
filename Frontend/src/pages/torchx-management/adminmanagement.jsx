@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Clock,
   CalendarDays,
@@ -98,6 +98,18 @@ const MONTH_NAMES = [
   "November",
   "December",
 ];
+
+// Keeps the browser-level horizontal scrollbar from appearing while this page is mounted
+function useNoPageXScroll() {
+  useEffect(() => {
+    const body = document.body;
+    const prev = body.style.overflowX;
+    body.style.overflowX = "hidden";
+    return () => {
+      body.style.overflowX = prev;
+    };
+  }, []);
+}
 
 function today() {
   const now = new Date();
@@ -244,7 +256,7 @@ function DayPicker({ value, onChange }) {
 
 function SectionCard({ icon: Icon, title, subtitle, action, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm min-w-0 max-w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-5 md:px-6 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#F9F0F5] text-[#730042] flex items-center justify-center shrink-0">
@@ -263,7 +275,7 @@ function SectionCard({ icon: Icon, title, subtitle, action, children }) {
         </div>
         {action && <div className="w-full sm:w-auto">{action}</div>}
       </div>
-      <div className="p-4 sm:p-5 md:p-6">{children}</div>
+      <div className="p-4 sm:p-5 md:p-6 min-w-0">{children}</div>
     </div>
   );
 }
@@ -646,7 +658,7 @@ function ShiftsPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0 max-w-full">
       <SectionCard
         icon={Clock}
         title="Shifts"
@@ -1258,7 +1270,7 @@ function HolidaysPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0 max-w-full">
       <SectionCard
         icon={CalendarDays}
         title="Holiday calendar"
@@ -1519,7 +1531,7 @@ function WeekOffPanel({ notify }) {
   const isRotational = policy === "rotational";
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0 max-w-full">
       <SectionCard
         icon={Settings2}
         title="Week-off policy"
@@ -1626,7 +1638,7 @@ function WeekOffPanel({ notify }) {
                         </div>
                       ))}
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 min-w-0">
                       <select
                         className={`${inputCls} text-xs py-2 sm:py-1.5 sm:w-28`}
                         value={memberDraft[g._id]?.role || "employee"}
@@ -1648,7 +1660,7 @@ function WeekOffPanel({ notify }) {
                         ))}
                       </select>
                       <PersonSelect
-                        className={`${inputCls} text-xs py-2 sm:py-1.5`}
+                        className={`${inputCls} text-xs py-2 sm:py-1.5 min-w-0`}
                         role={memberDraft[g._id]?.role || "employee"}
                         value={memberDraft[g._id]?.employee || ""}
                         onChange={(v) =>
@@ -1892,7 +1904,7 @@ function WeekOffPanel({ notify }) {
         subtitle="Give one person a different week-off rule than the rest of the org"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 min-w-0">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Set an override
             </p>
@@ -1952,7 +1964,7 @@ function WeekOffPanel({ notify }) {
               )}
             </Button>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 min-w-0">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Remove an override
             </p>
@@ -2065,7 +2077,7 @@ function DepartmentsPanel({ notify }) {
   };
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+    <div className="flex flex-col gap-5 sm:gap-6 min-w-0 max-w-full">
       <SectionCard
         icon={Building2}
         title="Departments"
@@ -2218,11 +2230,13 @@ const TABS = [
 ];
 
 export default function AdminManagement() {
+  useNoPageXScroll();
+
   const [tab, setTab] = useState("shifts");
   const { toasts, notify } = useToasts();
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 w-full min-w-0 max-w-full overflow-x-hidden">
       <ToastStack toasts={toasts} />
       <div className="max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-8 lg:py-10 min-w-0">
         <div className="mb-6 sm:mb-8">
@@ -2237,7 +2251,7 @@ export default function AdminManagement() {
           </p>
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full sm:w-fit mb-6 overflow-x-auto max-w-full">
+        <div className="flex gap-1.5 p-1 bg-white border border-slate-200 rounded-xl w-full max-w-full flex-wrap mb-6">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -2258,14 +2272,16 @@ export default function AdminManagement() {
           })}
         </div>
 
-        {tab === "shifts" && <ShiftsPanel notify={notify} />}
-        {tab === "holidays" && <HolidaysPanel notify={notify} />}
-        {tab === "weekoff" && <WeekOffPanel notify={notify} />}
-        {tab === "departments" && <DepartmentsPanel notify={notify} />}
-        {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
-        {tab === "approval_flow" && <ApprovalFlowPanel notify={notify} />}
-        {tab === "attendance" && <AttendanceSettingsPanel notify={notify} />}
-        {tab === "teams" && <TeamsPanel notify={notify} />}
+        <div className="min-w-0 max-w-full">
+          {tab === "shifts" && <ShiftsPanel notify={notify} />}
+          {tab === "holidays" && <HolidaysPanel notify={notify} />}
+          {tab === "weekoff" && <WeekOffPanel notify={notify} />}
+          {tab === "departments" && <DepartmentsPanel notify={notify} />}
+          {tab === "field_work" && <FieldWorkSettingsCard canToggleEnabled />}
+          {tab === "approval_flow" && <ApprovalFlowPanel notify={notify} />}
+          {tab === "attendance" && <AttendanceSettingsPanel notify={notify} />}
+          {tab === "teams" && <TeamsPanel notify={notify} />}
+        </div>
       </div>
     </div>
   );
