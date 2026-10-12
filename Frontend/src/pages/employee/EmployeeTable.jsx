@@ -45,6 +45,7 @@ import {
 } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useFindAllEmployeesFull } from "../../auth/server-state/adminauth/adminauth.hook";
 import { uploadDocument } from "../../../src/auth/api/adminapi/document/addocument.api";
+import { prepareUploadFile } from "../../lib/prepareUploadFile";
 // ^ actual path apne project structure ke hisaab se adjust karo — jis file me aapne ye upload wala code (uploadDocument function) rakha hai
 import BulkOnboardingModal from "./BulkOnboardingModal";
 
@@ -645,7 +646,10 @@ function FileUploadField({
     setUploadError("");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      const prepared = await prepareUploadFile(file);
+      formData.append("file", prepared);
+      formData.append("title", label);
+      formData.append("fileType", "personal");
       const res = await uploadDocument(formData);
       const url =
         res?.url ||

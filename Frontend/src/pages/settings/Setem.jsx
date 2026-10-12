@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import React from "react";
 import { useUpdateProfile, useUpdatePassword, useGetMeUser } from "../../auth/server-state/employee/employeeauth/employeeauth.hook";
 import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other.api";
+import { prepareUploadFile } from "../../lib/prepareUploadFile";
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
@@ -260,7 +261,8 @@ function FileUploadField({ label, value, onChange, hint, accept = ".pdf,.jpg,.jp
     setUploadError("");
     try {
      const formData = new FormData();
-      formData.append("file", file);
+      const prepared = await prepareUploadFile(file);
+      formData.append("file", prepared);
       formData.append("title", label);
       formData.append("fileType", "personal");
       const res = await uploadDocument(formData);
