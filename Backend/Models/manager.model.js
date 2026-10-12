@@ -31,7 +31,7 @@ const managerSchema = new mongoose.Schema(
     },
 
     f_name: { type: String, required: true },
-    l_name: { type: String, required: true },
+    l_name: { type: String, default: "", trim: true },
 
     work_email: {
       type: String,
