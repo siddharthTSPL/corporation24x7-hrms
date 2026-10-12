@@ -75,7 +75,7 @@ const inflight = new Map();
 
 // Re-scans MongoDB + ImageKit usage for the org (uses the same scanner as the
 // Storage tab / owner dashboard) and persists the total on the org document.
-const refreshStorageUsage = (org) => {
+const refreshStorageUsage = (org, { force = false } = {}) => {
   const key = String(org._id);
   if (!inflight.has(key)) {
     const p = (async () => {
@@ -83,7 +83,7 @@ const refreshStorageUsage = (org) => {
         _id: org._id,
         organisation_id: org.organisation_id,
         organisation_name: org.organisation_name,
-      });
+      }, { force });
       const usedBytes = usage.totalBytes || 0;
       await SuperAdminModel.updateOne(
         { _id: org._id },
@@ -125,17 +125,16 @@ const isFresh = (org) =>
   org?.storage_checked_at &&
   Date.now() - new Date(org.storage_checked_at).getTime() < STORAGE_FRESH_MS;
 
-// Used at LOGIN: waits for a re-scan when the stored number is stale.
+// Used at LOGIN: always re-scans before granting free-tier access so a recent
+// upload cannot keep using an under-limit snapshot for the storage freshness window.
 const getStorageStatusForLogin = async (org) => {
   let used = org.storage_used_bytes || 0;
   let checkedAt = org.storage_checked_at;
-  if (!isFresh(org)) {
-    try {
-      used = await withTimeout(refreshStorageUsage(org), STORAGE_LOGIN_WAIT_MS);
-      checkedAt = new Date();
-    } catch (err) {
-      console.error("[planAccess] storage scan failed, using last known value:", err?.message);
-    }
+  try {
+    used = await withTimeout(refreshStorageUsage(org, { force: true }), STORAGE_LOGIN_WAIT_MS);
+    checkedAt = new Date();
+  } catch (err) {
+    console.error("[planAccess] storage scan failed, using last known value:", err?.message);
   }
   return buildStorageStatus(org, used, checkedAt);
 };

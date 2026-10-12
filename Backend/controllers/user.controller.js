@@ -147,29 +147,6 @@ const userlogin = async (req, res, next) => {
       ),
     );
 
-  const trialValid = superAdmin.isTrialValid();
-
-  const hasTalentLicense = superAdmin.licenses.some(
-    (l) =>
-      l.product === "torchx_talent" &&
-      l.isActive &&
-      new Date(l.expiresAt) > new Date(),
-  );
-
-  if (!trialValid && !hasTalentLicense) {
-    return next(
-      Object.assign(
-        new Error(
-          "Service stopped! Sorry for the inconvenience, please contact your administrator for further assistance.",
-        ),
-        {
-          statusCode: 403,
-          code: "SERVICE_STOPPED",
-        },
-      ),
-    );
-  }
-
   const token = jwt.sign(
     {
       _id: user._id, // ← was "userId", now "_id" to match middleware

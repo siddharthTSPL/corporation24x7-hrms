@@ -215,7 +215,7 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     return true;
   };
 
-  const menu = (menuByRole[role] ?? employeeMenu).filter(passesFieldGate);
+  const roleMenu = (menuByRole[role] ?? employeeMenu).filter(passesFieldGate);
 
   const isPending = pendingSuperAdmin || pendingAdmin || pendingManager || pendingEmployee;
 
@@ -226,6 +226,20 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
     if (!permissionsReady) return false;
     return item.permissionGroup.some((p) => can(p));
   };
+
+  // Admins only see items they can open. Employees keep their own menus
+  // visible with locks, while delegated admin menus stay hidden unless granted.
+  const isDelegatedAdminMenu = (item) =>
+    item.permissionGroup?.some(
+      (permission) =>
+        permission.startsWith("adminAccess.") ||
+        permission === "payroll.can_manage_payroll",
+    );
+  const menu = role === "admin"
+    ? roleMenu.filter((item) => isAllowed(item))
+    : role === "employee"
+      ? roleMenu.filter((item) => !isDelegatedAdminMenu(item) || isAllowed(item))
+      : roleMenu;
 
   // Review / Timesheet / Recruitment / Asset Management / TorchX Voice (tickets)
   // are locked on the Basic plan and open on Advance/enterprise (or during
