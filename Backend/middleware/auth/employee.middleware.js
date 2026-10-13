@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const usermodel = require("../../Models/user.model");
+const { isSessionStillActive } = require("../../utils/singleSignIn.utils");
 
 const authemployee = async (req, res, next) => {
   try {
@@ -24,6 +25,10 @@ const authemployee = async (req, res, next) => {
 
     if (!rawId) return res.status(401).json({ message: "Invalid token payload" });
 
+    if (decoded.sid && !(await isSessionStillActive(decoded.sid))) {
+      return res.status(401).json({ message: "Logged out — signed in from another device.", code: "SESSION_REVOKED" });
+    }
+
     const employee = await usermodel.findById(rawId);
     if (!employee) return res.status(401).json({ message: "Unauthorized: user not found" });
 
@@ -33,6 +38,9 @@ const authemployee = async (req, res, next) => {
 
     req.employee = employee;
     req.user = employee;
+    // Raw decoded claims (sid included) — needed by logout to revoke this
+    // device's Single Sign-In session row.
+    req.tokenPayload = decoded;
 
     next();
   } catch (error) {

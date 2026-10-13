@@ -15,11 +15,9 @@ const uidCounterSchema = new mongoose.Schema({
     unique: true,
   },
   departments: {
-    MGMT: { type: departmentCounterSchema, default: () => ({}) },
-    OPR:  { type: departmentCounterSchema, default: () => ({}) },
-    BPO:  { type: departmentCounterSchema, default: () => ({}) },
-    HR:   { type: departmentCounterSchema, default: () => ({}) },
-    ENG:  { type: departmentCounterSchema, default: () => ({}) },
+    type: Map,
+    of: departmentCounterSchema,
+    default: () => ({}),
   },
 });
 

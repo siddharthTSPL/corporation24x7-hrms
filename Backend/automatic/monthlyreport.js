@@ -11,6 +11,8 @@ const LEAVE_TYPE_MAP = {
   half_day_sl: "sl",
   ml: "ml",
   pl: "pl",
+  // Comp Off day is counted as a worked (present) day
+  comp_off: "present",
 };
 
 function getLeaveModel(role) {

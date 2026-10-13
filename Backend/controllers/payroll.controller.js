@@ -1,15 +1,29 @@
+const mongoose = require("mongoose");
 const SalaryStructure = require("../Models/salarystructure.model");
 const Payroll = require("../Models/payroll.model");
 const AttendanceSummary = require("../Models/attendancesummary.model");
+const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const SuperAdmin = require("../Models/superadmin.model");
 const { getOrCreatePolicy } = require("./payrollpolicy.controller");
 const { calculateSalaryBreakup, calculatePayrollForMonth } = require("../utils/payroll.utils");
+const { getTimesheetOvertimeByEmployee, buildOvertime } = require("../utils/Timesheetovertime.utils");
+const { getOvertimeRequestsByEmployee, linkRequestsToPayroll } = require("../utils/Overtimerequest.utils");
+const { isTimesheetBasis, getTimesheetAttendanceByEmployee } = require("../utils/Timesheetattendance.utils");
+const FieldDutySession = require("../Models/fieldDutySession.model");
+const { istDateFromYMD } = require("../utils/Istdate.utils");
 
 const EMPLOYEE_MODEL_MAP = { User, Manager, Admin, SuperAdmin };
 const ALLOWED_EMPLOYEE_MODELS = ["User", "Manager", "Admin", "SuperAdmin"];
+
+const getPayrollPeriodBounds = (month, year) => ({
+  start: istDateFromYMD(Number(year), Number(month), 1),
+  end: Number(month) === 12
+    ? istDateFromYMD(Number(year) + 1, 1, 1)
+    : istDateFromYMD(Number(year), Number(month) + 1, 1),
+});
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -57,27 +71,33 @@ const getOrganisationSnapshot = async (organisation_id) => {
 
 const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   const Model = EMPLOYEE_MODEL_MAP[employeeModel];
-  if (!Model) return { name: "", employeeId: "", department: "", designation: "" };
+  if (!Model) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
 
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name").lean();
-    if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
+    if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
       employeeId: "OWNER",
       department: "Management",
       designation: "Super Admin",
+      bankName: person.bank_name || "",
+      accountNumber: person.account_number || "",
     };
   }
 
-  const person = await Model.findById(employeeId).select("f_name l_name empid uid department designation").lean();
-  if (!person) return { name: "", employeeId: "", department: "", designation: "" };
+  const person = await Model.findById(employeeId)
+    .select("f_name l_name empid uid department designation bank_name account_number")
+    .lean();
+  if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
   return {
     name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
     employeeId: person.empid || person.uid || "",
     department: person.department || "",
     designation: person.designation || "",
+    bankName: person.bank_name || "",
+    accountNumber: person.account_number || "",
   };
 };
 
@@ -113,9 +133,55 @@ const getOrgOwner = async (req, res) => {
 
 
 
+const applyAttendanceBasis = async (structure, basis) => {
+  if (basis === structure.attendanceBasis) return;
+  structure.attendanceBasis = basis;
+  if (basis !== "timesheet") {
+    structure.timesheetBasisFrom = { month: null, year: null };
+    return;
+  }
+  const lastPaid = await Payroll.findOne({ employee: structure.employee, status: "paid" })
+    .sort({ year: -1, month: -1 })
+    .select("month year")
+    .lean();
+  structure.timesheetBasisFrom = !lastPaid
+    ? { month: null, year: null }
+    : lastPaid.month === 12
+      ? { month: 1, year: lastPaid.year + 1 }
+      : { month: lastPaid.month + 1, year: lastPaid.year };
+};
+
+const updateAttendanceBasis = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { employee } = req.params;
+  const { attendanceBasis } = req.body;
+
+  if (!["attendance", "timesheet"].includes(attendanceBasis))
+    return res.status(400).json({ success: false, message: "attendanceBasis must be attendance or timesheet" });
+
+  const structure = await SalaryStructure.findOne({ employee, organisation_id });
+  if (!structure) return res.status(404).json({ success: false, message: "Salary structure not found" });
+
+  if (attendanceBasis === "timesheet" && structure.employeeModel === "SuperAdmin")
+    return res.status(400).json({ success: false, message: "Timesheet basis is not available for the organisation owner" });
+
+  await applyAttendanceBasis(structure, attendanceBasis);
+  await structure.save();
+
+  const from = structure.timesheetBasisFrom;
+  const message =
+    attendanceBasis === "timesheet" && from?.month
+      ? `Timesheet basis applies from ${MONTH_NAMES[from.month - 1]} ${from.year}. Earlier paid months stay attendance-based.`
+      : attendanceBasis === "timesheet"
+        ? "Timesheet basis applies to all payroll months"
+        : "Attendance basis restored";
+
+  res.status(200).json({ success: true, structure, message });
+};
+
 const setEmployeeCTC = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
-  const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom } = req.body;
+  const { employee, employeeModel, ctc, annualTaxEstimate, effectiveFrom, attendanceBasis } = req.body;
 
   if (!employee || !employeeModel || !ctc)
     return res.status(400).json({ success: false, message: "employee, employeeModel and ctc are required" });
@@ -124,6 +190,12 @@ const setEmployeeCTC = async (req, res) => {
     return res.status(400).json({ success: false, message: "Invalid employeeModel" });
 
   if (ctc <= 0) return res.status(400).json({ success: false, message: "ctc must be greater than 0" });
+
+  if (attendanceBasis !== undefined && !["attendance", "timesheet"].includes(attendanceBasis))
+    return res.status(400).json({ success: false, message: "attendanceBasis must be attendance or timesheet" });
+
+  if (attendanceBasis === "timesheet" && employeeModel === "SuperAdmin")
+    return res.status(400).json({ success: false, message: "Timesheet basis is not available for the organisation owner" });
 
   const policy = await getOrCreatePolicy(organisation_id);
   const breakup = calculateSalaryBreakup(ctc, policy);
@@ -151,6 +223,7 @@ const setEmployeeCTC = async (req, res) => {
     }
     existing.ctc = ctc;
     existing.annualTaxEstimate = annualTaxEstimate ?? existing.annualTaxEstimate;
+    if (attendanceBasis) await applyAttendanceBasis(existing, attendanceBasis);
     existing.effectiveFrom = effectiveFrom ? new Date(effectiveFrom) : new Date();
     existing.breakup = breakup;
     existing.policySnapshot = policySnapshot;
@@ -166,6 +239,7 @@ const setEmployeeCTC = async (req, res) => {
     employeeModel,
     ctc,
     annualTaxEstimate: annualTaxEstimate || 0,
+    attendanceBasis: attendanceBasis || "attendance",
     effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
     breakup,
     policySnapshot,
@@ -174,6 +248,116 @@ const setEmployeeCTC = async (req, res) => {
   });
 
   res.status(201).json({ success: true, structure, message: "Salary structure created" });
+};
+
+const bulkSetEmployeeCTC = async (req, res) => {
+  const organisation_id = req.admin.organisation_id;
+  const { rows } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0)
+    return res.status(400).json({ success: false, message: "At least one CTC row is required" });
+  if (rows.length > 1000)
+    return res.status(400).json({ success: false, message: "A maximum of 1,000 employees can be updated at once" });
+
+  const seen = new Set();
+  const normalized = [];
+  for (const [index, row] of rows.entries()) {
+    const employeeModel = row?.employeeModel;
+    const employee = String(row?.employee || "");
+    const ctc = Number(row?.ctc);
+    const effectiveFrom = row?.effectiveFrom ? new Date(row.effectiveFrom) : new Date();
+    const effectiveDateText = row?.effectiveFrom ? String(row.effectiveFrom).slice(0, 10) : "";
+    const key = `${employeeModel}:${employee}`;
+
+    if (!ALLOWED_EMPLOYEE_MODELS.includes(employeeModel) || !mongoose.isValidObjectId(employee))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: invalid employee or employee type` });
+    if (!Number.isFinite(ctc) || ctc <= 0)
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: annual CTC must be greater than 0` });
+    if (Number.isNaN(effectiveFrom.getTime()) || (effectiveDateText && effectiveFrom.toISOString().slice(0, 10) !== effectiveDateText))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: invalid effective date` });
+    if (seen.has(key))
+      return res.status(400).json({ success: false, message: `Row ${index + 1}: duplicate employee in upload` });
+    seen.add(key);
+    normalized.push({ employee, employeeModel, ctc, effectiveFrom });
+  }
+
+  const idsByModel = {};
+  for (const row of normalized) (idsByModel[row.employeeModel] ||= []).push(row.employee);
+  for (const [employeeModel, ids] of Object.entries(idsByModel)) {
+    if (employeeModel === "SuperAdmin") {
+      if (ids.some((id) => String(id) !== String(organisation_id)))
+        return res.status(400).json({ success: false, message: "The selected organisation owner is invalid" });
+      continue;
+    }
+    const Model = EMPLOYEE_MODEL_MAP[employeeModel];
+    const validEmployees = await Model.find({ _id: { $in: ids }, organisation_id }).select("_id").lean();
+    const validIds = new Set(validEmployees.map((employee) => String(employee._id)));
+    const invalid = ids.find((id) => !validIds.has(String(id)));
+    if (invalid)
+      return res.status(400).json({ success: false, message: "An employee in the upload does not belong to this organisation" });
+  }
+
+  const structures = await SalaryStructure.find({
+    organisation_id,
+    employee: { $in: normalized.map((row) => row.employee) },
+  });
+  const structuresByEmployee = new Map(structures.map((structure) => [String(structure.employee), structure]));
+  const mismatched = normalized.find((row) => {
+    const existing = structuresByEmployee.get(String(row.employee));
+    return existing && existing.employeeModel !== row.employeeModel;
+  });
+  if (mismatched)
+    return res.status(400).json({ success: false, message: "Employee type does not match the existing salary structure" });
+  const policy = await getOrCreatePolicy(organisation_id);
+  const policySnapshot = {
+    basic: policy.basic,
+    hra: policy.hra,
+    allowances: policy.allowances,
+    pf: policy.pf,
+    esi: policy.esi,
+    professionalTax: policy.professionalTax,
+    tds: policy.tds,
+  };
+  const operations = normalized.map((row) => {
+    const existing = structuresByEmployee.get(String(row.employee));
+    const set = {
+      organisation_id,
+      employeeModel: row.employeeModel,
+      ctc: row.ctc,
+      effectiveFrom: row.effectiveFrom,
+      breakup: calculateSalaryBreakup(row.ctc, policy),
+      policySnapshot,
+      setBy: req.admin._id,
+      setByModel: req.actorModel || "Admin",
+    };
+    if (existing) {
+      const update = { $set: set };
+      if (Number(existing.ctc) !== row.ctc) {
+        update.$push = { revisionHistory: {
+          ctc: existing.ctc,
+          effectiveFrom: existing.effectiveFrom,
+          changedBy: req.admin._id,
+          changedByModel: req.actorModel || "Admin",
+        } };
+      }
+      return { updateOne: { filter: { _id: existing._id, organisation_id }, update } };
+    }
+    return { insertOne: { document: {
+      ...set,
+      employee: row.employee,
+      annualTaxEstimate: 0,
+      attendanceBasis: "attendance",
+    } } };
+  });
+
+  if (operations.length) await SalaryStructure.bulkWrite(operations, { ordered: true });
+  const created = operations.filter((operation) => operation.insertOne).length;
+  res.status(200).json({
+    success: true,
+    created,
+    revised: operations.length - created,
+    message: `${created} salary structure${created === 1 ? "" : "s"} created and ${operations.length - created} revised`,
+  });
 };
 
 
@@ -306,6 +490,37 @@ const generatePayroll = async (req, res) => {
 
   const role = employeeModel === "User" ? "employee" : employeeModel.toLowerCase();
 
+  if (employeeModel === "User") {
+    const period = getPayrollPeriodBounds(month, year);
+    const [openFieldDuty, unsyncedFieldAttendance] = await Promise.all([
+      FieldDutySession.exists({
+        organisation_id,
+        employee,
+        status: { $in: ["active", "paused", "offline"] },
+        startedAt: { $lt: period.end },
+      }),
+      Attendance.exists({
+        organisation_id,
+        employee,
+        role: "employee",
+        source: "field",
+        date: { $gte: period.start, $lt: period.end },
+        $or: [
+          { checkOut: { $exists: false } },
+          { checkOut: null },
+          { fieldSummarySyncedAt: { $exists: false } },
+          { fieldSummarySyncedAt: null },
+        ],
+      }),
+    ]);
+    if (openFieldDuty || unsyncedFieldAttendance)
+      return res.status(409).json({
+        success: false,
+        message: "This employee has an unfinished or unsynced field attendance record in the selected payroll period. Complete or resolve it before generating payroll.",
+        reason: "field_duty_incomplete",
+      });
+  }
+
 
   const hasManualPaidDays = paidDays !== undefined && paidDays !== null && paidDays !== "";
   const manualAttendance = hasManualPaidDays
@@ -316,7 +531,9 @@ const generatePayroll = async (req, res) => {
       }
     : null;
 
-  const attendanceSummary = manualAttendance
+  const timesheetBasis = isTimesheetBasis(structure, employeeModel, month, year);
+
+  let attendanceSummary = manualAttendance || timesheetBasis
     ? null
     : await AttendanceSummary.findOne({ employee, role, month: Number(month), year: Number(year) }).lean();
 
@@ -340,13 +557,52 @@ const generatePayroll = async (req, res) => {
     });
   }
 
+  // Timesheet -> payroll sync: approved timesheet overtime (if the org turned
+  // it on in Payroll Policy) becomes this month's overtime earning, unless the
+  // admin typed an overtime amount themselves (then that wins).
+  if (timesheetBasis && !manualAttendance) {
+    const attendanceMap = await getTimesheetAttendanceByEmployee({
+      organisation_id,
+      employeeModel,
+      employees: [{ id: employee, joinDate: dateOfJoining }],
+      month,
+      year,
+      policy,
+    });
+    attendanceSummary = attendanceMap.get(String(employee)) || null;
+  }
+
+  const overtimeMap = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel,
+    employeeIds: [employee],
+    month,
+    year,
+  });
+  const requestMap = await getOvertimeRequestsByEmployee({
+    organisation_id,
+    employeeModel,
+    employeeIds: [employee],
+    month,
+    year,
+  });
+  const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+    policy,
+    structure,
+    overtimeEntry: overtimeMap.get(String(employee)),
+    manualOvertime: overtime,
+    requestEntry: requestMap.get(String(employee)),
+    month,
+    year,
+  });
+
   const result = calculatePayrollForMonth({
     structure,
     policy,
     attendanceSummary,
     month: Number(month),
     year: Number(year),
-    extras: { bonus, incentive, overtime, reimbursement, otherEarnings, loan, advance, otherDeductions },
+    extras: { bonus, incentive, overtime: overtimeAmount, reimbursement, otherEarnings, loan, advance, otherDeductions },
     manualAttendance,
     dateOfJoining,
   });
@@ -364,6 +620,7 @@ const generatePayroll = async (req, res) => {
         organisationSnapshot,
         ctc: structure.ctc,
         ...result,
+        overtimeDetail,
         policySnapshot: structure.policySnapshot,
         remarks: remarks || "",
         status: "generated",
@@ -373,6 +630,15 @@ const generatePayroll = async (req, res) => {
     },
     { upsert: true, new: true }
   );
+
+  await linkRequestsToPayroll({
+    employee,
+    employeeModel,
+    month,
+    year,
+    payrollId: payroll?._id,
+    requestIds: overtimeDetail.requestIds,
+  });
 
 
   await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
@@ -422,6 +688,34 @@ const bulkGeneratePayroll = async (req, res) => {
   const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
 
   const employeeIds = structures.map((s) => s.employee);
+  const period = getPayrollPeriodBounds(month, year);
+  const [openFieldDuties, unsyncedFieldAttendances] = model === "User"
+    ? await Promise.all([
+        FieldDutySession.find({
+          organisation_id,
+          employee: { $in: employeeIds },
+          status: { $in: ["active", "paused", "offline"] },
+          startedAt: { $lt: period.end },
+        }).select("employee").lean(),
+        Attendance.find({
+          organisation_id,
+          employee: { $in: employeeIds },
+          role: "employee",
+          source: "field",
+          date: { $gte: period.start, $lt: period.end },
+          $or: [
+            { checkOut: { $exists: false } },
+            { checkOut: null },
+            { fieldSummarySyncedAt: { $exists: false } },
+            { fieldSummarySyncedAt: null },
+          ],
+        }).select("employee").lean(),
+      ])
+    : [[], []];
+  const employeesWithOpenFieldDuty = new Set([
+    ...openFieldDuties.map((row) => String(row.employee)),
+    ...unsyncedFieldAttendances.map((row) => String(row.employee)),
+  ]);
   const summaries = await AttendanceSummary.find({
     employee: { $in: employeeIds },
     role,
@@ -430,6 +724,23 @@ const bulkGeneratePayroll = async (req, res) => {
   }).lean();
   const summaryByEmployee = new Map(summaries.map((s) => [String(s.employee), s]));
 
+  // One query for the whole run: approved-timesheet overtime per employee.
+  const overtimeByEmployee = await getTimesheetOvertimeByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employeeIds,
+    month,
+    year,
+  });
+
+
+  const requestsByEmployee = await getOvertimeRequestsByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employeeIds,
+    month,
+    year,
+  });
 
   const existingPayrolls = await Payroll.find({
     employee: { $in: employeeIds },
@@ -446,10 +757,27 @@ const bulkGeneratePayroll = async (req, res) => {
     .lean();
   const employeeDocById = new Map(employeeDocs.map((d) => [String(d._id), d]));
 
+  const timesheetAttendanceByEmployee = await getTimesheetAttendanceByEmployee({
+    organisation_id,
+    employeeModel: model,
+    employees: structures
+      .filter((s) => isTimesheetBasis(s, model, month, year))
+      .map((s) => ({ id: s.employee, joinDate: getEffectiveJoinDate(employeeDocById.get(String(s.employee))) })),
+    month,
+    year,
+    policy,
+  });
+
+  const overtimeRequestIdsByEmployee = new Map();
   const ops = [];
   const skipped = [];
 
   for (const structure of structures) {
+    if (employeesWithOpenFieldDuty.has(String(structure.employee))) {
+      skipped.push({ employee: structure.employee, reason: "unfinished or unsynced field attendance in the selected payroll period" });
+      continue;
+    }
+
     if ((workingStatusMap.get(String(structure.employee)) || "working") !== "working") {
       skipped.push({ employee: structure.employee, reason: "resigned/terminated/fired — settle via Full & Final (FnF) instead" });
       continue;
@@ -482,14 +810,27 @@ const bulkGeneratePayroll = async (req, res) => {
       continue;
     }
 
-    const attendanceSummary = summaryByEmployee.get(String(structure.employee)) || null;
+    const timesheetBasis = isTimesheetBasis(structure, model, month, year);
+    const attendanceSummary = timesheetBasis
+      ? timesheetAttendanceByEmployee.get(String(structure.employee)) || null
+      : summaryByEmployee.get(String(structure.employee)) || null;
+    const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+      policy,
+      structure,
+      overtimeEntry: overtimeByEmployee.get(String(structure.employee)),
+      manualOvertime: 0,
+      requestEntry: requestsByEmployee.get(String(structure.employee)),
+      month,
+      year,
+    });
+    overtimeRequestIdsByEmployee.set(String(structure.employee), overtimeDetail.requestIds || []);
     const result = calculatePayrollForMonth({
       structure,
       policy,
       attendanceSummary,
       month: Number(month),
       year: Number(year),
-      extras: {},
+      extras: { overtime: overtimeAmount },
       dateOfJoining: effectiveJoinDate,
     });
 
@@ -506,6 +847,7 @@ const bulkGeneratePayroll = async (req, res) => {
             organisationSnapshot,
             ctc: structure.ctc,
             ...result,
+            overtimeDetail,
             policySnapshot: structure.policySnapshot,
             status: "generated",
             generatedBy: req.admin._id,
@@ -519,6 +861,26 @@ const bulkGeneratePayroll = async (req, res) => {
 
   const bulkResult = ops.length ? await Payroll.bulkWrite(ops) : { upsertedCount: 0, modifiedCount: 0 };
 
+  if (ops.length) {
+    const saved = await Payroll.find({
+      employee: { $in: [...overtimeRequestIdsByEmployee.keys()] },
+      month: Number(month),
+      year: Number(year),
+    })
+      .select("_id employee")
+      .lean();
+    for (const row of saved) {
+      await linkRequestsToPayroll({
+        employee: row.employee,
+        employeeModel: model,
+        month,
+        year,
+        payrollId: row._id,
+        requestIds: overtimeRequestIdsByEmployee.get(String(row.employee)),
+      });
+    }
+  }
+
   if (ops.length) await lockPayScheduleIfFirstRun(organisation_id, Number(month), Number(year));
 
   res.status(200).json({
@@ -529,6 +891,184 @@ const bulkGeneratePayroll = async (req, res) => {
   });
 };
 
+
+
+// Re-derives the ATTENDANCE-driven numbers of payrolls that already exist for
+// one org / month / employeeModel, after AttendanceSummary (or an approved
+// timesheet / overtime request) was corrected late. Used by
+// scripts/Regeneratepayrolls.js - not wired to any route.
+//
+// Differences from bulkGeneratePayroll (deliberate):
+//  - only touches payrolls that ALREADY exist, in `statuses` ("paid" is never
+//    allowed - money has already gone out);
+//  - keeps what an admin typed by hand: bonus, incentive, reimbursement,
+//    other earnings, loan, advance, other deductions, and a manual overtime
+//    amount. bulkGeneratePayroll would reset all of those to 0;
+//  - skips payrolls whose paid days were typed in by hand (manualEntry);
+//  - a changed "approved" payroll goes back to "generated" so it gets
+//    re-approved; status/generatedBy/remarks/snapshots are otherwise kept.
+// Uses the CURRENT salary structure + payroll policy, same as any regenerate.
+const regeneratePayrollsForMonth = async ({
+  organisation_id,
+  month,
+  year,
+  employeeModel = "User",
+  statuses = ["generated"],
+  apply = false,
+  employeeIds = null,
+}) => {
+  const report = { organisation_id, month, year, employeeModel, considered: 0, changed: 0, unchanged: 0, skipped: [], changes: [] };
+  if (!ALLOWED_EMPLOYEE_MODELS.includes(employeeModel)) return report;
+
+  const allowedStatuses = (statuses || []).filter((st) => ["generated", "approved"].includes(st));
+  if (!allowedStatuses.length) return report;
+
+  const payrollFilter = {
+    organisation_id,
+    employeeModel,
+    month: Number(month),
+    year: Number(year),
+    status: { $in: allowedStatuses },
+  };
+  if (employeeIds?.length) payrollFilter.employee = { $in: employeeIds };
+
+  const payrolls = await Payroll.find(payrollFilter).lean();
+  report.considered = payrolls.length;
+  if (!payrolls.length) return report;
+
+  const ids = payrolls.map((p) => p.employee);
+  const role = employeeModel === "User" ? "employee" : employeeModel.toLowerCase();
+
+  const [structures, workingStatusMap, policy, summaries, employeeDocs] = await Promise.all([
+    SalaryStructure.find({ organisation_id, employeeModel, employee: { $in: ids }, isActive: true }).lean(),
+    getWorkingStatusMap(employeeModel, ids),
+    getOrCreatePolicy(organisation_id),
+    AttendanceSummary.find({ employee: { $in: ids }, role, month: Number(month), year: Number(year) }).lean(),
+    EMPLOYEE_MODEL_MAP[employeeModel].find({ _id: { $in: ids } }).select("date_of_joining createdAt").lean(),
+  ]);
+
+  const structureByEmployee = new Map(structures.map((st) => [String(st.employee), st]));
+  const summaryByEmployee = new Map(summaries.map((sm) => [String(sm.employee), sm]));
+  const employeeDocById = new Map(employeeDocs.map((d) => [String(d._id), d]));
+
+  const [overtimeByEmployee, requestsByEmployee, timesheetAttendanceByEmployee] = await Promise.all([
+    getTimesheetOvertimeByEmployee({ organisation_id, employeeModel, employeeIds: ids, month, year }),
+    getOvertimeRequestsByEmployee({ organisation_id, employeeModel, employeeIds: ids, month, year }),
+    getTimesheetAttendanceByEmployee({
+      organisation_id,
+      employeeModel,
+      employees: structures
+        .filter((st) => isTimesheetBasis(st, employeeModel, month, year))
+        .map((st) => ({ id: st.employee, joinDate: getEffectiveJoinDate(employeeDocById.get(String(st.employee))) })),
+      month,
+      year,
+      policy,
+    }),
+  ]);
+
+  const ops = [];
+  const linkJobs = [];
+
+  for (const p of payrolls) {
+    const key = String(p.employee);
+    const label = p.employeeSnapshot?.name || key;
+
+    if (p.attendance?.manualEntry) {
+      report.skipped.push({ employee: p.employee, name: label, reason: "paid days were typed in by hand" });
+      continue;
+    }
+    const structure = structureByEmployee.get(key);
+    if (!structure?.breakup?.monthlyGross) {
+      report.skipped.push({ employee: p.employee, name: label, reason: "no active salary structure" });
+      continue;
+    }
+    if ((workingStatusMap.get(key) || "working") !== "working") {
+      report.skipped.push({ employee: p.employee, name: label, reason: "resigned/terminated - settle via FnF" });
+      continue;
+    }
+
+    const timesheetBasis = isTimesheetBasis(structure, employeeModel, month, year);
+    const attendanceSummary = timesheetBasis
+      ? timesheetAttendanceByEmployee.get(key) || null
+      : summaryByEmployee.get(key) || null;
+
+    const { amount: overtimeAmount, detail: overtimeDetail } = buildOvertime({
+      policy,
+      structure,
+      overtimeEntry: overtimeByEmployee.get(key),
+      manualOvertime: p.overtimeDetail?.source === "manual" ? p.earnings?.overtime || 0 : 0,
+      requestEntry: requestsByEmployee.get(key),
+      month,
+      year,
+    });
+
+    const result = calculatePayrollForMonth({
+      structure,
+      policy,
+      attendanceSummary,
+      month: Number(month),
+      year: Number(year),
+      extras: {
+        bonus: p.earnings?.bonus,
+        incentive: p.earnings?.incentive,
+        overtime: overtimeAmount,
+        reimbursement: p.earnings?.reimbursement,
+        otherEarnings: p.earnings?.other,
+        loan: p.deductions?.loan,
+        advance: p.deductions?.advance,
+        otherDeductions: p.deductions?.other,
+      },
+      dateOfJoining: getEffectiveJoinDate(employeeDocById.get(key)),
+    });
+
+    const before = {
+      absent: p.attendance?.absentDays ?? 0,
+      half: p.attendance?.halfDays ?? 0,
+      paid: p.attendance?.paidDays ?? 0,
+      overtime: p.earnings?.overtime ?? 0,
+      net: p.netSalary ?? 0,
+    };
+    const after = {
+      absent: result.attendance.absentDays,
+      half: result.attendance.halfDays,
+      paid: result.attendance.paidDays,
+      overtime: result.earnings.overtime,
+      net: result.netSalary,
+    };
+
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      report.unchanged += 1;
+      continue;
+    }
+
+    report.changed += 1;
+    report.changes.push({ employee: p.employee, name: label, status: p.status, before, after });
+
+    ops.push({
+      updateOne: {
+        filter: { _id: p._id },
+        update: { $set: { ...result, overtimeDetail, status: "generated" } },
+      },
+    });
+    linkJobs.push({ employee: p.employee, payrollId: p._id, requestIds: overtimeDetail.requestIds || [] });
+  }
+
+  if (apply && ops.length) {
+    await Payroll.bulkWrite(ops, { ordered: false });
+    for (const job of linkJobs) {
+      await linkRequestsToPayroll({
+        employee: job.employee,
+        employeeModel,
+        month,
+        year,
+        payrollId: job.payrollId,
+        requestIds: job.requestIds,
+      });
+    }
+  }
+
+  return report;
+};
 
 
 const listPayrolls = async (req, res) => {
@@ -551,6 +1091,26 @@ const listPayrolls = async (req, res) => {
     }
   }
 
+  // Older payrolls (generated before bank details were added to the
+  // snapshot) won't have bankName/accountNumber saved — backfill from each
+  // employee's current bank details so existing payslips still show them.
+  const needsBankBackfill = payrolls.filter((p) => !p.employeeSnapshot?.bankName || !p.employeeSnapshot?.accountNumber);
+  if (needsBankBackfill.length) {
+    const cache = new Map();
+    for (const p of needsBankBackfill) {
+      const cacheKey = `${p.employeeModel}:${p.employee}`;
+      if (!cache.has(cacheKey)) {
+        cache.set(cacheKey, await getEmployeeSnapshot(p.employeeModel, p.employee));
+      }
+      const { bankName, accountNumber } = cache.get(cacheKey);
+      p.employeeSnapshot = {
+        ...p.employeeSnapshot,
+        bankName: p.employeeSnapshot?.bankName || bankName,
+        accountNumber: p.employeeSnapshot?.accountNumber || accountNumber,
+      };
+    }
+  }
+
   res.status(200).json({ success: true, count: payrolls.length, payrolls });
 };
 
@@ -569,7 +1129,65 @@ const getPayslip = async (req, res) => {
     payslip.organisationSnapshot = await getOrganisationSnapshot(organisation_id);
   }
 
+  // Older payslips (generated before bank details were added to the
+  // snapshot) won't have bankName/accountNumber saved — backfill from the
+  // employee's current bank details so existing payslips still show them.
+  if (!payslip.employeeSnapshot?.bankName && !payslip.employeeSnapshot?.accountNumber) {
+    const { bankName, accountNumber } = await getEmployeeSnapshot(payslip.employeeModel, payslip.employee);
+    payslip.employeeSnapshot = { ...payslip.employeeSnapshot, bankName, accountNumber };
+  }
+
   res.status(200).json({ success: true, payslip });
+};
+
+// Self-service endpoint: lets the logged-in Employee/Manager/Admin see and
+// download their OWN payslips — but only once payroll has actually been
+// marked "paid". This is deliberately plan-independent (no restrictPlanFeature
+// gate on its route) so it works on every plan, including Basic.
+const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin" };
+
+const resolveSelfServiceActor = (req) => {
+  if (req.employee) return { actor: req.employee, employeeModel: SELF_SERVICE_ROLE_MODEL.employee, organisation_id: req.employee.organisation_id };
+  if (req.manager) return { actor: req.manager, employeeModel: SELF_SERVICE_ROLE_MODEL.manager, organisation_id: req.manager.organisation_id };
+  if (req.admin) return { actor: req.admin, employeeModel: SELF_SERVICE_ROLE_MODEL.admin, organisation_id: req.admin.organisation_id };
+  return null;
+};
+
+const getMyPayslips = async (req, res, next) => {
+  try {
+    const resolved = resolveSelfServiceActor(req);
+    if (!resolved) return next(Object.assign(new Error("Payslips are not available for this account type."), { statusCode: 403 }));
+
+    const { actor, employeeModel, organisation_id } = resolved;
+
+    const payslips = await Payroll.find({
+      organisation_id,
+      employee: actor._id,
+      employeeModel,
+      status: "paid",
+    })
+      .sort({ year: -1, month: -1 })
+      .lean();
+
+    if (payslips.length) {
+      const organisationSnapshot = payslips[0].organisationSnapshot?.name
+        ? null
+        : await getOrganisationSnapshot(organisation_id);
+      const needsEmployeeSnapshot = !payslips[0].employeeSnapshot?.bankName && !payslips[0].employeeSnapshot?.accountNumber;
+      const employeeSnapshot = needsEmployeeSnapshot ? await getEmployeeSnapshot(employeeModel, actor._id) : null;
+
+      for (const p of payslips) {
+        if (organisationSnapshot && !p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
+        if (employeeSnapshot && !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber) {
+          p.employeeSnapshot = { ...p.employeeSnapshot, ...employeeSnapshot };
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, count: payslips.length, payslips });
+  } catch (err) {
+    next(err);
+  }
 };
 
 const updatePayrollStatus = async (req, res) => {
@@ -691,13 +1309,17 @@ const bulkDeletePayroll = async (req, res) => {
 module.exports = {
   getOrgOwner,
   setEmployeeCTC,
+  bulkSetEmployeeCTC,
+  updateAttendanceBasis,
   reapplyPolicy,
   getSalaryStructure,
   listSalaryStructures,
   generatePayroll,
   bulkGeneratePayroll,
+  regeneratePayrollsForMonth,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,

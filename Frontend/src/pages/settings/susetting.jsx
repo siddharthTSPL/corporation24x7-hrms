@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import React from "react";
 import {
   useGetMeSuperAdmin,
@@ -8,13 +8,41 @@ import {
   useChangeSuperAdminPassword,
   useKioskPasswordStatus,
   useSetKioskPassword,
+  useGetStorageUsage,
+  useRefreshStorageUsage,
+  useGetStorageFiles,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+} from "recharts";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  ExternalLink,
+  Search,
+} from "lucide-react";
+import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 
 const AVATAR_STYLES = [
-  "avataaars", "bottts", "personas", "lorelei",
-  "micah", "open-peeps", "big-ears", "croodles",
+  "avataaars",
+  "bottts",
+  "personas",
+  "lorelei",
+  "micah",
+  "open-peeps",
+  "big-ears",
+  "croodles",
 ];
+
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const ACCOUNT_REGEX = /^[0-9]{9,18}$/;
 
 const C = {
   brand: "#730042",
@@ -49,13 +77,27 @@ function getErrorMessage(err) {
 function formatDate(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "numeric", month: "long", year: "numeric",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
 function formatRole(role) {
   if (!role) return "—";
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "—";
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
+  const value = bytes / Math.pow(1024, i);
+  return `${value < 10 && i > 0 ? value.toFixed(2) : value < 100 && i > 0 ? value.toFixed(1) : Math.round(value)} ${units[i]}`;
 }
 
 function daysLeft(dateStr) {
@@ -81,9 +123,14 @@ function getSubscriptionInfo(superAdmin) {
     (lic) => lic.isActive && new Date(lic.expiresAt) > new Date(),
   );
   const trialValid =
-    superAdmin.is_trial_active && new Date() < new Date(superAdmin.trial_expires_at);
+    superAdmin.is_trial_active &&
+    new Date() < new Date(superAdmin.trial_expires_at);
 
-  const status = activeLicense ? "plan_active" : trialValid ? "trial_active" : "trial_ended";
+  const status = activeLicense
+    ? "plan_active"
+    : trialValid
+      ? "trial_active"
+      : "trial_ended";
   return { status, activeLicense: activeLicense || null };
 }
 
@@ -105,7 +152,11 @@ function PlanBadge({ status, planName }) {
   const color = isTrial ? C.amber : isEnded ? C.red : "#1a5c3a";
   const bg = isTrial ? C.amberBg : isEnded ? C.redBg : C.greenBg;
   const border = isTrial ? "#f5d98a" : isEnded ? "#f5c6c6" : "#a8dfc3";
-  const label = isTrial ? "⏱ Free Trial" : isEnded ? "Trial Ended" : "✓ " + (planName ? `${planName} Plan` : "Active");
+  const label = isTrial
+    ? "⏱ Free Trial"
+    : isEnded
+      ? "Trial Ended"
+      : "✓ " + (planName ? `${planName} Plan` : "Active");
 
   return (
     <span
@@ -134,7 +185,8 @@ function Spinner({ size = 16, color = "#fff" }) {
     <div
       className="rounded-full animate-spin shrink-0"
       style={{
-        width: size, height: size,
+        width: size,
+        height: size,
         border: `2px solid ${color}33`,
         borderTop: `2px solid ${color}`,
       }}
@@ -162,10 +214,38 @@ function Toast({ message, type, onClose }) {
         className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center shrink-0"
         style={{ background: isSuccess ? C.greenBg : C.redBg }}
       >
-        {isSuccess
-          ? <svg width="12" height="12" viewBox="0 0 14 14"><polyline points="2,7 5.5,10.5 12,4" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" /></svg>
-          : <svg width="12" height="12" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /><line x1="11" y1="3" x2="3" y2="11" stroke={C.red} strokeWidth="2" strokeLinecap="round" /></svg>
-        }
+        {isSuccess ? (
+          <svg width="12" height="12" viewBox="0 0 14 14">
+            <polyline
+              points="2,7 5.5,10.5 12,4"
+              fill="none"
+              stroke={C.green}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 14 14">
+            <line
+              x1="3"
+              y1="3"
+              x2="11"
+              y2="11"
+              stroke={C.red}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <line
+              x1="11"
+              y1="3"
+              x2="3"
+              y2="11"
+              stroke={C.red}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
       </div>
       <span
         className="text-xs sm:text-[13px] font-medium flex-1 break-words"
@@ -173,7 +253,12 @@ function Toast({ message, type, onClose }) {
       >
         {message}
       </span>
-      <button onClick={onClose} className="bg-none border-none cursor-pointer text-[#b0948a] text-base p-0 leading-none shrink-0">×</button>
+      <button
+        onClick={onClose}
+        className="bg-none border-none cursor-pointer text-[#b0948a] text-base p-0 leading-none shrink-0"
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -181,10 +266,15 @@ function Toast({ message, type, onClose }) {
 function SectionCard({ title, subtitle, accent = C.brand, children }) {
   return (
     <div className="bg-white rounded-2xl border border-[#ede5e0] overflow-hidden relative mb-4 sm:mb-6 w-full">
-      <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: accent }} />
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
+        style={{ background: accent }}
+      />
       <div className="px-4 py-4 sm:px-6 sm:py-6 border-b border-[#ede5e0]">
         <div className="text-sm font-medium text-[#2a1a16]">{title}</div>
-        {subtitle && <div className="text-xs text-[#b0948a] mt-1">{subtitle}</div>}
+        {subtitle && (
+          <div className="text-xs text-[#b0948a] mt-1">{subtitle}</div>
+        )}
       </div>
       <div className="px-4 py-4 sm:px-6 sm:py-6">{children}</div>
     </div>
@@ -192,7 +282,11 @@ function SectionCard({ title, subtitle, accent = C.brand, children }) {
 }
 
 function FieldLabel({ children }) {
-  return <div className="text-xs font-medium text-[#b0948a] mb-1.5 tracking-wide">{children}</div>;
+  return (
+    <div className="text-xs font-medium text-[#b0948a] mb-1.5 tracking-wide">
+      {children}
+    </div>
+  );
 }
 
 function ReadonlyField({ value, label }) {
@@ -207,7 +301,17 @@ function ReadonlyField({ value, label }) {
   );
 }
 
-function InputField({ label, value, onChange, type = "text", placeholder, hint, rightEl, name, disabled }) {
+function InputField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  hint,
+  rightEl,
+  name,
+  disabled,
+}) {
   return (
     <div className="mb-4 min-w-0">
       <FieldLabel>{label}</FieldLabel>
@@ -232,7 +336,13 @@ function InputField({ label, value, onChange, type = "text", placeholder, hint, 
   );
 }
 
-function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }) {
+function PrimaryButton({
+  onClick,
+  disabled,
+  loading,
+  children,
+  color = C.brand,
+}) {
   return (
     <button
       onClick={onClick}
@@ -243,7 +353,14 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
         cursor: disabled || loading ? "not-allowed" : "pointer",
       }}
     >
-      {loading ? <><Spinner />{children}</> : children}
+      {loading ? (
+        <>
+          <Spinner />
+          {children}
+        </>
+      ) : (
+        children
+      )}
     </button>
   );
 }
@@ -251,64 +368,274 @@ function PrimaryButton({ onClick, disabled, loading, children, color = C.brand }
 function Sidebar({ tab, setTab, superAdmin, initials }) {
   const tabs = [
     {
-      key: "overview", label: "Overview", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.4" /></svg>
-      )
+      key: "overview",
+      label: "Overview",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <rect
+            x="2"
+            y="2"
+            width="5"
+            height="5"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <rect
+            x="9"
+            y="2"
+            width="5"
+            height="5"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <rect
+            x="2"
+            y="9"
+            width="5"
+            height="5"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <rect
+            x="9"
+            y="9"
+            width="5"
+            height="5"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      ),
     },
     {
-      key: "profile", label: "Profile", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" /><path d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-      )
+      key: "profile",
+      label: "Profile",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.4" />
+          <path
+            d="M2 13c0-3.314 2.686-5 6-5s6 1.686 6 5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
     },
     {
-      key: "organisation", label: "Organisation", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" /><rect x="6" y="9" width="4" height="5" rx="1" stroke="currentColor" strokeWidth="1.4" /></svg>
-      )
+      key: "organisation",
+      label: "Organisation",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M2 14V6l6-4 6 4v8"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <rect
+            x="6"
+            y="9"
+            width="4"
+            height="5"
+            rx="1"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      ),
     },
     {
-      key: "password", label: "Password", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4" /><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-      )
+      key: "storage",
+      label: "Storage",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <ellipse
+            cx="8"
+            cy="4"
+            rx="6"
+            ry="2.2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 4v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M2 8v4c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V8"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+        </svg>
+      ),
     },
     {
-      key: "kiosk", label: "Kiosk", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4" /><path d="M6 14h4M8 11v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
-      )
+      key: "banking",
+      label: "Banking",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M1.5 6L8 2l6.5 4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <rect
+            x="2"
+            y="6.5"
+            width="12"
+            height="6.5"
+            rx="1"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M4.5 9v2M8 9v2M11.5 9v2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M1.5 13.5h13"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
     },
     {
-      key: "avatar", label: "Avatar", icon: (
-        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" /><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-      )
+      key: "password",
+      label: "Password",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <rect
+            x="4"
+            y="7"
+            width="8"
+            height="6"
+            rx="2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M6 7V5a2 2 0 0 1 4 0v2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "kiosk",
+      label: "Kiosk",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <rect
+            x="2"
+            y="2"
+            width="12"
+            height="9"
+            rx="1.5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M6 14h4M8 11v3"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "security",
+      label: "Security",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "avatar",
+      label: "Avatar",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
+          <circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" />
+          <path
+            d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
     },
   ];
 
   const { status, activeLicense } = getSubscriptionInfo(superAdmin);
   const isPlanActive = status === "plan_active";
-  const countdownDate = isPlanActive ? activeLicense?.expiresAt : superAdmin?.trial_expires_at;
+  const countdownDate = isPlanActive
+    ? activeLicense?.expiresAt
+    : superAdmin?.trial_expires_at;
   const days = daysLeft(countdownDate);
 
   return (
     <div className="w-full lg:w-64 lg:shrink-0">
       <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 mb-3 relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})` }} />
+        <div
+          className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl"
+          style={{
+            background: `linear-gradient(90deg, ${C.grad1}, ${C.grad2})`,
+          }}
+        />
         <div className="flex flex-col items-center gap-2.5 min-w-0">
           <div
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
             style={{
-              background: superAdmin?.profile_image ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
+              background: superAdmin?.profile_image
+                ? "transparent"
+                : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
               borderColor: C.brandLight,
             }}
           >
-            {superAdmin?.profile_image
-              ? <img src={superAdmin.profile_image} alt="avatar" className="w-full h-full object-cover" />
-              : initials
-            }
+            {superAdmin?.profile_image ? (
+              <img
+                src={superAdmin.profile_image}
+                alt="avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              initials
+            )}
           </div>
           <div className="text-center w-full min-w-0 px-1">
-            <div className="text-sm font-semibold text-[#2a1a16] truncate">{superAdmin?.f_name} {superAdmin?.l_name}</div>
-            <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">{superAdmin?.organisation_name || "—"}</div>
+            <div className="text-sm font-semibold text-[#2a1a16] truncate">
+              {superAdmin?.f_name} {superAdmin?.l_name}
+            </div>
+            <div className="text-[11px] text-[#b0948a] mt-0.5 truncate">
+              {superAdmin?.organisation_name || "—"}
+            </div>
             <div className="mt-2 flex flex-wrap gap-1.5 items-center justify-center">
-              <Badge color={C.brand} bg={C.brandLight}>{formatRole(superAdmin?.role || "super_admin")}</Badge>
+              <Badge color={C.brand} bg={C.brandLight}>
+                {formatRole(superAdmin?.role || "super_admin")}
+              </Badge>
               <PlanBadge status={status} planName={activeLicense?.plan} />
             </div>
           </div>
@@ -320,11 +647,17 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
                 border: `0.5px solid ${days <= 5 ? "#f5c6c6" : "#f5d98a"}`,
               }}
             >
-              <div className="text-[11px] font-semibold" style={{ color: days <= 5 ? C.red : C.amber }}>
-                {days === 0 ? "Expires today!" : `${days} day${days !== 1 ? "s" : ""} left`}
+              <div
+                className="text-[11px] font-semibold"
+                style={{ color: days <= 5 ? C.red : C.amber }}
+              >
+                {days === 0
+                  ? "Expires today!"
+                  : `${days} day${days !== 1 ? "s" : ""} left`}
               </div>
               <div className="text-[10px] text-[#b0948a] mt-0.5">
-                {isPlanActive ? "Plan" : "Trial"} expires {formatDate(countdownDate)}
+                {isPlanActive ? "Plan" : "Trial"} expires{" "}
+                {formatDate(countdownDate)}
               </div>
             </div>
           )}
@@ -341,7 +674,9 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
               className={`flex-1 lg:flex-none w-full px-3 sm:px-4 py-3 flex items-center justify-center sm:justify-start lg:justify-start gap-2 sm:gap-2.5 text-xs sm:text-sm transition-all text-left font-sans ${active ? "bg-[#730042]/10 text-[#730042] font-medium" : "text-[#b0948a] hover:bg-gray-50"} ${i < tabs.length - 1 ? "border-b sm:border-b-0 sm:border-r lg:border-r-0 lg:border-b border-[#ede5e0]" : ""}`}
             >
               {t.icon}
-              <span className="hidden sm:inline lg:inline truncate">{t.label}</span>
+              <span className="hidden sm:inline lg:inline truncate">
+                {t.label}
+              </span>
               {active && (
                 <div className="hidden lg:block ml-auto w-1.5 h-1.5 rounded-full bg-[#730042] shrink-0" />
               )}
@@ -356,15 +691,27 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
 function OverviewTab({ superAdmin }) {
   const { status, activeLicense } = getSubscriptionInfo(superAdmin);
   const isPlanActive = status === "plan_active";
-  const countdownDate = isPlanActive ? activeLicense?.expiresAt : superAdmin?.trial_expires_at;
+  const countdownDate = isPlanActive
+    ? activeLicense?.expiresAt
+    : superAdmin?.trial_expires_at;
   const days = daysLeft(countdownDate);
 
   return (
     <>
-      <SectionCard title="Account summary" subtitle="Your super admin account at a glance" accent={C.brand}>
+      <SectionCard
+        title="Account summary"
+        subtitle="Your super admin account at a glance"
+        accent={C.brand}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
-          <ReadonlyField label="Full name" value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()} />
+          <ReadonlyField
+            label="Full name"
+            value={`${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim()}
+          />
           <ReadonlyField label="Email address" value={superAdmin?.email} />
+          <ReadonlyField label="Employee ID" value={superAdmin?.empid} />
+          <ReadonlyField label="Designation" value={superAdmin?.designation} />
+          <ReadonlyField label="Department" value={superAdmin?.department} />
           <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
           <div className="mb-4">
             <FieldLabel>Account status</FieldLabel>
@@ -372,12 +719,22 @@ function OverviewTab({ superAdmin }) {
               <StatusBadge status={superAdmin?.status} />
             </div>
           </div>
-          <ReadonlyField label="Email verified" value={superAdmin?.isVerified ? "Yes" : "No"} />
-          <ReadonlyField label="Account created" value={formatDate(superAdmin?.createdAt)} />
+          <ReadonlyField
+            label="Email verified"
+            value={superAdmin?.isVerified ? "Yes" : "No"}
+          />
+          <ReadonlyField
+            label="Account created"
+            value={formatDate(superAdmin?.createdAt)}
+          />
         </div>
       </SectionCard>
 
-      <SectionCard title="Plan & billing" subtitle="Current subscription details" accent={C.amber}>
+      <SectionCard
+        title="Plan & billing"
+        subtitle="Current subscription details"
+        accent={C.amber}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
           <div className="mb-4">
             <FieldLabel>Current plan</FieldLabel>
@@ -390,55 +747,108 @@ function OverviewTab({ superAdmin }) {
             <>
               <ReadonlyField
                 label="Plan type"
-                value={activeLicense?.plan_type ? activeLicense.plan_type.charAt(0).toUpperCase() + activeLicense.plan_type.slice(1) : "—"}
+                value={
+                  activeLicense?.plan_type
+                    ? activeLicense.plan_type.charAt(0).toUpperCase() +
+                      activeLicense.plan_type.slice(1)
+                    : "—"
+                }
               />
-              <ReadonlyField label="Plan activated" value={formatDate(activeLicense?.activatedAt)} />
+              <ReadonlyField
+                label="Plan activated"
+                value={formatDate(activeLicense?.activatedAt)}
+              />
               <div className="mb-4">
                 <FieldLabel>Plan expires</FieldLabel>
                 <div
                   className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
                   style={{
-                    background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
+                    background:
+                      days !== null && days <= 5 ? C.redBg : "#f9f4f2",
                     border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
                     color: days !== null && days <= 5 ? C.red : C.text,
                   }}
                 >
                   {formatDate(activeLicense?.expiresAt)}
-                  {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
+                  {days !== null && (
+                    <span className="text-[11px] ml-2 opacity-70">
+                      ({days}d left)
+                    </span>
+                  )}
                 </div>
               </div>
-              <ReadonlyField label="Seats" value={activeLicense?.users ? `${activeLicense.users} users` : "—"} />
+              <ReadonlyField
+                label="Seats"
+                value={
+                  activeLicense?.users ? `${activeLicense.users} users` : "—"
+                }
+              />
             </>
           ) : (
             <>
-              <ReadonlyField label="Trial started" value={formatDate(superAdmin?.trial_started_at)} />
+              <ReadonlyField
+                label="Trial started"
+                value={formatDate(superAdmin?.trial_started_at)}
+              />
               <div className="mb-4">
                 <FieldLabel>Trial expires</FieldLabel>
                 <div
                   className="px-3.5 py-2.5 rounded-lg text-sm font-medium break-words"
                   style={{
-                    background: days !== null && days <= 5 ? C.redBg : "#f9f4f2",
+                    background:
+                      days !== null && days <= 5 ? C.redBg : "#f9f4f2",
                     border: `0.5px solid ${days !== null && days <= 5 ? "#f5c6c6" : C.border}`,
                     color: days !== null && days <= 5 ? C.red : C.text,
                   }}
                 >
                   {formatDate(superAdmin?.trial_expires_at)}
-                  {days !== null && <span className="text-[11px] ml-2 opacity-70">({days}d left)</span>}
+                  {days !== null && (
+                    <span className="text-[11px] ml-2 opacity-70">
+                      ({days}d left)
+                    </span>
+                  )}
                 </div>
               </div>
             </>
           )}
 
-          <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
-          <ReadonlyField label="Licenses" value={superAdmin?.licenses?.length ? `${superAdmin.licenses.length} active` : "None"} />
-          <ReadonlyField label="Purchased products" value={superAdmin?.purchased_products?.length ? `${superAdmin.purchased_products.length}` : "None"} />
+          <ReadonlyField
+            label="Company domain"
+            value={superAdmin?.company_domain}
+          />
+          <ReadonlyField
+            label="Licenses"
+            value={
+              superAdmin?.licenses?.length
+                ? `${superAdmin.licenses.length} active`
+                : "None"
+            }
+          />
+          <ReadonlyField
+            label="Purchased products"
+            value={
+              superAdmin?.purchased_products?.length
+                ? `${superAdmin.purchased_products.length}`
+                : "None"
+            }
+          />
         </div>
       </SectionCard>
 
-      <SectionCard title="Organisation snapshot" subtitle="Your company profile" accent={C.blue}>
+      <SectionCard
+        title="Organisation snapshot"
+        subtitle="Your company profile"
+        accent={C.blue}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
-          <ReadonlyField label="Organisation name" value={superAdmin?.organisation_name} />
-          <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
+          <ReadonlyField
+            label="Organisation name"
+            value={superAdmin?.organisation_name}
+          />
+          <ReadonlyField
+            label="Company domain"
+            value={superAdmin?.company_domain}
+          />
         </div>
       </SectionCard>
     </>
@@ -452,6 +862,9 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   const [form, setForm] = useState({
     f_name: superAdmin?.f_name || "",
     l_name: superAdmin?.l_name || "",
+    empid: superAdmin?.empid || "",
+    designation: superAdmin?.designation || "",
+    department: superAdmin?.department || "",
   });
 
   useEffect(() => {
@@ -459,12 +872,18 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
       setForm({
         f_name: superAdmin.f_name || "",
         l_name: superAdmin.l_name || "",
+        empid: superAdmin.empid || "",
+        designation: superAdmin.designation || "",
+        department: superAdmin.department || "",
       });
     }
   }, [superAdmin]);
 
   const handleSave = () => {
-    if (!form.f_name || !form.l_name) { onError("First and last name are required"); return; }
+    if (!form.f_name || !form.l_name) {
+      onError("First and last name are required");
+      return;
+    }
     updateProfile.mutate(form, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
@@ -475,18 +894,22 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Personal details" subtitle="Update your name" accent={C.brand}>
+    <SectionCard
+      title="Personal details"
+      subtitle="Update your name"
+      accent={C.brand}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <InputField
           label="First name *"
           value={form.f_name}
-          onChange={e => setForm(p => ({ ...p, f_name: e.target.value }))}
+          onChange={(e) => setForm((p) => ({ ...p, f_name: e.target.value }))}
           placeholder="First name"
         />
         <InputField
           label="Last name *"
           value={form.l_name}
-          onChange={e => setForm(p => ({ ...p, l_name: e.target.value }))}
+          onChange={(e) => setForm((p) => ({ ...p, l_name: e.target.value }))}
           placeholder="Last name"
         />
       </div>
@@ -497,8 +920,31 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         hint="Email cannot be changed. Contact support if needed."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
+        <InputField
+          label="Employee ID"
+          value={form.empid}
+          onChange={e => setForm(p => ({ ...p, empid: e.target.value }))}
+          placeholder="e.g. EMP001"
+        />
+        <InputField
+          label="Designation"
+          value={form.designation}
+          onChange={e => setForm(p => ({ ...p, designation: e.target.value }))}
+          placeholder="e.g. Founder & CEO"
+        />
+      </div>
+      <InputField
+        label="Department"
+        value={form.department}
+        onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
+        placeholder="e.g. Management"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
-        <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
+        <ReadonlyField
+          label="Company domain"
+          value={superAdmin?.company_domain}
+        />
       </div>
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
         Save personal details
@@ -524,7 +970,10 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
   }, [superAdmin]);
 
   const handleSave = () => {
-    if (!form.organisation_name) { onError("Organisation name is required"); return; }
+    if (!form.organisation_name) {
+      onError("Organisation name is required");
+      return;
+    }
     updateProfile.mutate(form, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
@@ -535,16 +984,134 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
   };
 
   return (
-    <SectionCard title="Organisation details" subtitle="Manage your company information" accent={C.blue}>
+    <SectionCard
+      title="Organisation details"
+      subtitle="Manage your company information"
+      accent={C.blue}
+    >
       <InputField
         label="Organisation name *"
         value={form.organisation_name}
-        onChange={e => setForm(p => ({ ...p, organisation_name: e.target.value }))}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, organisation_name: e.target.value }))
+        }
         placeholder="Your company name"
       />
-      <ReadonlyField label="Company domain" value={superAdmin?.company_domain} />
+      <ReadonlyField
+        label="Company domain"
+        value={superAdmin?.company_domain}
+      />
       <PrimaryButton onClick={handleSave} loading={updateProfile.isPending}>
         Save organisation details
+      </PrimaryButton>
+    </SectionCard>
+  );
+}
+
+function BankingTab({ superAdmin, onSuccess, onError }) {
+  const queryClient = useQueryClient();
+  const updateProfile = useUpdateSuperAdminProfile();
+
+  const [form, setForm] = useState({
+    bank_name: "",
+    account_holder_name: "",
+    account_number: "",
+    ifsc_code: "",
+  });
+
+  useEffect(() => {
+    if (superAdmin) {
+      setForm({
+        bank_name: superAdmin.bank_name || "",
+        account_holder_name: superAdmin.account_holder_name || "",
+        account_number: superAdmin.account_number || "",
+        ifsc_code: superAdmin.ifsc_code || "",
+      });
+    }
+  }, [superAdmin]);
+
+  const set = (key) => (e) => setForm((p) => ({ ...p, [key]: e.target.value }));
+
+  const handleSave = () => {
+    if (form.bank_name && form.bank_name.length > 100) {
+      onError("Bank name is too long");
+      return;
+    }
+    if (!form.account_holder_name.trim()) {
+      onError("Account holder name is required");
+      return;
+    }
+    if (!ACCOUNT_REGEX.test(form.account_number)) {
+      onError("Account number must be 9-18 digits");
+      return;
+    }
+    if (!IFSC_REGEX.test(form.ifsc_code.toUpperCase())) {
+      onError("Invalid IFSC code (e.g. HDFC0001234)");
+      return;
+    }
+
+    updateProfile.mutate(
+      {
+        bank_name: form.bank_name,
+        account_holder_name: form.account_holder_name,
+        account_number: form.account_number,
+        ifsc_code: form.ifsc_code.toUpperCase(),
+      },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
+          onSuccess("Banking details updated!");
+        },
+        onError: (err) => onError(getErrorMessage(err)),
+      },
+    );
+  };
+
+  return (
+    <SectionCard
+      title="Banking details"
+      subtitle="Used for your own salary/payslip disbursement"
+      accent={C.green}
+    >
+      <InputField
+        label="Bank name"
+        value={form.bank_name}
+        onChange={set("bank_name")}
+        placeholder="e.g. HDFC Bank"
+      />
+      <InputField
+        label="Account holder name *"
+        value={form.account_holder_name}
+        onChange={set("account_holder_name")}
+        placeholder="Name exactly as per passbook"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
+        <InputField
+          label="Account number *"
+          value={form.account_number}
+          onChange={(e) =>
+            setForm((p) => ({
+              ...p,
+              account_number: e.target.value.replace(/\D/g, ""),
+            }))
+          }
+          placeholder="9-18 digit account number"
+        />
+        <InputField
+          label="IFSC code *"
+          value={form.ifsc_code}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, ifsc_code: e.target.value.toUpperCase() }))
+          }
+          placeholder="e.g. HDFC0001234"
+        />
+      </div>
+      <PrimaryButton
+        onClick={handleSave}
+        loading={updateProfile.isPending}
+        color={C.green}
+      >
+        Save banking details
       </PrimaryButton>
     </SectionCard>
   );
@@ -553,7 +1120,11 @@ function OrganisationTab({ superAdmin, onSuccess, onError }) {
 function PasswordTab({ onSuccess, onError }) {
   const changePassword = useChangeSuperAdminPassword();
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
+  const [form, setForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirm: "",
+  });
 
   const strength = (pw) => {
     if (!pw) return 0;
@@ -567,66 +1138,153 @@ function PasswordTab({ onSuccess, onError }) {
   };
 
   const s = strength(form.newPassword);
-  const strengthLabel = ["", "Weak", "Fair", "Good", "Strong", "Very strong"][s];
+  const strengthLabel = ["", "Weak", "Fair", "Good", "Strong", "Very strong"][
+    s
+  ];
   const strengthColor = ["", C.red, C.amber, "#f9a825", C.green, C.green][s];
 
-  const EyeIcon = ({ open }) => open
-    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" /></svg>
-    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" /></svg>;
+  const EyeIcon = ({ open }) =>
+    open ? (
+      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"
+          stroke={C.muted}
+          strokeWidth="1.3"
+        />
+        <circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"
+          stroke={C.muted}
+          strokeWidth="1.3"
+        />
+        <line
+          x1="2"
+          y1="2"
+          x2="14"
+          y2="14"
+          stroke={C.muted}
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
 
   const eyeToggle = (
-    <button type="button" onClick={() => setShow(s => !s)} className="bg-none border-none cursor-pointer flex p-0">
+    <button
+      type="button"
+      onClick={() => setShow((s) => !s)}
+      className="bg-none border-none cursor-pointer flex p-0"
+    >
       <EyeIcon open={show} />
     </button>
   );
 
   const handleChange = () => {
-    if (!form.currentPassword || !form.newPassword) { onError("All fields are required"); return; }
-    if (form.newPassword !== form.confirm) { onError("Passwords do not match"); return; }
-    if (form.newPassword.length < 6) { onError("Password must be at least 6 characters"); return; }
+    if (!form.currentPassword || !form.newPassword) {
+      onError("All fields are required");
+      return;
+    }
+    if (form.newPassword !== form.confirm) {
+      onError("Passwords do not match");
+      return;
+    }
+    if (form.newPassword.length < 6) {
+      onError("Password must be at least 6 characters");
+      return;
+    }
     changePassword.mutate(
       { currentPassword: form.currentPassword, newPassword: form.newPassword },
       {
-        onSuccess: () => { setForm({ currentPassword: "", newPassword: "", confirm: "" }); onSuccess("Password changed successfully!"); },
+        onSuccess: () => {
+          setForm({ currentPassword: "", newPassword: "", confirm: "" });
+          onSuccess("Password changed successfully!");
+        },
         onError: (err) => onError(getErrorMessage(err)),
-      }
+      },
     );
   };
 
   return (
-    <SectionCard title="Change password" subtitle="Keep your super admin account secure" accent={C.brand}>
+    <SectionCard
+      title="Change password"
+      subtitle="Keep your super admin account secure"
+      accent={C.brand}
+    >
       <div className="w-full max-w-md">
-        <InputField label="Current password *" type={show ? "text" : "password"} name="currentPassword"
-          value={form.currentPassword} onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
-          placeholder="Enter current password" rightEl={eyeToggle} />
+        <InputField
+          label="Current password *"
+          type={show ? "text" : "password"}
+          name="currentPassword"
+          value={form.currentPassword}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, currentPassword: e.target.value }))
+          }
+          placeholder="Enter current password"
+          rightEl={eyeToggle}
+        />
 
-        <InputField label="New password *" type={show ? "text" : "password"} name="newPassword"
-          value={form.newPassword} onChange={e => setForm(p => ({ ...p, newPassword: e.target.value }))}
-          placeholder="Enter new password" rightEl={eyeToggle} />
+        <InputField
+          label="New password *"
+          type={show ? "text" : "password"}
+          name="newPassword"
+          value={form.newPassword}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, newPassword: e.target.value }))
+          }
+          placeholder="Enter new password"
+          rightEl={eyeToggle}
+        />
 
         {form.newPassword && (
           <div className="-mt-2 mb-4">
             <div className="flex gap-1 mb-1.5">
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="flex-1 h-1 rounded-full transition-colors" style={{ background: i <= s ? strengthColor : C.border }} />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="flex-1 h-1 rounded-full transition-colors"
+                  style={{ background: i <= s ? strengthColor : C.border }}
+                />
               ))}
             </div>
-            <div className="text-[11px] font-medium" style={{ color: strengthColor }}>{strengthLabel}</div>
+            <div
+              className="text-[11px] font-medium"
+              style={{ color: strengthColor }}
+            >
+              {strengthLabel}
+            </div>
           </div>
         )}
 
-        <InputField label="Confirm new password *" type={show ? "text" : "password"} name="confirm"
-          value={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
+        <InputField
+          label="Confirm new password *"
+          type={show ? "text" : "password"}
+          name="confirm"
+          value={form.confirm}
+          onChange={(e) => setForm((p) => ({ ...p, confirm: e.target.value }))}
           placeholder="Confirm new password"
-          hint={form.confirm && form.newPassword !== form.confirm ? "Passwords do not match" : ""}
+          hint={
+            form.confirm && form.newPassword !== form.confirm
+              ? "Passwords do not match"
+              : ""
+          }
         />
 
-        <PrimaryButton onClick={handleChange} loading={changePassword.isPending}>
+        <PrimaryButton
+          onClick={handleChange}
+          loading={changePassword.isPending}
+        >
           Update password
         </PrimaryButton>
 
-        <div className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed" style={{ background: C.brandLight, color: C.brand }}>
-          Tips: use 10+ characters, mix uppercase, numbers and symbols for a strong password.
+        <div
+          className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed"
+          style={{ background: C.brandLight, color: C.brand }}
+        >
+          Tips: use 10+ characters, mix uppercase, numbers and symbols for a
+          strong password.
         </div>
       </div>
     </SectionCard>
@@ -634,72 +1292,165 @@ function PasswordTab({ onSuccess, onError }) {
 }
 
 function KioskTab({ superAdmin, onSuccess, onError }) {
-  const { data: statusData, isLoading: statusLoading } = useKioskPasswordStatus();
+  const { data: statusData, isLoading: statusLoading } =
+    useKioskPasswordStatus();
   const setKiosk = useSetKioskPassword();
   const [show, setShow] = useState(false);
-  const [form, setForm] = useState({ currentPassword: "", kioskPassword: "", confirm: "" });
+  const [form, setForm] = useState({
+    currentPassword: "",
+    kioskPassword: "",
+    confirm: "",
+  });
 
-  const EyeIcon = ({ open }) => open
-    ? <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" /></svg>
-    : <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke={C.muted} strokeWidth="1.3" /><line x1="2" y1="2" x2="14" y2="14" stroke={C.muted} strokeWidth="1.3" strokeLinecap="round" /></svg>;
+  const EyeIcon = ({ open }) =>
+    open ? (
+      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"
+          stroke={C.muted}
+          strokeWidth="1.3"
+        />
+        <circle cx="8" cy="8" r="2" stroke={C.muted} strokeWidth="1.3" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"
+          stroke={C.muted}
+          strokeWidth="1.3"
+        />
+        <line
+          x1="2"
+          y1="2"
+          x2="14"
+          y2="14"
+          stroke={C.muted}
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
 
   const eyeToggle = (
-    <button type="button" onClick={() => setShow(s => !s)} className="bg-none border-none cursor-pointer flex p-0">
+    <button
+      type="button"
+      onClick={() => setShow((s) => !s)}
+      className="bg-none border-none cursor-pointer flex p-0"
+    >
       <EyeIcon open={show} />
     </button>
   );
 
   const handleSave = () => {
-    if (!form.currentPassword || !form.kioskPassword) { onError("All fields are required"); return; }
-    if (form.kioskPassword !== form.confirm) { onError("Kiosk passwords do not match"); return; }
-    if (form.kioskPassword.length < 6) { onError("Kiosk password must be at least 6 characters"); return; }
+    if (!form.currentPassword || !form.kioskPassword) {
+      onError("All fields are required");
+      return;
+    }
+    if (form.kioskPassword !== form.confirm) {
+      onError("Kiosk passwords do not match");
+      return;
+    }
+    if (form.kioskPassword.length < 6) {
+      onError("Kiosk password must be at least 6 characters");
+      return;
+    }
     setKiosk.mutate(
-      { currentPassword: form.currentPassword, kioskPassword: form.kioskPassword },
       {
-        onSuccess: () => { setForm({ currentPassword: "", kioskPassword: "", confirm: "" }); onSuccess("Kiosk password saved!"); },
+        currentPassword: form.currentPassword,
+        kioskPassword: form.kioskPassword,
+      },
+      {
+        onSuccess: () => {
+          setForm({ currentPassword: "", kioskPassword: "", confirm: "" });
+          onSuccess("Kiosk password saved!");
+        },
         onError: (err) => onError(getErrorMessage(err)),
-      }
+      },
     );
   };
 
   return (
-    <SectionCard title="Kiosk password" subtitle="Shared credential used by attendance kiosk devices" accent={C.blue}>
+    <SectionCard
+      title="Kiosk password"
+      subtitle="Shared credential used by attendance kiosk devices"
+      accent={C.blue}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
-        <ReadonlyField label="Organisation ID" value={statusLoading ? "Loading..." : statusData?.organisation_id} />
+        <ReadonlyField
+          label="Organisation ID"
+          value={statusLoading ? "Loading..." : statusData?.organisation_id}
+        />
         <div className="mb-4">
           <FieldLabel>Kiosk password status</FieldLabel>
           <div className="px-3.5 py-2.5 rounded-lg bg-[#f9f4f2] border border-[#ede5e0] flex items-center">
-            {statusLoading
-              ? <span className="text-sm text-[#b0948a]">Loading...</span>
-              : <Badge color={statusData?.kiosk_password_set ? "#1a5c3a" : C.amber} bg={statusData?.kiosk_password_set ? C.greenBg : C.amberBg}>
-                  {statusData?.kiosk_password_set ? "Set" : "Not set"}
-                </Badge>
-            }
+            {statusLoading ? (
+              <span className="text-sm text-[#b0948a]">Loading...</span>
+            ) : (
+              <Badge
+                color={statusData?.kiosk_password_set ? "#1a5c3a" : C.amber}
+                bg={statusData?.kiosk_password_set ? C.greenBg : C.amberBg}
+              >
+                {statusData?.kiosk_password_set ? "Set" : "Not set"}
+              </Badge>
+            )}
           </div>
         </div>
       </div>
 
       <div className="w-full max-w-md">
-        <InputField label="Your account password *" type={show ? "text" : "password"} name="currentPassword"
-          value={form.currentPassword} onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
-          placeholder="Enter your account password" rightEl={eyeToggle} />
-
-        <InputField label="New kiosk password *" type={show ? "text" : "password"} name="kioskPassword"
-          value={form.kioskPassword} onChange={e => setForm(p => ({ ...p, kioskPassword: e.target.value }))}
-          placeholder="Enter new kiosk password" rightEl={eyeToggle} />
-
-        <InputField label="Confirm kiosk password *" type={show ? "text" : "password"} name="confirm"
-          value={form.confirm} onChange={e => setForm(p => ({ ...p, confirm: e.target.value }))}
-          placeholder="Confirm kiosk password"
-          hint={form.confirm && form.kioskPassword !== form.confirm ? "Passwords do not match" : ""}
+        <InputField
+          label="Your account password *"
+          type={show ? "text" : "password"}
+          name="currentPassword"
+          value={form.currentPassword}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, currentPassword: e.target.value }))
+          }
+          placeholder="Enter your account password"
+          rightEl={eyeToggle}
         />
 
-        <PrimaryButton onClick={handleSave} loading={setKiosk.isPending} color={C.blue}>
+        <InputField
+          label="New kiosk password *"
+          type={show ? "text" : "password"}
+          name="kioskPassword"
+          value={form.kioskPassword}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, kioskPassword: e.target.value }))
+          }
+          placeholder="Enter new kiosk password"
+          rightEl={eyeToggle}
+        />
+
+        <InputField
+          label="Confirm kiosk password *"
+          type={show ? "text" : "password"}
+          name="confirm"
+          value={form.confirm}
+          onChange={(e) => setForm((p) => ({ ...p, confirm: e.target.value }))}
+          placeholder="Confirm kiosk password"
+          hint={
+            form.confirm && form.kioskPassword !== form.confirm
+              ? "Passwords do not match"
+              : ""
+          }
+        />
+
+        <PrimaryButton
+          onClick={handleSave}
+          loading={setKiosk.isPending}
+          color={C.blue}
+        >
           Save kiosk password
         </PrimaryButton>
 
-        <div className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed" style={{ background: C.blueBg, color: C.blue }}>
-          Use your Organisation ID and this kiosk password to sign in on shared attendance devices. This password is separate from your own account password.
+        <div
+          className="mt-4 p-3.5 rounded-lg text-xs leading-relaxed"
+          style={{ background: C.blueBg, color: C.blue }}
+        >
+          Use your Organisation ID and this kiosk password to sign in on shared
+          attendance devices. This password is separate from your own account
+          password.
         </div>
       </div>
     </SectionCard>
@@ -712,7 +1463,9 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   const [currentImg, setCurrentImg] = useState(superAdmin?.profile_image || "");
   const [pending, setPending] = useState(null);
 
-  useEffect(() => { setCurrentImg(superAdmin?.profile_image || ""); }, [superAdmin]);
+  useEffect(() => {
+    setCurrentImg(superAdmin?.profile_image || "");
+  }, [superAdmin]);
 
   const initials = getInitials(superAdmin?.f_name, superAdmin?.l_name);
   const seed = initials || "superadmin";
@@ -733,29 +1486,42 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
           onError(getErrorMessage(err));
           setPending(null);
         },
-      }
+      },
     );
   };
 
   const removeAvatar = () => applyAvatar("");
 
   return (
-    <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
+    <SectionCard
+      title="Profile avatar"
+      subtitle="Choose an avatar that represents you"
+      accent={C.blue}
+    >
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-6 p-4 sm:p-5 bg-[#f9f8f2] rounded-xl border border-[#ede5e0]">
         <div
           className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full flex items-center justify-center text-2xl font-semibold text-white overflow-hidden border-[3px] shrink-0"
           style={{
-            background: currentImg ? "transparent" : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
+            background: currentImg
+              ? "transparent"
+              : `linear-gradient(135deg, ${C.grad1}, ${C.grad2})`,
             borderColor: C.brandLight,
           }}
         >
-          {currentImg
-            ? <img src={currentImg} alt="avatar" className="w-full h-full object-cover" />
-            : initials
-          }
+          {currentImg ? (
+            <img
+              src={currentImg}
+              alt="avatar"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            initials
+          )}
         </div>
         <div className="text-center sm:text-left min-w-0">
-          <div className="text-sm font-medium text-[#2a1a16] mb-1">Current avatar</div>
+          <div className="text-sm font-medium text-[#2a1a16] mb-1">
+            Current avatar
+          </div>
           <div className="text-xs text-[#b0948a] mb-2.5">
             {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
           </div>
@@ -796,10 +1562,17 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
                   <Spinner size={18} color={C.brand} />
                 </div>
               )}
-              <img src={url} alt={style} className="w-full aspect-square block rounded-lg" />
+              <img
+                src={url}
+                alt={style}
+                className="w-full aspect-square block rounded-lg"
+              />
               <div
                 className="text-[9px] sm:text-[10px] mt-1 sm:mt-1.5 text-center capitalize truncate w-full"
-                style={{ color: isActive ? C.brand : C.muted, fontWeight: isActive ? 500 : 400 }}
+                style={{
+                  color: isActive ? C.brand : C.muted,
+                  fontWeight: isActive ? 500 : 400,
+                }}
               >
                 {style}
               </div>
@@ -811,13 +1584,484 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
   );
 }
 
+// Small horizontal split bar showing what share of total storage each
+// segment takes up. `segments`: [{ label, bytes, color }]
+function StorageSplitBar({ segments, totalBytes }) {
+  const safeTotal = totalBytes || 1;
+  return (
+    <div className="w-full">
+      <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-[#f3ede9]">
+        {segments.map((seg, i) => {
+          const pct = Math.max(0, (seg.bytes / safeTotal) * 100);
+          if (pct <= 0) return null;
+          return (
+            <div
+              key={i}
+              style={{ width: `${pct}%`, background: seg.color }}
+              className="h-full"
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[11px] text-[#8a7570]">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: seg.color }}
+            />
+            {seg.label} · {formatBytes(seg.bytes)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StorageStatCard({ label, value, sublabel, accent }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#ede5e0] p-4 sm:p-5 relative overflow-hidden">
+      <div
+        className="absolute top-0 left-0 right-0 h-[3px]"
+        style={{ background: accent }}
+      />
+      <div className="text-[11px] text-[#b0948a] font-medium mb-1">{label}</div>
+      <div className="text-xl sm:text-2xl font-semibold text-[#2a1a16]">{value}</div>
+      {sublabel && (
+        <div className="text-[11px] text-[#b0948a] mt-1">{sublabel}</div>
+      )}
+    </div>
+  );
+}
+
+const STORAGE_PALETTE = [
+  "#730042", "#2563EB", "#16A34A", "#B45309", "#7C3AED", "#DB2777",
+  "#0891B2", "#65A30D", "#EA580C", "#4F46E5", "#0D9488", "#BE123C",
+];
+
+function StorageGroupRows({ group, open, onToggle }) {
+  return (
+    <>
+      <tr
+        className="border-t border-[#f3ede9] cursor-pointer hover:bg-[#faf7f5]"
+        onClick={onToggle}
+      >
+        <td className="px-3 py-2.5 text-[13px] font-semibold text-[#2a1a16]">
+          <span className="inline-flex items-center gap-1.5">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {group.label}
+          </span>
+        </td>
+        <td className="px-3 py-2.5 text-[13px] text-right text-[#2a1a16]">
+          {group.docs.toLocaleString("en-IN")}
+        </td>
+        <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+          {group.formatted}
+        </td>
+      </tr>
+      {open &&
+        group.collections.map((c) => (
+          <tr key={c.name} className="border-t border-[#f3ede9]">
+            <td className="pl-9 pr-3 py-2 text-xs font-mono text-[#8a7570]">{c.name}</td>
+            <td className="px-3 py-2 text-xs text-right text-[#8a7570]">
+              {c.docs.toLocaleString("en-IN")}
+            </td>
+            <td className="px-3 py-2 text-xs text-right text-[#8a7570] whitespace-nowrap">
+              {c.formatted}
+            </td>
+          </tr>
+        ))}
+    </>
+  );
+}
+
+function StorageTab() {
+  const { data: usage, isLoading, isError, error } = useGetStorageUsage();
+  const refresh = useRefreshStorageUsage();
+
+  const [openGroups, setOpenGroups] = useState({});
+  const [moduleFilter, setModuleFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const fileParams = useMemo(
+    () => ({ module: moduleFilter, search, page, limit: 10 }),
+    [moduleFilter, search, page],
+  );
+  const { data: filesData, isFetching: filesFetching } = useGetStorageFiles(fileParams);
+
+  const mongo = usage?.mongo;
+  const imagekit = usage?.imagekit;
+
+  const slices = useMemo(() => {
+    if (!usage) return [];
+    return [
+      ...(mongo?.groups || []).map((g) => ({ name: `Database · ${g.label}`, bytes: g.bytes })),
+      ...(imagekit?.modules || []).map((m) => ({ name: `Files · ${m.label}`, bytes: m.bytes })),
+    ].filter((x) => x.bytes > 0);
+  }, [usage, mongo, imagekit]);
+
+  return (
+    <>
+      <SectionCard
+        title="Storage usage"
+        subtitle="Database records (every collection) + files belonging to your organisation"
+        accent={C.brand}
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-3 py-6">
+            <Spinner size={20} color={C.brand} />
+            <span className="text-sm text-[#b0948a]">
+              Calculating storage usage... (the first load may take a few seconds)
+            </span>
+          </div>
+        ) : isError ? (
+          <div className="text-sm text-[#E24B4A]">
+            Couldn't load storage usage: {getErrorMessage(error)}
+          </div>
+        ) : (
+          <>
+            {usage?.imagekitAvailable === false && (
+              <div
+                className="mb-4 p-3 rounded-lg text-xs"
+                style={{ background: C.amberBg, color: C.amber }}
+              >
+                Could not fetch the file list from storage ({usage.imagekitError || "unknown error"}).
+                File sizes are taken from sizes saved in the database and are not verified.
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-5">
+              <StorageStatCard
+                label="Total storage used"
+                value={usage.totalFormatted}
+                sublabel="Database + Files"
+                accent={C.brand}
+              />
+              <StorageStatCard
+                label="Database"
+                value={mongo.formatted}
+                sublabel={`${mongo.docs.toLocaleString("en-IN")} documents · ~${mongo.estimatedDiskFormatted} on disk incl. indexes`}
+                accent={C.blue}
+              />
+              <StorageStatCard
+                label="Files"
+                value={imagekit.formatted}
+                sublabel={`${imagekit.files.toLocaleString("en-IN")} files${imagekit.missingFiles ? ` · ${imagekit.missingFiles} missing from storage` : ""}`}
+                accent={C.amber}
+              />
+            </div>
+
+            <StorageSplitBar
+              totalBytes={usage.totalBytes}
+              segments={[
+                { label: "Database", bytes: mongo.bytes, color: C.blue },
+                { label: "Files", bytes: imagekit.bytes, color: C.amber },
+              ]}
+            />
+
+            <div className="flex items-center justify-between mt-5">
+              <div className="text-[11px] text-[#b0948a]">
+                {usage.computedAt
+                  ? `Updated ${new Date(usage.computedAt).toLocaleString("en-IN")}`
+                  : ""}
+              </div>
+              <button
+                onClick={() => refresh.mutate()}
+                disabled={refresh.isPending}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-[#ede5e0] text-[#730042] hover:bg-[#730042]/5 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {refresh.isPending && <Spinner size={12} color={C.brand} />}
+                {refresh.isPending ? "Recalculating..." : "Refresh"}
+              </button>
+            </div>
+          </>
+        )}
+      </SectionCard>
+
+      {!isLoading && !isError && usage && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <SectionCard
+              title="Storage breakdown"
+              subtitle="Share of each area across the database and file storage"
+              accent={C.blue}
+            >
+              {slices.length === 0 ? (
+                <div className="text-sm text-[#b0948a]">No data stored yet.</div>
+              ) : (
+                <div style={{ height: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={slices}
+                        dataKey="bytes"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {slices.map((e, i) => (
+                          <Cell key={e.name} fill={STORAGE_PALETTE[i % STORAGE_PALETTE.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v, n) => [formatBytes(v), n]}
+                        contentStyle={{ borderRadius: 10, border: "1px solid #ede5e0", fontSize: 13 }}
+                      />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={70}
+                        formatter={(v) => <span style={{ fontSize: 11, color: "#8a7570" }}>{v}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              title="Files by module"
+              subtitle="Documents, policies, receipts, tickets, photos and more"
+              accent={C.amber}
+            >
+              {imagekit.modules.length === 0 ? (
+                <div className="text-sm text-[#b0948a]">
+                  No files in storage for this organisation.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                        <th className="px-3 py-2 text-left font-medium">Module</th>
+                        <th className="px-3 py-2 text-right font-medium">Files</th>
+                        <th className="px-3 py-2 text-right font-medium">Size</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {imagekit.modules.map((m) => (
+                        <tr key={m.key} className="border-t border-[#f3ede9]">
+                          <td className="px-3 py-2.5 text-[13px] text-[#2a1a16]">
+                            {m.label}
+                            {m.missing > 0 && (
+                              <span
+                                className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: C.amberBg, color: C.amber }}
+                              >
+                                {m.missing} missing
+                              </span>
+                            )}
+                            {m.externalLinks > 0 && (
+                              <span className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#eef3fe] text-[#2563EB]">
+                                {m.externalLinks} external link{m.externalLinks > 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-[13px] text-right text-[#2a1a16]">
+                            {m.fileCount.toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+                            {m.formatted}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            title="Database by area & collection"
+            subtitle="Real on-disk size of this organisation's documents. Click an area to expand."
+            accent={C.blue}
+          >
+            {mongo.groups.length === 0 ? (
+              <div className="text-sm text-[#b0948a]">No data stored yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                      <th className="px-3 py-2 text-left font-medium">Area / collection</th>
+                      <th className="px-3 py-2 text-right font-medium">Documents</th>
+                      <th className="px-3 py-2 text-right font-medium">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mongo.groups.map((g) => (
+                      <StorageGroupRows
+                        key={g.key}
+                        group={g}
+                        open={!!openGroups[g.key]}
+                        onToggle={() =>
+                          setOpenGroups((p) => ({ ...p, [g.key]: !p[g.key] }))
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {mongo.inlineFiles.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg text-xs bg-[#f8f6f4] border border-[#ede5e0] text-[#8a7570] leading-relaxed">
+                <strong>Inline images inside the database:</strong>{" "}
+                {mongo.inlineFiles
+                  .map((i) => `${i.label} — ${i.count.toLocaleString("en-IN")} (${i.formatted})`)
+                  .join(" · ")}
+                . These are stored directly inside database documents as base64 instead of a URL and
+                are already included in the database size (not double counted).
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title={`Files${filesData ? ` (${filesData.total.toLocaleString("en-IN")} · ${filesData.totalFormatted})` : ""}`}
+            subtitle="Every file uploaded by your organisation"
+            accent={C.amber}
+          >
+            <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex items-center gap-1.5 border border-[#ede5e0] rounded-lg px-2.5 py-1.5 bg-white">
+                <Search size={13} color="#b0948a" />
+                <input
+                  className="outline-none text-xs w-40 bg-transparent"
+                  placeholder="Search file name..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+              </div>
+              <select
+                className="border border-[#ede5e0] rounded-lg px-2.5 py-1.5 text-xs bg-white"
+                value={moduleFilter}
+                onChange={(e) => {
+                  setModuleFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All modules</option>
+                {imagekit.modules
+                  .filter((m) => m.fileCount > 0)
+                  .map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="overflow-x-auto" style={{ opacity: filesFetching ? 0.6 : 1 }}>
+              <table className="w-full">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-[#b0948a]">
+                    <th className="px-3 py-2 text-left font-medium">File</th>
+                    <th className="px-3 py-2 text-left font-medium">Module</th>
+                    <th className="px-3 py-2 text-right font-medium">Size</th>
+                    <th className="px-3 py-2 text-left font-medium">Uploaded</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {(filesData?.files || []).length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-4 text-sm text-[#b0948a]">
+                        No files found.
+                      </td>
+                    </tr>
+                  )}
+                  {(filesData?.files || []).map((f) => (
+                    <tr key={`${f.fileId}-${f.url}`} className="border-t border-[#f3ede9] align-top">
+                      <td className="px-3 py-2.5">
+                        <div className="text-[13px] font-medium text-[#2a1a16] break-all">
+                          {f.title || f.name}
+                        </div>
+                        <div className="text-[11px] font-mono text-[#b0948a] break-all">
+                          {f.filePath}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-[#2a1a16]">{f.moduleLabel}</td>
+                      <td className="px-3 py-2.5 text-[13px] text-right font-semibold text-[#2a1a16] whitespace-nowrap">
+                        {f.formatted}
+                        {!f.verified && (
+                          <span
+                            className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: C.amberBg, color: C.amber }}
+                            title="File not found in storage; size taken from the database record"
+                          >
+                            unverified
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-[13px] text-[#8a7570] whitespace-nowrap">
+                        {formatDate(f.uploadedAt)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {f.url && (
+                          <a
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#730042] inline-flex"
+                            title="Open file"
+                          >
+                            <ExternalLink size={14} />
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filesData?.pagination && filesData.pagination.pages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-4">
+                <button
+                  className="border border-[#ede5e0] rounded-lg p-1.5 disabled:opacity-40"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-[#8a7570]">
+                  Page {filesData.pagination.page} of {filesData.pagination.pages}
+                </span>
+                <button
+                  className="border border-[#ede5e0] rounded-lg p-1.5 disabled:opacity-40"
+                  disabled={page >= filesData.pagination.pages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </SectionCard>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function SuperAdminSettingsPage() {
   const [tab, setTab] = useState("overview");
   const [toast, setToast] = useState({ message: "", type: "" });
 
   const { data: profileData, isLoading } = useGetMeSuperAdmin();
   const superAdmin = profileData?.superAdmin ?? null;
-  const initials = superAdmin ? getInitials(superAdmin.f_name, superAdmin.l_name) : "SA";
+  const initials = superAdmin
+    ? getInitials(superAdmin.f_name, superAdmin.l_name)
+    : "SA";
 
   const showSuccess = (msg) => setToast({ message: msg, type: "success" });
   const showError = (msg) => setToast({ message: msg, type: "error" });
@@ -840,23 +2084,76 @@ export default function SuperAdminSettingsPage() {
         @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
       `}</style>
 
-      <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: "", type: "" })}
+      />
 
       <div className="mb-5 sm:mb-8">
-        <h1 className="text-lg sm:text-xl font-medium m-0 tracking-tight">Settings</h1>
-        <p className="text-xs sm:text-sm text-[#b0948a] mt-1">Manage your super admin profile, organisation and security</p>
+        <h1 className="text-lg sm:text-xl font-medium m-0 tracking-tight">
+          Settings
+        </h1>
+        <p className="text-xs sm:text-sm text-[#b0948a] mt-1">
+          Manage your super admin profile, organisation and security
+        </p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start w-full">
-        <Sidebar tab={tab} setTab={setTab} superAdmin={superAdmin} initials={initials} />
+        <Sidebar
+          tab={tab}
+          setTab={setTab}
+          superAdmin={superAdmin}
+          initials={initials}
+        />
 
         <div className="flex-1 w-full min-w-0">
           {tab === "overview" && <OverviewTab superAdmin={superAdmin} />}
-          {tab === "profile" && <ProfileTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
-          {tab === "organisation" && <OrganisationTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
-          {tab === "password" && <PasswordTab onSuccess={showSuccess} onError={showError} />}
-          {tab === "kiosk" && <KioskTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
-          {tab === "avatar" && <AvatarTab superAdmin={superAdmin} onSuccess={showSuccess} onError={showError} />}
+          {tab === "profile" && (
+            <ProfileTab
+              superAdmin={superAdmin}
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
+          {tab === "organisation" && (
+            <OrganisationTab
+              superAdmin={superAdmin}
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
+          {tab === "storage" && <StorageTab />}
+          {tab === "banking" && (
+            <BankingTab
+              superAdmin={superAdmin}
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
+          {tab === "password" && (
+            <PasswordTab onSuccess={showSuccess} onError={showError} />
+          )}
+          {tab === "kiosk" && (
+            <KioskTab
+              superAdmin={superAdmin}
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
+          {tab === "security" && (
+            <SingleSignInSecurityTab
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
+          {tab === "avatar" && (
+            <AvatarTab
+              superAdmin={superAdmin}
+              onSuccess={showSuccess}
+              onError={showError}
+            />
+          )}
 
           <div className="text-center text-xs text-[#c9bab5] mt-2">
             Changes are saved to your account automatically

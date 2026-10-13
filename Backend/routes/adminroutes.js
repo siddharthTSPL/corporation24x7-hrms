@@ -3,15 +3,25 @@ const adminrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
+const leaveDocumentUpload = require("../middleware/upload/Leavedocument.middleware");
 const checkPermission = require("../middleware/auth/Checkpermission.middleware");
-const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
+const adminDelegatedAccess = require("../middleware/auth/adminDelegatedAccess.middleware");
+const {
+  restrictPlanFeature,
+} = require("../middleware/auth/planFeatureGate.middleware");
+const { cacheRoute } = require("../middleware/cache/cache.middleware");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
 // Advance/enterprise (or during the free trial).
 const reviewPlanGate = restrictPlanFeature("review");
-const assetPlanGate = restrictPlanFeature("asset");
 const ticketsPlanGate = restrictPlanFeature("tickets");
+const onboardingAccess = adminDelegatedAccess("onboarding");
+const onboardingOrTorchXAccess = adminDelegatedAccess(["onboarding", "torchx_management"]);
+const assetManagementAccess = adminDelegatedAccess("asset_management");
+// Self Service Portal — Leave, Reimbursements, and Document/File
+// self-management — is likewise fully locked on Basic and fully open on
+// Advance/enterprise (or during the free trial).
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -48,6 +58,7 @@ const {
   getperticularemanager,
   deleteemployee,
   showallleaves,
+  forwardAdminLeave,
   acceptLeave,
   rejectLeave,
   applyleave,
@@ -86,8 +97,7 @@ const {
   getActiveUserCount,
   getAllAdminsForOrg,
   respondToMyReview,
-  hrAcknowledgeReviewHandler
-
+  hrAcknowledgeReviewHandler,
 } = require("../controllers/admin.controller");
 
 const {
@@ -96,7 +106,6 @@ const {
   editDocument,
   deleteDocument,
 } = require("../controllers/uploaddocument.controller");
-
 
 const {
   createAssetAdmin,
@@ -120,8 +129,22 @@ adminrouter.post("/verifyotp", asyncHandler(verifyAotp));
 adminrouter.post("/resetpassword", asyncHandler(resetAdminPassword));
 
 adminrouter.post("/logout", adminauthmiddleware, asyncHandler(adminlogout));
-adminrouter.get("/getme", adminauthmiddleware, asyncHandler(getme));
-adminrouter.get("/getattendance", adminauthmiddleware, asyncHandler(getMyAttendanceHistory));
+// getme is the "who am I / what's my dashboard" call — fired on nearly
+// every page load and hits Admin + LeaveBalance + Review in parallel.
+// Cached 30s per admin (never per-org — this is one person's own data,
+// so the key MUST be their own _id or two admins in the same org would
+// see each other's profile/reviews).
+adminrouter.get(
+  "/getme",
+  adminauthmiddleware,
+  cacheRoute(30_000, (req) => `user:${req.admin._id}:${req.originalUrl}`),
+  asyncHandler(getme),
+);
+adminrouter.get(
+  "/getattendance",
+  adminauthmiddleware,
+  asyncHandler(getMyAttendanceHistory),
+);
 adminrouter.put(
   "/editadminprofile",
   adminauthmiddleware,
@@ -154,45 +177,44 @@ adminrouter.get(
   asyncHandler(getAttendanceHistory),
 );
 
-adminrouter.post("/addmanager", adminauthmiddleware, asyncHandler(addmanager));
+adminrouter.post("/addmanager", onboardingAccess, asyncHandler(addmanager));
 adminrouter.post(
   "/addemployee",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(addemployee),
 );
 
 adminrouter.get(
   "/employees/bulk-template",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(downloadEmployeeTemplate),
 );
 adminrouter.post(
   "/employees/bulk-upload",
-  adminauthmiddleware,
+  onboardingAccess,
   bulkOnboardingUpload.single("file"),
   asyncHandler(bulkUploadEmployees),
 );
 adminrouter.post(
   "/employees/bulk-import-sheet",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(bulkImportFromGoogleSheet),
 );
 adminrouter.get(
   "/findallmanagers",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(findallmanagers),
 );
 
-
 adminrouter.get(
   "/findallemployeesfull",
-  adminauthmiddleware,
-  asyncHandler(findallemployeesfull)
+  onboardingOrTorchXAccess,
+  asyncHandler(findallemployeesfull),
 );
 
 adminrouter.get(
   "/getallemployee",
-  adminOrSuperAdminAuth,
+  onboardingOrTorchXAccess,
   asyncHandler(getallemployee),
 );
 adminrouter.get(
@@ -202,33 +224,33 @@ adminrouter.get(
 );
 adminrouter.put(
   "/editemployee/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(editemployee),
 );
 adminrouter.put(
   "/editmanager/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(editmanager),
 );
 adminrouter.get(
   "/getperticularemployee/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(getperticularemployee),
 );
 adminrouter.get(
   "/getperticularemanager/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(getperticularemanager),
 );
 adminrouter.delete(
   "/deleteuser/:id",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(deleteemployee),
 );
 
 adminrouter.post(
   "/employee/:id/promote/manager",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(promoteEmployeeToManager),
 );
 adminrouter.post(
@@ -243,7 +265,7 @@ adminrouter.post(
 );
 adminrouter.post(
   "/manager/:id/demote/employee",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(demoteManagerToEmployee),
 );
 adminrouter.post(
@@ -258,7 +280,7 @@ adminrouter.post(
 );
 adminrouter.put(
   "/manager/:id/role",
-  adminauthmiddleware,
+  onboardingAccess,
   asyncHandler(changeManagerRole),
 );
 
@@ -267,16 +289,18 @@ adminrouter.get(
   adminauthmiddleware,
   asyncHandler(showallleaves),
 );
-adminrouter.post("/applyleave", adminauthmiddleware, asyncHandler(applyleave));
+adminrouter.post(
+  "/applyleave",
+  adminauthmiddleware,
+  leaveDocumentUpload.single("supportingDocument"),
+  asyncHandler(applyleave)
+);
+
 adminrouter.put(
   "/editleave/:id",
   adminauthmiddleware,
-  asyncHandler(editleaveadmin),
-);
-adminrouter.delete(
-  "/deleteleave/:id",
-  adminauthmiddleware,
-  asyncHandler(deleteleaveadmin),
+  leaveDocumentUpload.single("supportingDocument"),
+  asyncHandler(editleaveadmin)
 );
 adminrouter.get(
   "/getmyleavehistory",
@@ -292,6 +316,11 @@ adminrouter.put(
   "/rejectleave/:id",
   adminauthmiddleware,
   asyncHandler(rejectLeave),
+);
+adminrouter.post(
+  "/forwardleave",
+  adminauthmiddleware,
+  asyncHandler(forwardAdminLeave),
 );
 adminrouter.post(
   "/actionleave",
@@ -434,49 +463,101 @@ adminrouter.get(
 
 adminrouter.get(
   "/all-no-admin",
-  adminauthmiddleware,
-  asyncHandler(findallmanagerswoadmin)
+  onboardingAccess,
+  asyncHandler(findallmanagerswoadmin),
 );
 
 adminrouter.put(
   "/employee/:id/working-status",
-  adminauthmiddleware,
-  asyncHandler(setEmployeeWorkingStatus)
+  onboardingAccess,
+  asyncHandler(setEmployeeWorkingStatus),
 );
 
 adminrouter.put(
   "/manager/:id/working-status",
-  adminauthmiddleware,
-  asyncHandler(setManagerWorkingStatus)
+  onboardingAccess,
+  asyncHandler(setManagerWorkingStatus),
 );
-adminrouter.get("/all-admins", adminOrSuperAdminAuth, asyncHandler(getAllAdminsForOrg));
+adminrouter.get(
+  "/all-admins",
+  adminOrSuperAdminAuth,
+  asyncHandler(getAllAdminsForOrg),
+);
 
-adminrouter.get("/inactive-users", adminauthmiddleware, asyncHandler(getInactiveUsers));
-adminrouter.get("/active-user-count", adminauthmiddleware, getActiveUserCount);
+adminrouter.get(
+  "/inactive-users",
+  onboardingAccess,
+  asyncHandler(getInactiveUsers),
+);
+adminrouter.get("/active-user-count", onboardingAccess, getActiveUserCount);
 
 // ── Asset Management (Admin) — plan-gated: locked on Basic ─────────────────────
-adminrouter.post("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(createAssetAdmin));
-adminrouter.get("/assets", adminauthmiddleware, assetPlanGate, asyncHandler(getAllAssetsAdmin));
+adminrouter.post(
+  "/assets",
+  assetManagementAccess,
+  asyncHandler(createAssetAdmin),
+);
+adminrouter.get(
+  "/assets",
+  assetManagementAccess,
+  asyncHandler(getAllAssetsAdmin),
+);
 // Employee-wise asset views (kept above "/assets/:id" so "employees" isn't swallowed as an :id)
-adminrouter.get("/assets/employees", adminauthmiddleware, assetPlanGate, asyncHandler(getEmployeesWithAssets));
+adminrouter.get(
+  "/assets/employees",
+  assetManagementAccess,
+  asyncHandler(getEmployeesWithAssets),
+);
 adminrouter.get(
   "/assets/employees/:person_id/:person_model/history",
-  adminauthmiddleware,
-  assetPlanGate,
-  asyncHandler(getEmployeeAssetHistory)
+  assetManagementAccess,
+  asyncHandler(getEmployeeAssetHistory),
 );
-adminrouter.get("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetByIdAdmin));
-adminrouter.put("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(updateAssetAdmin));
-adminrouter.delete("/assets/:id", adminauthmiddleware, assetPlanGate, asyncHandler(deleteAssetAdmin));
-adminrouter.patch("/assets/:id/assign-employee", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToEmployee));
-adminrouter.patch("/assets/:id/assign-manager", adminauthmiddleware, assetPlanGate, asyncHandler(assignAssetToManager));
-adminrouter.patch("/assets/:id/revoke", adminauthmiddleware, assetPlanGate, asyncHandler(revokeAssetAdmin));
-adminrouter.get("/assets/person/:person_id/:person_model", adminauthmiddleware, assetPlanGate, asyncHandler(getAssetsOfPerson));
+adminrouter.get(
+  "/assets/:id",
+  assetManagementAccess,
+  asyncHandler(getAssetByIdAdmin),
+);
+adminrouter.put(
+  "/assets/:id",
+  assetManagementAccess,
+  asyncHandler(updateAssetAdmin),
+);
+adminrouter.delete(
+  "/assets/:id",
+  assetManagementAccess,
+  asyncHandler(deleteAssetAdmin),
+);
+adminrouter.patch(
+  "/assets/:id/assign-employee",
+  assetManagementAccess,
+  asyncHandler(assignAssetToEmployee),
+);
+adminrouter.patch(
+  "/assets/:id/assign-manager",
+  assetManagementAccess,
+  asyncHandler(assignAssetToManager),
+);
+adminrouter.patch(
+  "/assets/:id/revoke",
+  assetManagementAccess,
+  asyncHandler(revokeAssetAdmin),
+);
+adminrouter.get(
+  "/assets/person/:person_id/:person_model",
+  assetManagementAccess,
+  asyncHandler(getAssetsOfPerson),
+);
 
 // Assets assigned to the logged-in admin themself (e.g. by SuperAdmin) — Dashboard / Settings "My Assets" widget
 adminrouter.get("/my-assets", adminauthmiddleware, asyncHandler(getMyAssets));
 
 // Help & Support form — no permission gate, every logged-in admin can reach support.
-adminrouter.post("/contact-support", adminauthmiddleware, supportUpload.array("attachments", 5), asyncHandler(sendSupportRequest));
+adminrouter.post(
+  "/contact-support",
+  adminauthmiddleware,
+  supportUpload.array("attachments", 5),
+  asyncHandler(sendSupportRequest),
+);
 
 module.exports = adminrouter;

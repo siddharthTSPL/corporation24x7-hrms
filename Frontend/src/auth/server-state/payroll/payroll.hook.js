@@ -10,6 +10,8 @@ import {
   setPaySchedule,
   getOrgOwner,
   setEmployeeCTC,
+  bulkSetEmployeeCTC,
+  updateAttendanceBasis,
   listSalaryStructures,
   getSalaryStructure,
   reapplyPolicy,
@@ -17,6 +19,7 @@ import {
   bulkGeneratePayroll,
   listPayrolls,
   getPayslip,
+  getMyPayslips,
   updatePayrollStatus,
   deletePayroll,
   bulkUpdatePayrollStatus,
@@ -154,6 +157,26 @@ export const useSetEmployeeCTC = () => {
   });
 };
 
+export const useBulkSetEmployeeCTC = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkSetEmployeeCTC,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
+    },
+  });
+};
+
+export const useUpdateAttendanceBasis = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateAttendanceBasis,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
+    },
+  });
+};
+
 export const useReapplyPolicy = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -203,6 +226,17 @@ export const useGetPayslip = (params, enabled) => {
     queryKey: ["payslip", params],
     queryFn: () => getPayslip(params),
     enabled: Boolean(enabled && params?.employee && params?.month && params?.year),
+    staleTime: 0,
+  });
+};
+
+// Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
+// Available on every plan (Basic included).
+export const useMyPayslips = (enabled = true) => {
+  return useQuery({
+    queryKey: ["my-payslips"],
+    queryFn: () => getMyPayslips(),
+    enabled,
     staleTime: 0,
   });
 };

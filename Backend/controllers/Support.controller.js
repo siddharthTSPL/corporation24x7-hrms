@@ -93,6 +93,10 @@ const sendSupportRequest = async (req, res) => {
       attachmentNames: files.map((f) => f.originalname),
     }),
     attachments,
+    mailbox: "support",
+    // So a support agent can just hit "reply" on this alert and land
+    // straight in the reporter's inbox, instead of replying to themselves.
+    ...(email && { replyTo: email }),
   });
 
   if (email) {
@@ -101,6 +105,7 @@ const sendSupportRequest = async (req, res) => {
         to: email,
         subject: `We've received your request: ${subject.trim()}`,
         html: buildSupportAckEmail({ name, subject: subject.trim() }),
+        mailbox: "support",
       });
     } catch (err) {
       // Acknowledgement failing shouldn't fail the whole request — the

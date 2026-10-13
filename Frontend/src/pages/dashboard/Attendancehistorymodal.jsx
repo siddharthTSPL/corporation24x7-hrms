@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FaTimes, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaDownload, FaFilter, FaUsers } from "react-icons/fa";
-import { downloadCsv } from "./exportCsv";
+import { DAY_BUCKET_LABEL, dayBucket, downloadCsv, paidDayValue, summarizeDays, summaryFooterRows, summaryTableRows, withTotalRow } from "./Exportcsv";
 
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", weekday: "short" }) : "—";
@@ -44,12 +44,28 @@ const STATUS_META = {
   present: { label: "Present", color: "#16A34A", bg: "#DCFCE7" },
   half_day: { label: "Half Day", color: "#B8760A", bg: "#FEF3C7" },
   absent: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
+  week_off: { label: "Week Off", color: "#475569", bg: "#F1F5F9" },
+  holiday: { label: "Holiday", color: "#0F766E", bg: "#CCFBF1" },
+  leave: { label: "Leave", color: "#6B21A8", bg: "#F3E8FF" },
 };
+
+const LEAVE_TYPE_LABEL = {
+  el: "Earned Leave",
+  sl: "Sick Leave",
+  ml: "Maternity Leave",
+  pl: "Paternity Leave",
+  half_day_el: "Half Day EL",
+  half_day_sl: "Half Day SL",
+  comp_off: "Compensatory Leave",
+  lwp: "LWP",
+};
+const leaveLabel = (code) => LEAVE_TYPE_LABEL[code] || code || "Leave";
 
 const SOURCE_META = {
   face: { label: "🤳 Face", color: "#9B2554", bg: "#FDF2F7" },
   agent: { label: "💻 Agent", color: "#2563EB", bg: "#EFF6FF" },
   system: { label: "📍 System", color: "#0D9E6E", bg: "#E8F7F1" },
+  timesheet: { label: "🗂 Timesheet", color: "#7C3AED", bg: "#F3E8FF" },
 };
 
 const PRESETS = [
@@ -65,6 +81,9 @@ const STATUS_FILTER_OPTIONS = [
   { value: "present", label: "Present" },
   { value: "half_day", label: "Half Day" },
   { value: "absent", label: "Absent" },
+  { value: "week_off", label: "Week Off" },
+  { value: "holiday", label: "Holiday" },
+  { value: "leave", label: "Leave" },
 ];
 
 const SOURCE_FILTER_OPTIONS = [
@@ -72,6 +91,7 @@ const SOURCE_FILTER_OPTIONS = [
   { value: "face", label: "🤳 Face" },
   { value: "system", label: "📍 System" },
   { value: "agent", label: "💻 Agent" },
+  { value: "timesheet", label: "🗂 Timesheet" },
 ];
 
 function presetRange(key) {
@@ -126,19 +146,36 @@ function HistoryRow({ r }) {
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: src.color, background: src.bg }}
         >
-          {src.label}
+          {r.synthetic && !r.source ? "—" : src.label}
         </span>
       </td>
-      <td className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap">{fmtMinutes(r.activeMinutes)}</td>
+      <td
+        className="py-2.5 px-2 text-[12px] text-emerald-700 font-mono whitespace-nowrap"
+        title={r.source === "timesheet" ? `Timesheet logs: ${fmtMinutes(r.timesheetMinutes)} (${r.timesheetPercent}% of standard day)${r.timesheetApproved === false ? " — timesheet not approved yet" : ""}` : undefined}
+      >
+        {r.source === "timesheet" ? fmtMinutes(r.timesheetMinutes) : fmtMinutes(r.activeMinutes)}
+      </td>
       <td className="py-2.5 px-2 text-[12px] text-amber-700 font-mono whitespace-nowrap">{fmtMinutes(r.idleMinutes)}</td>
-      <td className="py-2.5 pr-3 pl-2">
+      <td className="py-2.5 px-2">
         <span
           className="text-[10.5px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
           style={{ color: meta.color, background: meta.bg }}
         >
-          {meta.label}
-          {r.isLate ? " · Late" : ""}
+          {r.status === "leave"
+            ? leaveLabel(r.leaveType)
+            : r.status === "holiday" && r.holidayName
+              ? `Holiday · ${r.holidayName}`
+              : meta.label}
+          {r.status !== "leave" && r.leaveType ? ` · ${leaveLabel(r.leaveType)}` : ""}
+          {r.status === "half_day" && !r.leaveType && !r.latePenalty && r.source !== "timesheet"
+            ? (r.checkoutRemark === "missed_checkout" ? " · Missed check-out" : r.checkOut ? " · Short hours" : "")
+            : ""}
+          {r.isLate ? (r.latePenalty ? (r.lateCountInMonth ? ` · Late #${r.lateCountInMonth} (Half Day)` : " · Late 1h+ (Half Day)") : r.lateCountInMonth ? ` · Late ${r.lateCountInMonth}` : " · Late") : ""}
+          {r.source === "timesheet" ? ` · Timesheet ${r.timesheetPercent}%${r.timesheetApproved === false ? " (not approved yet)" : ""}` : ""}
         </span>
+      </td>
+      <td className="py-2.5 pr-3 pl-2 text-[12px] font-semibold font-mono" style={{ color: paidDayValue(r) ? "#16A34A" : "#DC2626" }}>
+        {paidDayValue(r)}
       </td>
     </tr>
   );
@@ -193,21 +230,30 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     );
   }, [rows]);
 
+  const summary = useMemo(() => summarizeDays(allRows), [allRows]);
+  const paidDays = summary.paidDays;
+
   const exportCsv = () => {
     downloadCsv(
       `attendance-history-${(employeeName || employeeId || "employee").replace(/\s+/g, "_")}-${range.startDate}_to_${range.endDate}.csv`,
-      [
+      withTotalRow([
         { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
         { key: "checkIn", label: "Check-in", format: (r) => fmtTime(r.checkIn) },
         { key: "checkOut", label: "Check-out", format: (r) => fmtTime(r.checkOut) },
         { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
         { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
         { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
-        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
-      ],
-      rows
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
+      ]),
+      [...rows, { __total: true, paidDays }],
+      summaryFooterRows(summary)
     );
   };
 
@@ -220,6 +266,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
     setExportAllProgress({ done: 0, total: people.length });
 
     const combined = [];
+    const empSummaries = [];
     const failedNames = [];
 
     await runWithConcurrency(people, CONCURRENCY, async (person) => {
@@ -231,6 +278,9 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           if (sourceFilter !== "all" && r.source !== sourceFilter) return;
           combined.push({ ...r, employeeName: person.name || "Unknown", empid: person.empid || "—" });
         });
+        const empSum = summarizeDays(dayRows);
+        empSummaries.push({ name: person.name || "Unknown", empid: person.empid || "—", sum: empSum });
+        combined.push({ __total: true, employeeName: person.name || "Unknown", empid: person.empid || "—", paidDays: empSum.paidDays });
       } catch {
         failedNames.push(person.name || person.empid || person.id);
       } finally {
@@ -240,7 +290,7 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
 
     downloadCsv(
       `attendance-history-all-employees-${range.startDate}_to_${range.endDate}.csv`,
-      [
+      withTotalRow([
         { key: "employeeName", label: "Employee", format: (r) => r.employeeName },
         { key: "empid", label: "Emp ID", format: (r) => r.empid },
         { key: "date", label: "Date", format: (r) => fmtDate(r.date) },
@@ -249,11 +299,17 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
         { key: "source", label: "Via", format: (r) => (SOURCE_META[r.source] || SOURCE_META.system).label.replace(/^\S+\s/, "") },
         { key: "activeMinutes", label: "Active Minutes", format: (r) => Math.round(r.activeMinutes || 0) },
         { key: "idleMinutes", label: "Idle Minutes", format: (r) => Math.round(r.idleMinutes || 0) },
-        { key: "status", label: "Status", format: (r) => (STATUS_META[r.status] || STATUS_META.absent).label },
+        { key: "status", label: "Status", format: (r) => (r.status === "leave" ? leaveLabel(r.leaveType) : (STATUS_META[r.status] || STATUS_META.absent).label) },
+        { key: "leaveType", label: "Leave Type", format: (r) => (r.leaveType ? leaveLabel(r.leaveType) : "") },
         { key: "isLate", label: "Late", format: (r) => (r.isLate ? "Yes" : "No") },
         { key: "overtimeMinutes", label: "Overtime Minutes", format: (r) => Math.round(r.overtimeMinutes || 0) },
-      ],
-      combined
+        { key: "timesheetMinutes", label: "Timesheet Minutes", format: (r) => (r.source === "timesheet" ? Math.round(r.timesheetMinutes || 0) : "") },
+        { key: "timesheetPercent", label: "Timesheet %", format: (r) => (r.source === "timesheet" ? r.timesheetPercent : "") },
+        { key: "dayType", label: "Day Type", format: (r) => DAY_BUCKET_LABEL[dayBucket(r)] },
+        { key: "paidDay", label: "Paid Day", format: (r) => paidDayValue(r) },
+      ]),
+      combined,
+      summaryTableRows(empSummaries)
     );
 
     setIsExportingAll(false);
@@ -378,6 +434,35 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
           </span>
         </div>
 
+        <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap flex-shrink-0 border-b border-gray-100">
+          {[
+            { label: "Total Days", value: summary.totalDays, color: "#1F2937", bg: "#F3F4F6" },
+            { label: "Present", value: summary.present, color: STATUS_META.present.color, bg: STATUS_META.present.bg },
+            { label: "Week Off", value: summary.weekOff, color: STATUS_META.week_off.color, bg: STATUS_META.week_off.bg },
+            { label: "Paid Leave", value: summary.paidLeave, color: STATUS_META.leave.color, bg: STATUS_META.leave.bg },
+            { label: "Holiday", value: summary.holiday, color: STATUS_META.holiday.color, bg: STATUS_META.holiday.bg },
+            { label: "Half Day", value: summary.halfDay, color: STATUS_META.half_day.color, bg: STATUS_META.half_day.bg },
+            { label: "Absent", value: summary.absent, color: STATUS_META.absent.color, bg: STATUS_META.absent.bg },
+            { label: "Via Timesheet", value: summary.timesheetDays, color: SOURCE_META.timesheet.color, bg: SOURCE_META.timesheet.bg },
+          ].map((c) => (
+            <span
+              key={c.label}
+              className="text-[11px] font-semibold rounded-lg px-2.5 py-1 whitespace-nowrap"
+              style={{ color: c.color, background: c.bg }}
+              title={c.label === "Absent" ? "No-show + unpaid leave (LWP) + anything not Present / Week Off / Paid Leave / Holiday" : undefined}
+            >
+              {c.label}: {c.value}
+            </span>
+          ))}
+          <span
+            className="ml-auto text-[13px] font-bold rounded-lg px-3 py-1.5 whitespace-nowrap"
+            style={{ color: "#fff", background: "#730042" }}
+            title="Present + Week Off + Paid Leave + Holiday + Half Day (0.5)"
+          >
+            Total Paid Days: {paidDays} / {summary.totalDays}
+          </span>
+        </div>
+
         <div className="overflow-auto flex-1">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-gray-400">
@@ -404,7 +489,8 @@ export default function AttendanceHistoryModal({ open, onClose, employeeId, empl
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Via</th>
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Active</th>
                   <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Idle</th>
-                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Status</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 px-2">Status</th>
+                  <th className="text-left text-[10.5px] uppercase tracking-wide text-gray-400 font-semibold py-2.5 pr-3 pl-2">Paid Day</th>
                 </tr>
               </thead>
               <tbody>

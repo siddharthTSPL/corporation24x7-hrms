@@ -46,7 +46,7 @@ const getPolicy = async (req, res) => {
 // so the frontend can send just the one toggle/percentage that changed.
 const setPolicy = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
-  const { basic, hra, pf, esi, professionalTax, tds, lwf, statutoryBonus } = req.body;
+  const { basic, hra, pf, esi, professionalTax, tds, lwf, statutoryBonus, timesheetSync } = req.body;
 
   const policy = await getOrCreatePolicy(organisation_id);
 
@@ -93,6 +93,26 @@ const setPolicy = async (req, res) => {
   if (statutoryBonus) {
     if (typeof statutoryBonus.enabled === "boolean") policy.statutoryBonus.enabled = statutoryBonus.enabled;
     if (typeof statutoryBonus.percentOfBasic === "number") policy.statutoryBonus.percentOfBasic = statutoryBonus.percentOfBasic;
+  }
+
+  if (timesheetSync) {
+    if (timesheetSync.overtimeMultiplier !== undefined) {
+      const m = Number(timesheetSync.overtimeMultiplier);
+      if (!Number.isFinite(m) || m < 0.1 || m > 10)
+        return res.status(400).json({ success: false, message: "timesheetSync.overtimeMultiplier must be between 0.1 and 10" });
+    }
+    if (timesheetSync.standardHoursPerDay !== undefined) {
+      const h = Number(timesheetSync.standardHoursPerDay);
+      if (!Number.isFinite(h) || h < 1 || h > 24)
+        return res.status(400).json({ success: false, message: "timesheetSync.standardHoursPerDay must be between 1 and 24" });
+    }
+    if (timesheetSync.enabled !== undefined && typeof timesheetSync.enabled !== "boolean")
+      return res.status(400).json({ success: false, message: "timesheetSync.enabled must be true or false" });
+
+    policy.timesheetSync = policy.timesheetSync || {};
+    if (typeof timesheetSync.enabled === "boolean") policy.timesheetSync.enabled = timesheetSync.enabled;
+    if (timesheetSync.overtimeMultiplier !== undefined) policy.timesheetSync.overtimeMultiplier = Number(timesheetSync.overtimeMultiplier);
+    if (timesheetSync.standardHoursPerDay !== undefined) policy.timesheetSync.standardHoursPerDay = Number(timesheetSync.standardHoursPerDay);
   }
 
   policy.updatedBy = req.admin._id;

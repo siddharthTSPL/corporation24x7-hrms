@@ -100,6 +100,11 @@ const reimbursementSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Set only when the org has an active custom approval flow for
+    // reimbursements (see utils/approvalFlow.utils.js). Empty = default
+    // routing: every Admin in the org can review the claim.
+    approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
+
     status: {
       type: String,
       enum: ["draft", "submitted", "approved", "rejected", "paid"],
@@ -162,6 +167,7 @@ reimbursementSchema.pre("save", async function () {
 
 reimbursementSchema.index({ organisation_id: 1, submitterModel: 1, status: 1 });
 reimbursementSchema.index({ organisation_id: 1, approverModel: 1, status: 1 });
+reimbursementSchema.index({ approverPool: 1, status: 1 });
 reimbursementSchema.index({ submittedBy: 1, submitterModel: 1 });
 reimbursementSchema.index({ createdAt: -1 });
 

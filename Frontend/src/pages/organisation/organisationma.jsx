@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from "react";
 import {
   Crown, Users, Building2, User,
   Download, Search, X, Loader2, CheckCircle2,
@@ -54,6 +54,28 @@ const STYLES = `
     animation: pulseYou 2.6s ease-in-out infinite;
     pointer-events: none;
   }
+
+  /* Page never scrolls sideways: extra chart width scrolls INSIDE the chart block only */
+  .mgr-org-root { contain: inline-size; }
+
+  /* While scrolling, cards ignore the mouse so hover lift can't make them jitter */
+  .mgr-org-root.is-scrolling [class*="hover:-translate-y"] { pointer-events: none; }
+
+  /* Chart scroll area: native bars hidden, the fixed bar at the bottom of the screen drives horizontal scroll */
+  .mgr-scroll {
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mgr-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  /* Horizontal bar pinned to the bottom of the screen */
+  .mgr-hbar { scrollbar-width: thin; scrollbar-color: #c9afc0 #f5edf2; }
+  .mgr-hbar::-webkit-scrollbar { height: 12px; }
+  .mgr-hbar::-webkit-scrollbar-track { background: #f5edf2; border-radius: 8px; }
+  .mgr-hbar::-webkit-scrollbar-thumb { background: #c9afc0; border-radius: 8px; border: 2px solid #f5edf2; }
+  .mgr-hbar::-webkit-scrollbar-thumb:hover { background: #730042; }
 `;
 
 function Sk({ w, h, r = 8 }) {
@@ -116,7 +138,6 @@ function Card({ level, name, department, designation, empid, isOrg, width = 172,
 
   return (
     <div className="shrink-0">
-      <style>{STYLES}</style>
       <div
         className={[
           "bg-white border rounded-[11px] py-3.5 px-3 pb-[11px] shadow-[0_2px_8px_rgba(115,0,66,0.04)] flex flex-col items-center relative overflow-hidden transition-transform duration-150 ease hover:-translate-y-0.5 cursor-default",
@@ -353,7 +374,7 @@ function countNodes(managers) {
   return n;
 }
 
-function OrgTree({ data, loading, q }) {
+function OrgTreeInner({ data, loading, q }) {
   const chainIds = useMemo(() => buildChainIds(data), [data]);
 
   if (loading) return <SkeletonTree />;
@@ -414,6 +435,9 @@ function OrgTree({ data, loading, q }) {
   );
 }
 
+// Memoised so scroll-driven state changes never re-render the whole tree
+const OrgTree = memo(OrgTreeInner);
+
 function StatCard({ label, text, icon: Icon, barBg, iconBg, iconColor, delay = 0 }) {
   return (
     <div className="bg-white border border-[#eedde8] rounded-[11px] p-3.5 sm:p-4 flex items-center gap-[11px] sm:gap-[13px] shadow-[0_1px_4px_rgba(115,0,66,0.04)] relative overflow-hidden transition-transform duration-[140ms] hover:-translate-y-0.5 min-w-0">
@@ -436,7 +460,14 @@ export default function OrganizationPageManager() {
   const [searchQuery, setSearchQuery] = useState("");
   const [exportStatus, setExportStatus] = useState(null);
   const inputRef = useRef(null);
+  const rootRef = useRef(null);
+
+  // chartRef = horizontally scrolling viewport, exportRef = full-width chart content inside it
   const chartRef = useRef(null);
+  const exportRef = useRef(null);
+  const barRef = useRef(null);
+  const [bar, setBar] = useState({ sw: 0, show: false });
+  const [pos, setPos] = useState({ left: 0, width: 0, visible: false });
 
   const orgName = data?.organisation_name || "My Organisation";
 
@@ -489,8 +520,63 @@ export default function OrganizationPageManager() {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
+  // Horizontal bar is pinned to the bottom of the SCREEN with CSS (bottom: 0), so it is perfectly static.
+  // JS only measures left/width of the chart and whether the chart is on screen.
+  useEffect(() => {
+    const inner = exportRef.current;
+    const sc = chartRef.current;
+    const root = rootRef.current;
+    if (!inner || !sc) return undefined;
+    const BAR_H = 14;
+    let raf = 0;
+    let scrollTimer = 0;
+    const measure = () => {
+      raf = 0;
+      const r = sc.getBoundingClientRect();
+      const vh = window.innerHeight;
+      setBar((prev) => {
+        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        return prev.sw === next.sw && prev.show === next.show ? prev : next;
+      });
+      const visible = r.bottom > BAR_H && r.top < vh - BAR_H;
+      setPos((prev) =>
+        prev.left === r.left && prev.width === r.width && prev.visible === visible
+          ? prev
+          : { left: r.left, width: r.width, visible }
+      );
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    const onScroll = (e) => {
+      // While scrolling, cards ignore the mouse so hover lift effects can't make them jitter
+      root?.classList.add("is-scrolling");
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => root?.classList.remove("is-scrolling"), 140);
+      // Horizontal scrolling of the chart/bar never changes layout, so no re-measure needed
+      if (e.target !== sc && e.target !== barRef.current) schedule();
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    ro?.observe(inner);
+    ro?.observe(sc);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", onScroll, true); // capture: also catches the layout's own scroll container
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", onScroll, true);
+      clearTimeout(scrollTimer);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const syncScroll = (from, to) => {
+    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  };
+
   const handleExport = useCallback(async () => {
-    if (!chartRef.current || exportStatus === "loading") return;
+    // Export the full-width inner content (not the clipped scroll viewport)
+    const target = exportRef.current;
+    if (!target || exportStatus === "loading") return;
     setExportStatus("loading");
     try {
       if (!window.html2canvas) {
@@ -501,7 +587,23 @@ export default function OrganizationPageManager() {
           document.head.appendChild(s);
         });
       }
-      const canvas = await window.html2canvas(chartRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true, allowTaint: false, logging: false });
+      const canvas = await window.html2canvas(target, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        width: target.scrollWidth,
+        height: target.scrollHeight,
+        windowWidth: Math.max(target.scrollWidth, window.innerWidth),
+        windowHeight: Math.max(target.scrollHeight, window.innerHeight),
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (doc) => {
+          const sc = doc.querySelector("[data-org-scroll]");
+          if (sc) { sc.style.overflow = "visible"; sc.style.maxWidth = "none"; }
+        },
+      });
       const link = document.createElement("a");
       link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -516,8 +618,9 @@ export default function OrganizationPageManager() {
   const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
 
   return (
-    <div className="min-h-screen bg-[#faf5f8] font-['DM_Sans',sans-serif] overflow-x-hidden">
+    <div ref={rootRef} className="mgr-org-root w-full max-w-full min-w-0 bg-[#faf5f8] font-['DM_Sans',sans-serif]">
       <FontLoader />
+      <style>{STYLES}</style>
 
       <div className="bg-white border-b border-[#eedde8] px-3 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-3 sm:py-0 sm:h-[54px]">
         <div className="flex items-center gap-2 shrink-0 min-w-0">
@@ -552,7 +655,7 @@ export default function OrganizationPageManager() {
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto py-5 px-3 sm:px-6 pb-12">
+      <div className="max-w-[1600px] w-full min-w-0 mx-auto py-5 px-3 sm:px-6 pb-12">
         <div className="mb-4">
           <h1 className="text-[19px] font-bold text-[#1a0d14] m-0 tracking-[-0.3px] font-['Syne',sans-serif]">Organisation Chart</h1>
           <p className="text-xs text-[#b89aad] mt-1 mb-0">
@@ -573,7 +676,7 @@ export default function OrganizationPageManager() {
           </div>
         )}
 
-        <div className="bg-white border border-[#eedde8] rounded-[14px] shadow-[0_2px_10px_rgba(115,0,66,0.05)] overflow-hidden">
+        <div className="w-full max-w-full min-w-0 bg-white border border-[#eedde8] rounded-[14px] shadow-[0_2px_10px_rgba(115,0,66,0.05)] overflow-hidden">
           <div className="px-3 py-2.5 sm:px-4 sm:py-[11px] border-b border-[#f5edf2] flex flex-col sm:flex-row sm:items-center sm:justify-between bg-[#fdf8fb] gap-2">
             <div className="flex items-center gap-2.5 flex-wrap min-w-0">
               <Crown size={13} className="text-[#b89aad] shrink-0" />
@@ -599,10 +702,44 @@ export default function OrganizationPageManager() {
             </div>
           </div>
 
-          <div ref={chartRef} className="overflow-x-auto overscroll-x-contain py-6 px-3 sm:p-9 bg-white max-w-full">
-            <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
+          {/* Scroll viewport: width is capped to the page, extra width scrolls INSIDE this block (horizontal only) */}
+          <div
+            data-org-scroll
+            ref={chartRef}
+            onScroll={() => syncScroll(chartRef.current, barRef.current)}
+            className="mgr-scroll w-full max-w-full min-w-0 bg-white"
+            style={{ overflowX: "auto", overflowY: "hidden" }}
+          >
+            <div
+              ref={exportRef}
+              className="bg-white py-6 px-3 sm:p-9"
+              style={{ width: "max-content", minWidth: "100%" }}
+            >
+              <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* Horizontal scrollbar: fixed at the bottom of the screen, never moves while the page scrolls */}
+      <div
+        ref={barRef}
+        className="mgr-hbar"
+        onScroll={() => syncScroll(barRef.current, chartRef.current)}
+        style={{
+          position: "fixed",
+          left: pos.left,
+          bottom: 0,
+          width: pos.width,
+          height: 14,
+          zIndex: 40,
+          overflowX: "auto",
+          overflowY: "hidden",
+          display: bar.show && pos.visible ? "block" : "none",
+          background: "transparent",
+        }}
+      >
+        <div style={{ width: bar.sw, height: 1 }} />
       </div>
 
       {exportStatus && (

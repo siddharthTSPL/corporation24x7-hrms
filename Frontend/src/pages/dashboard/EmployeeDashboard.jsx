@@ -6,7 +6,7 @@ import { useGetAttendance } from "../../auth/server-state/employee/employeeother
 import { useCalendarMeta, useTodayAttendance } from "../../auth/server-state/attendance/attendance.hook";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -352,7 +352,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
   const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
-  const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
+  const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay",comp_off:"Compensatory Leave",half_day_el:"Half Day EL",half_day_sl:"Half Day SL" };
   const fmtTime=(d)=>d?new Date(d).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}):"—";
 
   // Once the day's session has started, always allow finishing it
@@ -452,6 +452,9 @@ const LEAVE_TYPE_META = {
   ml:{ label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
   cl:{ label:"Casual", color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
   lwp:{ label:"LWP", color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
+  comp_off:{ label: "Compensatory Leave", color:"#6B21A8", bg:"rgba(107,33,168,0.08)" },
+  half_day_el:{ label:"Half Day EL", color:"#065F46", bg:"rgba(6,95,70,0.08)" },
+  half_day_sl:{ label:"Half Day SL", color:"#1E40AF", bg:"rgba(30,64,175,0.08)" },
 };
 
 const STATUS_COLORS = {
@@ -737,7 +740,22 @@ export default function EmployeeDashboard() {
           </div>
         </div>
 
-        <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} isCheckedIn={isCheckedIn} isCheckedOut={isCheckedOut} myAtt={myAtt} checkinGate={checkinGate} onCheckIn={()=>navigate("/mark-attendance")} />
+        {calMeta?.today?.fieldDutyOnly ? (
+          <div className="rounded-2xl bg-gradient-to-br from-[#730042] to-[#a0004a] p-1 text-[#f9f8f2] shadow-[0_4px_20px_rgba(115,0,66,0.2)] sm:p-5 mb-4">
+            <p className="m-0 text-[10px] font-medium uppercase tracking-wide text-white/65">{new Date().toLocaleDateString("en-IN", { weekday: "long" })}</p>
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="m-0 text-lg font-bold sm:text-xl" style={{ fontFamily:"'Lora',serif" }}>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+                <p className="m-0 mt-1 text-xs text-white/75">Record today's attendance from Field Duty.</p>
+              </div>
+              <button type="button" onClick={() => navigate("/field-operations")} className="w-full shrink-0 rounded-xl border border-white/40 bg-white px-4 py-2.5 text-sm font-semibold text-[#730042] shadow-sm hover:bg-white/90 sm:w-auto mb-3">
+                Open Field Duty
+              </button>
+            </div>
+          </div>
+        ) : (
+          <TodayBanner isOnLeave={isOnLeaveToday} leaveType={todayLeave?.leaveType} isCheckedIn={isCheckedIn} isCheckedOut={isCheckedOut} myAtt={myAtt} checkinGate={checkinGate} onCheckIn={()=>navigate("/mark-attendance")} />
+        )}
 
         {/* Top 4 Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 mb-3.5">

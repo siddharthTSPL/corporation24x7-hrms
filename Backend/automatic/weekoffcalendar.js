@@ -263,7 +263,38 @@ async function getWeekOffMapForRange(monthStart, monthEnd, organisation_id, empl
   return map;
 }
 
+/**
+ * Combined holiday + week-off classification for a date range (IST days).
+ * Returns Map<"YYYY-MM-DD", { type: "holiday"|"week_off"|"unconfigured"|"working", isOff, name? }>
+ * A company holiday wins over a week-off. Used by the timesheet so holiday /
+ * week-off days can be shown as "Holiday" / "Week Off" (paid, no entry allowed).
+ */
+async function getDayTypeMapForRange(rangeStart, rangeEnd, organisation_id, employee = null, employeeModel = null) {
+  const weekOffMap = await getWeekOffMapForRange(rangeStart, rangeEnd, organisation_id, employee, employeeModel);
+  const from = startOfDay(rangeStart);
+  const to = new Date(startOfDay(rangeEnd).getTime() + 24 * 60 * 60 * 1000);
+  const holidays = await Holiday.find({ organisation_id, date: { $gte: from, $lt: to } })
+    .select("date name")
+    .lean();
+  const holidayMap = new Map(holidays.map((h) => [toISTKey(h.date), h.name]));
+
+  const out = new Map();
+  for (const [key, info] of weekOffMap.entries()) {
+    if (holidayMap.has(key)) {
+      out.set(key, { type: "holiday", isOff: true, name: holidayMap.get(key) || null });
+    } else if (info?.unconfigured) {
+      out.set(key, { type: "unconfigured", isOff: false });
+    } else if (info?.isOff) {
+      out.set(key, { type: "week_off", isOff: true, reason: info.reason });
+    } else {
+      out.set(key, { type: "working", isOff: false });
+    }
+  }
+  return out;
+}
+
 module.exports = {
+  getDayTypeMapForRange,
   isWeekOff,
   isHoliday,
   classifyNonWorkingDay,

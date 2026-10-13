@@ -49,6 +49,22 @@ const checkPermission = (permissionPath) => {
       });
 
       if (!permDoc) {
+        if ([
+          "leave.can_apply_leave",
+          "reimbursement.can_submit_claim",
+          "timesheet.can_access",
+          "review.can_access",
+          "navigation.can_view_dashboard",
+          "navigation.can_view_self_service",
+          "navigation.can_view_organisation",
+          "navigation.can_view_settings",
+          "navigation.can_view_policies",
+          "navigation.can_view_training",
+          "navigation.can_view_field_operations",
+          "payroll.can_view_own_payslips",
+        ].includes(permissionPath)) {
+          return next();
+        }
         return res.status(403).json({
           success: false,
           message: "No permissions found.",
@@ -60,6 +76,26 @@ const checkPermission = (permissionPath) => {
 
       for (const key of keys) {
         value = value?.[key];
+      }
+
+      // These permissions were added after existing records had been created.
+      // Keep legacy accounts enabled unless an administrator explicitly turns
+      // the new permission off.
+      if (value === undefined && [
+        "leave.can_apply_leave",
+        "reimbursement.can_submit_claim",
+        "timesheet.can_access",
+        "review.can_access",
+        "navigation.can_view_dashboard",
+        "navigation.can_view_self_service",
+        "navigation.can_view_organisation",
+        "navigation.can_view_settings",
+        "navigation.can_view_policies",
+        "navigation.can_view_training",
+        "navigation.can_view_field_operations",
+        "payroll.can_view_own_payslips",
+      ].includes(permissionPath)) {
+        return next();
       }
 
       if (!value) {

@@ -4,9 +4,12 @@ const Attendance = require("../Models/attendance.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const AdminUser = require("../Models/Admin.model");
+const FieldTeam = require("../Models/fieldTeam.model");
+const FieldAssignment = require("../Models/fieldAssignment.model");
 const { updateSummary } = require("../automatic/monthattendanceupdate");
+const { computeLateStanding, applyLatePenaltyToStatus, refreshLateStanding, lateForgiveMinutes } = require("../utils/Laterule.utils");
 const { getEmbedding, cosineSimilarity } = require("../utils/faceService");
-const { startOfISTDay } = require("../utils/istDate.utils");
+const { startOfISTDay } = require("../utils/Istdate.utils");
 const {
   resolveEmployeeShift,
   evaluateCheckinWindow,
@@ -41,10 +44,14 @@ const enrollFace = async (req, res) => {
         .json({ message: "employeeId, onModel and role are required" });
 
     if (!["User", "Manager", "Admin"].includes(onModel))
-      return res.status(400).json({ message: "onModel must be User, Manager or Admin" });
+      return res
+        .status(400)
+        .json({ message: "onModel must be User, Manager or Admin" });
 
     if (!req.file)
-      return res.status(400).json({ message: "A photo file is required (field name: photo)" });
+      return res
+        .status(400)
+        .json({ message: "A photo file is required (field name: photo)" });
 
     const organisation_id = req.admin.organisation_id;
     const imageBase64 = req.file.buffer.toString("base64");
@@ -61,7 +68,7 @@ const enrollFace = async (req, res) => {
         embedding,
         enrolledBy: req.admin._id,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     res.status(200).json({
@@ -88,7 +95,10 @@ const listEnrolled = async (req, res) => {
 const removeFace = async (req, res) => {
   try {
     const organisation_id = req.admin.organisation_id;
-    await FaceProfile.findOneAndDelete({ organisation_id, employee: req.params.employeeId });
+    await FaceProfile.findOneAndDelete({
+      organisation_id,
+      employee: req.params.employeeId,
+    });
     res.json({ message: "Face profile removed" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -98,12 +108,14 @@ const removeFace = async (req, res) => {
 const scanFace = async (req, res) => {
   try {
     const { image, gate } = req.body;
-    if (!image) return res.status(400).json({ message: "image (base64) is required" });
+    if (!image)
+      return res.status(400).json({ message: "image (base64) is required" });
 
     // Kiosk sends a preset gate name (Gate 1..5) or a free-text "Other"
     // value. Just cap length/sanitize - this is a location label, not a
     // permission gate, so we don't hard-reject unrecognised values.
-    const gateName = typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
+    const gateName =
+      typeof gate === "string" && gate.trim() ? gate.trim().slice(0, 40) : null;
 
     const { organisation_id } = req.kiosk;
 
@@ -112,7 +124,8 @@ const scanFace = async (req, res) => {
     const profiles = await FaceProfile.find({ organisation_id }).lean();
     if (!profiles.length)
       return res.status(404).json({
-        message: "No employees are registered for face attendance yet. Please register first.",
+        message:
+          "No employees are registered for face attendance yet. Please register first.",
         reason: "not_registered",
       });
 
@@ -128,7 +141,8 @@ const scanFace = async (req, res) => {
 
     if (!best || bestScore < SIMILARITY_THRESHOLD)
       return res.status(404).json({
-        message: "Face not recognized. If you're new here, please register first.",
+        message:
+          "Face not recognized. If you're new here, please register first.",
         reason: "not_registered",
       });
 
@@ -138,11 +152,39 @@ const scanFace = async (req, res) => {
       .lean();
 
     if (!employeeDoc)
-      return res.status(404).json({ message: "Matched employee record no longer exists" });
+      return res
+        .status(404)
+        .json({ message: "Matched employee record no longer exists" });
 
-    const employeeName = `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
+    if (best.onModel === "User") {
+      const [onFieldTeam, individualFieldAssignment] = await Promise.all([
+        FieldTeam.exists({
+          organisation_id,
+          members: best.employee,
+          active: true,
+        }),
+        FieldAssignment.exists({
+          organisation_id,
+          employee: best.employee,
+          active: true,
+        }),
+      ]);
+      if (onFieldTeam || individualFieldAssignment)
+        return res.status(409).json({
+          message:
+            "This employee is assigned to field work and checks in from the Field Duty app, not the kiosk.",
+          reason: "field_work_assigned",
+        });
+    }
+
+    const employeeName =
+      `${employeeDoc.f_name || ""} ${employeeDoc.l_name || ""}`.trim();
     const shift = await resolveEmployeeShift(employeeDoc, organisation_id);
-    const shiftInfo = { name: shift.name, startTime: shift.startTime, endTime: shift.endTime };
+    const shiftInfo = {
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+    };
 
     const now = new Date();
     const today = startOfISTDay(now); // IST-based day boundary, not server-local
@@ -153,6 +195,13 @@ const scanFace = async (req, res) => {
       date: today,
       organisation_id,
     });
+
+    if (attendance?.source === "field" && !attendance.checkOut)
+      return res.status(409).json({
+        message:
+          "This employee started attendance through Field Duty. They must check out from the Field Duty app.",
+        reason: "checked_in_by_field_duty",
+      });
 
     // No record yet, OR only a background desktop-agent ping exists.
     // An "agent" record was never a real, window-validated check-in, so
@@ -176,7 +225,10 @@ const scanFace = async (req, res) => {
     }
 
     if (needsRealCheckin) {
-      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(shift, now);
+      const { allowed, isLate, lateMinutes, tooLate } = evaluateCheckinWindow(
+        shift,
+        now,
+      );
 
       if (!allowed) {
         const earlyBuffer = shift.earlyBufferMinutes ?? 60;
@@ -188,11 +240,23 @@ const scanFace = async (req, res) => {
         });
       }
 
+      // Late rule: which late check-in of the month is this?
+      const { lateCountInMonth, latePenalty, rule: lateRule } = await computeLateStanding({
+        organisation_id,
+        employee: best.employee,
+        role: best.role,
+        date: today,
+        isLate,
+        lateMinutes,
+      });
+
       if (attendance) {
         attendance.checkIn = now;
         attendance.source = "face";
         attendance.isLate = isLate;
         attendance.lateMinutes = lateMinutes;
+        attendance.lateCountInMonth = lateCountInMonth;
+        attendance.latePenalty = latePenalty;
         attendance.shift = shift._id;
         attendance.activeMinutes = 0;
         attendance.idleMinutes = 0;
@@ -209,22 +273,36 @@ const scanFace = async (req, res) => {
           shift: shift._id,
           isLate,
           lateMinutes,
+          lateCountInMonth,
+          latePenalty,
           source: "face",
           checkInGate: gateName,
         });
       }
 
       const grace = shift.graceMinutes ?? 15;
-      const checkinMessage = !isLate
+      const baseCheckinMessage = !isLate
         ? "Checked in on time"
         : tooLate
           ? `You are quite late (by ${minutesToLabel(lateMinutes)}), but welcome! Checked in.`
           : `Checked in — late by ${minutesToLabel(lateMinutes)} (grace period was ${shift.startTime} to +${grace} min)`;
+      const lateNote = !isLate || !lateRule?.enabled
+        ? ""
+        : latePenalty
+          ? (lateCountInMonth
+              ? ` Late check-in #${lateCountInMonth} this month (limit ${lateRule.allowedLatePerMonth}) — today will be counted as a Half Day.`
+              : ` You are more than 1 hour late — today will be counted as a Half Day.`)
+          : ` Late check-in ${lateCountInMonth} of ${lateRule.allowedLatePerMonth} allowed this month.`;
+      const checkinMessage = baseCheckinMessage + lateNote;
 
       // Exact instant checkout unlocks, so the kiosk can show a live
       // countdown chip right after check-in instead of only surfacing it
       // reactively after a blocked second scan.
-      const { checkoutOpensAt } = evaluateCheckoutWindow(shift, attendance.checkIn, attendance.checkIn);
+      const { checkoutOpensAt } = evaluateCheckoutWindow(
+        shift,
+        attendance.checkIn,
+        attendance.checkIn,
+      );
 
       return res.json({
         message: checkinMessage,
@@ -234,6 +312,8 @@ const scanFace = async (req, res) => {
         time: attendance.checkIn,
         isLate,
         lateMinutes,
+        lateCountInMonth,
+        latePenalty,
         gate: gateName,
         shift: shiftInfo,
         checkoutOpensAt,
@@ -250,7 +330,11 @@ const scanFace = async (req, res) => {
         checkOut: attendance.checkOut,
       });
 
-    const checkoutWindow = evaluateCheckoutWindow(shift, now, attendance.checkIn);
+    const checkoutWindow = evaluateCheckoutWindow(
+      shift,
+      now,
+      attendance.checkIn,
+    );
 
     if (!checkoutWindow.allowed) {
       const who = employeeName || "You";
@@ -268,20 +352,30 @@ const scanFace = async (req, res) => {
 
     const { remark, isOvertime, overtimeMinutes } = checkoutWindow;
 
+    // Already counted as Half Day by autoCheckoutAll() (org has auto
+    // check-out OFF) - keep that status and don't re-add it to the summary.
+    const alreadyCountedAsMissed = attendance.checkoutRemark === "missed_checkout";
+
     attendance.checkOut = now;
     attendance.checkOutGate = gateName;
-    const durationMinutes = Math.round((attendance.checkOut - attendance.checkIn) / 60000);
+    const durationMinutes = Math.round(
+      (attendance.checkOut - attendance.checkIn) / 60000,
+    );
     attendance.activeMinutes = durationMinutes;
 
     // Face-only rule: judged as a PERCENTAGE of this shift's own total
     // length (<50% = absent, 50%-85% = half_day, >=85% = present) -
     // separate from the manual/agent flow, which still uses the shift's
     // fixed absentBelowMinutes/halfDayBelowMinutes untouched.
-    attendance.status = calculateFaceStatus(durationMinutes, shift);
+    // Fresh monthly late count; a FREE late day gets its late time added back
+    // so lateness alone never makes it a half day (only late #N+1 onward does).
+    const lateStanding = await refreshLateStanding(attendance);
+    const forgive = lateForgiveMinutes(attendance, shift, lateStanding);
+    attendance.status = alreadyCountedAsMissed ? "half_day" : applyLatePenaltyToStatus(attendance, calculateFaceStatus(durationMinutes + forgive, shift));
     attendance.checkoutRemark = remark;
     attendance.overtimeMinutes = isOvertime ? overtimeMinutes : 0;
     await attendance.save();
-    await updateSummary(attendance);
+    if (!alreadyCountedAsMissed) await updateSummary(attendance);
 
     const remarkMessage = {
       on_time: "Checked out on time. Have a good day!",
@@ -290,11 +384,12 @@ const scanFace = async (req, res) => {
       auto_overtime: `You are automatically checked out because you are overtime more than ${Math.floor((shift.maxOvertimeMinutes ?? 60) / 60)} hour(s).`,
     }[remark];
 
-    const finalMessage = attendance.status === "absent"
-      ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
-      : attendance.status === "half_day"
-        ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
-        : remarkMessage;
+    const finalMessage =
+      attendance.status === "absent"
+        ? `Checked out after only ${minutesToLabel(durationMinutes)} — marked Absent as per your shift's attendance rules.`
+        : attendance.status === "half_day"
+          ? `Checked out after ${minutesToLabel(durationMinutes)} — marked Half Day as per your shift's attendance rules.`
+          : remarkMessage;
 
     return res.json({
       message: finalMessage,

@@ -10,11 +10,11 @@ import {
 import { useAdminGetMyWFH } from "../../auth/server-state/adminwfh/adminwfh.hook";
 import { useTodayAttendance, useCalendarMeta } from "../../auth/server-state/attendance/attendance.hook";
 import { useGetAllAnnouncement } from "../../auth/server-state/adminannounce/adminannounce.hook";
-import AttendanceModal from "./AttendanceModal";
-import AttendanceDetailsModal from "./AttendanceDetailsModal";
+import AttendanceModal from "./Attendancemodal";
+import AttendanceDetailsModal from "./Attendancedetailsmodal";
 import { getISTDayKey, buildAttendanceMap, resolveAttendanceStatus, isPastShiftEnd } from "../../pages/utils/attendance";
 import NotificationBell from "../../components/notifications/NotificationBell";
-import MyAssetsWidget from "../asset/MyAssetsWidget";
+import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 import AnalyticsDashboard from "./AnalyticsDashboard";
 import { FaChartBar, FaHome } from "react-icons/fa";
@@ -356,7 +356,7 @@ function TodayBanner({ isOnLeave, leaveType, isCheckedIn, isCheckedOut, myAtt, c
   const today=new Date();
   const day=today.toLocaleDateString("en-IN",{weekday:"long"});
   const date=today.toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
-  const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay" };
+  const leaveLabel={ el:"Earned Leave",sl:"Sick Leave",pl:"Paternity Leave",ml:"Maternity Leave",cl:"Casual Leave",lwp:"Leave Without Pay",comp_off:"Compensatory Leave",half_day_el:"Half Day EL",half_day_sl:"Half Day SL" };
 
   // Once the day's session has started, always allow finishing it
   // regardless of holiday/week-off/shift-window (those only gate the
@@ -453,6 +453,9 @@ const LEAVE_TYPE_META = {
   ml:{ label:"Maternity", color:"#9333EA", bg:"rgba(147,51,234,0.08)" },
   cl:{ label:"Casual", color:"#BA7517", bg:"rgba(186,117,23,0.08)" },
   lwp:{ label:"LWP", color:"#E24B4A", bg:"rgba(226,75,74,0.08)" },
+  comp_off:{ label: "Compensatory Leave", color:"#6B21A8", bg:"rgba(107,33,168,0.08)" },
+  half_day_el:{ label:"Half Day EL", color:"#065F46", bg:"rgba(6,95,70,0.08)" },
+  half_day_sl:{ label:"Half Day SL", color:"#1E40AF", bg:"rgba(30,64,175,0.08)" },
 };
 
 const STATUS_COLORS = {
@@ -846,7 +849,13 @@ export default function Dashboard() {
     };
   }, [calMeta]);
 
-  const employees = Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [];
+  // Same employment-status gate used in EmployeeTable.jsx / the attendance
+  // directory: only currently-active employees (working_status === "working",
+  // missing treated as working) should ever show up here — resigned, fired
+  // or terminated employees must be excluded entirely.
+  const isActiveEmployee = (u) => (u?.working_status || "working").toLowerCase() === "working";
+  const employees = (Array.isArray(empData?.users) ? empData.users : Array.isArray(empData) ? empData : [])
+    .filter(isActiveEmployee);
   const announcements = Array.isArray(annData?.announcements) ? annData.announcements : Array.isArray(annData) ? annData : [];
   const checkins = checkinData?.checkins ?? [];
   const leaveRequests = Array.isArray(leaveReqData?.leaves) ? leaveReqData.leaves : Array.isArray(leaveReqData) ? leaveReqData : [];

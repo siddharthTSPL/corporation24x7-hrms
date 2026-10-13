@@ -710,7 +710,6 @@ export default function SuperAdminAssets() {
   const [showFilters, setShowFilters] = useState(false);
   const [exportDone, setExportDone] = useState(false);
   const [activeTab, setActiveTab] = useState("assets"); // "assets" | "employees"
-  const pageRef = useRef(null);
 
   const { data, isLoading } = useGetAllAssetsSuperAdmin(
     Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
@@ -800,10 +799,17 @@ export default function SuperAdminAssets() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F8F2] p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif] text-[#0d0209]">
-      <style>{`@keyframes modalUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}`}</style>
+    <div className="sa-assets-root w-full max-w-full min-w-0 min-h-full [contain:inline-size] bg-[#F9F8F2] p-3 sm:p-4 md:p-6 lg:p-8 font-['DM_Sans',system-ui,sans-serif] text-[#0d0209]">
+      <style>{`
+        @keyframes modalUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+        .sa-assets-table-scroll { scrollbar-width: thin; scrollbar-color: #b98aa3 #f3e8ee; overscroll-behavior-x: contain; }
+        .sa-assets-table-scroll::-webkit-scrollbar { height: 12px; }
+        .sa-assets-table-scroll::-webkit-scrollbar-track { background: #f3e8ee; border-top: 1px solid #e8d5e2; }
+        .sa-assets-table-scroll::-webkit-scrollbar-thumb { background: #b98aa3; border-radius: 9999px; border: 2px solid #f3e8ee; }
+        .sa-assets-table-scroll::-webkit-scrollbar-thumb:hover { background: #730042; }
+      `}</style>
 
-      <div className="max-w-7xl mx-auto" ref={pageRef}>
+      <div className="max-w-7xl mx-auto w-full min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">Asset Management</h1>
@@ -931,8 +937,8 @@ export default function SuperAdminAssets() {
             </div>
           ) : (
             <>
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
+              <div className="sa-assets-table-scroll hidden lg:block overflow-x-auto overflow-y-hidden">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead>
                     <tr className="border-b border-[#F4C0D1] bg-[#F9F8F2]">
                       {["Asset", "Type", "Brand / Serial", "Condition", "Quantity", "Status", "Assigned To", "Actions"].map((h) => (

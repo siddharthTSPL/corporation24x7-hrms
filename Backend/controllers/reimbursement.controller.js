@@ -1,5 +1,6 @@
 const Reimbursement = require("../Models/reimbursement.model");
 const imagekit = require("../utils/imagekit.utils");
+const { resolveCustomRouting, isInPool } = require("../utils/approvalFlow.utils");
 
 const ALLOWED_TYPES = [
   "Travel",
@@ -29,7 +30,7 @@ const hasBankDetails = (actor) =>
 
 // Uploads whatever multer put on req.files["receipts"] / req.files["supportingDocuments"]
 // to ImageKit and returns the attachment sub-docs — mirrors uploaddocument.controller.js.
-const uploadAttachments = async (files = []) => {
+const uploadAttachments = async (files = [], organisationId) => {
   const uploaded = [];
   for (const file of files) {
     const fileBase64 = file.buffer.toString("base64");
@@ -38,6 +39,9 @@ const uploadAttachments = async (files = []) => {
       fileName: file.originalname,
       folder: "/reimbursements",
       useUniqueFileName: true,
+      // Tags the file with its owning org so /superadmin/storage-usage can
+      // sum real ImageKit storage per organisation via listFiles(tags).
+      tags: organisationId ? [String(organisationId)] : undefined,
     });
     uploaded.push({
       url: res.url,
@@ -49,6 +53,33 @@ const uploadAttachments = async (files = []) => {
   }
   return uploaded;
 };
+
+// Custom approval flow: when the org has an active "reimbursement" flow, a
+// submitted claim is restricted to the chosen admins (approverPool). Admin's
+// own claims always go to the SuperAdmin, so they never get a pool. Returns []
+// when no custom flow applies, which keeps the default routing untouched.
+const REQUESTER_ROLE = { User: "Employee", Manager: "Manager" };
+
+const resolveApproverPool = async (actor, model) => {
+  const requesterRole = REQUESTER_ROLE[model];
+  if (!requesterRole) return [];
+  const routing = await resolveCustomRouting({
+    organisation_id: actor.organisation_id,
+    module: "reimbursement",
+    requesterRole,
+  });
+  return routing?.pool || [];
+};
+
+// Claims with no pool (default routing / submitted before the flow was
+// switched on) stay visible to every Admin; pooled claims only to pool members.
+const visibleToAdmin = (adminId) => ({
+  $or: [
+    { approverPool: { $exists: false } },
+    { approverPool: { $size: 0 } },
+    { approverPool: adminId },
+  ],
+});
 
 // Builds the snapshot + actor fields shared by every "apply" handler, given
 // the authenticated actor (req.employee / req.manager / req.admin) and which
@@ -90,14 +121,17 @@ const createClaim = async ({ actor, model, body, files, asDraft }) => {
   if (!asDraft && !hasBankDetails(actor))
     throw err("Bank details is not available. Please update your bank details in Settings before submitting a reimbursement claim.");
 
-  const receipts = await uploadAttachments(files?.receipts);
-  const supportingDocuments = await uploadAttachments(files?.supportingDocuments);
+  const receipts = await uploadAttachments(files?.receipts, actor.organisation_id);
+  const supportingDocuments = await uploadAttachments(files?.supportingDocuments, actor.organisation_id);
 
   if (!asDraft && receipts.length === 0)
     throw err("At least one receipt/invoice must be attached to submit a claim");
 
+  const approverPool = asDraft ? [] : await resolveApproverPool(actor, model);
+
   const claim = await Reimbursement.create({
     ...buildActorSnapshot(actor, model),
+    approverPool,
     reimbursementType: body.reimbursementType,
     expenseDate: body.expenseDate,
     amountClaimed: body.amountClaimed,
@@ -126,6 +160,7 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
   if (!claim) throw err("Reimbursement claim not found", 404);
   if (!["draft", "submitted"].includes(claim.status))
     throw err("Only a draft or pending review claim can be edited", 400);
+  const wasDraft = claim.status === "draft";
 
   const editable = [
     "reimbursementType",
@@ -144,8 +179,8 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
   if (body.reimbursementPolicyAcknowledged !== undefined)
     claim.reimbursementPolicyAcknowledged = !!body.reimbursementPolicyAcknowledged;
 
-  const newReceipts = await uploadAttachments(files?.receipts);
-  const newSupportingDocuments = await uploadAttachments(files?.supportingDocuments);
+  const newReceipts = await uploadAttachments(files?.receipts, claim.organisation_id);
+  const newSupportingDocuments = await uploadAttachments(files?.supportingDocuments, claim.organisation_id);
   if (newReceipts.length) claim.receipts.push(...newReceipts);
   if (newSupportingDocuments.length) claim.supportingDocuments.push(...newSupportingDocuments);
 
@@ -165,6 +200,9 @@ const updateClaim = async ({ actor, model, id, body, files }) => {
       ifscCode: actor.ifsc_code || "",
     };
     claim.status = "submitted";
+    // Pool is fixed the moment a draft is submitted; an already-submitted
+    // claim keeps the flow it started with.
+    if (wasDraft) claim.approverPool = await resolveApproverPool(actor, model);
   }
 
   await claim.save();
@@ -199,10 +237,13 @@ const listMyClaims = async ({ actor, model }) => {
 // Admin reviews claims raised by User/Manager. SuperAdmin can review claims
 // raised by Admin, Manager, or Employee — i.e. everything org-wide.
 // `approverModel` may be a single role string or an array of roles.
-const listQueueForApprover = async ({ organisation_id, approverModel, status }) => {
+// Pass `adminId` for an Admin's queue so pooled claims are limited to the
+// admins chosen in the approval flow. SuperAdmin omits it and sees everything.
+const listQueueForApprover = async ({ organisation_id, approverModel, status, adminId }) => {
   const query = { organisation_id, isDeleted: false };
   query.approverModel = Array.isArray(approverModel) ? { $in: approverModel } : approverModel;
   if (status) query.status = status;
+  if (adminId) Object.assign(query, visibleToAdmin(adminId));
   return Reimbursement.find(query)
     .sort({ createdAt: -1 })
     .populate("reportingManager", "f_name l_name work_email personal_contact")
@@ -223,6 +264,8 @@ const decideClaim = async ({
   if (!claim) throw err("Reimbursement claim not found", 404);
   if (!allowedApproverModels.includes(claim.approverModel))
     throw err("You are not authorized to act on this claim", 403);
+  if (actorModel === "Admin" && claim.approverPool?.length && !isInPool(claim, actorId))
+    throw err("This claim is assigned to other approving admins", 403);
   if (claim.status !== "submitted")
     throw err(`Cannot ${decision} a claim that is not pending review`, 400);
 
@@ -249,6 +292,8 @@ const markPaid = async ({ organisation_id, id, actorId, actorModel, paymentRefer
   if (!claim) throw err("Reimbursement claim not found", 404);
   if (!allowedApproverModels.includes(claim.approverModel))
     throw err("You are not authorized to act on this claim", 403);
+  if (actorModel === "Admin" && claim.approverPool?.length && !isInPool(claim, actorId))
+    throw err("This claim is assigned to other approving admins", 403);
   if (claim.status !== "approved")
     throw err("Only an approved claim can be marked as paid", 400);
 
@@ -360,6 +405,7 @@ const adminGetPending = async (req, res) => {
     organisation_id: req.admin.organisation_id,
     approverModel: "Admin",
     status: "submitted",
+    adminId: req.admin._id,
   });
   res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
 };
@@ -370,6 +416,7 @@ const adminGetAll = async (req, res) => {
     organisation_id: req.admin.organisation_id,
     approverModel: "Admin",
     status: req.query.status,
+    adminId: req.admin._id,
   });
   res.status(200).json({ success: true, count: reimbursements.length, reimbursements });
 };

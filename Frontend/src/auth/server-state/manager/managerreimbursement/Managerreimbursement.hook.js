@@ -3,7 +3,7 @@ import {
   updateReimbursement,
   deleteReimbursement,
   getMyReimbursements,
-} from "../../../api/managerapi/reimbursement/mareimbursement.api";
+} from "../../../api/managerapi/reimbursement/Mareimbursement.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const useGetMyReimbursements = () => {

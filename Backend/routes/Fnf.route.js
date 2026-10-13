@@ -1,7 +1,7 @@
 const express = require("express");
 const fnfrouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
-const adminauthmiddleware = require("../middleware/auth/adminOrSuperadmin.middleware");
+const payrollManagementAuth = require("../middleware/auth/payrollManagement.middleware");
 
 const {
   listEligibleForFnF,
@@ -13,14 +13,14 @@ const {
   deleteFnF,
 } = require("../controllers/Fnf.controller");
 
-fnfrouter.get("/eligible", adminauthmiddleware, asyncHandler(listEligibleForFnF));
+fnfrouter.get("/eligible", payrollManagementAuth, asyncHandler(listEligibleForFnF));
 
-fnfrouter.post("/generate", adminauthmiddleware, asyncHandler(generateFnF));
+fnfrouter.post("/generate", payrollManagementAuth, asyncHandler(generateFnF));
 
-fnfrouter.get("/", adminauthmiddleware, asyncHandler(listFnF));
-fnfrouter.get("/:id", adminauthmiddleware, asyncHandler(getFnFSlip));
-fnfrouter.patch("/:id", adminauthmiddleware, asyncHandler(updateFnF));
-fnfrouter.patch("/:id/status", adminauthmiddleware, asyncHandler(updateFnFStatus));
-fnfrouter.delete("/:id", adminauthmiddleware, asyncHandler(deleteFnF));
+fnfrouter.get("/", payrollManagementAuth, asyncHandler(listFnF));
+fnfrouter.get("/:id", payrollManagementAuth, asyncHandler(getFnFSlip));
+fnfrouter.patch("/:id", payrollManagementAuth, asyncHandler(updateFnF));
+fnfrouter.patch("/:id/status", payrollManagementAuth, asyncHandler(updateFnFStatus));
+fnfrouter.delete("/:id", payrollManagementAuth, asyncHandler(deleteFnF));
 
 module.exports = fnfrouter;

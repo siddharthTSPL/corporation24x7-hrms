@@ -3,8 +3,10 @@ const TSJob = require("../Models/Tsjob.model");
 const TimeLog = require("../Models/Timelog.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 const { endOfISTDay, startOfISTDay } = require("../utils/Istdate.utils");
+const { classifyNonWorkingDay } = require("../automatic/weekoffcalendar");
 const {
   recomputeJobHours,
+  offDayBlockMessage,
   resolveDailyLimitMinutes,
   resolveDayType,
   splitRegularOvertime,
@@ -24,6 +26,12 @@ const startTimer = async (req, res, next) => {
   const { job, note } = req.body;
 
   if (!job) return next(httpError("job is required", 400));
+
+  // Holiday / week-off: timer can't be started (day is paid automatically).
+  const todayStatus = await classifyNonWorkingDay(new Date(), organisation_id, actor.id, actor.model);
+  if (todayStatus.type === "holiday" || todayStatus.type === "week_off") {
+    return next(httpError(offDayBlockMessage(todayStatus), 400));
+  }
 
   // Block if any timer (running OR paused) already exists
   const existing = await ActiveTimer.findOne({

@@ -59,6 +59,19 @@ export const getOrgInfo = async () => {
   return res.data;
 };
 
+// Powers the "Storage" tab in Settings — MongoDB + ImageKit usage for this org.
+export const getStorageUsage = async (refresh = false) => {
+  const res = await api.get("superadmin/storage-usage", {
+    params: refresh ? { refresh: 1 } : {},
+  });
+  return res.data;
+};
+
+export const getStorageFiles = async (params) => {
+  const res = await api.get("superadmin/storage-usage/files", { params });
+  return res.data;
+};
+
 
 
 
@@ -222,6 +235,22 @@ export const setKioskPassword = async (data) => {
   const res = await api.put("superadmin/kiosk-password", data);
   return res.data;
 };
+
+export const promoteAdminToSuperAdmin = async (id) => {
+  const res = await api.post(`superadmin/admin/${id}/promote/super-admin`);
+  return res.data;
+};
+
+export const demoteSuperAdminToAdmin = async (id) => {
+  const res = await api.post(`superadmin/admin/${id}/demote/super-admin`);
+  return res.data;
+};
+
+export const demoteAdminToManager = async (id) => {
+  const res = await api.post(`superadmin/admin/${id}/demote/manager`);
+  return res.data;
+};
+
 export const getParticularAdmin = async (uid) => {
   const res = await api.get(`superadmin/getperticularadmin/${uid}`);
   return res.data;

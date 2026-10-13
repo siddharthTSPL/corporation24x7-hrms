@@ -31,6 +31,12 @@ const summarySchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  // Approved leave days (any type, half day = 0.5) that fell on a working
+  // day - informational, shown on admin/superadmin attendance dashboards.
+  leaveDays: {
+    type: Number,
+    default: 0,
+  },
   totalWorkingMinutes: {
     type: Number,
     default: 0,

@@ -17,10 +17,9 @@ const STYLES = `
 
   .su-org *, .su-org { font-family: 'Inter', sans-serif; box-sizing: border-box; }
 
-  .su-shell { min-height: 100vh; }
-  @supports (height: 100dvh) {
-    .su-shell { min-height: 100dvh; }
-  }
+  /* Never let the chart widen the page: extra width scrolls INSIDE the chart block only. */
+  .su-org { contain: inline-size; }
+  .su-shell { min-height: 0; }
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
@@ -60,14 +59,21 @@ const STYLES = `
     pointer-events: none;
   }
 
+  /* Chart scroll area: native bars hidden, the fixed bar at the bottom of the screen drives horizontal scroll */
   .su-scroll {
-    touch-action: pan-x;
     overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
   }
-  .su-scroll::-webkit-scrollbar { height:5px; width:5px; }
-  .su-scroll::-webkit-scrollbar-track { background:transparent; }
-  .su-scroll::-webkit-scrollbar-thumb { background:#dde3ec; border-radius:6px; }
-  .su-scroll { -webkit-overflow-scrolling: touch; }
+  .su-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+  /* Horizontal bar pinned to the bottom of the screen */
+  .su-hbar { scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+  .su-hbar::-webkit-scrollbar { height: 12px; }
+  .su-hbar::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 8px; }
+  .su-hbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; border: 2px solid #e2e8f0; }
+  .su-hbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
   .su-field-row {
     display: flex;
@@ -150,7 +156,7 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
+function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", verticalSpace = 26 }) {
   const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const containerRef = useRef(null);
   const rowRef = useRef(null);
@@ -201,13 +207,13 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4" }) {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [items.length]);
+  }, [items.length, verticalSpace]);
 
   if (items.length === 0) return null;
 
   return (
     <div ref={containerRef} className="relative w-full flex flex-col items-center">
-      <div aria-hidden style={{ height: 26 }} />
+      <div aria-hidden style={{ height: verticalSpace }} />
       {lines && (
         <svg
           className="absolute inset-0 pointer-events-none"
@@ -758,14 +764,14 @@ function ReviewsTab({ uid, role }) {
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/10</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/5</span>
               {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}
             </div>
           </div>
           {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
             <div className="flex flex-wrap gap-2 mb-1.5 text-[11px] text-gray-500">
               {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
-              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/10</span>}
+              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/5</span>}
               {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
             </div>
           )}
@@ -845,15 +851,27 @@ function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   );
 }
 
-function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
+function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
   const nodeRef = useRef(null);
   const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
   const admDimmed = hasQ && !admMatch;
   const adminId   = idStr(admin._id);
 
-  const admManagers = managers.filter(
-    (m) => idStr(m.reporting_manager) === adminId && m.reporting_manager_model === "Admin"
+  const coAdmins = allAdmins.filter(
+    (a) => idStr(a.reporting_manager) === adminId && a.reporting_manager_model === "Admin"
   );
+  const coAdminParent = admin.reporting_manager_model === "Admin"
+    ? allAdmins.find((a) => idStr(a._id) === idStr(admin.reporting_manager))
+    : null;
+  const parentCoAdmins = coAdminParent
+    ? allAdmins.filter((a) => idStr(a.reporting_manager) === idStr(coAdminParent._id) && a.reporting_manager_model === "Admin")
+    : [];
+  const isOnlyCoAdminForParent = parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === adminId;
+  const managerAdminId = isOnlyCoAdminForParent ? idStr(coAdminParent._id) : adminId;
+  const admManagers = managers.filter(
+    (m) => idStr(m.reporting_manager) === managerAdminId && m.reporting_manager_model === "Admin"
+  );
+  const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
 
   return (
     <div className="org-branch">
@@ -866,7 +884,25 @@ function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick,
         onClick={() => onNodeClick(admin, "admin")}
       />
 
-      {admManagers.length > 0 ? (
+      {coAdmins.length > 0 && (
+        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4 md:gap-5" verticalSpace={44}>
+          {coAdmins.map((coAdmin, index) => (
+            <AdminBranch
+              key={coAdmin._id}
+              admin={coAdmin}
+              allAdmins={allAdmins}
+              managers={managers}
+              employees={employees}
+              matchName={matchName}
+              hasQ={hasQ}
+              onNodeClick={onNodeClick}
+              delay={delay + 340 + index * 60}
+            />
+          ))}
+        </OrgConnectorGroup>
+      )}
+
+      {showManagersHere && admManagers.length > 0 && (
         <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
           {admManagers.map((mgr, mi) => (
             <ManagerBranch
@@ -882,7 +918,9 @@ function AdminBranch({ admin, managers, employees, matchName, hasQ, onNodeClick,
             />
           ))}
         </OrgConnectorGroup>
-      ) : (
+      )}
+
+      {admManagers.length === 0 && coAdmins.length === 0 && (
         <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
       )}
     </div>
@@ -904,6 +942,11 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
            normalize(desig).includes(q);
   };
 
+  const rootAdmins = admins.filter((admin) =>
+    admin.reporting_manager_model !== "Admin" ||
+    !admins.some((parent) => idStr(parent._id) === idStr(admin.reporting_manager))
+  );
+
   return (
     <div className="org-tree-root w-max min-w-full mx-auto">
       <SuperAdminNode
@@ -917,12 +960,13 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         onClick={() => onNodeClick(superAdmin, "superadmin")}
       />
 
-      {admins.length > 0 ? (
+      {rootAdmins.length > 0 ? (
         <OrgConnectorGroup parentRef={saRef} gapClassName="gap-3 sm:gap-4 md:gap-5">
-          {admins.map((admin, ai) => (
+          {rootAdmins.map((admin, ai) => (
             <AdminBranch
               key={admin._id}
               admin={admin}
+              allAdmins={admins}
               managers={managers}
               employees={employees}
               matchName={matchName}
@@ -1010,7 +1054,13 @@ export default function SuperAdminOrgChart() {
   const [exporting,   setExporting]   = useState(false);
   const [exportDone,  setExportDone]  = useState(false);
   const inputRef = useRef(null);
+
+  // treeRef = the horizontally scrolling viewport, exportRef = the full-width chart content inside it
   const treeRef = useRef(null);
+  const exportRef = useRef(null);
+  const barRef = useRef(null);
+  const [bar, setBar] = useState({ sw: 0, show: false });
+  const [pos, setPos] = useState({ left: 0, width: 0, top: 0, visible: false });
 
   const superAdmin = saData?.superAdmin || saData;
   const admins     = useMemo(() => admData?.admins || [], [admData]);
@@ -1056,6 +1106,49 @@ export default function SuperAdminOrgChart() {
     if (searchOpen) setTimeout(() => inputRef.current?.focus(), 40);
   }, [searchOpen]);
 
+  // Horizontal bar pinned to the bottom of the SCREEN (fixed), aligned with the chart block.
+  // If the chart's own bottom edge is on screen, the bar sits right at that edge instead.
+  useEffect(() => {
+    const inner = exportRef.current;
+    const sc = treeRef.current;
+    if (!inner || !sc) return undefined;
+    const BAR_H = 14;
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const r = sc.getBoundingClientRect();
+      const vh = window.innerHeight;
+      setBar((prev) => {
+        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        return prev.sw === next.sw && prev.show === next.show ? prev : next;
+      });
+      // Bar is always pinned to the bottom edge of the screen; only shown while the chart block is on screen
+      const visible = r.bottom > 0 && r.top < vh - BAR_H;
+      setPos((prev) =>
+        prev.left === r.left && prev.width === r.width && prev.visible === visible
+          ? prev
+          : { left: r.left, width: r.width, top: 0, visible }
+      );
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    ro?.observe(inner);
+    ro?.observe(sc);
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true); // capture: also catches the layout's own scroll container
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const syncScroll = (from, to) => {
+    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+  };
+
   function buildCsvRows() {
     const rows = [["Role", "Emp ID", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
 
@@ -1092,24 +1185,28 @@ export default function SuperAdminOrgChart() {
   }
 
   async function exportPng() {
-    if (!treeRef.current || exporting) return;
+    // Export the full-width inner content (not the clipped scroll viewport)
+    const target = exportRef.current;
+    if (!target || exporting) return;
     setExporting(true);
     try {
       await loadScript(HTML_TO_IMAGE_CDN);
-      treeRef.current.classList.add("su-export-flat");
-      const dataUrl = await window.htmlToImage.toPng(treeRef.current, {
+      target.classList.add("su-export-flat");
+      const dataUrl = await window.htmlToImage.toPng(target, {
         backgroundColor: "#ffffff",
         pixelRatio: 2,
         cacheBust: true,
+        width: target.scrollWidth,
+        height: target.scrollHeight,
       });
-      treeRef.current.classList.remove("su-export-flat");
+      target.classList.remove("su-export-flat");
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`);
       setExportDone(true);
       setTimeout(() => setExportDone(false), 2600);
     } catch (err) {
-      treeRef.current?.classList.remove("su-export-flat");
+      exportRef.current?.classList.remove("su-export-flat");
       window.alert("Could not generate the image export. Please try again.");
     } finally {
       setExporting(false);
@@ -1124,7 +1221,7 @@ export default function SuperAdminOrgChart() {
   ];
 
   return (
-    <div className="su-org su-shell w-full max-w-full min-w-0 bg-[#f4f7fb] flex flex-col overflow-x-hidden">
+    <div className="su-org su-shell w-full max-w-full min-w-0 bg-[#f4f7fb] flex flex-col">
       <style>{STYLES}</style>
 
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
@@ -1299,19 +1396,28 @@ export default function SuperAdminOrgChart() {
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
           </div>
 
+          {/* Scroll viewport: width is capped to the page, extra width scrolls INSIDE this block (horizontal only) */}
           <div
             ref={treeRef}
-            className="su-scroll w-full max-w-full min-w-0 overflow-x-auto overflow-y-visible bg-white p-3 sm:p-6 lg:p-8"
+            onScroll={() => syncScroll(treeRef.current, barRef.current)}
+            className="su-scroll w-full max-w-full min-w-0 bg-white"
+            style={{ overflowX: "auto", overflowY: "hidden" }}
           >
-            <OrgTree
-              superAdmin={superAdmin}
-              admins={admins}
-              managers={managers}
-              employees={employees}
-              loading={loading}
-              searchQuery={searchQuery}
-              onNodeClick={(person, type) => setSelected({ person, type })}
-            />
+            <div
+              ref={exportRef}
+              className="bg-white p-3 sm:p-6 lg:p-8"
+              style={{ width: "max-content", minWidth: "100%" }}
+            >
+              <OrgTree
+                superAdmin={superAdmin}
+                admins={admins}
+                managers={managers}
+                employees={employees}
+                loading={loading}
+                searchQuery={searchQuery}
+                onNodeClick={(person, type) => setSelected({ person, type })}
+              />
+            </div>
           </div>
         </div>
 
@@ -1338,6 +1444,27 @@ export default function SuperAdminOrgChart() {
           </div>
         )}
       </main>
+
+      {/* Horizontal scrollbar: fixed at the bottom of the screen, never moves while the page scrolls */}
+      <div
+        ref={barRef}
+        className="su-hbar"
+        onScroll={() => syncScroll(barRef.current, treeRef.current)}
+        style={{
+          position: "fixed",
+          left: pos.left,
+          bottom: 0,
+          width: pos.width,
+          height: 14,
+          zIndex: 30,
+          overflowX: "auto",
+          overflowY: "hidden",
+          display: bar.show && pos.visible ? "block" : "none",
+          background: "transparent",
+        }}
+      >
+        <div style={{ width: bar.sw, height: 1 }} />
+      </div>
 
       {selected && (
         <EmployeeDetailPanel

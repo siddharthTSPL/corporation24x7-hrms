@@ -33,7 +33,8 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message,
-    ...(err.asset_return_check && { asset_return_check: err.asset_return_check }), // 👈 naya
+    ...(err.code && { code: err.code }),
+    ...(err.asset_return_check && { asset_return_check: err.asset_return_check }),
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 };

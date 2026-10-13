@@ -19,6 +19,7 @@ const adminLeaveSchema = new mongoose.Schema(
         "half_day_el",
         "half_day_sl",
         "lwp",
+        "comp_off",
       ],
       required: true,
       lowercase: true,

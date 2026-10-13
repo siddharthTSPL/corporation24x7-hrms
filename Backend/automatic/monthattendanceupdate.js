@@ -4,7 +4,7 @@ const Leave = require("../Models/leave.model");
 const ManagerLeave = require("../Models/maleave.model");
 const AdminLeave = require("../Models/adleave.model");
 const { getISTDateParts } = require("../utils/Istdate.utils");
-const { isDateInLwpPortion } = require("../utils/leaveLwpDay.utils");
+const { isDateInLwpPortion } = require("../utils/Leavelwpday.utils");
 const mongoose = require("mongoose");
 
 function calculateStatus(activeMinutes, thresholds) {
@@ -47,7 +47,7 @@ const hasApprovedLeave = async (employeeId, date, role, { excludeLwp = false } =
   } else if (role === "admin") {
     leave = await AdminLeave.findOne({
       admin: id,
-      status: "approved_superadmin",
+      status: { $in: ["approved_reporting_manager", "approved_superadmin"] },
       startDate: { $lte: checkDate },
       endDate:   { $gte: checkDate },
       ...leaveTypeFilter,
@@ -55,7 +55,7 @@ const hasApprovedLeave = async (employeeId, date, role, { excludeLwp = false } =
   } else {
     leave = await Leave.findOne({
       employee: id,
-      status: { $in: ["approved_manager", "approved_admin"] },
+      status: { $in: ["approved_manager", "approved_reporting_manager", "approved_admin"] },
       startDate: { $lte: checkDate },
       endDate:   { $gte: checkDate },
       ...leaveTypeFilter,

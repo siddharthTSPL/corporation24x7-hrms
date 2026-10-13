@@ -1,12 +1,17 @@
 const Timesheet = require("../Models/Timesheet.model");
 const TimeLog = require("../Models/Timelog.model");
 const Manager = require("../Models/manager.model");
+const {
+  resolveCustomRouting,
+  resolveDefaultAdminHandler,
+  isInPool,
+} = require("../utils/approvalFlow.utils");
 const Admin = require("../Models/Admin.model");
 const User = require("../Models/user.model");
 const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
-const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
+const { getWeekOffMapForRange, getDayTypeMapForRange } = require("../automatic/weekoffcalendar");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,12 +35,64 @@ const getWeekBounds = (anyDateInWeek) => {
   return { start, end };
 };
 
+const resolveAdminApproval = async (adminId, organisation_id) => {
+  const handler = await resolveDefaultAdminHandler(adminId, organisation_id);
+  const targetAdmin = await Admin.findOne({ _id: handler, organisation_id })
+    .select("reporting_manager_model")
+    .lean();
+  return {
+    handler,
+    status: targetAdmin?.reporting_manager_model === "Admin"
+      ? "pending_coadmin"
+      : "pending_admin",
+  };
+};
+
+const getManagerNextHandler = async (managerId, organisation_id) => {
+  const manager = await Manager.findOne({ _id: managerId, organisation_id })
+    .select("reporting_manager reporting_manager_model")
+    .lean();
+  if (!manager?.reporting_manager) return null;
+  const adminRoute = manager.reporting_manager_model === "Admin"
+    ? await resolveAdminApproval(manager.reporting_manager, organisation_id)
+    : null;
+  return {
+    handler: adminRoute?.handler || manager.reporting_manager,
+    handlerModel: manager.reporting_manager_model,
+    status: adminRoute?.status || "pending_reporting_manager",
+  };
+};
+
+const isTimesheetOwner = (timesheet, actor) =>
+  timesheet.owner?.toString() === actor.id.toString() &&
+  timesheet.owner_model === actor.model;
+
 // Resolve the first handler in the approval chain for the given actor.
 // Rules:
 //   Employee  → their Under_manager (Manager)
 //   Manager   → their reporting_manager (Manager or Admin)
-//   Admin     → their reporting_manager (SuperAdmin always)
+//   Co-Admin  → their reporting Admin
+//   Admin     → their reporting SuperAdmin
 const resolveFirstHandler = async ({ actor, organisation_id }) => {
+  // Org-configured custom flow (admin pool) takes priority; null => default rules below.
+  const customRole =
+    actor.model === "User" ? "Employee" : actor.model === "Manager" ? "Manager" : null;
+  if (customRole) {
+    const custom = await resolveCustomRouting({
+      organisation_id,
+      module: "timesheet",
+      requesterRole: customRole,
+    });
+    if (custom) {
+      return {
+        handler: custom.primary,
+        handlerModel: "Admin",
+        status: custom.status,
+        pool: custom.pool,
+      };
+    }
+  }
+
   if (actor.model === "User") {
     const user = await User.findOne({ _id: actor.id, organisation_id })
       .select("Under_manager")
@@ -54,18 +111,35 @@ const resolveFirstHandler = async ({ actor, organisation_id }) => {
       .lean();
     if (!manager?.reporting_manager) return null; // no reporting manager — auto-approve
     const handlerModel = manager.reporting_manager_model; // "Admin" or "Manager"
+    const adminRoute = handlerModel === "Admin"
+      ? await resolveAdminApproval(manager.reporting_manager, organisation_id)
+      : null;
     return {
-      handler: manager.reporting_manager,
+      handler: adminRoute?.handler || manager.reporting_manager,
       handlerModel,
-      status: handlerModel === "Admin" ? "pending_admin" : "pending_reporting_manager",
+      status: adminRoute?.status || "pending_reporting_manager",
     };
   }
 
   if (actor.model === "Admin") {
     const admin = await Admin.findOne({ _id: actor.id, organisation_id })
-      .select("reporting_manager")
+      .select("reporting_manager reporting_manager_model")
       .lean();
-    if (!admin?.reporting_manager) return null; // no SA link — auto-approve
+    if (!admin?.reporting_manager) return null; // no reporting manager — auto-approve
+    if (admin.reporting_manager_model === "Admin") {
+      return {
+        handler: admin.reporting_manager,
+        handlerModel: "Admin",
+        status: "pending_admin",
+      };
+    }
+    if (admin.reporting_manager_model === "Manager") {
+      return {
+        handler: admin.reporting_manager,
+        handlerModel: "Manager",
+        status: "pending_reporting_manager",
+      };
+    }
     return {
       handler: admin.reporting_manager,
       handlerModel: "SuperAdmin",
@@ -139,6 +213,7 @@ const submitTimesheet = async (req, res, next) => {
   timesheet.total_billed_amount = Math.round(totalBilledAmount * 100) / 100;
   timesheet.currentHandler = routing?.handler || null;
   timesheet.currentHandlerModel = routing?.handlerModel || null;
+  timesheet.approverPool = routing?.pool || [];
   timesheet.status = routing ? routing.status : "approved";
   timesheet.submitted_at = new Date();
   timesheet.escalation_level = 0;
@@ -180,10 +255,17 @@ const getPendingApprovals = async (req, res, next) => {
 
   const timesheets = await Timesheet.find({
     organisation_id,
-    currentHandler: actor.id,
-    currentHandlerModel: actor.model,
+    ...(actor.model === "Admin"
+      ? {
+          $or: [
+            { currentHandler: actor.id, currentHandlerModel: "Admin" },
+            { approverPool: actor.id },
+          ],
+        }
+      : { currentHandler: actor.id, currentHandlerModel: actor.model }),
+    $nor: [{ owner: actor.id, owner_model: actor.model }],
     status: {
-      $in: ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"],
+      $in: ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"],
     },
   })
     .populate("owner", "f_name l_name work_email")
@@ -194,7 +276,7 @@ const getPendingApprovals = async (req, res, next) => {
 };
 
 // ─── approveTimesheet ─────────────────────────────────────────────────────────
-// Current handler approves — marks all logs approved and closes the timesheet.
+// Manager approvals may advance the chain; a Co-Admin can approve finally or forward manually.
 
 const approveTimesheet = async (req, res, next) => {
   const actor = resolveActor(req);
@@ -205,17 +287,43 @@ const approveTimesheet = async (req, res, next) => {
 
   const timesheet = await Timesheet.findOne({ _id: timesheetId, organisation_id });
   if (!timesheet) return next(httpError("Timesheet not found", 404));
+  if (isTimesheetOwner(timesheet, actor)) {
+    return next(httpError("You cannot approve your own timesheet", 403));
+  }
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
+
+  const isCustomAdminApproval = actor.model === "Admin" && timesheet.approverPool?.length > 0;
+  let nextHandler = null;
+  if (!isCustomAdminApproval && actor.model === "Manager") {
+    nextHandler = await getManagerNextHandler(actor.id, organisation_id);
+  }
+
+  if (nextHandler) {
+    timesheet.handlerChain.push(actor.id);
+    timesheet.currentHandler = nextHandler.handler;
+    timesheet.currentHandlerModel = nextHandler.handlerModel;
+    timesheet.approverPool = [];
+    timesheet.status = nextHandler.status;
+    timesheet.remarks = remarks || "Approved and sent to the next approver";
+    await timesheet.save();
+    return res.status(200).json({
+      success: true,
+      message: "Timesheet approved and sent to the next approver",
+      timesheet,
+    });
+  }
 
   timesheet.status = "approved";
   timesheet.approved_by = actor.id;
   timesheet.remarks = remarks || "";
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
 
   await timesheet.save();
   await TimeLog.updateMany({ timesheet: timesheet._id }, { $set: { status: "approved" } });
@@ -236,10 +344,14 @@ const rejectTimesheet = async (req, res, next) => {
 
   const timesheet = await Timesheet.findOne({ _id: timesheetId, organisation_id });
   if (!timesheet) return next(httpError("Timesheet not found", 404));
+  if (isTimesheetOwner(timesheet, actor)) {
+    return next(httpError("You cannot reject your own timesheet", 403));
+  }
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
 
   timesheet.status = "rejected";
@@ -247,6 +359,7 @@ const rejectTimesheet = async (req, res, next) => {
   timesheet.remarks = remarks;
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
 
   await timesheet.save();
   // Reset logs to draft so owner can edit and re-submit
@@ -275,10 +388,14 @@ const forwardTimesheet = async (req, res, next) => {
 
   const timesheet = await Timesheet.findOne({ _id: timesheetId, organisation_id });
   if (!timesheet) return next(httpError("Timesheet not found", 404));
+  if (isTimesheetOwner(timesheet, actor)) {
+    return next(httpError("You cannot forward your own timesheet", 403));
+  }
 
   const isHandler =
-    timesheet.currentHandler?.toString() === actor.id.toString() &&
-    timesheet.currentHandlerModel === actor.model;
+    (timesheet.currentHandler?.toString() === actor.id.toString() &&
+      timesheet.currentHandlerModel === actor.model) ||
+    (actor.model === "Admin" && isInPool(timesheet, actor.id));
   if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
 
   let nextHandler = null;
@@ -294,24 +411,35 @@ const forwardTimesheet = async (req, res, next) => {
     }
     nextHandler = manager.reporting_manager;
     nextHandlerModel = manager.reporting_manager_model; // "Admin" or "Manager"
-    nextStatus = nextHandlerModel === "Admin" ? "pending_admin" : "pending_reporting_manager";
+    if (nextHandlerModel === "Admin") {
+      const adminRoute = await resolveAdminApproval(nextHandler, organisation_id);
+      nextHandler = adminRoute.handler;
+      nextStatus = adminRoute.status;
+    } else {
+      nextStatus = "pending_reporting_manager";
+    }
   }
 
   if (actor.model === "Admin") {
     const admin = await Admin.findOne({ _id: actor.id, organisation_id })
-      .select("reporting_manager")
+      .select("reporting_manager reporting_manager_model")
       .lean();
     if (!admin?.reporting_manager) {
-      return next(httpError("No Super Admin linked to this Admin. Cannot forward.", 400));
+      return next(httpError("No reporting manager linked to this Admin. Cannot forward.", 400));
     }
     nextHandler = admin.reporting_manager;
-    nextHandlerModel = "SuperAdmin";
-    nextStatus = "pending_superadmin";
+    nextHandlerModel = admin.reporting_manager_model;
+    nextStatus = nextHandlerModel === "Admin"
+      ? "pending_admin"
+      : nextHandlerModel === "Manager"
+        ? "pending_reporting_manager"
+        : "pending_superadmin";
   }
 
   timesheet.handlerChain.push(actor.id);
   timesheet.currentHandler = nextHandler;
   timesheet.currentHandlerModel = nextHandlerModel;
+  timesheet.approverPool = [];
   timesheet.status = nextStatus;
   timesheet.remarks = remarks || "";
 
@@ -338,7 +466,7 @@ const recallTimesheet = async (req, res, next) => {
   });
   if (!timesheet) return next(httpError("Timesheet not found", 404));
 
-  const pendingStatuses = ["pending_manager", "pending_reporting_manager", "pending_admin", "pending_superadmin"];
+  const pendingStatuses = ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"];
   if (!pendingStatuses.includes(timesheet.status)) {
     return next(httpError(`Cannot recall a timesheet with status "${timesheet.status}"`, 400));
   }
@@ -346,6 +474,7 @@ const recallTimesheet = async (req, res, next) => {
   timesheet.status = "draft";
   timesheet.currentHandler = null;
   timesheet.currentHandlerModel = null;
+  timesheet.approverPool = [];
   timesheet.handlerChain = [];
   await timesheet.save();
 
@@ -600,7 +729,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
     const activeProjectCache = new Map();
 
     for (const emp of employeesSeen.values()) {
-      const dayTypeMap = await getWeekOffMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
+      const dayTypeMap = await getDayTypeMapForRange(start, rangeEnd, organisation_id, emp.id, emp.model);
       const activeProject = await resolveActiveProjectLabel(emp.id, emp.model, activeProjectCache);
       for (const [dateKey, info] of dayTypeMap.entries()) {
         if (!info.isOff) continue;
@@ -617,8 +746,9 @@ const getTimesheetDetailedReport = async (req, res, next) => {
           project: activeProject,
           job: null,
           date: dateKey,
-          day_type: "week_off",
-          day_label: "Weekend / Off",
+          day_type: info.type === "holiday" ? "holiday" : "week_off",
+          day_label: info.type === "holiday" ? "Holiday" : "Weekend / Off",
+          paid: true,
           required_hours: 0,
           serving_hours: 0,
           overtime_hours: 0,
@@ -627,7 +757,7 @@ const getTimesheetDetailedReport = async (req, res, next) => {
           timesheet_status: "off",
           approved_by: null,
           rejected_by: null,
-          remarks: "",
+          remarks: info.type === "holiday" ? info.name || "" : "",
         });
       }
     }

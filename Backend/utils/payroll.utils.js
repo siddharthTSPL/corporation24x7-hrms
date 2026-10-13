@@ -330,6 +330,7 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
       workingDays,
       lopDays,
       manualEntry: !!manualEntry,
+      basis: !manualEntry && attendanceSummary?.basis === "timesheet" ? "timesheet" : "attendance",
     },
     earnings: {
       gross: earnedGross,

@@ -33,6 +33,8 @@ const wfhSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
       },
     ],
+    // Custom approval flow: admins allowed to act on this request (any one).
+    approverPool: [{ type: mongoose.Schema.Types.ObjectId, ref: "Admin" }],
     superadmin: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "SuperAdmin",
@@ -48,6 +50,7 @@ const wfhSchema = new mongoose.Schema(
         "pending_manager",
         "pending_reporting_manager",
         "pending_admin",
+        "forwarded_admin",
         "pending_superadmin",
         "approved_manager",
         "approved_reporting_manager",
@@ -64,6 +67,7 @@ const wfhSchema = new mongoose.Schema(
     approvedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     rejectedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
     forwardedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    forwardedByModel: { type: String, enum: ["Admin"], default: null },
     remarks: { type: String, trim: true, maxlength: 500, default: "" },
     deleteAt: { type: Date, default: null, index: { expires: 0 } },
   },
@@ -75,6 +79,7 @@ wfhSchema.index({ requester: 1, startDate: 1, endDate: 1 });
 wfhSchema.index({ currentHandler: 1, status: 1 });
 wfhSchema.index({ superadmin: 1, status: 1 });
 wfhSchema.index({ handlerChain: 1 });
+wfhSchema.index({ approverPool: 1, status: 1 });
 wfhSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.models.WFH || mongoose.model("WFH", wfhSchema);

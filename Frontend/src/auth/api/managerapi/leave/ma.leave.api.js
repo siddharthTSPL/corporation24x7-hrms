@@ -19,8 +19,21 @@ api.interceptors.response.use(
   }
 );
 
+const buildLeaveFormData = (data) => {
+  const fd = new FormData();
+  Object.entries(data || {}).forEach(([key, value]) => {
+    if (value === null || value === undefined) return;
+    if (key === "supportingDocument") {
+      if (value instanceof File) fd.append("supportingDocument", value);
+      return;
+    }
+    fd.append(key, value);
+  });
+  return fd;
+};
+
 export const applyLeaveManager = async (data) => {
-  const res = await api.post("manager/applyleavem", data);
+  const res = await api.post("manager/applyleavem", buildLeaveFormData(data));
   return res.data;
 };
 
@@ -78,7 +91,7 @@ export const rejectForwardedLeave = async (data) => {
   return res.data;
 };
 export const editLeaveManager = async ({ id, ...data }) => {
-  const res = await api.put(`manager/editleavem/${id}`, data);
+  const res = await api.put(`manager/editleavem/${id}`, buildLeaveFormData(data));
   return res.data;
 };
 

@@ -4,7 +4,7 @@ import {
   useApplyReimbursement,
   useUpdateReimbursement,
   useDeleteReimbursement,
-} from "../../auth/server-state/employee/employeereimbursement/employeereimbursement.hook";
+} from "../../auth/server-state/employee/employeereimbursement/Employeereimbursement.hook";
 
 export default function ReimbursementEmployee() {
   const myClaims = useGetMyReimbursements();

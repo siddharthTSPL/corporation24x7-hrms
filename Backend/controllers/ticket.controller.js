@@ -13,6 +13,7 @@ const sendTicketEmail = async ({ to, ticketNumber, type, status, note }) => {
     to,
     subject: `[${ticketNumber}] Your ${typeLabel} ticket status: ${statusLabel}`,
     html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#F9F8F2;font-family:'Segoe UI',sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;"><tr><td align="center"><table width="600" style="background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#730042,#CD166E);padding:30px;text-align:center;color:white;"><h2 style="margin:0;">Ticket Update — ${ticketNumber}</h2><p style="margin:8px 0 0;opacity:.9;">${typeLabel} Ticket</p></td></tr><tr><td style="padding:36px;"><div style="background:#F9F4F7;border-left:4px solid #CD166E;border-radius:4px;padding:14px 18px;margin-bottom:24px;"><p style="margin:0;font-size:13px;color:#555;"><strong>Status:</strong> ${statusLabel}</p></div>${note ? `<p style="font-size:14px;color:#444;line-height:1.7;">${note}</p>` : ""}<p style="font-size:13px;color:#888;margin-top:24px;">If you have questions, please log in to the HRMS portal to view your ticket details.</p></td></tr><tr><td style="background:#F9F8F2;padding:20px;text-align:center;font-size:12px;color:#888;">© ${new Date().getFullYear()} TechTorch HRMS Platform — This email is confidential.</td></tr></table></td></tr></table></body></html>`,
+    mailbox: "support",
   });
 };
 

@@ -8,7 +8,7 @@ import {
   approveReimbursement,
   rejectReimbursement,
   markReimbursementPaid,
-} from "../../api/adminapi/reimbursement/adminreimbursement.api";
+} from "../../api/adminapi/reimbursement/Adminreimbursement.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // ---- Admin's own claims (escalate to SuperAdmin) ----

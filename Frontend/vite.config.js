@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
-import { writeFileSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
 
 const PROTECTED_PATHS = [
@@ -33,7 +33,9 @@ ${disallowLines}
 Sitemap: https://torchxsuite.com/talent/sitemap.xml
 `;
 
-      writeFileSync(resolve(__dirname, "dist/robots.txt"), content, "utf-8");
+      const distDir = resolve(__dirname, "dist");
+      if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
+      writeFileSync(resolve(distDir, "robots.txt"), content, "utf-8");
     },
   };
 }

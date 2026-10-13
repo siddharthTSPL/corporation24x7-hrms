@@ -4,7 +4,7 @@ const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, httpError } = require("../utils/heirarchy.utils");
 const { parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 const { resolveEmployeeShift, getShiftDurationMinutes } = require("../utils/shift.utils");
-const { classifyNonWorkingDay, getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
+const { classifyNonWorkingDay, getWeekOffMapForRange, getDayTypeMapForRange } = require("../automatic/weekoffcalendar");
 
 // ─── overtime helpers ────────────────────────────────────────────────────────
 // A job can set its own per-day working-hour cap (max_hours_per_day). If it
@@ -19,6 +19,16 @@ const { classifyNonWorkingDay, getWeekOffMapForRange } = require("../automatic/w
 // dailyCap x (working days in the week) - e.g. 8h/day x 5 working days =
 // 40h billable, with anything on top (including all of Sat/Sun) overtime.
 const DEFAULT_DAILY_LIMIT_MINUTES = 9 * 60; // 9h/day default when a job has no max_hours_per_day set
+
+// Message shown when someone tries to log time (or start a timer) on a
+// company holiday / week-off day.
+const offDayBlockMessage = (status, dateLabel) => {
+  const when = dateLabel ? `${dateLabel} is` : "Today is";
+  if (status.type === "holiday") {
+    return `${when} a company holiday${status.name ? ` (${status.name})` : ""}. It is paid automatically - time can't be logged on it.`;
+  }
+  return `${when} a week off. It is paid automatically - time can't be logged on it.`;
+};
 
 const getActorDoc = (req) => req.employee || req.manager || req.admin || null;
 
@@ -197,10 +207,26 @@ const logTime = async (req, res, next) => {
     );
   }
 
+  if (parseISTDateOnly(log_date) > endOfISTDay(new Date())) {
+    return next(httpError("Future dates par time log nahi kar sakte", 400));
+  }
+
   if (duration_minutes <= 0 || duration_minutes > 1440) {
     return next(
       httpError("duration_minutes must be between 1 and 1440", 400)
     );
+  }
+
+  // Holiday / week-off: no time entry allowed. These days are automatically
+  // paid, so nothing needs to be (or can be) logged on them.
+  const requestedDayStatus = await classifyNonWorkingDay(
+    parseISTDateOnly(log_date),
+    organisation_id,
+    actor.id,
+    actor.model
+  );
+  if (requestedDayStatus.type === "holiday" || requestedDayStatus.type === "week_off") {
+    return next(httpError(offDayBlockMessage(requestedDayStatus, log_date), 400));
   }
 
   const jobDoc = await TSJob.findOne({ _id: job, organisation_id });
@@ -364,14 +390,18 @@ const getMyWeekLog = async (req, res, next) => {
   // "Off" instead of an empty loggable cell, and know only the working
   // days count toward the weekly regular-hours allowance.
   const weekEnd = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-  const dayTypeMap = await getWeekOffMapForRange(start, weekEnd, organisation_id, actor.id, actor.model);
+  const dayTypeMap = await getDayTypeMapForRange(start, weekEnd, organisation_id, actor.id, actor.model);
   let workingDaysCount = 0;
   dayKeys.forEach(({ key }) => {
     const info = dayTypeMap.get(key);
-    const dayType = info?.unconfigured ? "unconfigured" : info?.isOff ? "week_off" : "working";
+    const dayType = info?.type || "working";
+    const isOff = dayType === "week_off" || dayType === "holiday";
     dayBuckets[key].dayType = dayType;
-    dayBuckets[key].isOff = dayType === "week_off";
-    if (dayType === "working" || dayType === "unconfigured") workingDaysCount += 1;
+    dayBuckets[key].isOff = isOff;
+    dayBuckets[key].dayLabel = dayType === "holiday" ? "Holiday" : dayType === "week_off" ? "Week Off" : null;
+    dayBuckets[key].holidayName = dayType === "holiday" ? info?.name || null : null;
+    dayBuckets[key].paid = isOff;
+    if (!isOff) workingDaysCount += 1;
   });
 
   const totalMinutes = logs.reduce((sum, l) => sum + l.duration_minutes, 0);
@@ -392,6 +422,31 @@ const getMyWeekLog = async (req, res, next) => {
     workingDaysCount,
     weeklyBillableCapMinutes,
     days: dayBuckets,
+  });
+};
+
+// GET /time-logs/day-status?date=YYYY-MM-DD (defaults to today IST)
+// Tells the UI whether a day is a holiday / week-off so it can disable the
+// timer & manual log buttons and show "Holiday" / "Week Off" instead.
+const getMyDayStatus = async (req, res, next) => {
+  const actor = resolveActor(req);
+  const organisation_id = resolveOrgId(req);
+  const dateKey = req.query.date || toISTKey(new Date());
+  const date = parseISTDateOnly(dateKey);
+
+  const result = await classifyNonWorkingDay(date, organisation_id, actor.id, actor.model);
+  const dayType = result.type || "working";
+  const isOff = dayType === "holiday" || dayType === "week_off";
+
+  res.status(200).json({
+    success: true,
+    date: dateKey,
+    dayType,
+    isOff,
+    dayLabel: dayType === "holiday" ? "Holiday" : dayType === "week_off" ? "Week Off" : null,
+    holidayName: dayType === "holiday" ? result.name || null : null,
+    paid: isOff,
+    canLog: !isOff,
   });
 };
 
@@ -564,6 +619,8 @@ module.exports = {
   logTime,
   getMyDayLog,
   getMyWeekLog,
+  getMyDayStatus,
+  offDayBlockMessage,
   updateTimeLog,
   deleteTimeLog,
   getJobTimeLogs,

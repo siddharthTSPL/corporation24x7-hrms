@@ -8,7 +8,7 @@ import {
   FaBook,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import { helpSections, ROLE_LABEL } from "./helpContent";
+import { helpSections, ROLE_LABEL } from "./Helpcontent";
 import TechnicalSupportModal from "../../components/help/TechnicalSupportModal";
 
 const C = {

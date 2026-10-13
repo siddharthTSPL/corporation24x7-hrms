@@ -1,3 +1,18 @@
 .env
 node_modules
 databaseconnect.js
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# Python Cache & Compiled Files
+__pycache__/
+*.pyc
+
+# Local Insightface Downloaded Models
+.insightface/
+*.zip
+
+# Environment Variables
+.env

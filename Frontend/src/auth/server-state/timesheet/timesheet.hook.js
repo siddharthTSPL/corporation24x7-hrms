@@ -4,7 +4,7 @@ import {
   addProjectMembers, removeProjectMember, archiveProject,
   getAssignableTargets, createJob, getMyAssignedJobs, getJobsCreatedByMe,
   getJobById, updateJobStatus, updateJob, toggleWorkItem, archiveJob,
-  getJobTimeLogs, logTime, getMyDayLog, getMyWeekLog, updateTimeLog, deleteTimeLog,
+  getJobTimeLogs, logTime, getMyDayLog, getMyWeekLog, getMyDayStatus, updateTimeLog, deleteTimeLog,
   startTimer, heartbeatTimer, pauseTimer, resumeTimer, stopTimer, getActiveTimer, discardTimer,
   submitTimesheet, recallTimesheet, getMyTimesheets, getPendingApprovals,
   approveTimesheet, rejectTimesheet, forwardTimesheet,
@@ -220,6 +220,13 @@ export const useMyWeekLog = (weekStart) =>
     enabled: !!weekStart,
     staleTime: 0,
     refetchOnMount: true,
+  });
+
+export const useMyDayStatus = (date) =>
+  useQuery({
+    queryKey: ["tsDayStatus", date || "today"],
+    queryFn: () => getMyDayStatus(date),
+    staleTime: 60 * 1000,
   });
 
 export const useUpdateTimeLog = () => {

@@ -7,12 +7,17 @@ const FEATURE_LABELS = {
   recruitment: "Recruitment Management",
   asset: "Asset Management",
   tickets: "TorchX Voice",
+  single_sign_in: "Single Sign-In",
 };
 
 // Plans that unlock the gated features below (Review, Timesheet, Recruitment,
 // Asset Management, TorchX Voice). "basic" is deliberately excluded —
 // organisations on Basic get these features fully locked, while Advance and
 // enterprise get them fully open. Update here if a new plan tier is introduced.
+//
+// Self Service Portal (Leave/Reimbursement/Documents) and payslip download
+// are NOT part of this gate — they're available on every plan, including
+// Basic. Don't wrap their routes with restrictPlanFeature().
 const UNLOCKED_PLANS = ["Advance", "enterprise"];
 
 // Every role (SuperAdmin/Admin/Manager/Employee) ultimately belongs to one
