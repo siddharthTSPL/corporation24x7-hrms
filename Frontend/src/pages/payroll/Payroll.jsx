@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Fragment } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FaFileExcel } from "react-icons/fa";
 import {
   useGetPayrollPolicy,
@@ -185,7 +185,9 @@ function Card({ title, subtitle, children, right }) {
       className="min-w-0"
       style={{
         background: C.surface, borderRadius: 14,
-        border: `1px solid ${C.border}`, overflow: "hidden",
+        // "clip" looks identical to "hidden" but does not create a scroll
+        // container.
+        border: `1px solid ${C.border}`, overflow: "clip",
         position: "relative", marginBottom: 16,
       }}
     >
@@ -256,9 +258,6 @@ function Badge({ children, color, bg }) {
     </span>
   );
 }
-
-
-
 
 function SubTabs({ items, active, onChange }) {
   return (
@@ -636,8 +635,6 @@ function PayScheduleTab({ notify }) {
 }
 
 
-
-
 const STATUTORY_SUBTABS = [
   { key: "epf", label: "EPF" },
   { key: "esi", label: "ESI" },
@@ -848,7 +845,6 @@ function StatutoryTab({ notify }) {
     </Card>
   );
 }
-
 
 
 function emptyComponentForm(category) {
@@ -1177,7 +1173,6 @@ function ComponentsTab({ notify }) {
     </Card>
   );
 }
-
 
 
 const CLAIMS_SUBTABS = [
@@ -1588,11 +1583,11 @@ function GenerateTab({ notify, directory }) {
   const handleSingle = (e) => {
     e.preventDefault();
     if (!single.employee) return notify("Select an employee", "error");
-if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
-if (Number(single.paidDays) > Number(single.workingDays)) {
-  return notify("Paid Days cannot be greater than Working Days", "error");
-}
-setSingleResult(null);
+    if (single.paidDays === "" || single.paidDays === null) return notify("Enter Paid Days for this month", "error");
+    if (Number(single.paidDays) > Number(single.workingDays)) {
+      return notify("Paid Days cannot be greater than Working Days", "error");
+    }
+    setSingleResult(null);
     generate(
       {
         employee: single.employee,
@@ -1673,17 +1668,17 @@ setSingleResult(null);
               <TextInput type="number" min={1} max={31} value={single.workingDays} onChange={(e) => setSingle((p) => ({ ...p, workingDays: e.target.value }))} />
             </Field>
             <Field label="Paid Days" hint={`Present — manual entry (max ${single.workingDays || "—"})`}>
-  <TextInput
-    type="number"
-    min={0}
-    max={single.workingDays || undefined}
-    step="0.5"
-    value={single.paidDays}
-    onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))}
-    placeholder="e.g. 27"
-    required
-  />
-</Field>
+              <TextInput
+                type="number"
+                min={0}
+                max={single.workingDays || undefined}
+                step="0.5"
+                value={single.paidDays}
+                onChange={(e) => setSingle((p) => ({ ...p, paidDays: e.target.value }))}
+                placeholder="e.g. 27"
+                required
+              />
+            </Field>
             <Field label="LOP Days" hint="Auto-calculated">
               <div style={{ ...inputStyle, background: "#f7f3f1", color: C.muted, display: "flex", alignItems: "center" }}>
                 {lopDaysPreview === null ? "—" : lopDaysPreview}
@@ -1786,15 +1781,10 @@ function PayslipSection({ title, children }) {
 }
 
 
-
-
-
 function humanizeKey(key) {
   const spaced = String(key).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
-
-
 
 
 const EARNINGS_LABELS = { other: "Other Earnings" };
@@ -1811,16 +1801,8 @@ const DEDUCTIONS_LABELS = {
 const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
 
 
-
-
-
 const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];
 const DEDUCTIONS_EXCLUDE = ["lossOfPay", "components", "totalDeductions"];
-
-
-
-
-
 
 
 function dynamicRows(obj, excludeKeys, labelOverrides) {
@@ -1828,8 +1810,6 @@ function dynamicRows(obj, excludeKeys, labelOverrides) {
     .filter(([key, value]) => !excludeKeys.includes(key) && typeof value === "number" && value !== 0)
     .map(([key, value]) => ({ label: labelOverrides[key] || humanizeKey(key), amount: value }));
 }
-
-
 
 
 function getPayslipLineItems(payroll) {
@@ -1855,14 +1835,148 @@ function getPayslipLineItems(payroll) {
 }
 
 
+/* =============================================================================
+   PAYSLIP TEMPLATE (new design) — company header in beetroot #730042
+   ============================================================================= */
 
+const BEETROOT = "#730042";
 
+/* ---------- helpers ---------- */
 
-function downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName }) {
+const ONES = [
+  "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function twoDigitWords(n) {
+  return n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : "");
+}
+function threeDigitWords(n) {
+  const h = Math.floor(n / 100);
+  const r = n % 100;
+  return [h ? ONES[h] + " Hundred" : "", r ? twoDigitWords(r) : ""].filter(Boolean).join(" ");
+}
+
+// Indian numbering (Thousand / Lakh / Crore)
+function amountInWords(value) {
+  const rounded = Math.round(Number(value) || 0) || 0;
+  if (rounded === 0) return "Zero Rupees Only";
+  let num = Math.abs(rounded);
+  const parts = [];
+  const crore = Math.floor(num / 10000000); num %= 10000000;
+  const lakh = Math.floor(num / 100000); num %= 100000;
+  const thousand = Math.floor(num / 1000); num %= 1000;
+  if (crore) parts.push(threeDigitWords(crore) + " Crore");
+  if (lakh) parts.push(twoDigitWords(lakh) + " Lakh");
+  if (thousand) parts.push(twoDigitWords(thousand) + " Thousand");
+  if (num) parts.push(threeDigitWords(num));
+  return (rounded < 0 ? "Minus " : "") + parts.join(" ") + " Rupees Only";
+}
+
+// Company lines shown under the company name. Only the fields that exist on
+// payroll.organisationSnapshot are printed, so nothing breaks if the backend
+// only sends `name` today. Add more fields to the snapshot to show them here.
+function getOrgDetailLines(org) {
+  const o = org || {};
+  const lines = [];
+  if (o.address) lines.push(String(o.address));
+  const ids = [
+    o.cin && `CIN: ${o.cin}`,
+    o.gstin && `GSTIN: ${o.gstin}`,
+    o.pan && `PAN: ${o.pan}`,
+  ].filter(Boolean);
+  if (ids.length) lines.push(ids.join("  |  "));
+  const contact = [o.email, o.phone].filter(Boolean);
+  if (contact.length) lines.push(contact.join("  |  "));
+  return lines;
+}
+
+/* ---------- HTML -> PDF (direct file download, no print dialog) ----------
+   Needs:  npm i jspdf html2canvas
+   The slip HTML is rendered in a hidden iframe (so its own <style> applies),
+   captured with html2canvas, then placed on A4 page(s) with jsPDF.         */
+
+const safeFileName = (s) => String(s ?? "").replace(/[\\/:*?"<>|]/g, "-").trim();
+
+async function htmlToPdfDownload(html, filename) {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
+
+  try {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    // let layout / fonts settle
+    await new Promise((r) => setTimeout(r, 350));
+    if (doc.fonts?.ready) await doc.fonts.ready;
+    iframe.style.height = `${doc.body.scrollHeight}px`;
+
+    const canvas = await html2canvas(doc.body, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+    });
+
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgH = (canvas.height * pageW) / canvas.width;
+    const img = canvas.toDataURL("image/jpeg", 0.98);
+
+    let heightLeft = imgH;
+    let position = 0;
+    pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position = heightLeft - imgH;
+      pdf.addPage();
+      pdf.addImage(img, "JPEG", 0, position, pageW, imgH);
+      heightLeft -= pageH;
+    }
+    pdf.save(filename);
+  } catch (err) {
+    console.error("PDF generation failed", err);
+    alert("PDF download failed. Please try again.");
+  } finally {
+    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+  }
+}
+
+/* ---------- downloadable payslip (PDF) ---------- */
+
+async function downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName }) {
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
-  const rowsHtml = (items) => items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("");
+  const hasDeductions = deductions.length > 0;
   const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+  const orgDetails = getOrgDetailLines(payroll.organisationSnapshot);
+  const statusText = payroll.status ? payroll.status.toUpperCase().replace("_", " ") : "";
+
+  // Status pill as inline SVG: the browser rasterises SVG exactly, so the text
+  // stays dead-centre inside the rounded border in the PDF (plain HTML text
+  // gets drawn a few px low by html2canvas).
+  const pillW = Math.round(statusText.length * 7.6 + 26);
+  const statusPill = statusText
+    ? `<div class="s"><svg xmlns="http://www.w3.org/2000/svg" width="${pillW}" height="22" viewBox="0 0 ${pillW} 22"><rect x="0.5" y="0.5" width="${pillW - 1}" height="21" rx="10.5" ry="10.5" fill="none" stroke="${BEETROOT}" stroke-width="1"/><text x="${pillW / 2}" y="11" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.6" fill="${BEETROOT}">${statusText}</text></svg></div>`
+    : "";
+
+  const rowsHtml = (items) =>
+    items.length
+      ? items.map((r) => `<tr><td>${r.label}</td><td class="amt">${fmtINR(r.amount)}</td></tr>`).join("")
+      : `<tr><td class="empty" colspan="2">—</td></tr>`;
+
+  const detail = (label, value) => `<div class="d"><span class="lbl">${label}</span><span class="val">${value}</span></div>`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -1871,86 +1985,173 @@ function downloadPayslip({ payroll, name, employeeId, department, designation, b
 <title>${orgName ? orgName + " - " : ""}Payslip - ${name} - ${period}</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; }
-  .sub { color: #8a7a74; font-size: 12px; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-  th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a7a74; padding: 4px 0; border-bottom: 1px solid #ede5e0; }
-  td { font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f3ede9; }
-  td.amt, th.amt { text-align: right; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 20px; font-size: 13px; }
-  .grid .lbl { color: #8a7a74; }
-  .total-row td { font-weight: 700; border-top: 2px solid #2a1a16; border-bottom: none; }
-  .net { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 2px solid #2a1a16; border-bottom: 2px solid #2a1a16; margin: 18px 0; }
-  .net .lbl { font-size: 14px; font-weight: 700; }
-  .net .val { font-size: 18px; font-weight: 800; }
-  @media print { body { padding: 0; } }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; margin: 0; padding: 20px; background: #fff; }
+  .sheet { max-width: 780px; margin: 0 auto; border: 1px solid #e3d6dd; border-top: 6px solid ${BEETROOT}; border-radius: 6px; padding: 26px 28px; }
+
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid ${BEETROOT}; }
+  .org { font-size: 22px; font-weight: 800; color: ${BEETROOT}; margin: 0; letter-spacing: 0.2px; line-height: 1.2; }
+  .org-line { font-size: 11.5px; color: #6b5a54; margin: 4px 0 0; line-height: 1.5; }
+  .title { text-align: right; flex-shrink: 0; }
+  .title .t { font-size: 20px; font-weight: 800; color: #2a1a16; letter-spacing: 2px; }
+  .title .p { font-size: 12.5px; color: #6b5a54; margin-top: 4px; }
+  .title .s { margin-top: 8px; line-height: 0; }
+  .title .s svg { display: inline-block; vertical-align: top; }
+
+  .box { border: 1px solid #e3d6dd; border-radius: 6px; margin-top: 16px; }
+  .box-title { background: #f7eef2; color: ${BEETROOT}; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 7px 14px; border-bottom: 1px solid #e3d6dd; border-radius: 6px 6px 0 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; }
+  .d { display: flex; gap: 8px; padding: 7px 14px; font-size: 12.5px; border-bottom: 1px solid #f3eaee; }
+  .d .lbl { color: #8a7a74; min-width: 112px; }
+  .d .val { font-weight: 700; color: #2a1a16; word-break: break-word; }
+  .att { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .att div { padding: 10px 14px; border-right: 1px solid #f3eaee; }
+  .att div:last-child { border-right: none; }
+  .att .lbl { font-size: 10.5px; color: #8a7a74; text-transform: uppercase; letter-spacing: 0.4px; }
+  .att .val { font-size: 15px; font-weight: 800; margin-top: 2px; }
+
+  .cols { display: flex; gap: 16px; margin-top: 16px; align-items: stretch; }
+  .col { flex: 1; border: 1px solid #e3d6dd; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: ${BEETROOT}; color: #fff; text-align: left; font-size: 11px; letter-spacing: 0.7px; text-transform: uppercase; padding: 8px 12px; }
+  th.amt, td.amt { text-align: right; }
+  td { font-size: 12.5px; padding: 7px 12px; border-bottom: 1px solid #f3eaee; }
+  td.empty { color: #b0948a; text-align: center; }
+  .grow { flex: 1; }
+  .total td { background: #f7eef2; font-weight: 800; color: ${BEETROOT}; border-top: 2px solid ${BEETROOT}; border-bottom: none; }
+
+  .net { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 14px 18px; background: #f7eef2; border: 1px solid ${BEETROOT}; border-radius: 6px; }
+  .net .lbl { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: ${BEETROOT}; }
+  .net .words { font-size: 11.5px; color: #6b5a54; margin-top: 4px; }
+  .net .val { font-size: 24px; font-weight: 800; color: ${BEETROOT}; white-space: nowrap; }
+
+  .note { font-size: 11.5px; color: #6b5a54; margin-top: 12px; }
+  .foot { margin-top: 22px; padding-top: 10px; border-top: 1px dashed #d9c9d1; text-align: center; font-size: 10.5px; color: #8a7a74; }
 </style>
 </head>
 <body>
-  ${orgName ? `<p class="org">${orgName}</p>` : ""}
-  <h1>Payslip</h1>
-  <div class="sub">Pay Period: ${period}${payroll.status ? " · " + payroll.status.toUpperCase().replace("_", " ") : ""}</div>
+  <div class="sheet">
+    <div class="head">
+      <div>
+        <p class="org">${orgName || "Company"}</p>
+        ${orgDetails.map((l) => `<p class="org-line">${l}</p>`).join("")}
+      </div>
+      <div class="title">
+        <div class="t">PAYSLIP</div>
+        <div class="p">For the month of <strong>${period}</strong></div>
+        ${statusPill}
+      </div>
+    </div>
 
-  <div class="grid">
-    <div><span class="lbl">Employee: </span>${name}</div>
-    <div><span class="lbl">Employee ID: </span>${employeeId}</div>
-    <div><span class="lbl">Department: </span>${departmentLabel(department)}</div>
-    <div><span class="lbl">Designation: </span>${designation}</div>
-    <div><span class="lbl">Bank Name: </span>${bankName || "—"}</div>
-    <div><span class="lbl">Account Number: </span>${accountNumber || "—"}</div>
-    <div><span class="lbl">Paid Days: </span>${att.paidDays ?? "—"} / ${att.workingDays ?? "—"}</div>
-    <div><span class="lbl">LOP Days: </span>${att.lopDays ?? "—"}</div>
+    <div class="box">
+      <div class="box-title">Employee Details</div>
+      <div class="grid">
+        ${detail("Employee Name", name)}
+        ${detail("Employee ID", employeeId)}
+        ${detail("Department", departmentLabel(department))}
+        ${detail("Designation", designation)}
+        ${detail("Bank Name", bankName || "—")}
+        ${detail("Account Number", accountNumber || "—")}
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="box-title">Attendance Summary</div>
+      <div class="att">
+        <div><div class="lbl">Calendar Days</div><div class="val">${att.calendarDays ?? att.daysInMonth ?? "—"}</div></div>
+        <div><div class="lbl">Working Days</div><div class="val">${att.workingDays ?? "—"}</div></div>
+        <div><div class="lbl">Paid Days</div><div class="val">${att.paidDays ?? "—"}</div></div>
+        <div><div class="lbl">LOP Days</div><div class="val">${att.lopDays ?? "—"}</div></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="col">
+        <table class="grow">
+          <thead><tr><th>Earnings</th><th class="amt">Amount</th></tr></thead>
+          <tbody>${rowsHtml(earnings)}</tbody>
+        </table>
+        <table>
+          <tbody><tr class="total"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr></tbody>
+        </table>
+      </div>
+      ${hasDeductions ? `
+      <div class="col">
+        <table class="grow">
+          <thead><tr><th>Deductions</th><th class="amt">Amount</th></tr></thead>
+          <tbody>${rowsHtml(deductions)}</tbody>
+        </table>
+        <table>
+          <tbody><tr class="total"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr></tbody>
+        </table>
+      </div>` : ""}
+    </div>
+
+    <div class="net">
+      <div>
+        <div class="lbl">NET PAY</div>
+        <div class="words">${amountInWords(payroll.netSalary)}</div>
+      </div>
+      <div class="val">${fmtINR(payroll.netSalary)}</div>
+    </div>
+
+    ${employerContribution.length ? `
+    <div class="box">
+      <div class="box-title">Employer Contributions (not deducted from salary)</div>
+      <table>
+        <tbody>${rowsHtml(employerContribution)}</tbody>
+      </table>
+    </div>` : ""}
+
+    ${att.manualEntry ? `<p class="note">Paid Days entered manually for this pay run.</p>` : ""}
+    ${payroll.remarks ? `<p class="note"><strong>Remarks:</strong> ${payroll.remarks}</p>` : ""}
+
+    <div class="foot">This is a system-generated payslip and does not require a signature.</div>
   </div>
-
-  <table>
-    <thead><tr><th>Earnings</th><th class="amt">Amount</th></tr></thead>
-    <tbody>
-      ${rowsHtml(earnings)}
-      <tr class="total-row"><td>GROSS EARNINGS</td><td class="amt">${fmtINR(payroll.earnings?.totalEarnings)}</td></tr>
-    </tbody>
-  </table>
-
-  <table>
-    <thead><tr><th>Deductions</th><th class="amt">Amount</th></tr></thead>
-    <tbody>
-      ${rowsHtml(deductions)}
-      <tr class="total-row"><td>TOTAL DEDUCTIONS</td><td class="amt">${fmtINR(payroll.deductions?.totalDeductions)}</td></tr>
-    </tbody>
-  </table>
-
-  <div class="net">
-    <span class="lbl">NET PAY</span>
-    <span class="val">${fmtINR(payroll.netSalary)}</span>
-  </div>
-
-  <script>window.onload = function() { window.print(); };</script>
 </body>
 </html>`;
 
+  await htmlToPdfDownload(html, `Payslip - ${safeFileName(name)} - ${safeFileName(period)}.pdf`);
+}
 
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, "_blank");
+/* ---------- on-screen payslip ("View Payslip") ---------- */
 
-  if (!win) {
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `Payslip - ${name} - ${period}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+function PayslipTable({ title, rows, totalLabel, total }) {
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ background: BEETROOT, color: "#fff", display: "flex", justifyContent: "space-between", padding: "8px 12px", fontSize: 11, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase" }}>
+        <span>{title}</span>
+        <span>Amount</span>
+      </div>
+      <div style={{ flex: 1 }}>
+        {rows.length === 0 && (
+          <div style={{ padding: "10px 12px", fontSize: 12.5, color: C.muted, textAlign: "center" }}>—</div>
+        )}
+        {rows.map((r, i) => (
+          <div
+            key={`${title}-${i}-${r.label}`}
+            className="flex justify-between gap-3"
+            style={{ padding: "7px 12px", fontSize: 12.5, borderBottom: `1px solid ${C.border}` }}
+          >
+            <span className="break-words" style={{ color: C.text }}>{r.label}</span>
+            <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{fmtINR(r.amount)}</span>
+          </div>
+        ))}
+      </div>
+      <div
+        className="flex justify-between gap-3"
+        style={{ padding: "9px 12px", background: C.brandLight, borderTop: `2px solid ${BEETROOT}`, fontSize: 12.5, fontWeight: 800, color: BEETROOT }}
+      >
+        <span>{totalLabel}</span>
+        <span style={{ whiteSpace: "nowrap" }}>{fmtINR(total)}</span>
+      </div>
+    </div>
+  );
 }
 
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
   const orgName = payroll.organisationSnapshot?.name || "";
+  const orgDetails = getOrgDetailLines(payroll.organisationSnapshot);
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
   const name = snap.name || person?.name || resolveName(directory, payroll.employee, payroll.employeeModel);
@@ -1961,80 +2162,139 @@ function PayslipModal({ payroll, directory, onClose }) {
   const accountNumber = snap.accountNumber || "—";
   const att = payroll.attendance || {};
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+  const hasDeductions = deductions.length > 0;
+  const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+
+  const employeeDetails = [
+    ["Employee Name", name],
+    ["Employee ID", employeeId],
+    ["Department", departmentLabel(department)],
+    ["Designation", designation],
+    ["Bank Name", bankName],
+    ["Account Number", accountNumber],
+  ];
+  const attendanceCells = [
+    ["Calendar Days", att.calendarDays ?? att.daysInMonth ?? "—"],
+    ["Working Days", att.workingDays ?? "—"],
+    ["Paid Days", att.paidDays ?? "—"],
+    ["LOP Days", att.lopDays ?? "—"],
+  ];
+
+  const sectionTitle = (text) => (
+    <div style={{ background: C.brandLight, color: BEETROOT, fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: "uppercase", padding: "7px 14px", borderBottom: `1px solid ${C.border}` }}>
+      {text}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-[998] flex items-center justify-center p-3 sm:p-4 overscroll-contain" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="p-4 sm:p-[22px] overscroll-contain"
-        style={{ background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "88vh", overflowY: "auto" }}
+        className="overscroll-contain"
+        style={{ background: "#fff", borderRadius: 14, maxWidth: 780, width: "100%", maxHeight: "92vh", overflowY: "auto", borderTop: `6px solid ${BEETROOT}` }}
       >
-        <div className="flex items-center justify-between mb-3 gap-3">
-          <div>
-            {orgName && <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.brand }}>{orgName}</p>}
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>Payslip</h3>
+        <div className="p-4 sm:p-6">
+          {/* Company header */}
+          <div className="pb-3" style={{ borderBottom: `2px solid ${BEETROOT}` }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="break-words" style={{ margin: 0, fontSize: 21, fontWeight: 800, color: BEETROOT, lineHeight: 1.2 }}>
+                  {orgName || "Company"}
+                </h2>
+                {orgDetails.map((line, i) => (
+                  <p key={i} className="break-words" style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{line}</p>
+                ))}
+              </div>
+              <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+                {payroll.status === "paid" && (
+                  <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
+                    Download PDF
+                  </GhostButton>
+                )}
+                <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, cursor: "pointer", color: C.muted }}>×</button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap" style={{ marginTop: 10 }}>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: 2, color: C.text }}>PAYSLIP</span>
+                <span style={{ fontSize: 12.5, color: C.muted }}>For the month of <strong style={{ color: C.text }}>{period}</strong></span>
+              </div>
+              {statusBadge(payroll.status)}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {payroll.status === "paid" && (
-              <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
-                Download
-              </GhostButton>
+
+          {/* Employee details */}
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 16, overflow: "hidden" }}>
+            {sectionTitle("Employee Details")}
+            <div className="grid grid-cols-1 sm:grid-cols-2">
+              {employeeDetails.map(([label, value]) => (
+                <div key={label} className="flex gap-2" style={{ padding: "7px 14px", fontSize: 12.5, borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.muted, minWidth: 108, flexShrink: 0 }}>{label}</span>
+                  <span className="break-words" style={{ fontWeight: 700, color: C.text }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Attendance */}
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 14, overflow: "hidden" }}>
+            {sectionTitle("Attendance Summary")}
+            <div className="grid grid-cols-2 sm:grid-cols-4">
+              {attendanceCells.map(([label, value]) => (
+                <div key={label} style={{ padding: "10px 14px", borderRight: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 10.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>{label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: C.text, marginTop: 2 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Earnings | Deductions (Deductions only when there is any) */}
+          <div className={`grid grid-cols-1 ${hasDeductions ? "sm:grid-cols-2" : ""} gap-4`} style={{ marginTop: 14 }}>
+            <PayslipTable title="Earnings" rows={earnings} totalLabel="GROSS EARNINGS" total={payroll.earnings?.totalEarnings} />
+            {hasDeductions && (
+              <PayslipTable title="Deductions" rows={deductions} totalLabel="TOTAL DEDUCTIONS" total={payroll.deductions?.totalDeductions} />
             )}
-            <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1.5 mb-3 pb-3" style={{ borderBottom: `1px dashed ${C.border}` }}>
-          <PayslipRow label="Employee" value={<span className="break-words">{name}</span>} />
-          <PayslipRow label="Employee ID" value={employeeId} />
-          <PayslipRow label="Department" value={departmentLabel(department)} />
-          <PayslipRow label="Designation" value={designation} />
-          <PayslipRow label="Bank Name" value={bankName} />
-          <PayslipRow label="Account Number" value={accountNumber} />
-          <PayslipRow label="Pay Period" value={<span className="flex items-center gap-2 justify-end flex-wrap">{MONTH_NAMES[payroll.month - 1]} {payroll.year} {statusBadge(payroll.status)}</span>} />
-        </div>
+          {/* Net pay */}
+          <div
+            className="flex items-center justify-between gap-4 flex-wrap"
+            style={{ marginTop: 14, padding: "14px 18px", background: C.brandLight, border: `1px solid ${BEETROOT}`, borderRadius: 10 }}
+          >
+            <div className="min-w-0">
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1, color: BEETROOT }}>NET PAY</div>
+              <div className="break-words" style={{ fontSize: 11.5, color: C.muted, marginTop: 3 }}>{amountInWords(payroll.netSalary)}</div>
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: BEETROOT, whiteSpace: "nowrap" }}>{fmtINR(payroll.netSalary)}</div>
+          </div>
 
-        <PayslipSection title="Attendance">
-          <PayslipRow label="Calendar Days" value={att.calendarDays ?? att.daysInMonth ?? "—"} />
-          <PayslipRow label="Working Days" value={att.workingDays ?? "—"} />
-          <PayslipRow label="Paid Days" value={att.paidDays ?? "—"} />
-          <PayslipRow label="LOP Days" value={att.lopDays ?? "—"} />
-        </PayslipSection>
-
-        <PayslipSection title="Earnings">
-          {earnings.map((r, i) => (
-            <Fragment key={`e-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
-          ))}
-          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
-          <PayslipRow label="GROSS EARNINGS" value={fmtINR(payroll.earnings?.totalEarnings)} bold />
-        </PayslipSection>
-
-        <PayslipSection title="Deductions">
-          {deductions.map((r, i) => (
-            <Fragment key={`d-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
-          ))}
-          <div className="col-span-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${C.border}` }} />
-          <PayslipRow label="TOTAL DEDUCTIONS" value={fmtINR(payroll.deductions?.totalDeductions)} bold />
-        </PayslipSection>
-
-        <div className="flex items-center justify-between py-3 mb-1" style={{ borderTop: `2px solid ${C.border}`, borderBottom: `2px solid ${C.border}` }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>NET PAY</span>
-          <span style={{ fontSize: 17, fontWeight: 800, color: C.brandDark }}>{fmtINR(payroll.netSalary)}</span>
-        </div>
-
-        <PayslipSection title="Employer Contributions">
-          {employerContribution.map((r, i) => (
-            <Fragment key={`ec-${i}-${r.label}`}><PayslipRow label={r.label} value={fmtINR(r.amount)} /></Fragment>
-          ))}
-          {employerContribution.length === 0 && (
-            <span style={{ fontSize: 12.5, color: C.muted, gridColumn: "1 / -1" }}>No employer contributions for this pay run.</span>
+          {/* Employer contributions */}
+          {employerContribution.length > 0 && (
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, marginTop: 14, overflow: "hidden" }}>
+              {sectionTitle("Employer Contributions (not deducted from salary)")}
+              {employerContribution.map((r, i) => (
+                <div key={`ec-${i}-${r.label}`} className="flex justify-between gap-3" style={{ padding: "7px 14px", fontSize: 12.5, borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.text }}>{r.label}</span>
+                  <span style={{ fontWeight: 600 }}>{fmtINR(r.amount)}</span>
+                </div>
+              ))}
+            </div>
           )}
-        </PayslipSection>
 
-        {att.manualEntry && (
-          <p style={{ fontSize: 11, color: C.muted, marginTop: -4, marginBottom: 8 }}>Paid Days entered manually for this pay run.</p>
-        )}
-        {payroll.remarks && <p style={{ fontSize: 12, color: C.muted, marginTop: 6 }} className="break-words">Remarks: {payroll.remarks}</p>}
+          {att.manualEntry && (
+            <p style={{ fontSize: 11.5, color: C.muted, marginTop: 12, marginBottom: 0 }}>Paid Days entered manually for this pay run.</p>
+          )}
+          {payroll.remarks && (
+            <p className="break-words" style={{ fontSize: 12, color: C.muted, marginTop: 8, marginBottom: 0 }}>
+              <strong>Remarks:</strong> {payroll.remarks}
+            </p>
+          )}
+
+          <p style={{ fontSize: 10.5, color: C.muted, textAlign: "center", marginTop: 18, marginBottom: 0, paddingTop: 10, borderTop: `1px dashed ${C.border}` }}>
+            This is a system-generated payslip and does not require a signature.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -2187,6 +2447,24 @@ function exportPayrollCSV(payrolls, directory) {
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* Wide-table wrapper: sirf HORIZONTAL internal scroll.
+   Koi fixed height / vertical scrollbar nahi hai, isliye page par sirf ek hi
+   vertical scrollbar rehti hai (page ki apni). Horizontal scrollbar table ke
+   neeche, content ke andar rehti hai — browser-level nahi. */
+function ScrollTable({ children }) {
+  return (
+    <div
+      className="w-full max-w-full overflow-x-auto overscroll-x-contain"
+      style={{
+        border: `1px solid ${C.border}`,
+        borderRadius: 10,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 function RecordsTab({ notify, directory }) {
@@ -2420,7 +2698,7 @@ function RecordsTab({ notify, directory }) {
             </button>
           </div>
         )}
-        <div className="overflow-x-auto overscroll-x-contain -mx-1">
+        <ScrollTable>
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 1060 }}>
             <thead>
               <tr style={{ textAlign: "left", fontSize: 11.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 }}>
@@ -2491,7 +2769,7 @@ function RecordsTab({ notify, directory }) {
                         }}
                         style={{ marginRight: 8 }}
                       >
-                        Download
+                        Download PDF
                       </GhostButton>
                     )}
                     {p.status === "generated" && <GhostButton onClick={() => handleStatus(p._id, "approved")} style={{ marginRight: 8 }}>Approve</GhostButton>}
@@ -2508,7 +2786,7 @@ function RecordsTab({ notify, directory }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
         </>
       )}
 
@@ -2738,7 +3016,7 @@ function FnFSlipSection({ title, rows, total, totalLabel = "Total" }) {
   );
 }
 
-function downloadFnFSlip(fnf) {
+async function downloadFnFSlip(fnf) {
   const income = fnf.income || { basic: 0, hra: 0, allowances: [], total: 0 };
   const otherIncome = fnf.otherIncome || { items: [], total: 0 };
   const holding = fnf.holding || { salaryOnHold: 0, reimbursementOnHold: 0, assetRecovery: 0, total: 0 };
@@ -2784,7 +3062,7 @@ function downloadFnFSlip(fnf) {
 <title>${orgName ? orgName + " - " : ""}Full & Final Settlement - ${name}</title>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 640px; margin: 0 auto; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; padding: 32px; max-width: 700px; margin: 0 auto; background: #fff; }
   h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
   .org { font-size: 14px; font-weight: 700; color: #CD166E; margin: 0 0 2px; text-align: center; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
@@ -2798,7 +3076,6 @@ function downloadFnFSlip(fnf) {
   .net .lbl { font-size: 14px; font-weight: 700; }
   .net .val { font-size: 18px; font-weight: 800; }
   .remarks { font-size: 12.5px; color: #8a7a74; margin-top: 10px; }
-  @media print { body { padding: 0; } }
 </style>
 </head>
 <body>
@@ -2831,25 +3108,10 @@ function downloadFnFSlip(fnf) {
   </div>
 
   ${fnf.remarks ? `<p class="remarks">${fnf.remarks}</p>` : ""}
-
-  <script>window.onload = function() { window.print(); };</script>
 </body>
 </html>`;
 
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, "_blank");
-
-  if (!win) {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `FnF Statement - ${name}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  await htmlToPdfDownload(html, `FnF Statement - ${safeFileName(name)}.pdf`);
 }
 
 function FnFSlipModal({ fnf, onClose }) {
@@ -2895,7 +3157,7 @@ function FnFSlipModal({ fnf, onClose }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canDownload && (
-              <GhostButton onClick={() => downloadFnFSlip(fnf)}>Download</GhostButton>
+              <GhostButton onClick={() => downloadFnFSlip(fnf)}>Download PDF</GhostButton>
             )}
             <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: C.muted, flexShrink: 0 }}>×</button>
           </div>
@@ -3155,13 +3417,18 @@ export default function Payroll() {
 
   return (
     <div
-      className="w-full overflow-x-hidden p-3 sm:p-6 lg:p-8 box-border"
-      style={{ background: C.page }}
+      className="w-full min-w-0 max-w-full p-3 sm:p-6 lg:p-8 box-border"
+      // overflowX "clip" hides sideways overflow without making this div a scroll container.
+      // `contain: inline-size` stops wide children (tables) from stretching this
+      // div / the parent layout, which is what caused the browser-level horizontal scrollbar.
+      style={{ background: C.page, overflowX: "clip", contain: "inline-size" }}
     >
       <style>{`
         @keyframes payroll-spin { to { transform: rotate(360deg); } }
         @keyframes payroll-slideIn { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes payroll-fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .payroll-hide-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        .payroll-hide-scroll::-webkit-scrollbar { display: none; }
       `}</style>
 
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: "", type: "" })} />
@@ -3232,5 +3499,4 @@ export default function Payroll() {
       </div>
     </div>
   );
-
 }

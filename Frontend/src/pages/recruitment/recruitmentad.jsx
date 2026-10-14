@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
   useGetAllRequisitions,
@@ -295,7 +296,7 @@ const RequisitionProgressHeader = ({ requisition, candidates }) => {
 
   return (
     <div
-      className="mx-4 sm:mx-6 mt-5 mb-1 rounded-2xl p-4 sm:p-5 relative overflow-hidden"
+      className="mx-4 sm:mx-6 mt-5 mb-1 rounded-3xl p-4 sm:p-5 relative overflow-hidden isolate shadow-lg shadow-[#2e0019]/20"
       style={{ background: "linear-gradient(135deg, #1a000d 0%, #2e0019 50%, #4a0029 100%)" }}
     >
       <div className="absolute w-40 h-40 rounded-full -top-20 -right-10 bg-white/5 pointer-events-none" />
@@ -1000,6 +1001,13 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
   );
   const remaining = Math.max(0, requisition.openings - filledCount);
 
+  // Lock background scroll while the panel is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   const handleStageUpdate = async (candidateId, form) => {
     if (!canAddCandidate) return;
     await stageMut.mutateAsync({ id: candidateId, data: form });
@@ -1024,156 +1032,170 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
 
   const stages = ["ALL", ...Object.keys(STAGE_META)];
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl my-4">
+  const panel = (
+    <div className="fixed inset-0 z-[1000] bg-slate-900/55 backdrop-blur-sm flex items-center justify-center p-2 sm:p-6">
+      <div className="bg-white rounded-3xl w-full max-w-5xl h-[92vh] sm:h-[90vh] shadow-[0_30px_80px_-20px_rgba(46,0,25,0.55)] border border-white/60 flex flex-col overflow-hidden">
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10 rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <FaUserCheck size={13} className="text-emerald-600" />
+        {/* Fixed header */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-4 bg-white border-b border-gray-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+              <FaUserCheck size={15} className="text-emerald-600" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Hiring Pipeline</h2>
-              <p className="text-xs text-gray-400 mt-0.5">{requisition.job_title} · {DEPT_LABELS[requisition.department] || requisition.department}</p>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 leading-tight" style={{ fontFamily: "'Cormorant Garamond', serif" }}>Hiring Pipeline</h2>
+              <p className="text-xs text-gray-400 mt-0.5 truncate">{requisition.job_title} · {DEPT_LABELS[requisition.department] || requisition.department}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {canAddCandidate && remaining > 0 ? (
-              <button onClick={() => setShowAddCandidate(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all shadow-sm whitespace-nowrap">
+              <button onClick={() => setShowAddCandidate(true)} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-[#730042] to-[#a0125f] text-white text-xs font-semibold rounded-xl hover:shadow-lg hover:shadow-[#730042]/25 hover:-translate-y-px transition-all whitespace-nowrap">
                 <FaPlus size={9} /> Add Candidate
               </button>
             ) : remaining === 0 ? (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
                 <FaCheckCircle size={11} className="text-emerald-600" />
-                <span className="text-xs font-semibold text-emerald-700">All Positions Filled</span>
+                <span className="text-xs font-semibold text-emerald-700 whitespace-nowrap">All Positions Filled</span>
               </div>
             ) : null}
-            <button onClick={onClose} className="text-gray-400 hover:bg-gray-100 p-2.5 rounded-xl transition-colors"><FaTimes size={13} /></button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 p-2.5 rounded-xl transition-colors"><FaTimes size={13} /></button>
           </div>
         </div>
 
-        <RequisitionProgressHeader requisition={requisition} candidates={candidates} />
+        {/* Scrollable body */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-[#fdf5f9]">
+          <RequisitionProgressHeader requisition={requisition} candidates={candidates} />
 
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 bg-[#fdf5f9]">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: "Total", val: candidates.length, icon: <FaUsers size={12} />, color: "text-[#730042]", bg: "bg-[#f7edf3]" },
-              { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Selected / Offered", val: filledCount, icon: <FaCheckCircle size={12} />, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Rejected", val: candidates.filter((c) => DEAD_STAGES.includes(c.current_stage)).length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
-            ].map(({ label, val, icon, color, bg }) => (
-              <div key={label} className="bg-white rounded-xl p-3 border border-gray-100 flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-lg ${bg} ${color} flex items-center justify-center flex-shrink-0`}>{icon}</div>
-                <div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{label}</div>
-                  <div className="text-lg font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{val}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {pipeline.length > 0 && (
-            <div className="mt-4">
-              <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">Pipeline Breakdown</div>
-              <div className="flex flex-wrap gap-2">
-                {pipeline.map(({ stage, count }) => (
-                  <button
-                    key={stage}
-                    onClick={() => setStageFilter(stageFilter === stage ? "ALL" : stage)}
-                    className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full border transition-all ${stageFilter === stage ? "bg-[#730042] text-white border-[#730042]" : "bg-white text-gray-600 border-gray-200 hover:border-[#730042] hover:text-[#730042]"}`}
-                  >
-                    {STAGE_TIMELINE_META[stage]?.icon} {stage.replace(/_/g, " ")} <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${stageFilter === stage ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-4 sm:px-6 pt-4 pb-2 flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
-            <input
-              placeholder="Search candidates…"
-              className="w-full pl-9 pr-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            className="px-3 py-2.5 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-sm text-gray-700 outline-none focus:border-[#730042] transition-all"
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-          >
-            {stages.map((s) => (
-              <option key={s} value={s}>{s === "ALL" ? "All Stages" : s.replace(/_/g, " ")}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="p-4 sm:p-6 max-h-[50vh] overflow-y-auto space-y-2">
-          {!candidates.length ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-full bg-[#f7edf3] flex items-center justify-center mx-auto mb-4">
-                <FaUsers size={22} className="text-[#730042] opacity-50" />
-              </div>
-              <p className="text-sm font-semibold text-gray-500 mb-1">No candidates yet</p>
-              <p className="text-xs text-gray-400">Add your first candidate to get started with the pipeline.</p>
-              {canAddCandidate && (
-                <button onClick={() => setShowAddCandidate(true)} className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all mx-auto">
-                  <FaPlus size={9} /> Add First Candidate
-                </button>
-              )}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-sm">No candidates match your filter.</p>
-            </div>
-          ) : (
-            filtered.map((c) => {
-              const isFilled = FILLED_STAGES.includes(c.current_stage);
-              return (
-                <div
-                  key={c._id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border rounded-xl hover:shadow-sm transition-all group ${
-                    isFilled ? "border-emerald-100 bg-emerald-50/30" : "border-gray-100 hover:border-[#eedde8]"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                      {initials(c.full_name)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-800 group-hover:text-[#730042] transition-colors">{c.full_name}</span>
-                        {isFilled && <FaCheckCircle size={11} className="text-emerald-500" />}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{c.email} · {c.experience || "—"} exp</div>
-                      {c.skills?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {c.skills.slice(0, 3).map((s, i) => (
-                            <span key={i} className="text-[10px] font-medium bg-[#f7edf3] text-[#730042] px-2 py-0.5 rounded-full">{s}</span>
-                          ))}
-                          {c.skills.length > 3 && <span className="text-[10px] text-gray-400">+{c.skills.length - 3}</span>}
-                        </div>
-                      )}
-                    </div>
+          <div className="px-4 sm:px-6 pt-4 pb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: "Total", val: candidates.length, icon: <FaUsers size={12} />, color: "text-[#730042]", bg: "bg-[#f7edf3]" },
+                { label: "In Pipeline", val: candidates.filter((c) => !["REJECTED", "OFFER_REJECTED", "OFFER_EXPIRED", "JOINED", "SELECTED", "OFFER_RELEASED", "OFFER_ACCEPTED"].includes(c.current_stage)).length, icon: <FaChartLine size={12} />, color: "text-blue-600", bg: "bg-blue-50" },
+                { label: "Selected / Offered", val: filledCount, icon: <FaCheckCircle size={12} />, color: "text-emerald-600", bg: "bg-emerald-50" },
+                { label: "Rejected", val: candidates.filter((c) => DEAD_STAGES.includes(c.current_stage)).length, icon: <FaTimesCircle size={12} />, color: "text-red-500", bg: "bg-red-50" },
+              ].map(({ label, val, icon, color, bg }) => (
+                <div key={label} className="bg-white rounded-2xl p-3.5 border border-white shadow-sm flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl ${bg} ${color} flex items-center justify-center flex-shrink-0`}>{icon}</div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide truncate">{label}</div>
+                    <div className="text-xl font-bold text-gray-800 leading-tight" style={{ fontFamily: "'Cormorant Garamond', serif" }}>{val}</div>
                   </div>
-                  <div className="flex items-center gap-2 sm:ml-auto flex-wrap">
-                    <StageBadge stage={c.current_stage} />
-                    <span className="text-xs text-gray-400">{c.source}</span>
+                </div>
+              ))}
+            </div>
+
+            {pipeline.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase mb-2">Pipeline Breakdown</div>
+                <div className="flex flex-wrap gap-2">
+                  {pipeline.map(({ stage, count }) => (
                     <button
-                      onClick={() => setSelectedCandidateId(c._id)}
-                      className="text-xs font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors"
+                      key={stage}
+                      onClick={() => setStageFilter(stageFilter === stage ? "ALL" : stage)}
+                      className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1 rounded-full border transition-all ${stageFilter === stage ? "bg-[#730042] text-white border-[#730042] shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-[#730042] hover:text-[#730042]"}`}
                     >
-                      View
+                      {STAGE_TIMELINE_META[stage]?.icon} {stage.replace(/_/g, " ")} <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${stageFilter === stage ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>{count}</span>
                     </button>
-                  </div>
+                  ))}
                 </div>
-              );
-            })
-          )}
+              </div>
+            )}
+          </div>
+
+          {/* Sticky toolbar (sticks to the top of the scrolling body) */}
+          <div className="sticky top-0 z-20 px-4 sm:px-6 py-3 bg-[#fdf5f9]/90 backdrop-blur-md border-y border-[#f0e0ea] flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+              <input
+                placeholder="Search candidates…"
+                className="w-full pl-10 pr-3 py-2.5 bg-white border border-[#eedde8] rounded-xl text-sm text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              className="px-3 py-2.5 bg-white border border-[#eedde8] rounded-xl text-sm text-gray-700 outline-none focus:border-[#730042] transition-all sm:w-48"
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+            >
+              {stages.map((s) => (
+                <option key={s} value={s}>{s === "ALL" ? "All Stages" : s.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Candidates */}
+          <div className="px-4 sm:px-6 pt-4 pb-8 space-y-3">
+            {!candidates.length ? (
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-[#eedde8]">
+                <div className="w-16 h-16 rounded-full bg-[#f7edf3] flex items-center justify-center mx-auto mb-4">
+                  <FaUsers size={22} className="text-[#730042] opacity-50" />
+                </div>
+                <p className="text-sm font-semibold text-gray-500 mb-1">No candidates yet</p>
+                <p className="text-xs text-gray-400">Add your first candidate to get started with the pipeline.</p>
+                {canAddCandidate && (
+                  <button onClick={() => setShowAddCandidate(true)} className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-[#730042] text-white text-xs font-semibold rounded-xl hover:bg-[#4a0029] transition-all mx-auto">
+                    <FaPlus size={9} /> Add First Candidate
+                  </button>
+                )}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 bg-white rounded-2xl border border-dashed border-[#eedde8]">
+                <p className="text-sm">No candidates match your filter.</p>
+              </div>
+            ) : (
+              filtered.map((c) => {
+                const isFilled = FILLED_STAGES.includes(c.current_stage);
+                return (
+                  <div
+                    key={c._id}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white border rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-px transition-all group ${
+                      isFilled ? "border-emerald-200 bg-emerald-50/40" : "border-white hover:border-[#eedde8]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#730042] to-[#CD166E] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ring-4 ring-[#f7edf3]">
+                        {initials(c.full_name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-800 group-hover:text-[#730042] transition-colors truncate">{c.full_name}</span>
+                          {isFilled && <FaCheckCircle size={11} className="text-emerald-500 flex-shrink-0" />}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5 truncate">{c.email} · {c.experience || "—"} exp</div>
+                        {c.skills?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {c.skills.slice(0, 3).map((s, i) => (
+                              <span key={i} className="text-[10px] font-medium bg-[#f7edf3] text-[#730042] px-2 py-0.5 rounded-full">{s}</span>
+                            ))}
+                            {c.skills.length > 3 && <span className="text-[10px] text-gray-400">+{c.skills.length - 3}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 sm:ml-auto flex-wrap flex-shrink-0">
+                      <StageBadge stage={c.current_stage} />
+                      <span className="text-xs text-gray-400">{c.source}</span>
+                      <button
+                        onClick={() => setSelectedCandidateId(c._id)}
+                        className="text-xs font-semibold px-4 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:bg-[#730042] hover:text-white transition-all"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Fixed footer */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-white border-t border-gray-100">
+          <span className="text-[11px] font-medium text-gray-400">
+            Showing <strong className="text-gray-600">{filtered.length}</strong> of <strong className="text-gray-600">{candidates.length}</strong> candidates
+          </span>
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-gray-600 border border-gray-200 rounded-xl hover:border-[#730042] hover:text-[#730042] transition-colors">Close</button>
         </div>
       </div>
 
@@ -1192,6 +1214,9 @@ const OpenHiringPanel = ({ requisition, onClose, canAddCandidate }) => {
       )}
     </div>
   );
+
+  // Rendered at document.body so the page's scroll container / sidebar can never clip or overlap it
+  return createPortal(panel, document.body);
 };
 
 const RequisitionDetailModal = ({ requisition, onClose }) => {
@@ -1380,8 +1405,10 @@ const RecruitmentAdmin = () => {
   const [hiringModal, setHiringModal] = useState(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchParams, setSearchParams] = useSearchParams();
-  const mainTab = searchParams.get("tab") === "approvals" ? "approvals" : "requisitions";
-  const setMainTab = (t) => setSearchParams(t === "approvals" ? { tab: "approvals" } : {}, { replace: true });
+  const tabParam = searchParams.get("tab");
+  const mainTab = tabParam === "approvals" ? "approvals" : tabParam === "pending" ? "pending" : "requisitions";
+  const setMainTab = (t) =>
+    setSearchParams(t === "approvals" ? { tab: "approvals" } : t === "pending" ? { tab: "pending" } : {}, { replace: true });
   const { data: approvalCountData } = useApprovalPendingCount();
   const approvalCount = approvalCountData?.data?.count || 0;
 
@@ -1530,6 +1557,7 @@ const RecruitmentAdmin = () => {
         {[
           { key: "requisitions", label: "Requisitions", icon: <FaBriefcase size={11} /> },
           { key: "approvals", label: "Offer Approvals", icon: <FaFileSignature size={11} />, badge: approvalCount },
+          { key: "pending", label: "Pending Requests", icon: <FaExclamationTriangle size={11} />, badge: pendingRequisitions.length },
         ].map((t) => (
           <button
             key={t.key}
@@ -1544,6 +1572,52 @@ const RecruitmentAdmin = () => {
 
       {mainTab === "approvals" ? (
         <OfferApprovals />
+      ) : mainTab === "pending" ? (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <FaExclamationTriangle className="text-amber-500" size={13} />
+            <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>Pending Requests</h2>
+          </div>
+          {pendingRequisitions.length > 0 && (
+            <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+              {pendingRequisitions.length}
+            </span>
+          )}
+        </div>
+        <div className="p-4">
+          {pendingRequisitions.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <FaCheckCircle size={26} className="mx-auto mb-2 text-emerald-400" />
+              <p className="text-sm">No pending requisitions.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {pendingRequisitions.map((item) => (
+                <div key={item._id} className="border border-gray-100 rounded-xl p-4 hover:border-[#eedde8] hover:shadow-sm transition-all">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{DEPT_LABELS[item.department] || item.department}</div>
+                    </div>
+                    <PriorityPill priority={item.priority} />
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
+                    <FaUsers size={9} />
+                    <span>{item.openings} opening{item.openings !== 1 ? "s" : ""}</span>
+                    <span>·</span>
+                    <span>{fmtDate(item.createdAt)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setDetailModal(item)} className="flex-1 text-xs font-semibold py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors">Details</button>
+                    <button onClick={() => setManageModal(item)} className="flex-1 text-xs font-semibold py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all">Manage</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
       ) : (
       <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -1563,188 +1637,114 @@ const RecruitmentAdmin = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_250px] gap-4">
-
-        <div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <FaBriefcase className="text-[#730042]" size={14} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>All Requisitions</h2>
+      <div className="w-full">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <FaBriefcase className="text-[#730042]" size={14} />
+              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 16 }}>All Requisitions</h2>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                className="px-3 py-2 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-xs text-gray-700 outline-none focus:border-[#730042] transition-all"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="ALL">All Status</option>
+                {["PENDING", "APPROVED", "FILLED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"].map((s) => (
+                  <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+              <div className="relative">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={11} />
+                <input
+                  placeholder="Search job, dept…"
+                  className="pl-8 pr-3 py-2 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-xs text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all w-full sm:w-52"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <select
-                  className="px-3 py-2 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-xs text-gray-700 outline-none focus:border-[#730042] transition-all"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="ALL">All Status</option>
-                  {["PENDING", "APPROVED", "FILLED", "REJECTED", "ON_HOLD", "REVISION_REQUIRED"].map((s) => (
-                    <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+              <button
+                onClick={() => exportCSV(filtered)}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#e8f7f1] border border-[#b7e3d1] text-[#0d9e6e] text-xs font-semibold rounded-xl hover:bg-[#0d9e6e] hover:text-white hover:border-[#0d9e6e] transition-all whitespace-nowrap"
+              >
+                <FaFileExcel size={11} /> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto w-full">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="bg-[#fdf5f9]">
+                  {["Job Role", "Department", "Openings (Filled/Total)", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
+                    <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
                   ))}
-                </select>
-                <div className="relative">
-                  <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={11} />
-                  <input
-                    placeholder="Search job, dept…"
-                    className="pl-8 pr-3 py-2 bg-[#fdf5f9] border border-[#eedde8] rounded-xl text-xs text-gray-800 outline-none focus:border-[#730042] focus:ring-2 focus:ring-[#730042]/10 transition-all w-full sm:w-52"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <button
-                  onClick={() => exportCSV(filtered)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#e8f7f1] border border-[#b7e3d1] text-[#0d9e6e] text-xs font-semibold rounded-xl hover:bg-[#0d9e6e] hover:text-white hover:border-[#0d9e6e] transition-all whitespace-nowrap"
-                >
-                  <FaFileExcel size={11} /> Export CSV
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
-                <thead>
-                  <tr className="bg-[#fdf5f9]">
-                    {["Job Role", "Department", "Openings (Filled/Total)", "Priority", "Status", "Requested By", "Date", "Actions"].map((h) => (
-                      <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold tracking-widest text-gray-400 uppercase border-b border-gray-100">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">Loading requisitions…</td></tr>
-                  ) : filtered.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">No requisitions found.</td></tr>
-                  ) : (
-                    filtered.map((item) => (
-                      <tr key={item._id} className="border-b border-gray-50 hover:bg-[#fdf5f9] transition-colors">
-                        <td className="px-3 py-2.5">
-                          <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[11px] text-gray-400">{item.employment_type}</span>
-                            <span className="text-gray-200">·</span>
-                            <button
-                              onClick={() => setDetailModal(item)}
-                              className="text-[11px] font-semibold text-gray-400 hover:text-[#730042] transition-colors underline-offset-2 hover:underline"
-                            >
-                              Details
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex justify-center">
-                            <OpeningsBadge requisition={item} />
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5"><PriorityPill priority={item.priority} /></td>
-                        <td className="px-3 py-2.5"><StatusPill status={item.status} /></td>
-                        <td className="px-3 py-2.5">
-                          <div className="text-xs font-semibold text-gray-700">{item.requested_by?.f_name} {item.requested_by?.l_name}</div>
-                          <div className="text-[11px] text-gray-400">{item.requested_by?.designation}</div>
-                        </td>
-                        <td className="px-3 py-2.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
-                        <td className="px-3 py-2.5">
-                          {item.status === "PENDING" ? (
-                            <button
-                              onClick={() => setManageModal(item)}
-                              className="w-full text-[11px] font-semibold px-3 py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all whitespace-nowrap"
-                            >
-                              Manage
-                            </button>
-                          ) : canViewCandidates && (item.status === "APPROVED" || item.status === "FILLED") ? (
-                            <button
-                              onClick={() => setHiringModal(item)}
-                              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all whitespace-nowrap"
-                            >
-                              <FaUsers size={9} /> {item.status === "FILLED" ? "View Hiring" : "Manage Hiring"}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => setDetailModal(item)}
-                              className="w-full flex items-center justify-center gap-1 text-[11px] font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors whitespace-nowrap"
-                            >
-                              <FaChevronRight size={8} /> Details
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-5">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <FaExclamationTriangle className="text-amber-500" size={13} />
-                <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Pending Requests</h2>
-              </div>
-              {pendingRequisitions.length > 0 && (
-                <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
-                  {pendingRequisitions.length}
-                </span>
-              )}
-            </div>
-            <div className="p-3 max-h-[340px] overflow-y-auto space-y-2">
-              {pendingRequisitions.length === 0 ? (
-                <div className="text-center py-10 text-gray-400">
-                  <FaCheckCircle size={22} className="mx-auto mb-2 text-emerald-400" />
-                  <p className="text-xs">No pending requisitions.</p>
-                </div>
-              ) : (
-                pendingRequisitions.map((item) => (
-                  <div key={item._id} className="border border-gray-100 rounded-xl p-3 hover:border-[#eedde8] hover:shadow-sm transition-all">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">Loading requisitions…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={8} className="text-center py-12 text-gray-400 text-sm">No requisitions found.</td></tr>
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item._id} className="border-b border-gray-50 hover:bg-[#fdf5f9] transition-colors">
+                      <td className="px-3 py-2.5">
                         <div className="text-sm font-semibold text-gray-800">{item.job_title}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{DEPT_LABELS[item.department] || item.department}</div>
-                      </div>
-                      <PriorityPill priority={item.priority} />
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
-                      <FaUsers size={9} />
-                      <span>{item.openings} opening{item.openings !== 1 ? "s" : ""}</span>
-                      <span>·</span>
-                      <span>{fmtDate(item.createdAt)}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setDetailModal(item)} className="flex-1 text-xs font-semibold py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors">Details</button>
-                      <button onClick={() => setManageModal(item)} className="flex-1 text-xs font-semibold py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all">Manage</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-              <FaArrowRight className="text-[#730042]" size={12} />
-              <h2 className="font-bold text-gray-800" style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>Recruitment Flow</h2>
-            </div>
-            <div className="p-3 space-y-0">
-              {[
-                { step: "PENDING",           color: "bg-amber-400",  desc: "Submitted by manager, awaits admin review" },
-                { step: "APPROVED",          color: "bg-emerald-500", desc: "Approved — candidates can be added" },
-                { step: "FILLED",            color: "bg-teal-500",   desc: "All openings filled — auto-closes hiring" },
-                { step: "ON HOLD",           color: "bg-orange-400", desc: "Temporarily paused by admin" },
-                { step: "REVISION REQUIRED", color: "bg-blue-500",   desc: "Manager must revise and resubmit" },
-                { step: "REJECTED",          color: "bg-red-500",    desc: "Closed — requisition not accepted" },
-              ].map((s, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-b-0">
-                  <div className={`w-6 h-6 rounded-full ${s.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{i + 1}</div>
-                  <div>
-                    <div className="text-xs font-semibold text-gray-700">{s.step}</div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">{s.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-gray-400">{item.employment_type}</span>
+                          <span className="text-gray-200">·</span>
+                          <button
+                            onClick={() => setDetailModal(item)}
+                            className="text-[11px] font-semibold text-gray-400 hover:text-[#730042] transition-colors underline-offset-2 hover:underline"
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600">{DEPT_LABELS[item.department] || item.department}</td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex justify-center">
+                          <OpeningsBadge requisition={item} />
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5"><PriorityPill priority={item.priority} /></td>
+                      <td className="px-3 py-2.5"><StatusPill status={item.status} /></td>
+                      <td className="px-3 py-2.5">
+                        <div className="text-xs font-semibold text-gray-700">{item.requested_by?.f_name} {item.requested_by?.l_name}</div>
+                        <div className="text-[11px] text-gray-400">{item.requested_by?.designation}</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-400">{fmtDate(item.createdAt)}</td>
+                      <td className="px-3 py-2.5">
+                        {item.status === "PENDING" ? (
+                          <button
+                            onClick={() => setManageModal(item)}
+                            className="w-full text-[11px] font-semibold px-3 py-1.5 bg-[#730042] text-white rounded-lg hover:bg-[#4a0029] transition-all whitespace-nowrap"
+                          >
+                            Manage
+                          </button>
+                        ) : canViewCandidates && (item.status === "APPROVED" || item.status === "FILLED") ? (
+                          <button
+                            onClick={() => setHiringModal(item)}
+                            className="w-full flex items-center justify-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all whitespace-nowrap"
+                          >
+                            <FaUsers size={9} /> {item.status === "FILLED" ? "View Hiring" : "Manage Hiring"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setDetailModal(item)}
+                            className="w-full flex items-center justify-center gap-1 text-[11px] font-semibold px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-[#730042] hover:text-[#730042] transition-colors whitespace-nowrap"
+                          >
+                            <FaChevronRight size={8} /> Details
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

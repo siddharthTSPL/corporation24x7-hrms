@@ -3743,7 +3743,7 @@ function ManagerDashboard({ canManageTeams, isSuperAdmin }) {
             Field Operations
           </p>
           <h1 className="mt-0.5 text-base font-extrabold text-slate-900 sm:mt-1 sm:text-xl lg:text-2xl">
-            Live field map
+            Live Field Map
           </h1>
           <p className="mt-0.5 text-[10px] text-slate-500 sm:mt-1 sm:text-sm">
             {isRefreshing
