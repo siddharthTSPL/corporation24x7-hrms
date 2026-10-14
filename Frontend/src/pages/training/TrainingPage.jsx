@@ -832,7 +832,7 @@ export default function TrainingPage({ superAdminView = false }) {
               <img
                 src={organisation.logo}
                 alt=""
-                className="h-14 w-14 rounded-2xl border bg-white object-contain p-1.5 shadow-sm"
+                className="h-14 w-14 rounded-2xl border bg-white object-cover p-0 shadow-sm"
                 style={{ borderColor: BRAND.border }}
               />
             ) : (
