@@ -841,7 +841,7 @@ const findallemployeesfull = async (req, res, next) => {
       working_status: "working",
     })
       .select(EXCLUDE)
-      .populate("Under_manager", "f_name l_name work_email designation")
+      .populate("Under_manager", "f_name l_name work_email designation profile_image")
       .lean();
 
     return res.status(200).json({
@@ -990,20 +990,20 @@ const getallemployee = async (req, res, next) => {
     const [users, managers] = await Promise.all([
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id gender e_contact personal_contact"
+          "empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id gender e_contact personal_contact profile_image"
         )
         .populate({
           path: "Under_manager",
-          select: "empid uid f_name l_name work_email role",
+          select: "empid uid f_name l_name work_email role profile_image",
         })
         .lean(),
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id"
+          "empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id profile_image"
         )
         .populate({
           path: "reporting_manager",
-          select: "empid uid f_name l_name work_email role",
+          select: "empid uid f_name l_name work_email role profile_image",
         })
         .lean(),
     ]);
@@ -2554,7 +2554,7 @@ const getperticularemployee = async (req, res, next) => {
     Usermodel.findOne({ _id: id, organisation_id })
       .populate({
         path: "Under_manager",
-        select: "empid uid f_name l_name work_email role",
+        select: "empid uid f_name l_name work_email role profile_image",
       })
       .select(PROFILE_EXCLUDE)
       .lean(),
@@ -2616,7 +2616,7 @@ const getperticularemanager = async (req, res, next) => {
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(PROFILE_EXCLUDE)
-      .populate("reporting_manager", "empid uid f_name l_name work_email role")
+      .populate("reporting_manager", "empid uid f_name l_name work_email role profile_image")
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
@@ -5767,7 +5767,7 @@ const getInactiveUsers = async (req, res, next) => {
         working_status: { $in: inactiveStatuses },
       })
         .select(
-          "uid f_name l_name work_email role department designation working_status status"
+          "uid f_name l_name work_email role department designation working_status status profile_image"
         )
         .lean(),
       Usermodel.find({
@@ -5775,7 +5775,7 @@ const getInactiveUsers = async (req, res, next) => {
         working_status: { $in: inactiveStatuses },
       })
         .select(
-          "uid f_name l_name work_email role department designation working_status status"
+          "uid f_name l_name work_email role department designation working_status status profile_image"
         )
         .lean(),
     ]);
