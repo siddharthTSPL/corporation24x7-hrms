@@ -806,7 +806,7 @@ const findallmanagers = async (req, res, next) => {
         .lean(),
       Adminmodel.find({ organisation_id, working_status: "working" })
         .select(
-          "uid f_name l_name work_email designation department office_location role organisation_id"
+          "uid f_name l_name work_email designation department office_location role organisation_id profile_image"
         )
         .lean(),
     ]);
@@ -2561,7 +2561,7 @@ const getperticularemployee = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -2621,7 +2621,7 @@ const getperticularemanager = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -3832,10 +3832,10 @@ const getAllReviewsForAdmin = async (req, res, next) => {
   if (monthYear) filter.monthYear = monthYear;
 
   const reviews = await Review.find(filter)
-    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
     .populate({
       path: "reviewee",
-      select: "f_name l_name work_email role designation department",
+      select: "f_name l_name work_email role designation department profile_image",
     })
     .sort({ createdAt: -1 })
     .lean();
@@ -4037,10 +4037,10 @@ const getme = async (req, res, next) => {
       .lean(),
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .populate({
         path: "reviewee",
-        select: "f_name l_name work_email role designation department",
+        select: "f_name l_name work_email role designation department profile_image",
       })
       .lean(),
   ]);
@@ -4169,7 +4169,11 @@ const editadminprofile = async (req, res, next) => {
           statusCode: 400,
         })
       );
-    if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
+    if (
+      profile_image === "" ||
+      profile_image === admin.profile_image ||
+      profile_image.includes("api.dicebear.com")
+    ) {
       admin.profile_image = profile_image;
     } else {
       return next(

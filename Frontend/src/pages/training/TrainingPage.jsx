@@ -45,6 +45,21 @@ const CHIP = "rounded-full border px-2.5 py-1";
 const CHIP_STYLE = { borderColor: BRAND.border, background: "#FCFAFB" };
 
 const personKey = (person) => `${person.model}:${person.id}`;
+function ParticipantAvatar({ name, image }) {
+  const initials = String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+  return (
+    <span className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8B1A4A] text-[9px] font-bold text-white">
+      {initials}
+      {image && <img src={image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
+    </span>
+  );
+}
+
 const localDateTimeMin = () => {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -817,7 +832,7 @@ export default function TrainingPage({ superAdminView = false }) {
               <img
                 src={organisation.logo}
                 alt=""
-                className="h-14 w-14 rounded-2xl border bg-white object-contain p-1.5 shadow-sm"
+                className="h-14 w-14 rounded-2xl border bg-white object-cover p-0 shadow-sm"
                 style={{ borderColor: BRAND.border }}
               />
             ) : (
@@ -1321,14 +1336,14 @@ export default function TrainingPage({ superAdminView = false }) {
                         style={{ color: BRAND.muted }}
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          <UserRound size={14} style={{ color: BRAND.pink }} />
+                          <ParticipantAvatar name={training.participant_details?.trainee} image={training.participant_details?.trainee_image} />
                           <strong style={{ color: BRAND.text }}>
                             Trainee:
                           </strong>{" "}
                           {training.participant_details?.trainee || "Employee"}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                          <UsersRound size={14} style={{ color: BRAND.pink }} />
+                          <ParticipantAvatar name={training.participant_details?.trainer} image={training.participant_details?.trainer_image} />
                           <strong style={{ color: BRAND.text }}>
                             Trainer:
                           </strong>{" "}
