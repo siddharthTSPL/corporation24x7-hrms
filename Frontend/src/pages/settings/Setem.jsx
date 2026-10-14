@@ -5,6 +5,7 @@ import { uploadDocument } from "../../../src/auth/api/employeeapi/other/em.other
 import { useQueryClient } from "@tanstack/react-query";
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
 import { useGetMyAssetsEmployee } from "../../auth/server-state/employee/employeeasset/employeeasset.hook";
 
 const DEFAULT_COUNTRY_ISO = "IN";
@@ -1155,6 +1156,14 @@ function AvatarTab({ employee, onSuccess, onError }) {
 
   const removeAvatar = () => applyAvatar("");
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.setQueryData(["meUser"], old => old ? { ...old, employee: { ...old.employee, profile_image: url } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meUser"] });
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
       <div className="st-avatar-current" style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}`, flexWrap: "wrap" }}>
@@ -1174,7 +1183,7 @@ function AvatarTab({ employee, onSuccess, onError }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
@@ -1188,6 +1197,7 @@ function AvatarTab({ employee, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="user" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="st-avatar-grid">
         {AVATAR_STYLES.map((style) => {

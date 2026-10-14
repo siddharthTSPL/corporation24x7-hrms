@@ -683,12 +683,13 @@ function EmployeeDetailPanel({ person, type, onClose }) {
             className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border min-w-0"
             style={{ background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`, borderColor: `${accentColor}20` }}
           >
-            <div
-              className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shrink-0"
-              style={{ background: accentColor, boxShadow: `0 4px 16px ${accentColor}35` }}
-            >
-              {getInitials(person.f_name, person.l_name)}
-            </div>
+            <Avatar
+              initials={getInitials(person.f_name, person.l_name)}
+              image={person.profile_image}
+              sizeClass="w-14 h-14 sm:w-16 sm:h-16"
+              textClass="text-xl sm:text-2xl"
+              bg={accentColor}
+            />
             <div className="text-center min-w-0 w-full">
               <div className="text-base font-bold text-slate-900 break-words">{name}</div>
               <div className="text-xs text-gray-500 mt-0.5 break-all">{person.work_email || person.email}</div>
@@ -760,9 +761,17 @@ function ReviewsTab({ uid, role }) {
       {reviews.map((r) => (
         <div key={r._id} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
           <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
-            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
-              {r.reviewer?.f_name} {r.reviewer?.l_name}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <Avatar
+                initials={getInitials(r.reviewer?.f_name, r.reviewer?.l_name)}
+                image={r.reviewer?.profile_image}
+                sizeClass="w-7 h-7"
+                textClass="text-[9px]"
+              />
+              <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
+                {r.reviewer?.f_name} {r.reviewer?.l_name}
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/5</span>
               {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}

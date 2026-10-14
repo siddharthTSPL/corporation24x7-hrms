@@ -1461,8 +1461,8 @@ const getMyTeamReviews = async (req, res, next) => {
   if (monthYear) filter.monthYear = monthYear;
 
   const reviews = await Review.find(filter)
-    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
-    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department profile_image" })
     .sort({ createdAt: -1 })
     .lean();
 
@@ -1480,11 +1480,11 @@ const getme = async (req, res, next) => {
   const [leavebalance, reviews] = await Promise.all([
     LeaveBalance.find({ employee: manager._id, organisation_id }).lean(),
     Review.find({ reviewee: manager._id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       // Reviewee here is always this manager, but ReviewCard still reads
       // review.reviewee.f_name for the card title — without this the
       // frontend showed "Unknown" on every card in "My Review".
-      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+      .populate({ path: "reviewee", select: "f_name l_name work_email role designation department profile_image" })
       .lean(),
   ]);
 
@@ -1591,7 +1591,11 @@ const editprofilemanager = async (req, res, next) => {
     if (profile_image !== undefined) {
       if (typeof profile_image !== "string")
         return next(Object.assign(new Error("Profile image must be a string"), { statusCode: 400 }));
-      if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
+      if (
+        profile_image === "" ||
+        profile_image === manager.profile_image ||
+        profile_image.includes("api.dicebear.com")
+      ) {
         manager.profile_image = profile_image;
       } else
         return next(Object.assign(new Error("Invalid avatar format"), { statusCode: 400 }));

@@ -6,6 +6,7 @@ import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/man
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
 
 
 const DEFAULT_COUNTRY_ISO = "IN";
@@ -1161,6 +1162,14 @@ function AvatarTab({ manager, onSuccess, onError }) {
 
   const removeAvatar = () => applyAvatar("");
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, profile_image: url } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meManager"] });
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
       <div className="st-avatar-current" style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}`, flexWrap: "wrap" }}>
@@ -1180,7 +1189,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
@@ -1194,6 +1203,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="manager" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="st-avatar-grid">
         {AVATAR_STYLES.map((style) => {

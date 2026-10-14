@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useEffect } from "react";
 import React from "react";
 import talent from "../assets/Talent.png";
 import TechTorchLogo from "../../src/assets/TechTorchLogo.png"
@@ -169,6 +170,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
+  const profilePerson = role === "superadmin" ? auth?.data?.superAdmin
+    : role === "manager" ? auth?.data?.manager
+      : role === "employee" ? auth?.data?.employee
+        : auth?.data?.user || auth?.data?.admin || auth?.data;
+  const [logoutAvatarFailed, setLogoutAvatarFailed] = useState(false);
+  useEffect(() => setLogoutAvatarFailed(false), [profilePerson?.profile_image]);
   const isCoAdmin = role === "admin" && auth?.data?.user?.reporting_manager_model === "Admin";
 
   const can = usePermissionStore((state) => state.can);
@@ -514,7 +521,16 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
           <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#F4C0D1] bg-white shadow-2xl">
             <div className="px-6 pt-6 pb-4" style={{ background: "#FBEAF0" }}>
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
-                <FaSignOutAlt className="text-[#730042]" size={16} />
+                {profilePerson?.profile_image && !logoutAvatarFailed ? (
+                  <img
+                    src={profilePerson.profile_image}
+                    alt="Your profile"
+                    className="h-full w-full rounded-full object-cover"
+                    onError={() => setLogoutAvatarFailed(true)}
+                  />
+                ) : (
+                  <FaSignOutAlt className="text-[#730042]" size={16} />
+                )}
               </div>
               <h3 className="text-center text-[15px] font-semibold text-[#730042]">
                 {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}

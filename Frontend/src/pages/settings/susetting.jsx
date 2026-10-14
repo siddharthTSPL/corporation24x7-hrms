@@ -13,6 +13,7 @@ import {
   useGetStorageFiles,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
 import {
   ResponsiveContainer,
   PieChart,
@@ -1492,6 +1493,13 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
 
   const removeAvatar = () => applyAvatar("");
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard
       title="Profile avatar"
@@ -1523,7 +1531,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
             Current avatar
           </div>
           <div className="text-xs text-[#b0948a] mb-2.5">
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
@@ -1537,6 +1545,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="superadmin" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-3">
         {AVATAR_STYLES.map((style) => {

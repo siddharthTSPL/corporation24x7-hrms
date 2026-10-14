@@ -1690,7 +1690,7 @@ const getperticularemployee = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -1735,7 +1735,7 @@ const getperticularemanager = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -2162,8 +2162,8 @@ const getAllReviewsForSuperAdmin = async (req, res, next) => {
   if (monthYear) filter.monthYear = monthYear;
 
   const reviews = await Review.find(filter)
-    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
-    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department profile_image" })
     .sort({ createdAt: -1 })
     .lean();
 
@@ -2708,7 +2708,7 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   const documents = await Document.find({ organisation_id, fileType: "personal" })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2738,6 +2738,7 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            profile_image: doc.uploader.profile_image,
           }
         : null,
     })),
@@ -2751,7 +2752,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   const documents = await Document.find({ organisation_id, fileType: "expense" })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2781,6 +2782,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            profile_image: doc.uploader.profile_image,
             role: doc.uploader.role,
           }
         : null,
@@ -2799,7 +2801,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
     return next(Object.assign(new Error("Document ID is required"), { statusCode: 400 }));
 
   const document = await Document.findOne({ _id: id, organisation_id })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation");
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image");
     
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
@@ -2826,6 +2828,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
             email: document.uploader.work_email,
             department: document.uploader.department,
             designation: document.uploader.designation,
+            profile_image: document.uploader.profile_image,
             role: document.uploader.role,
           }
         : null,
@@ -3181,7 +3184,7 @@ const getperticularadmin = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id, revieweeRoleModel: "Admin" })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 

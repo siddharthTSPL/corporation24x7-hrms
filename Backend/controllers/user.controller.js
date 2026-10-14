@@ -884,10 +884,10 @@ const getme = async (req, res, next) => {
       revieweeRoleModel: "User",
       organisation_id,
     })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .populate({
         path: "reviewee",
-        select: "f_name l_name work_email role designation department",
+        select: "f_name l_name work_email role designation department profile_image",
       })
       .lean(),
   ]);
@@ -1038,7 +1038,11 @@ const editprofile = async (req, res, next) => {
           statusCode: 400,
         }),
       );
-    if (profile_image !== "" && !profile_image.includes("api.dicebear.com"))
+    if (
+      profile_image !== "" &&
+      profile_image !== employee.profile_image &&
+      !profile_image.includes("api.dicebear.com")
+    )
       return next(
         Object.assign(new Error("Invalid avatar format"), { statusCode: 400 }),
       );

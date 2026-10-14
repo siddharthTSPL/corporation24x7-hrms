@@ -22,7 +22,7 @@ const actorStamp = (req) => ({ actor_id: req.actor.id, actor_model: req.actor.re
 async function getPerson(ref, organisation_id) {
   const Model = PERSON_MODELS[ref?.model];
   if (!Model) return null;
-  return Model.findOne({ _id: ref.id, organisation_id, working_status: "working" }).select("f_name l_name work_email organisation_id").lean();
+  return Model.findOne({ _id: ref.id, organisation_id, working_status: "working" }).select("f_name l_name work_email organisation_id profile_image").lean();
 }
 
 async function notifyPeople(training, title, message) {
@@ -78,7 +78,12 @@ exports.list = async (req, res) => {
     const [trainee, trainer] = await Promise.all([
       getPerson(t.trainee, t.organisation_id), getPerson(t.trainer, t.organisation_id),
     ]);
-    return { ...t, participant_details: { trainee: trainee ? personLabel(trainee) : "Unavailable", trainer: trainer ? personLabel(trainer) : "Unavailable" } };
+    return { ...t, participant_details: {
+      trainee: trainee ? personLabel(trainee) : "Unavailable",
+      trainee_image: trainee?.profile_image || "",
+      trainer: trainer ? personLabel(trainer) : "Unavailable",
+      trainer_image: trainer?.profile_image || "",
+    } };
   }));
   const privateRecords = withParticipants.map((t) => ({ ...t, certificate: { ...t.certificate, url: "" } }));
   const organisation = await SuperAdmin.findById(orgId(req)).select("organisation_name profile_image company_address").lean();
