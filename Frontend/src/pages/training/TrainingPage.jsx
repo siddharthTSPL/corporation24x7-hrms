@@ -828,23 +828,14 @@ export default function TrainingPage({ superAdminView = false }) {
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            {organisation?.logo ? (
-              <img
-                src={organisation.logo}
-                alt=""
-                className="h-14 w-14 rounded-2xl border bg-white object-cover p-0 shadow-sm"
-                style={{ borderColor: BRAND.border }}
-              />
-            ) : (
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
-                }}
-              >
-                <GraduationCap size={26} />
-              </div>
-            )}
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
+              style={{
+                background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
+              }}
+            >
+              <GraduationCap size={26} />
+            </div>
             <div>
               <p
                 className="text-[11px] font-bold uppercase tracking-[0.18em]"
