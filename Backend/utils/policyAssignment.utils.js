@@ -68,7 +68,9 @@ const buildActorFromReq = (req) => {
     id: account._id,
     model,
     roleGroup,
-    organisation_id: account.organisation_id || account._id, // SuperAdmin is its own org
+    // SuperAdmin is its own org. Its `organisation_id` field can hold the
+    // human-readable "ORG-*" code (not an ObjectId), so always use `_id`.
+    organisation_id: model === "SuperAdmin" ? account._id : account.organisation_id || account._id,
     department: account.department || null,
     office_location: account.office_location || null,
     name: `${account.f_name || ""} ${account.l_name || ""}`.trim() || account.organisation_name || "",
@@ -171,6 +173,28 @@ const ensureAcknowledgementRecord = async (policy, actor) => {
  * and the access-gate check.
  */
 const getPolicyStatusListForActor = async (actor) => {
+  // A SuperAdmin oversees every published policy of the organisation (their
+  // own and the ones published by Admins), so "My Policies" lists all of them.
+  // Only the ones that are actually assigned to the SuperAdmin get an
+  // acknowledgement record; the rest are view-only (acknowledgement: null) and
+  // never block access.
+  if (actor.roleGroup === "super_admin") {
+    const all = await Policy.find({ organisation_id: actor.organisation_id, status: "published" })
+      .populate("currentVersion")
+      .sort({ publishedAt: -1 })
+      .lean();
+
+    const results = [];
+    for (const policy of all) {
+      if (!policy.currentVersion) continue;
+      const ack = resolveAssignmentMatch(policy, actor)
+        ? await ensureAcknowledgementRecord(policy, actor)
+        : null;
+      results.push({ policy, acknowledgement: ack });
+    }
+    return results;
+  }
+
   const policies = await getApplicablePublishedPolicies(actor.organisation_id, actor);
 
   const results = [];
