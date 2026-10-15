@@ -366,13 +366,38 @@ const listPolicies = async (req, res) => {
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
     const organisation_id = account.organisation_id || account._id;
 
-    const { status, category, search } = req.query;
+    const { status, category, search, createdBy } = req.query;
     const filter = { organisation_id };
     if (status) filter.status = status;
     if (category) filter.category = category;
     if (search) filter.title = { $regex: search, $options: "i" };
 
+    // Optional creator filter (used by the SuperAdmin page): "me" = policies
+    // created by the logged-in account, "admin" = created by any Admin of the
+    // org, "superadmin" = created by the SuperAdmin. Without it, every policy
+    // of the organisation is returned, no matter who created it.
+    if (createdBy === "me") {
+      filter.createdBy = account._id;
+    } else if (createdBy === "admin") {
+      filter.createdByModel = "Admin";
+    } else if (createdBy === "superadmin") {
+      filter.createdByModel = "SuperAdmin";
+    }
+
     const policies = await Policy.find(filter).populate("currentVersion").sort({ createdAt: -1 }).lean();
+
+    // Resolve "who created this" for the list (Admin vs SuperAdmin).
+    const adminIds = [...new Set(policies.filter((p) => p.createdByModel === "Admin").map((p) => String(p.createdBy)))];
+    const superIds = [...new Set(policies.filter((p) => p.createdByModel === "SuperAdmin").map((p) => String(p.createdBy)))];
+    const [creatorAdmins, creatorSupers] = await Promise.all([
+      adminIds.length ? AdminModel.find({ _id: { $in: adminIds } }).select("f_name l_name").lean() : [],
+      superIds.length ? SuperAdminModel.find({ _id: { $in: superIds } }).select("f_name l_name organisation_name").lean() : [],
+    ]);
+    const creatorName = {};
+    for (const a of creatorAdmins) creatorName[String(a._id)] = `${a.f_name || ""} ${a.l_name || ""}`.trim();
+    for (const a of creatorSupers) {
+      creatorName[String(a._id)] = `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.organisation_name || "Super Admin";
+    }
 
     // Lightweight ack-count summary per policy for the list view.
     const policyIds = policies.map((p) => p._id);
@@ -390,6 +415,8 @@ const listPolicies = async (req, res) => {
     const enriched = policies.map((p) => ({
       ...p,
       ackSummary: countMap[String(p._id)] || {},
+      createdByName: creatorName[String(p.createdBy)] || "",
+      createdByIsMe: String(p.createdBy) === String(account._id),
     }));
 
     return res.status(200).json({ success: true, policies: enriched });
