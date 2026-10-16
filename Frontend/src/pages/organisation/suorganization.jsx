@@ -112,6 +112,17 @@ const fmtDate = (iso) => {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
 
+// Date of birth for display. Formatted on the IST calendar (same clock the
+// birthday reminders use) so it shows the intended day whether it was saved as
+// UTC-midnight or IST-midnight. Returns null when there is no (valid) DOB so the
+// caller can leave the row out entirely instead of showing "—".
+const fmtDob = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+};
+
 const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const normalize   = (s = "") => s.toLowerCase().trim();
 const fullName    = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
@@ -595,7 +606,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
   const leaveBalance = detailData?.leaveBalance || null;
 
-  const fields = useMemo(() => {
+  const baseFields = useMemo(() => {
     if (isSA) {
       const activeLicense = person.licenses?.find(
         (l) => l.isActive && new Date(l.expiresAt) > new Date()
@@ -658,6 +669,25 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       ["DOJ",         fmtDate(detailData?.user?.date_of_joining ?? detailData?.user?.createdAt ?? person.date_of_joining ?? person.createdAt)],
     ];
   }, [person, detailData, isSA, isAdmin, isManager]);
+
+  // Date of birth: shown only if the person has filled it in. Admin/manager
+  // lists already carry it; employees get it from the particular-user call.
+  const dobIso = isSA
+    ? null
+    : isAdmin
+      ? detailData?.admin?.date_of_birth ?? person.date_of_birth
+      : isManager
+        ? detailData?.manager?.date_of_birth ?? person.date_of_birth
+        : detailData?.user?.date_of_birth ?? person.date_of_birth;
+  const dobLabel = fmtDob(dobIso);
+
+  const fields = useMemo(() => {
+    if (!dobLabel) return baseFields; // no DOB on file -> no DOB row at all
+    const row = ["Date of birth", dobLabel];
+    const at = baseFields.findIndex(([label]) => label === "Marital");
+    if (at === -1) return [...baseFields, row];
+    return [...baseFields.slice(0, at + 1), row, ...baseFields.slice(at + 1)];
+  }, [baseFields, dobLabel]);
 
   return (
     <>
