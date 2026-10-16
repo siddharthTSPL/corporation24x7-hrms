@@ -200,19 +200,35 @@ function OrgConnectorGroup({
       const parentX = pRect.left + pRect.width / 2 - cRect.left;
       const parentY = pRect.bottom - cRect.top;
 
-      const kids = Array.from(rowRef.current.children)
-        .map((el) => {
-          const card = el.querySelector(".su-card-hover") || el;
-          const r = card.getBoundingClientRect();
-          if (!r.width && !r.height) return null;
-          return {
-            x: r.left + r.width / 2 - cRect.left,
-            y: r.top - cRect.top,
-            left: r.left - cRect.left,
-            right: r.right - cRect.left,
-          };
-        })
-        .filter(Boolean);
+      const collectKids = () =>
+        Array.from(rowRef.current.children)
+          .map((el) => {
+            const card = el.querySelector(".su-card-hover") || el;
+            const r = card.getBoundingClientRect();
+            if (!r.width && !r.height) return null;
+            return {
+              x: r.left + r.width / 2 - cRect.left,
+              y: r.top - cRect.top,
+              left: r.left - cRect.left,
+              right: r.right - cRect.left,
+            };
+          })
+          .filter(Boolean);
+
+      let kids = collectKids();
+
+      // Cards at different levels have different widths, so a parent's center and its
+      // first child's center don't line up. Nudge the child row right so the first child
+      // sits exactly under the parent's center. The lines then meet both cards dead-center.
+      if (kids.length) {
+        const rowEl = rowRef.current;
+        const cur = parseFloat(rowEl.style.marginLeft) || 0;
+        const want = Math.max(0, cur + (parentX - kids[0].x));
+        if (Math.abs(want - cur) > 0.5) {
+          rowEl.style.marginLeft = `${want}px`;
+          kids = collectKids();
+        }
+      }
 
       if (!kids.length) {
         setLines(null);
