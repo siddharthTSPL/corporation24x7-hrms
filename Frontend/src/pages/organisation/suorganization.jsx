@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
-import {
-  useGetMeSuperAdmin,
-} from "../../auth/server-state/superadmin/auth/suauth.hook";
+import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import {
   useGetAllEmployees,
   useGetAllManagers,
@@ -85,17 +83,30 @@ const STYLES = `
     flex: 1 1 auto;
   }
 
-  .org-tree-root { display: flex; flex-direction: column; align-items: center; }
-  .org-branch { display: flex; flex-direction: column; align-items: center; position: relative; min-width: 0; }
+   /* Force the whole chart to start from the left */
+  .org-tree-root {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start !important;
+    width: max-content;
+    margin: 0 !important;
+  }
+  .org-tree-root .org-branch { align-items: flex-start !important; }
 `;
 
-const BRAND       = "#730042";
+const BRAND = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
-const REFRESH_MS  = 1000 * 60 * 2;
-const HTML_TO_IMAGE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+const REFRESH_MS = 1000 * 60 * 2;
+const HTML_TO_IMAGE_CDN =
+  "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
 const LINE_COLOR = "#c9d2e0";
 
-const NODE_COLOR = { sa: "#0f172a", admin: "#334155", manager: "#475569", employee: "#64748b" };
+const NODE_COLOR = {
+  sa: "#0f172a",
+  admin: "#334155",
+  manager: "#475569",
+  employee: "#64748b",
+};
 
 const DEPT_FULL_FORMS = {
   OPR: "Operations",
@@ -109,12 +120,17 @@ const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
 
 const fmtDate = (iso) => {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 };
 
-const getInitials = (f = "", l = "") => `${f[0] || ""}${l[0] || ""}`.toUpperCase();
-const normalize   = (s = "") => s.toLowerCase().trim();
-const fullName    = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
+const getInitials = (f = "", l = "") =>
+  `${f[0] || ""}${l[0] || ""}`.toUpperCase();
+const normalize = (s = "") => s.toLowerCase().trim();
+const fullName = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
 
 function idStr(v) {
   if (!v) return "";
@@ -156,38 +172,67 @@ function Skeleton({ w, h, r = 8 }) {
   );
 }
 
-function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", verticalSpace = 26 }) {
-  const items = (Array.isArray(children) ? children : [children]).filter(Boolean);
+function OrgConnectorGroup({
+  parentRef,
+  children,
+  gapClassName = "gap-4",
+  verticalSpace = 26,
+}) {
+  const items = (Array.isArray(children) ? children : [children]).filter(
+    Boolean,
+  );
   const containerRef = useRef(null);
   const rowRef = useRef(null);
   const [lines, setLines] = useState(null);
 
   useLayoutEffect(() => {
-    if (!containerRef.current || !rowRef.current || !parentRef.current) return undefined;
+    if (!containerRef.current || !rowRef.current || !parentRef.current)
+      return undefined;
 
     const measure = () => {
-      if (!containerRef.current || !rowRef.current || !parentRef.current) return;
+      if (!containerRef.current || !rowRef.current || !parentRef.current)
+        return;
       const cRect = containerRef.current.getBoundingClientRect();
-      const pRect = parentRef.current.getBoundingClientRect();
+
+      const parentCard =
+        parentRef.current.querySelector(".su-card-hover") || parentRef.current;
+      const pRect = parentCard.getBoundingClientRect();
       const parentX = pRect.left + pRect.width / 2 - cRect.left;
       const parentY = pRect.bottom - cRect.top;
 
       const kids = Array.from(rowRef.current.children)
         .map((el) => {
-          const r = el.getBoundingClientRect();
+          const card = el.querySelector(".su-card-hover") || el;
+          const r = card.getBoundingClientRect();
           if (!r.width && !r.height) return null;
-          return { x: r.left + r.width / 2 - cRect.left, y: r.top - cRect.top };
+          return {
+            x: r.left + r.width / 2 - cRect.left,
+            y: r.top - cRect.top,
+            left: r.left - cRect.left,
+            right: r.right - cRect.left,
+          };
         })
         .filter(Boolean);
 
-      if (!kids.length) { setLines(null); return; }
+      if (!kids.length) {
+        setLines(null);
+        return;
+      }
+
+      // One child whose card sits under the parent's center: draw one straight line.
+      const straight =
+        kids.length === 1 &&
+        parentX >= kids[0].left + 6 &&
+        parentX <= kids[0].right - 6;
 
       const minKidY = Math.min(...kids.map((k) => k.y));
       const busY = parentY + Math.max(12, (minKidY - parentY) / 2);
-      const minX = Math.min(...kids.map((k) => k.x));
-      const maxX = Math.max(...kids.map((k) => k.x));
+      const minX = Math.min(parentX, ...kids.map((k) => k.x));
+      const maxX = Math.max(parentX, ...kids.map((k) => k.x));
+      const needBus =
+        !straight && (kids.length > 1 || Math.abs(kids[0].x - parentX) > 1);
 
-      setLines({ parentX, parentY, busY, kids, minX, maxX });
+      setLines({ parentX, parentY, busY, kids, minX, maxX, needBus, straight });
     };
 
     measure();
@@ -195,6 +240,13 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", vertic
     ro.observe(containerRef.current);
     ro.observe(rowRef.current);
     ro.observe(parentRef.current);
+    Array.from(rowRef.current.children).forEach((el) => ro.observe(el));
+
+    // Re-measure when a card's entrance animation ends, so lines don't use mid-animation sizes.
+    const rowEl = rowRef.current;
+    const parentEl = parentRef.current;
+    rowEl.addEventListener("animationend", measure, true);
+    parentEl.addEventListener("animationend", measure, true);
 
     window.addEventListener("resize", measure);
     const t1 = setTimeout(measure, 120);
@@ -203,6 +255,8 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", vertic
 
     return () => {
       ro.disconnect();
+      rowEl.removeEventListener("animationend", measure, true);
+      parentEl.removeEventListener("animationend", measure, true);
       window.removeEventListener("resize", measure);
       clearTimeout(t1);
       clearTimeout(t2);
@@ -212,40 +266,81 @@ function OrgConnectorGroup({ parentRef, children, gapClassName = "gap-4", vertic
   if (items.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="relative w-full flex flex-col items-center">
+    <div
+      ref={containerRef}
+      className="relative w-full flex flex-col items-start"
+    >
       <div aria-hidden style={{ height: verticalSpace }} />
       {lines && (
         <svg
           className="absolute inset-0 pointer-events-none"
           style={{ overflow: "visible", width: "100%", height: "100%" }}
         >
-          <line x1={lines.parentX} y1={lines.parentY} x2={lines.parentX} y2={lines.busY} stroke={LINE_COLOR} strokeWidth="1.5" />
-          {lines.kids.length > 1 && (
-            <line x1={lines.minX} y1={lines.busY} x2={lines.maxX} y2={lines.busY} stroke={LINE_COLOR} strokeWidth="1.5" />
-          )}
-          {lines.kids.map((k, i) => (
+          {lines.straight ? (
             <line
-              key={i}
-              x1={k.x}
-              y1={lines.kids.length > 1 ? lines.busY : lines.parentY}
-              x2={k.x}
-              y2={k.y}
+              x1={lines.parentX}
+              y1={lines.parentY}
+              x2={lines.parentX}
+              y2={lines.kids[0].y}
               stroke={LINE_COLOR}
               strokeWidth="1.5"
             />
-          ))}
+          ) : (
+            <>
+              <line
+                x1={lines.parentX}
+                y1={lines.parentY}
+                x2={lines.parentX}
+                y2={lines.busY}
+                stroke={LINE_COLOR}
+                strokeWidth="1.5"
+              />
+              {lines.needBus && (
+                <line
+                  x1={lines.minX}
+                  y1={lines.busY}
+                  x2={lines.maxX}
+                  y2={lines.busY}
+                  stroke={LINE_COLOR}
+                  strokeWidth="1.5"
+                />
+              )}
+              {lines.kids.map((k, i) => (
+                <line
+                  key={i}
+                  x1={k.x}
+                  y1={lines.needBus ? lines.busY : lines.parentY}
+                  x2={k.x}
+                  y2={k.y}
+                  stroke={LINE_COLOR}
+                  strokeWidth="1.5"
+                />
+              ))}
+            </>
+          )}
         </svg>
       )}
-      <div ref={rowRef} className={`flex flex-row flex-nowrap items-start justify-center ${gapClassName}`}>
+      <div
+        ref={rowRef}
+        className={`su-conn-row flex flex-row flex-nowrap items-start justify-start ${gapClassName}`}
+      >
         {items.map((item, i) => (
-          <div key={item?.key ?? i} className="min-w-0">{item}</div>
+          <div key={item?.key ?? i} className="min-w-0">
+            {item}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass = "text-sm sm:text-base", bg = BRAND, image }) {
+function Avatar({
+  initials,
+  sizeClass = "w-11 h-11 sm:w-12 sm:h-12",
+  textClass = "text-sm sm:text-base",
+  bg = BRAND,
+  image,
+}) {
   const [errored, setErrored] = useState(false);
   if (image && !errored) {
     return (
@@ -261,7 +356,11 @@ function Avatar({ initials, sizeClass = "w-11 h-11 sm:w-12 sm:h-12", textClass =
   return (
     <div
       className={`flex items-center justify-center rounded-full font-bold text-white shrink-0 ${sizeClass} ${textClass}`}
-      style={{ background: bg, boxShadow: `0 2px 8px ${bg}40`, letterSpacing: "0.02em" }}
+      style={{
+        background: bg,
+        boxShadow: `0 2px 8px ${bg}40`,
+        letterSpacing: "0.02em",
+      }}
     >
       {initials}
     </div>
@@ -292,9 +391,24 @@ function YouPill() {
   return <span className="su-you-pill"></span>;
 }
 
-const SuperAdminNode = ({ nodeRef, name, role, initials, image, delay = 0, onClick, isYou }) => {
+const SuperAdminNode = ({
+  nodeRef,
+  name,
+  role,
+  initials,
+  image,
+  delay = 0,
+  onClick,
+  isYou,
+}) => {
   return (
-    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
+    <div
+      ref={nodeRef}
+      className="opacity-0 shrink-0"
+      style={{
+        animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`,
+      }}
+    >
       <div
         className="su-card-hover su-card-sa w-[164px] sm:w-[190px] md:w-[210px] lg:w-[225px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3 sm:p-4 md:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
         onClick={onClick}
@@ -308,17 +422,34 @@ const SuperAdminNode = ({ nodeRef, name, role, initials, image, delay = 0, onCli
           textClass="text-sm sm:text-base md:text-lg"
           bg={NODE_COLOR.sa}
         />
-        <p className="text-xs sm:text-sm md:text-base font-bold text-slate-900 mt-2.5 sm:mt-3 text-center break-words">{name}</p>
-        <p className="text-[10px] sm:text-[11px] md:text-xs text-gray-500 mt-1 text-center break-words">{role}</p>
+        <p className="text-xs sm:text-sm md:text-base font-bold text-slate-900 mt-2.5 sm:mt-3 text-center break-words">
+          {name}
+        </p>
+        <p className="text-[10px] sm:text-[11px] md:text-xs text-gray-500 mt-1 text-center break-words">
+          {role}
+        </p>
       </div>
     </div>
   );
 };
 
-const AdminNode = ({ nodeRef, admin, delay = 0, dimmed, highlighted, onClick }) => {
+const AdminNode = ({
+  nodeRef,
+  admin,
+  delay = 0,
+  dimmed,
+  highlighted,
+  onClick,
+}) => {
   const name = fullName(admin);
   return (
-    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards` }}>
+    <div
+      ref={nodeRef}
+      className="opacity-0 shrink-0"
+      style={{
+        animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`,
+      }}
+    >
       <div
         className={`su-card-hover w-[136px] sm:w-[158px] md:w-[174px] lg:w-[184px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-2.5 sm:p-3 md:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -331,19 +462,41 @@ const AdminNode = ({ nodeRef, admin, delay = 0, dimmed, highlighted, onClick }) 
           textClass="text-xs sm:text-[13px]"
           bg={NODE_COLOR.admin}
         />
-        <p className="text-[11px] sm:text-xs md:text-[13px] font-semibold text-slate-900 mt-2 sm:mt-2.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{name}</p>
-        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-1 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{getDepartmentName(admin.department)}</p>
-        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">{admin.designation || "—"}</p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{admin.empid || "—"}</p>
+        <p className="text-[11px] sm:text-xs md:text-[13px] font-semibold text-slate-900 mt-2 sm:mt-2.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
+          {name}
+        </p>
+        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-1 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
+          {getDepartmentName(admin.department)}
+        </p>
+        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
+          {admin.designation || "—"}
+        </p>
+        <p
+          className="text-[9px] sm:text-[9.5px] md:text-[10px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full"
+          style={{ fontFamily: "'JetBrains Mono',monospace" }}
+        >
+          {admin.empid || "—"}
+        </p>
       </div>
     </div>
   );
 };
 
-const ManagerNode = ({ nodeRef, manager, delay = 0, dimmed, highlighted, onClick }) => {
+const ManagerNode = ({
+  nodeRef,
+  manager,
+  delay = 0,
+  dimmed,
+  highlighted,
+  onClick,
+}) => {
   const name = fullName(manager);
   return (
-    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
+    <div
+      ref={nodeRef}
+      className="opacity-0 shrink-0"
+      style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}
+    >
       <div
         className={`su-card-hover w-[118px] sm:w-[138px] md:w-[152px] lg:w-[160px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-2 sm:p-2.5 md:p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -356,19 +509,41 @@ const ManagerNode = ({ nodeRef, manager, delay = 0, dimmed, highlighted, onClick
           textClass="text-[10px] sm:text-[11px] md:text-xs"
           bg={NODE_COLOR.manager}
         />
-        <p className="text-[10px] sm:text-[11px] md:text-xs font-semibold text-slate-800 mt-1.5 sm:mt-2 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{name}</p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.department ? getDepartmentName(manager.department) : "—"}</p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">{manager.designation || "—"}</p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{manager.empid || "—"}</p>
+        <p className="text-[10px] sm:text-[11px] md:text-xs font-semibold text-slate-800 mt-1.5 sm:mt-2 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
+          {name}
+        </p>
+        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
+          {manager.department ? getDepartmentName(manager.department) : "—"}
+        </p>
+        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
+          {manager.designation || "—"}
+        </p>
+        <p
+          className="text-[8.5px] sm:text-[9px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full"
+          style={{ fontFamily: "'JetBrains Mono',monospace" }}
+        >
+          {manager.empid || "—"}
+        </p>
       </div>
     </div>
   );
 };
 
-const EmployeeNode = ({ nodeRef, employee, delay = 0, dimmed, highlighted, onClick }) => {
+const EmployeeNode = ({
+  nodeRef,
+  employee,
+  delay = 0,
+  dimmed,
+  highlighted,
+  onClick,
+}) => {
   const name = fullName(employee);
   return (
-    <div ref={nodeRef} className="opacity-0 shrink-0" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}>
+    <div
+      ref={nodeRef}
+      className="opacity-0 shrink-0"
+      style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}
+    >
       <div
         className={`su-card-hover w-[100px] sm:w-[116px] md:w-[132px] lg:w-[140px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-1.5 sm:p-2 md:p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
         onClick={onClick}
@@ -380,10 +555,21 @@ const EmployeeNode = ({ nodeRef, employee, delay = 0, dimmed, highlighted, onCli
           textClass="text-[8px] sm:text-[9px]"
           bg={NODE_COLOR.employee}
         />
-        <p className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-slate-800 mt-1 sm:mt-1.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{name}</p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.department ? getDepartmentName(employee.department) : "—"}</p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">{employee.designation || "—"}</p>
-        <p className="text-[8px] sm:text-[8.5px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full" style={{ fontFamily: "'JetBrains Mono',monospace" }}>{employee.empid || "—"}</p>
+        <p className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-slate-800 mt-1 sm:mt-1.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
+          {name}
+        </p>
+        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
+          {employee.department ? getDepartmentName(employee.department) : "—"}
+        </p>
+        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
+          {employee.designation || "—"}
+        </p>
+        <p
+          className="text-[8px] sm:text-[8.5px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full"
+          style={{ fontFamily: "'JetBrains Mono',monospace" }}
+        >
+          {employee.empid || "—"}
+        </p>
       </div>
     </div>
   );
@@ -395,13 +581,13 @@ function SkeletonTree() {
       <Skeleton w={164} h={110} r={16} />
       <div className="w-1.5 h-6 sm:h-7 bg-gray-200 mx-auto" />
       <div className="flex gap-3 sm:gap-4 md:gap-5 justify-center w-full min-w-0">
-        {[1, 2, 3].map(i => (
+        {[1, 2, 3].map((i) => (
           <div key={i} className="flex flex-col items-center min-w-0">
             <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
             <Skeleton w={136} h={92} r={13} />
             <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
             <div className="flex gap-2 sm:gap-2.5 md:gap-3.5 justify-center w-full min-w-0">
-              {[1, 2].map(j => (
+              {[1, 2].map((j) => (
                 <div key={j} className="flex flex-col items-center min-w-0">
                   <div className="w-1.5 h-3 sm:h-4 bg-gray-200 mx-auto" />
                   <Skeleton w={100} h={70} r={10} />
@@ -418,17 +604,24 @@ function SkeletonTree() {
 const PRIMARY_ORDER = ["EL", "SL", "ML", "PL"];
 
 const LEAVE_META = {
-  EL:  { label: "Earned Leave",    color: "#730042" },
-  SL:  { label: "Sick Leave",      color: "#2563eb" },
-  ML:  { label: "Maternity Leave", color: "#78716c" },
-  PL:  { label: "Paternity Leave", color: "#16a34a" },
+  EL: { label: "Earned Leave", color: "#730042" },
+  SL: { label: "Sick Leave", color: "#2563eb" },
+  ML: { label: "Maternity Leave", color: "#78716c" },
+  PL: { label: "Paternity Leave", color: "#16a34a" },
   pbc: { label: "PBC (Paid Leave)" },
   lwp: { label: "LWP (Leave Without Pay)" },
 };
 
 const LEAVE_BALANCE_HIDDEN_KEYS = new Set([
-  "_id", "__v", "employee", "organisation_id", "createdAt", "updatedAt",
-  "mlStartDate", "mlEndDate", "lastAccrualDate",
+  "_id",
+  "__v",
+  "employee",
+  "organisation_id",
+  "createdAt",
+  "updatedAt",
+  "mlStartDate",
+  "mlEndDate",
+  "lastAccrualDate",
 ]);
 
 function humanizeKey(key) {
@@ -442,7 +635,11 @@ function humanizeKey(key) {
 
 function fmtLeaveDate(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function normalizeBucket(val) {
@@ -451,23 +648,35 @@ function normalizeBucket(val) {
       entitled: Number(val.entitled ?? 0),
       availed: Number(val.availed ?? 0),
       accrued: val.accrued != null ? Number(val.accrued) : null,
-      yearlyEntitled: val.yearlyEntitled != null ? Number(val.yearlyEntitled) : null,
+      yearlyEntitled:
+        val.yearlyEntitled != null ? Number(val.yearlyEntitled) : null,
     };
   }
-  return { entitled: Number(val ?? 0), availed: 0, accrued: null, yearlyEntitled: null };
+  return {
+    entitled: Number(val ?? 0),
+    availed: 0,
+    accrued: null,
+    yearlyEntitled: null,
+  };
 }
 
 function QuotaCard({ typeKey, rawValue }) {
-  const meta = LEAVE_META[typeKey] || { label: humanizeKey(typeKey), color: "#730042" };
+  const meta = LEAVE_META[typeKey] || {
+    label: humanizeKey(typeKey),
+    color: "#730042",
+  };
   const { entitled, availed, accrued } = normalizeBucket(rawValue);
   const remaining = entitled - availed;
-  const pct = entitled > 0 ? Math.min(100, Math.max(0, (availed / entitled) * 100)) : 0;
+  const pct =
+    entitled > 0 ? Math.min(100, Math.max(0, (availed / entitled) * 100)) : 0;
   const isEmpty = entitled === 0;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
       <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-sm font-semibold text-slate-900 truncate">{meta.label}</span>
+        <span className="text-sm font-semibold text-slate-900 truncate">
+          {meta.label}
+        </span>
         <span
           className="text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0"
           style={{
@@ -482,13 +691,20 @@ function QuotaCard({ typeKey, rawValue }) {
       <div className="w-full h-[5px] rounded-full bg-gray-100 overflow-hidden mb-3">
         <div
           className="h-full rounded-full"
-          style={{ width: `${pct}%`, background: isEmpty ? "#e5e7eb" : meta.color }}
+          style={{
+            width: `${pct}%`,
+            background: isEmpty ? "#e5e7eb" : meta.color,
+          }}
         />
       </div>
 
       <div className="flex items-center justify-between text-xs sm:text-[13px] text-gray-500">
-        <span>Entitled: <b className="text-slate-800 font-semibold">{entitled}</b></span>
-        <span>Availed: <b className="text-slate-800 font-semibold">{availed}</b></span>
+        <span>
+          Entitled: <b className="text-slate-800 font-semibold">{entitled}</b>
+        </span>
+        <span>
+          Availed: <b className="text-slate-800 font-semibold">{availed}</b>
+        </span>
       </div>
       {accrued != null && (
         <div className="text-xs sm:text-[13px] text-gray-500 mt-1.5">
@@ -501,10 +717,15 @@ function QuotaCard({ typeKey, rawValue }) {
 
 function CounterTile({ typeKey, rawValue }) {
   const meta = LEAVE_META[typeKey];
-  const value = rawValue && typeof rawValue === "object" ? (rawValue.entitled ?? 0) : rawValue;
+  const value =
+    rawValue && typeof rawValue === "object"
+      ? (rawValue.entitled ?? 0)
+      : rawValue;
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 sm:p-5 min-w-0">
-      <div className="text-xs text-gray-400 mb-2 truncate">{meta?.label || humanizeKey(typeKey)}</div>
+      <div className="text-xs text-gray-400 mb-2 truncate">
+        {meta?.label || humanizeKey(typeKey)}
+      </div>
       <div
         className="text-xl sm:text-2xl font-bold text-slate-900"
         style={{ fontFamily: "'JetBrains Mono',monospace" }}
@@ -516,32 +737,47 @@ function CounterTile({ typeKey, rawValue }) {
 }
 
 function LeaveBalanceTab({ leaveBalance, isLoading, showHeader = true }) {
-  if (isLoading) return (
-    <div className="flex justify-center pt-9">
-      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="flex justify-center pt-9">
+        <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
+      </div>
+    );
 
-  if (!leaveBalance) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance record found.</div>
-  );
+  if (!leaveBalance)
+    return (
+      <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">
+        No leave balance record found.
+      </div>
+    );
 
-  const allKeys = Object.keys(leaveBalance).filter((k) => !LEAVE_BALANCE_HIDDEN_KEYS.has(k));
+  const allKeys = Object.keys(leaveBalance).filter(
+    (k) => !LEAVE_BALANCE_HIDDEN_KEYS.has(k),
+  );
   const primaryKeys = PRIMARY_ORDER.filter((k) => allKeys.includes(k));
   const secondaryKeys = allKeys.filter(
-    (k) => !PRIMARY_ORDER.includes(k) && (typeof leaveBalance[k] !== "object" || leaveBalance[k] === null)
+    (k) =>
+      !PRIMARY_ORDER.includes(k) &&
+      (typeof leaveBalance[k] !== "object" || leaveBalance[k] === null),
   );
 
-  if (!primaryKeys.length && !secondaryKeys.length) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No leave balance fields to show.</div>
-  );
+  if (!primaryKeys.length && !secondaryKeys.length)
+    return (
+      <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">
+        No leave balance fields to show.
+      </div>
+    );
 
   return (
     <div className="bg-[#fafbfc] rounded-2xl border border-gray-100 p-4 sm:p-6 min-w-0">
       {showHeader && (
         <div className="mb-4 sm:mb-5">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900">Leave Balance</h3>
-          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Your current leave entitlements</p>
+          <h3 className="text-base sm:text-lg font-bold text-slate-900">
+            Leave Balance
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+            Your current leave entitlements
+          </p>
         </div>
       )}
 
@@ -572,14 +808,26 @@ function LeaveBalanceTab({ leaveBalance, isLoading, showHeader = true }) {
 
 function EmployeeDetailPanel({ person, type, onClose }) {
   const [tab, setTab] = useState("info");
-  const isManager  = type === "manager";
-  const isAdmin    = type === "admin";
-  const isSA       = type === "superadmin";
+  const isManager = type === "manager";
+  const isAdmin = type === "admin";
+  const isSA = type === "superadmin";
 
   const name = fullName(person);
 
-  const accentColor = isSA ? NODE_COLOR.sa : isAdmin ? NODE_COLOR.admin : isManager ? NODE_COLOR.manager : NODE_COLOR.employee;
-  const roleLabel   = isSA ? "Super Admin" : isAdmin ? "Admin" : isManager ? "Manager" : "Employee";
+  const accentColor = isSA
+    ? NODE_COLOR.sa
+    : isAdmin
+      ? NODE_COLOR.admin
+      : isManager
+        ? NODE_COLOR.manager
+        : NODE_COLOR.employee;
+  const roleLabel = isSA
+    ? "Super Admin"
+    : isAdmin
+      ? "Admin"
+      : isManager
+        ? "Manager"
+        : "Employee";
 
   const detailFetchFn = isAdmin
     ? useGetParticularAdmin
@@ -598,9 +846,11 @@ function EmployeeDetailPanel({ person, type, onClose }) {
   const fields = useMemo(() => {
     if (isSA) {
       const activeLicense = person.licenses?.find(
-        (l) => l.isActive && new Date(l.expiresAt) > new Date()
+        (l) => l.isActive && new Date(l.expiresAt) > new Date(),
       );
-      const isTrial = person.is_trial_active && new Date() < new Date(person.trial_expires_at);
+      const isTrial =
+        person.is_trial_active &&
+        new Date() < new Date(person.trial_expires_at);
 
       const currentPlanLabel = isTrial
         ? "Trial"
@@ -609,65 +859,89 @@ function EmployeeDetailPanel({ person, type, onClose }) {
       const currentPlanExpiry = isTrial
         ? fmtDate(person.trial_expires_at)
         : activeLicense
-        ? fmtDate(activeLicense.expiresAt)
-        : fmtDate(person.plan_expires_at);
+          ? fmtDate(activeLicense.expiresAt)
+          : fmtDate(person.plan_expires_at);
 
       return [
-        ["Email",        person.email],
+        ["Email", person.email],
         // ["Phone",        person.phone || "—"],
         ["Organisation", person.organisation_name],
-        ["Domain",       person.company_domain || "—"],
+        ["Domain", person.company_domain || "—"],
         // ["Address",      person.company_address || "—"],
         // ["Industry",     person.industry || "—"],
-        ["Plan",         currentPlanLabel],
+        ["Plan", currentPlanLabel],
         ["Plan expires", currentPlanExpiry],
-        ["Status",       person.status],
+        ["Status", person.status],
         // ["Last login",   fmtDate(person.last_login)],
         ["Member since", fmtDate(person.createdAt)],
       ];
     }
-    if (isAdmin) return [
-      ["Emp ID",      person.empid || "—"],
-      ["Email",       person.work_email],
-      ["Phone",       person.personal_contact || "—"],
-      ["Gender",      person.gender || "—"],
-      ["Marital",     person.marital_status || "—"],
-      ["Designation", person.designation || "—"],
-      ["Status",      person.status || "—"],
-    ];
-    if (isManager) return [
-      ["Emp ID",      person.empid || "—"],
-      ["Email",       person.work_email],
-      ["Phone",       person.personal_contact || "—"],
-      ["Gender",      person.gender || "—"],
-      ["Marital",     person.marital_status || "—"],
-      ["Department",  getDepartmentName(person.department)],
-      ["Designation", person.designation || "—"],
-      ["Location",    person.office_location || "—"],
-      ["DOJ",         fmtDate(detailData?.manager?.date_of_joining ?? detailData?.manager?.createdAt ?? person.date_of_joining ?? person.createdAt)],
-    ];
+    if (isAdmin)
+      return [
+        ["Emp ID", person.empid || "—"],
+        ["Email", person.work_email],
+        ["Phone", person.personal_contact || "—"],
+        ["Gender", person.gender || "—"],
+        ["Marital", person.marital_status || "—"],
+        ["Designation", person.designation || "—"],
+        ["Status", person.status || "—"],
+      ];
+    if (isManager)
+      return [
+        ["Emp ID", person.empid || "—"],
+        ["Email", person.work_email],
+        ["Phone", person.personal_contact || "—"],
+        ["Gender", person.gender || "—"],
+        ["Marital", person.marital_status || "—"],
+        ["Department", getDepartmentName(person.department)],
+        ["Designation", person.designation || "—"],
+        ["Location", person.office_location || "—"],
+        [
+          "DOJ",
+          fmtDate(
+            detailData?.manager?.date_of_joining ??
+              detailData?.manager?.createdAt ??
+              person.date_of_joining ??
+              person.createdAt,
+          ),
+        ],
+      ];
     return [
-      ["Emp ID",      person.empid || "—"],
-      ["Email",       person.work_email],
-      ["Phone",       person.personal_contact || "—"],
-      ["Gender",      person.gender || "—"],
-      ["Marital",     person.marital_status || "—"],
-      ["Department",  getDepartmentName(person.department)],
+      ["Emp ID", person.empid || "—"],
+      ["Email", person.work_email],
+      ["Phone", person.personal_contact || "—"],
+      ["Gender", person.gender || "—"],
+      ["Marital", person.marital_status || "—"],
+      ["Department", getDepartmentName(person.department)],
       ["Designation", person.designation || "—"],
-      ["Location",    person.office_location || "—"],
-      ["DOJ",         fmtDate(detailData?.user?.date_of_joining ?? detailData?.user?.createdAt ?? person.date_of_joining ?? person.createdAt)],
+      ["Location", person.office_location || "—"],
+      [
+        "DOJ",
+        fmtDate(
+          detailData?.user?.date_of_joining ??
+            detailData?.user?.createdAt ??
+            person.date_of_joining ??
+            person.createdAt,
+        ),
+      ],
     ];
   }, [person, detailData, isSA, isAdmin, isManager]);
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease_forwards]" onClick={onClose} />
+      <div
+        className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease_forwards]"
+        onClick={onClose}
+      />
       <div className="fixed top-0 right-0 bottom-0 w-full sm:max-w-md md:max-w-lg h-full bg-white shadow-2xl z-50 overflow-y-auto flex flex-col animate-[slideR_0.25s_cubic-bezier(0.22,1,0.36,1)_forwards]">
-
         <div className="sticky top-0 bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between z-10 min-w-0">
           <div className="min-w-0">
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">Profile details</h2>
-            <p className="text-xs text-gray-400 mt-0.5 truncate">{roleLabel} · {name}</p>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+              Profile details
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5 truncate">
+              {roleLabel} · {name}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -678,25 +952,40 @@ function EmployeeDetailPanel({ person, type, onClose }) {
         </div>
 
         <div className="p-4 sm:p-6 flex-1 min-w-0">
-
           <div
             className="rounded-xl p-4 sm:p-6 mb-5 flex flex-col items-center gap-2.5 border min-w-0"
-            style={{ background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`, borderColor: `${accentColor}20` }}
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}05)`,
+              borderColor: `${accentColor}20`,
+            }}
           >
             <div
               className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shrink-0"
-              style={{ background: accentColor, boxShadow: `0 4px 16px ${accentColor}35` }}
+              style={{
+                background: accentColor,
+                boxShadow: `0 4px 16px ${accentColor}35`,
+              }}
             >
               {getInitials(person.f_name, person.l_name)}
             </div>
             <div className="text-center min-w-0 w-full">
-              <div className="text-base font-bold text-slate-900 break-words">{name}</div>
-              <div className="text-xs text-gray-500 mt-0.5 break-all">{person.work_email || person.email}</div>
+              <div className="text-base font-bold text-slate-900 break-words">
+                {name}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5 break-all">
+                {person.work_email || person.email}
+              </div>
             </div>
             <div className="flex gap-1.5 flex-wrap justify-center mt-1">
-              <Badge color={accentColor} bg={`${accentColor}15`}>{roleLabel}</Badge>
+              <Badge color={accentColor} bg={`${accentColor}15`}>
+                {roleLabel}
+              </Badge>
               {(person.department || person.designation) && (
-                <Badge color="#374151" bg="#f3f4f6">{person.department ? getDepartmentName(person.department) : person.designation}</Badge>
+                <Badge color="#374151" bg="#f3f4f6">
+                  {person.department
+                    ? getDepartmentName(person.department)
+                    : person.designation}
+                </Badge>
               )}
             </div>
           </div>
@@ -709,7 +998,11 @@ function EmployeeDetailPanel({ person, type, onClose }) {
                   className={`px-4 py-2 rounded-lg border text-xs font-medium transition-all min-h-[40px] flex items-center shrink-0 ${tab === t ? "bg-[#730042] text-white border-[#730042] shadow-md" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
                   onClick={() => setTab(t)}
                 >
-                  {t === "info" ? "Information" : t === "leave" ? "Leave Balance" : "Reviews"}
+                  {t === "info"
+                    ? "Information"
+                    : t === "leave"
+                      ? "Leave Balance"
+                      : "Reviews"}
                 </button>
               ))}
             </div>
@@ -718,19 +1011,33 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           {(tab === "info" || isSA) && (
             <div className="bg-[#fafbfc] rounded-xl p-4 sm:px-5 border border-gray-100 flex flex-col min-w-0">
               {fields.map(([label, val]) => (
-                <div key={label} className="su-field-row py-2.5 border-b border-gray-100 last:border-b-0 text-xs sm:text-sm min-w-0">
+                <div
+                  key={label}
+                  className="su-field-row py-2.5 border-b border-gray-100 last:border-b-0 text-xs sm:text-sm min-w-0"
+                >
                   <span className="text-gray-500 shrink-0">{label}</span>
-                  <span className="su-field-val text-slate-900 font-medium text-right break-all min-w-0" style={{ maxWidth: "65%" }}>{val || "—"}</span>
+                  <span
+                    className="su-field-val text-slate-900 font-medium text-right break-all min-w-0"
+                    style={{ maxWidth: "65%" }}
+                  >
+                    {val || "—"}
+                  </span>
                 </div>
               ))}
             </div>
           )}
 
           {tab === "leave" && !isSA && (
-            <LeaveBalanceTab leaveBalance={leaveBalance} isLoading={detailLoading} showHeader={false} />
+            <LeaveBalanceTab
+              leaveBalance={leaveBalance}
+              isLoading={detailLoading}
+              showHeader={false}
+            />
           )}
 
-          {tab === "reviews" && !isSA && <ReviewsTab uid={person._id} role={type} />}
+          {tab === "reviews" && !isSA && (
+            <ReviewsTab uid={person._id} role={type} />
+          )}
         </div>
       </div>
     </>
@@ -739,43 +1046,69 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
 function ReviewsTab({ uid, role }) {
   const fetchFn =
-    role === "manager" ? useGetParticularManager :
-    role === "admin"   ? useGetParticularAdmin :
-    useGetParticularEmployee;
+    role === "manager"
+      ? useGetParticularManager
+      : role === "admin"
+        ? useGetParticularAdmin
+        : useGetParticularEmployee;
   const { data, isLoading } = fetchFn(uid);
   const reviews = data?.reviews || [];
 
-  if (isLoading) return (
-    <div className="flex justify-center pt-9">
-      <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="flex justify-center pt-9">
+        <div className="w-6 h-6 rounded-full border-2 border-[#730042]/30 border-t-[#730042] animate-spin" />
+      </div>
+    );
 
-  if (!reviews.length) return (
-    <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">No reviews yet.</div>
-  );
+  if (!reviews.length)
+    return (
+      <div className="text-xs sm:text-sm text-gray-400 text-center pt-9">
+        No reviews yet.
+      </div>
+    );
 
   return (
     <div className="flex flex-col gap-3 min-w-0">
       {reviews.map((r) => (
-        <div key={r._id} className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0">
+        <div
+          key={r._id}
+          className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0"
+        >
           <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
             <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
               {r.reviewer?.f_name} {r.reviewer?.l_name}
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs sm:text-sm font-bold text-slate-900">{r.overallScore!=null?r.overallScore.toFixed(1):"–"}/5</span>
-              {r.overallRating && <span className="text-[11px] text-gray-400">· {r.overallRating}</span>}
+              <span className="text-xs sm:text-sm font-bold text-slate-900">
+                {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/5
+              </span>
+              {r.overallRating && (
+                <span className="text-[11px] text-gray-400">
+                  · {r.overallRating}
+                </span>
+              )}
             </div>
           </div>
-          {(r.taskSubmission||r.behaviourEthics||r.attendance) && (
+          {(r.taskSubmission || r.behaviourEthics || r.attendance) && (
             <div className="flex flex-wrap gap-2 mb-1.5 text-[11px] text-gray-500">
-              {r.taskSubmission && <span>Task: {r.taskSubmission.percentage}% ({r.taskSubmission.rating})</span>}
-              {r.behaviourEthics && <span>Behaviour: {r.behaviourEthics.score}/5</span>}
-              {r.attendance && <span>Attendance: {r.attendance.percentage}%</span>}
+              {r.taskSubmission && (
+                <span>
+                  Task: {r.taskSubmission.percentage}% (
+                  {r.taskSubmission.rating})
+                </span>
+              )}
+              {r.behaviourEthics && (
+                <span>Behaviour: {r.behaviourEthics.score}/5</span>
+              )}
+              {r.attendance && (
+                <span>Attendance: {r.attendance.percentage}%</span>
+              )}
             </div>
           )}
-          <p className="text-xs sm:text-sm text-gray-600 m-0 leading-relaxed break-words">{r.comment}</p>
+          <p className="text-xs sm:text-sm text-gray-600 m-0 leading-relaxed break-words">
+            {r.comment}
+          </p>
           <div className="text-[11px] text-gray-400 mt-1.5">{r.monthYear}</div>
         </div>
       ))}
@@ -783,19 +1116,137 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
-function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, parentMatched, onNodeClick, delay = 0 }) {
+function useLimited(items, limit = 2, forceAll = false) {
+  const [expanded, setExpanded] = useState(false);
+  const showAll = expanded || forceAll;
+  const visible = showAll ? items : items.slice(0, limit);
+  return {
+    visible,
+    hiddenCount: items.length - visible.length,
+    canCollapse: expanded && !forceAll && items.length > limit,
+    toggle: () => setExpanded((v) => !v),
+  };
+}
+
+// The See more / See less button is positioned right next to the last visible card
+// of this row (not at the far end of the row's subtree), at that card's vertical center.
+function LimitedRow({ limit, children }) {
+  const wrapRef = useRef(null);
+  const [btn, setBtn] = useState(null);
+  const showBtn = limit.hiddenCount > 0 || limit.canCollapse;
+  const BTN_W = 120;
+  const GAP = 12;
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || !showBtn) {
+      setBtn(null);
+      return undefined;
+    }
+
+    const measure = () => {
+      const row = wrap.querySelector(".su-conn-row");
+      const lastCol = row?.lastElementChild;
+      const card = lastCol?.querySelector(".su-card-hover");
+      if (!card) return;
+      const w = wrap.getBoundingClientRect();
+      const c = card.getBoundingClientRect();
+      const next = {
+        left: Math.round(c.right - w.left + GAP),
+        top: Math.round(c.top - w.top + c.height / 2),
+      };
+      setBtn((prev) =>
+        prev && prev.left === next.left && prev.top === next.top ? prev : next,
+      );
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    const row = wrap.querySelector(".su-conn-row");
+    if (row) {
+      ro.observe(row);
+      Array.from(row.children).forEach((el) => ro.observe(el));
+    }
+    wrap.addEventListener("animationend", measure, true);
+    window.addEventListener("resize", measure);
+    const t1 = setTimeout(measure, 120);
+    const t2 = setTimeout(measure, 450);
+    document.fonts?.ready?.then(measure).catch(() => {});
+
+    return () => {
+      ro.disconnect();
+      wrap.removeEventListener("animationend", measure, true);
+      window.removeEventListener("resize", measure);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [showBtn, limit.visible.length]);
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative flex items-start justify-start"
+      style={btn && showBtn ? { minWidth: btn.left + BTN_W } : undefined}
+    >
+      <div className="shrink-0 [&>div]:w-auto">{children}</div>
+      {showBtn && btn && (
+        <button
+          type="button"
+          onClick={limit.toggle}
+          className="su-seemore absolute inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+          style={{
+            left: btn.left,
+            top: btn.top,
+            transform: "translateY(-50%)",
+            zIndex: 5,
+          }}
+        >
+          {limit.canCollapse ? "← See less" : `See ${limit.hiddenCount} more →`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ManagerBranch({
+  manager,
+  allManagers,
+  employees,
+  matchName,
+  hasQ,
+  parentMatched,
+  onNodeClick,
+  delay = 0,
+}) {
   const nodeRef = useRef(null);
-  const mgrMatch  = hasQ && matchName(manager.f_name, manager.l_name, manager.department, manager.designation);
+  const mgrMatch =
+    hasQ &&
+    matchName(
+      manager.f_name,
+      manager.l_name,
+      manager.department,
+      manager.designation,
+    );
   const mgrDimmed = hasQ && !mgrMatch && !parentMatched;
   const mgrId = idStr(manager._id);
 
-  const subManagers = allManagers.filter((m) => idStr(m.reporting_manager) === mgrId && m.reporting_manager_model === "Manager");
+  const subManagers = allManagers.filter(
+    (m) =>
+      idStr(m.reporting_manager) === mgrId &&
+      m.reporting_manager_model === "Manager",
+  );
   const mgrEmps = employees.filter((e) => idStr(e.Under_manager) === mgrId);
 
-  const hasChildren = subManagers.length > 0 || mgrEmps.length > 0;
+  // Sub-managers and employees share one row, so they share one limit.
+  const children = [
+    ...subManagers.map((item) => ({ type: "manager", item })),
+    ...mgrEmps.map((item) => ({ type: "employee", item })),
+  ];
+  const childLimit = useLimited(children, 2, hasQ);
 
   return (
-    <div className="org-branch">
+    <div className="org-branch px-2">
       <ManagerNode
         nodeRef={nodeRef}
         manager={manager}
@@ -805,25 +1256,37 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
         onClick={() => onNodeClick(manager, "manager")}
       />
 
-      {hasChildren && (
-        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-1.5 sm:gap-2 md:gap-2.5">
-          {[
-            ...subManagers.map((sub, i) => (
-              <ManagerBranch
-                key={sub._id}
-                manager={sub}
-                allManagers={allManagers}
-                employees={employees}
-                matchName={matchName}
-                hasQ={hasQ}
-                parentMatched={mgrMatch || parentMatched}
-                onNodeClick={onNodeClick}
-                delay={i * 50}
-              />
-            )),
-            ...mgrEmps.map((emp, i) => {
-              const empMatch  = hasQ && matchName(emp.f_name, emp.l_name, emp.department, emp.designation);
-              const empDimmed = hasQ && !empMatch && !mgrMatch && !parentMatched;
+      {children.length > 0 && (
+        <LimitedRow limit={childLimit}>
+          <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4">
+            {childLimit.visible.map((child, i) => {
+              if (child.type === "manager") {
+                const sub = child.item;
+                return (
+                  <ManagerBranch
+                    key={sub._id}
+                    manager={sub}
+                    allManagers={allManagers}
+                    employees={employees}
+                    matchName={matchName}
+                    hasQ={hasQ}
+                    parentMatched={mgrMatch || parentMatched}
+                    onNodeClick={onNodeClick}
+                    delay={i * 50}
+                  />
+                );
+              }
+              const emp = child.item;
+              const empMatch =
+                hasQ &&
+                matchName(
+                  emp.f_name,
+                  emp.l_name,
+                  emp.department,
+                  emp.designation,
+                );
+              const empDimmed =
+                hasQ && !empMatch && !mgrMatch && !parentMatched;
               return (
                 <EmployeeBranch
                   key={emp._id}
@@ -834,9 +1297,9 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
                   onClick={() => onNodeClick(emp, "employee")}
                 />
               );
-            }),
-          ]}
-        </OrgConnectorGroup>
+            })}
+          </OrgConnectorGroup>
+        </LimitedRow>
       )}
     </div>
   );
@@ -845,33 +1308,68 @@ function ManagerBranch({ manager, allManagers, employees, matchName, hasQ, paren
 function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
   const nodeRef = useRef(null);
   return (
-    <div className="org-branch">
-      <EmployeeNode nodeRef={nodeRef} employee={employee} delay={delay} highlighted={highlighted} dimmed={dimmed} onClick={onClick} />
+    <div className="org-branch px-2">
+      <EmployeeNode
+        nodeRef={nodeRef}
+        employee={employee}
+        delay={delay}
+        highlighted={highlighted}
+        dimmed={dimmed}
+        onClick={onClick}
+      />
     </div>
   );
 }
 
-function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, onNodeClick, delay = 0 }) {
+function AdminBranch({
+  admin,
+  allAdmins,
+  managers,
+  employees,
+  matchName,
+  hasQ,
+  onNodeClick,
+  delay = 0,
+}) {
   const nodeRef = useRef(null);
-  const admMatch  = hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
+  const admMatch =
+    hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
   const admDimmed = hasQ && !admMatch;
-  const adminId   = idStr(admin._id);
+  const adminId = idStr(admin._id);
 
   const coAdmins = allAdmins.filter(
-    (a) => idStr(a.reporting_manager) === adminId && a.reporting_manager_model === "Admin"
+    (a) =>
+      idStr(a.reporting_manager) === adminId &&
+      a.reporting_manager_model === "Admin",
   );
-  const coAdminParent = admin.reporting_manager_model === "Admin"
-    ? allAdmins.find((a) => idStr(a._id) === idStr(admin.reporting_manager))
-    : null;
+  const coAdminParent =
+    admin.reporting_manager_model === "Admin"
+      ? allAdmins.find((a) => idStr(a._id) === idStr(admin.reporting_manager))
+      : null;
   const parentCoAdmins = coAdminParent
-    ? allAdmins.filter((a) => idStr(a.reporting_manager) === idStr(coAdminParent._id) && a.reporting_manager_model === "Admin")
+    ? allAdmins.filter(
+        (a) =>
+          idStr(a.reporting_manager) === idStr(coAdminParent._id) &&
+          a.reporting_manager_model === "Admin",
+      )
     : [];
-  const isOnlyCoAdminForParent = parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === adminId;
-  const managerAdminId = isOnlyCoAdminForParent ? idStr(coAdminParent._id) : adminId;
+  const isOnlyCoAdminForParent =
+    parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === adminId;
+  const managerAdminId = isOnlyCoAdminForParent
+    ? idStr(coAdminParent._id)
+    : adminId;
   const admManagers = managers.filter(
-    (m) => idStr(m.reporting_manager) === managerAdminId && m.reporting_manager_model === "Admin"
+    (m) =>
+      idStr(m.reporting_manager) === managerAdminId &&
+      m.reporting_manager_model === "Admin",
   );
   const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
+
+  // Managers directly under an admin: show 2, then "See N more →"
+  const managerLimit = useLimited(admManagers, 2, hasQ);
+
+  // Co-admins directly under an admin: show 2, then "See N more →"
+  const coAdminLimit = useLimited(coAdmins, 2, hasQ);
 
   return (
     <div className="org-branch">
@@ -885,70 +1383,100 @@ function AdminBranch({ admin, allAdmins, managers, employees, matchName, hasQ, o
       />
 
       {coAdmins.length > 0 && (
-        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4 md:gap-5" verticalSpace={44}>
-          {coAdmins.map((coAdmin, index) => (
-            <AdminBranch
-              key={coAdmin._id}
-              admin={coAdmin}
-              allAdmins={allAdmins}
-              managers={managers}
-              employees={employees}
-              matchName={matchName}
-              hasQ={hasQ}
-              onNodeClick={onNodeClick}
-              delay={delay + 340 + index * 60}
-            />
-          ))}
-        </OrgConnectorGroup>
+        <LimitedRow limit={coAdminLimit}>
+          <OrgConnectorGroup
+            parentRef={nodeRef}
+            gapClassName="gap-3 sm:gap-4 md:gap-5"
+            verticalSpace={44}
+          >
+            {coAdminLimit.visible.map((coAdmin, index) => (
+              <AdminBranch
+                key={coAdmin._id}
+                admin={coAdmin}
+                allAdmins={allAdmins}
+                managers={managers}
+                employees={employees}
+                matchName={matchName}
+                hasQ={hasQ}
+                onNodeClick={onNodeClick}
+                delay={delay + 340 + index * 60}
+              />
+            ))}
+          </OrgConnectorGroup>
+        </LimitedRow>
       )}
 
       {showManagersHere && admManagers.length > 0 && (
-        <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-2 sm:gap-3 md:gap-3.5">
-          {admManagers.map((mgr, mi) => (
-            <ManagerBranch
-              key={mgr._id}
-              manager={mgr}
-              allManagers={managers}
-              employees={employees}
-              matchName={matchName}
-              hasQ={hasQ}
-              parentMatched={admMatch}
-              onNodeClick={onNodeClick}
-              delay={mi * 55}
-            />
-          ))}
-        </OrgConnectorGroup>
+        <LimitedRow limit={managerLimit}>
+          <OrgConnectorGroup
+            parentRef={nodeRef}
+            gapClassName="gap-2 sm:gap-3 md:gap-3.5"
+          >
+            {managerLimit.visible.map((mgr, mi) => (
+              <ManagerBranch
+                key={mgr._id}
+                manager={mgr}
+                allManagers={managers}
+                employees={employees}
+                matchName={matchName}
+                hasQ={hasQ}
+                parentMatched={admMatch}
+                onNodeClick={onNodeClick}
+                delay={mi * 55}
+              />
+            ))}
+          </OrgConnectorGroup>
+        </LimitedRow>
       )}
 
       {admManagers.length === 0 && coAdmins.length === 0 && (
-        <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">No managers under this admin</p>
+        <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">
+          No managers under this admin
+        </p>
       )}
     </div>
   );
 }
 
-function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery, onNodeClick }) {
+function OrgTree({
+  superAdmin,
+  admins,
+  managers,
+  employees,
+  loading,
+  searchQuery,
+  onNodeClick,
+}) {
   const saRef = useRef(null);
+
+  const q = normalize(searchQuery);
+  const hasQ = q.length > 0;
+
+  const rootAdmins = admins.filter(
+    (admin) =>
+      admin.reporting_manager_model !== "Admin" ||
+      !admins.some(
+        (parent) => idStr(parent._id) === idStr(admin.reporting_manager),
+      ),
+  );
+
+  // Admins directly under the Super Admin: show 2, then "See N more →".
+  // Must be called before the early return below (hook rules).
+  const adminLimit = useLimited(rootAdmins, 2, hasQ);
 
   if (loading) return <SkeletonTree />;
 
-  const q    = normalize(searchQuery);
-  const hasQ = q.length > 0;
-
   const matchName = (f = "", l = "", dept = "", desig = "") => {
     if (!hasQ) return false;
-    return normalize(`${f} ${l}`).includes(q) ||
-           normalize(dept).includes(q) ||
-           normalize(desig).includes(q);
+    return (
+      normalize(`${f} ${l}`).includes(q) ||
+      normalize(dept).includes(q) ||
+      normalize(desig).includes(q)
+    );
   };
 
-  const rootAdmins = admins.filter((admin) =>
-    admin.reporting_manager_model !== "Admin" ||
-    !admins.some((parent) => idStr(parent._id) === idStr(admin.reporting_manager))
-  );
-
   return (
-    <div className="org-tree-root w-max min-w-full mx-auto">
+    <div className="org-tree-root">
       <SuperAdminNode
         nodeRef={saRef}
         name={fullName(superAdmin) || "Super Admin"}
@@ -961,21 +1489,26 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
       />
 
       {rootAdmins.length > 0 ? (
-        <OrgConnectorGroup parentRef={saRef} gapClassName="gap-3 sm:gap-4 md:gap-5">
-          {rootAdmins.map((admin, ai) => (
-            <AdminBranch
-              key={admin._id}
-              admin={admin}
-              allAdmins={admins}
-              managers={managers}
-              employees={employees}
-              matchName={matchName}
-              hasQ={hasQ}
-              onNodeClick={onNodeClick}
-              delay={340 + ai * 60}
-            />
-          ))}
-        </OrgConnectorGroup>
+        <LimitedRow limit={adminLimit}>
+          <OrgConnectorGroup
+            parentRef={saRef}
+            gapClassName="gap-3 sm:gap-4 md:gap-5"
+          >
+            {adminLimit.visible.map((admin, ai) => (
+              <AdminBranch
+                key={admin._id}
+                admin={admin}
+                allAdmins={admins}
+                managers={managers}
+                employees={employees}
+                matchName={matchName}
+                hasQ={hasQ}
+                onNodeClick={onNodeClick}
+                delay={340 + ai * 60}
+              />
+            ))}
+          </OrgConnectorGroup>
+        </LimitedRow>
       ) : (
         !loading && (
           <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
@@ -984,36 +1517,49 @@ function OrgTree({ superAdmin, admins, managers, employees, loading, searchQuery
         )
       )}
 
-      <OrphanNotice admins={admins} managers={managers} employees={employees} onNodeClick={onNodeClick} />
+      <OrphanNotice
+        admins={admins}
+        managers={managers}
+        employees={employees}
+        onNodeClick={onNodeClick}
+      />
     </div>
   );
 }
 
 function OrphanNotice({ admins, managers, employees, onNodeClick }) {
-  const adminIdSet   = new Set(admins.map((a) => idStr(a._id)));
+  const adminIdSet = new Set(admins.map((a) => idStr(a._id)));
   const managerIdSet = new Set(managers.map((m) => idStr(m._id)));
 
   const orphanManagers = managers.filter((m) => {
-    if (m.reporting_manager_model === "Admin")   return !adminIdSet.has(idStr(m.reporting_manager));
-    if (m.reporting_manager_model === "Manager") return !managerIdSet.has(idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Admin")
+      return !adminIdSet.has(idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Manager")
+      return !managerIdSet.has(idStr(m.reporting_manager));
     return true;
   });
 
-  const orphanEmployees = employees.filter((e) => !managerIdSet.has(idStr(e.Under_manager)));
+  const orphanEmployees = employees.filter(
+    (e) => !managerIdSet.has(idStr(e.Under_manager)),
+  );
 
   const total = orphanManagers.length + orphanEmployees.length;
   if (total === 0) return null;
 
   return (
-    <div className="mt-9 w-full max-w-xl mx-auto px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
+    <div className="mt-9 w-full max-w-xl px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
       <p className="text-xs sm:text-sm font-semibold text-amber-800">
-        {total} unassigned {total === 1 ? "record" : "records"} not shown in the chart above
+        {total} unassigned {total === 1 ? "record" : "records"} not shown in the
+        chart above
       </p>
       <p className="text-[11px] sm:text-xs text-amber-700 mt-1">
-        {orphanManagers.length > 0 && `${orphanManagers.length} manager${orphanManagers.length !== 1 ? "s" : ""}`}
+        {orphanManagers.length > 0 &&
+          `${orphanManagers.length} manager${orphanManagers.length !== 1 ? "s" : ""}`}
         {orphanManagers.length > 0 && orphanEmployees.length > 0 && " and "}
-        {orphanEmployees.length > 0 && `${orphanEmployees.length} employee${orphanEmployees.length !== 1 ? "s" : ""}`}
-        {" "}reference a manager/admin that no longer exists or was never set. Click a name to open and reassign.
+        {orphanEmployees.length > 0 &&
+          `${orphanEmployees.length} employee${orphanEmployees.length !== 1 ? "s" : ""}`}{" "}
+        reference a manager/admin that no longer exists or was never set. Click
+        a name to open and reassign.
       </p>
       <div className="flex flex-wrap gap-1.5 mt-2.5">
         {orphanManagers.map((m) => (
@@ -1040,19 +1586,25 @@ function OrphanNotice({ admins, managers, employees, onNodeClick }) {
 }
 
 export default function SuperAdminOrgChart() {
-  const refetchOpts = { staleTime: 1000 * 60 * 5, refetchInterval: REFRESH_MS, refetchOnWindowFocus: false };
+  const refetchOpts = {
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: REFRESH_MS,
+    refetchOnWindowFocus: false,
+  };
 
-  const { data: saData,  isLoading: loadingSA  } = useGetMeSuperAdmin();
+  const { data: saData, isLoading: loadingSA } = useGetMeSuperAdmin();
   const { data: admData, isLoading: loadingAdm } = useGetAllAdmins(refetchOpts);
-  const { data: mgrData, isLoading: loadingMgr } = useGetAllManagers(refetchOpts);
-  const { data: empData, isLoading: loadingEmp } = useGetAllEmployees(refetchOpts);
-  const { data: orgData }                         = useGetOrgInfo();
+  const { data: mgrData, isLoading: loadingMgr } =
+    useGetAllManagers(refetchOpts);
+  const { data: empData, isLoading: loadingEmp } =
+    useGetAllEmployees(refetchOpts);
+  const { data: orgData } = useGetOrgInfo();
 
-  const [searchOpen,  setSearchOpen]  = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selected,    setSelected]    = useState(null);
-  const [exporting,   setExporting]   = useState(false);
-  const [exportDone,  setExportDone]  = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
   const inputRef = useRef(null);
 
   // treeRef = the horizontally scrolling viewport, exportRef = the full-width chart content inside it
@@ -1063,12 +1615,12 @@ export default function SuperAdminOrgChart() {
   const [pos, setPos] = useState({ left: 0, width: 0, top: 0, visible: false });
 
   const superAdmin = saData?.superAdmin || saData;
-  const admins     = useMemo(() => admData?.admins || [], [admData]);
-  const managers   = useMemo(() => {
+  const admins = useMemo(() => admData?.admins || [], [admData]);
+  const managers = useMemo(() => {
     const raw = mgrData?.managers || mgrData || [];
     return Array.isArray(raw) ? raw : [];
   }, [mgrData]);
-  const employees  = useMemo(() => {
+  const employees = useMemo(() => {
     const raw = empData?.users || empData || [];
     const list = Array.isArray(raw) ? raw : [];
     return list.some((p) => p?.type)
@@ -1076,8 +1628,11 @@ export default function SuperAdminOrgChart() {
       : list;
   }, [empData]);
 
-  const orgName  = orgData?.organisation_name || superAdmin?.organisation_name || "Organisation";
-  const loading  = loadingSA || loadingAdm || loadingMgr || loadingEmp;
+  const orgName =
+    orgData?.organisation_name ||
+    superAdmin?.organisation_name ||
+    "Organisation";
+  const loading = loadingSA || loadingAdm || loadingMgr || loadingEmp;
   const totalNodes = 1 + admins.length + managers.length + employees.length;
 
   const matchCount = useMemo(() => {
@@ -1085,18 +1640,31 @@ export default function SuperAdminOrgChart() {
     const q = normalize(searchQuery);
     let n = 0;
     const check = (f, l, dept, desig) => {
-      if (normalize(`${f} ${l}`).includes(q) || normalize(dept||"").includes(q) || normalize(desig||"").includes(q)) n++;
+      if (
+        normalize(`${f} ${l}`).includes(q) ||
+        normalize(dept || "").includes(q) ||
+        normalize(desig || "").includes(q)
+      )
+        n++;
     };
     if (superAdmin) check(superAdmin.f_name, superAdmin.l_name, "", "");
-    admins.forEach(a   => check(a.f_name, a.l_name, "", a.designation));
-    managers.forEach(m => check(m.f_name, m.l_name, m.department, m.designation));
-    employees.forEach(e => check(e.f_name, e.l_name, e.department, e.designation));
+    admins.forEach((a) => check(a.f_name, a.l_name, "", a.designation));
+    managers.forEach((m) =>
+      check(m.f_name, m.l_name, m.department, m.designation),
+    );
+    employees.forEach((e) =>
+      check(e.f_name, e.l_name, e.department, e.designation),
+    );
     return n;
   }, [searchQuery, superAdmin, admins, managers, employees]);
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); setSelected(null); }
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setSearchQuery("");
+        setSelected(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1119,20 +1687,30 @@ export default function SuperAdminOrgChart() {
       const r = sc.getBoundingClientRect();
       const vh = window.innerHeight;
       setBar((prev) => {
-        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        const next = {
+          sw: inner.scrollWidth,
+          show: inner.scrollWidth > sc.clientWidth + 1,
+        };
         return prev.sw === next.sw && prev.show === next.show ? prev : next;
       });
       // Bar is always pinned to the bottom edge of the screen; only shown while the chart block is on screen
       const visible = r.bottom > 0 && r.top < vh - BAR_H;
       setPos((prev) =>
-        prev.left === r.left && prev.width === r.width && prev.visible === visible
+        prev.left === r.left &&
+        prev.width === r.width &&
+        prev.visible === visible
           ? prev
-          : { left: r.left, width: r.width, top: 0, visible }
+          : { left: r.left, width: r.width, top: 0, visible },
       );
     };
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
     measure();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(schedule)
+        : null;
     ro?.observe(inner);
     ro?.observe(sc);
     window.addEventListener("resize", schedule);
@@ -1146,32 +1724,92 @@ export default function SuperAdminOrgChart() {
   }, []);
 
   const syncScroll = (from, to) => {
-    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+    if (from && to && to.scrollLeft !== from.scrollLeft)
+      to.scrollLeft = from.scrollLeft;
   };
 
   function buildCsvRows() {
-    const rows = [["Role", "Emp ID", "Name", "Email", "Phone", "Department", "Designation", "Office Location", "Reports To"]];
+    const rows = [
+      [
+        "Role",
+        "Emp ID",
+        "Name",
+        "Email",
+        "Phone",
+        "Department",
+        "Designation",
+        "Office Location",
+        "Reports To",
+      ],
+    ];
 
     if (superAdmin) {
-      rows.push(["Super Admin", "", fullName(superAdmin), superAdmin.email || "", "", "", "", "", ""]);
+      rows.push([
+        "Super Admin",
+        "",
+        fullName(superAdmin),
+        superAdmin.email || "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
     }
 
     admins.forEach((a) => {
-      rows.push(["Admin", a.empid || "", fullName(a), a.work_email || "", a.personal_contact || "", a.department ? getDepartmentName(a.department) : "", a.designation || "", a.office_location || "", "Super Admin"]);
+      rows.push([
+        "Admin",
+        a.empid || "",
+        fullName(a),
+        a.work_email || "",
+        a.personal_contact || "",
+        a.department ? getDepartmentName(a.department) : "",
+        a.designation || "",
+        a.office_location || "",
+        "Super Admin",
+      ]);
     });
 
     managers.forEach((m) => {
-      const parentLabel = m.reporting_manager_model === "Admin"
-        ? (admins.find((a) => idStr(a._id) === idStr(m.reporting_manager)) ? `Admin: ${fullName(admins.find((a) => idStr(a._id) === idStr(m.reporting_manager)))}` : "Unassigned")
-        : m.reporting_manager_model === "Manager"
-          ? (managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)) ? `Manager: ${fullName(managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)))}` : "Unassigned")
-          : "Unassigned";
-      rows.push(["Manager", m.empid || "", fullName(m), m.work_email || "", m.personal_contact || "", m.department ? getDepartmentName(m.department) : "", m.designation || "", m.office_location || "", parentLabel]);
+      const parentLabel =
+        m.reporting_manager_model === "Admin"
+          ? admins.find((a) => idStr(a._id) === idStr(m.reporting_manager))
+            ? `Admin: ${fullName(admins.find((a) => idStr(a._id) === idStr(m.reporting_manager)))}`
+            : "Unassigned"
+          : m.reporting_manager_model === "Manager"
+            ? managers.find(
+                (mm) => idStr(mm._id) === idStr(m.reporting_manager),
+              )
+              ? `Manager: ${fullName(managers.find((mm) => idStr(mm._id) === idStr(m.reporting_manager)))}`
+              : "Unassigned"
+            : "Unassigned";
+      rows.push([
+        "Manager",
+        m.empid || "",
+        fullName(m),
+        m.work_email || "",
+        m.personal_contact || "",
+        m.department ? getDepartmentName(m.department) : "",
+        m.designation || "",
+        m.office_location || "",
+        parentLabel,
+      ]);
     });
 
     employees.forEach((e) => {
       const mgr = managers.find((m) => idStr(m._id) === idStr(e.Under_manager));
-      rows.push(["Employee", e.empid || "", fullName(e), e.work_email || "", e.personal_contact || "", e.department ? getDepartmentName(e.department) : "", e.designation || "", e.office_location || "", mgr ? `Manager: ${fullName(mgr)}` : "Unassigned"]);
+      rows.push([
+        "Employee",
+        e.empid || "",
+        fullName(e),
+        e.work_email || "",
+        e.personal_contact || "",
+        e.department ? getDepartmentName(e.department) : "",
+        e.designation || "",
+        e.office_location || "",
+        mgr ? `Manager: ${fullName(mgr)}` : "Unassigned",
+      ]);
     });
 
     return rows;
@@ -1181,7 +1819,10 @@ export default function SuperAdminOrgChart() {
     const rows = buildCsvRows();
     const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.csv`);
+    downloadBlob(
+      blob,
+      `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.csv`,
+    );
   }
 
   async function exportPng() {
@@ -1202,7 +1843,10 @@ export default function SuperAdminOrgChart() {
       target.classList.remove("su-export-flat");
       const res = await fetch(dataUrl);
       const blob = await res.blob();
-      downloadBlob(blob, `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`);
+      downloadBlob(
+        blob,
+        `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`,
+      );
       setExportDone(true);
       setTimeout(() => setExportDone(false), 2600);
     } catch (err) {
@@ -1214,10 +1858,10 @@ export default function SuperAdminOrgChart() {
   }
 
   const statItems = [
-    { label: "Admins",    value: admins.length,    color: "#334155" },
-    { label: "Managers",  value: managers.length,  color: "#475569" },
+    { label: "Admins", value: admins.length, color: "#334155" },
+    { label: "Managers", value: managers.length, color: "#475569" },
     { label: "Employees", value: employees.length, color: "#64748b" },
-    { label: "Total",     value: totalNodes,       color: "#0f172a" },
+    { label: "Total", value: totalNodes, color: "#0f172a" },
   ];
 
   return (
@@ -1226,38 +1870,83 @@ export default function SuperAdminOrgChart() {
 
       <header className="w-full max-w-full min-w-0 bg-white border-b border-gray-200 shadow-sm overflow-hidden">
         <div className="w-full max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 h-14 sm:h-16 flex items-center justify-between gap-4 min-w-0">
-          <div className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}>
+          <div
+            className={`flex items-center gap-2 sm:gap-3 min-w-0 flex-1 ${searchOpen ? "hidden sm:flex" : "flex"}`}
+          >
             <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#730042] shrink-0 shadow-[0_0_0_3px_rgba(115,0,66,0.15)]"></div>
-            <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">{orgName}</span>
-            <svg className="hidden md:block w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
-              <path d="M5 3l3 3.5L5 10" stroke="#d1d5db" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <span className="hidden md:inline text-sm text-gray-400 font-medium truncate min-w-0">
+              {orgName}
+            </span>
+            <svg
+              className="hidden md:block w-3 h-3 shrink-0"
+              viewBox="0 0 13 13"
+              fill="none"
+            >
+              <path
+                d="M5 3l3 3.5L5 10"
+                stroke="#d1d5db"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
-            <h1 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight truncate min-w-0">Org Chart</h1>
+            <h1 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight truncate min-w-0">
+              Org Chart
+            </h1>
             <span className="hidden xs:inline-block px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10.5px] font-bold text-[#730042] bg-[#730042]/10 rounded-full shrink-0">
               Super Admin
             </span>
-            {!loading && <div className="hidden sm:block shrink-0"><LiveDot /></div>}
+            {!loading && (
+              <div className="hidden sm:block shrink-0">
+                <LiveDot />
+              </div>
+            )}
           </div>
 
-          <div className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:flex-none sm:ml-auto" : "flex-none ml-auto"}`}>
+          <div
+            className={`flex items-center gap-2 min-w-0 ${searchOpen ? "w-full sm:w-auto sm:flex-none sm:ml-auto" : "flex-none ml-auto"}`}
+          >
             {searchOpen ? (
               <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
                 <div className="flex items-center gap-2 border-[1.5px] border-[#730042] rounded-lg px-3 h-10 sm:h-9 flex-1 sm:w-72 shadow-[0_0_0_4px_rgba(115,0,66,0.08)] min-w-0">
-                  <svg className="w-3 h-3 shrink-0" viewBox="0 0 13 13" fill="none">
-                    <circle cx="5.5" cy="5.5" r="4" stroke="#9ca3af" strokeWidth="1.3" />
-                    <path d="M9 9l2.5 2.5" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" />
+                  <svg
+                    className="w-3 h-3 shrink-0"
+                    viewBox="0 0 13 13"
+                    fill="none"
+                  >
+                    <circle
+                      cx="5.5"
+                      cy="5.5"
+                      r="4"
+                      stroke="#9ca3af"
+                      strokeWidth="1.3"
+                    />
+                    <path
+                      d="M9 9l2.5 2.5"
+                      stroke="#9ca3af"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   <input
                     ref={inputRef}
                     className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm text-slate-900 placeholder:text-gray-400"
                     placeholder="Name, role, department…"
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} className="flex items-center justify-center h-full px-2 -mr-2 text-gray-400 shrink-0">
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="flex items-center justify-center h-full px-2 -mr-2 text-gray-400 shrink-0"
+                    >
                       <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
-                        <path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                        <path
+                          d="M2 2l9 9M11 2l-9 9"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                        />
                       </svg>
                     </button>
                   )}
@@ -1269,10 +1958,18 @@ export default function SuperAdminOrgChart() {
                 )}
                 <button
                   className="flex items-center justify-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 shrink-0 min-w-[40px] sm:min-w-[44px]"
-                  onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                  }}
                 >
                   <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
-                    <path d="M2 2l9 9M11 2l-9 9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    <path
+                      d="M2 2l9 9M11 2l-9 9"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   <span className="hidden sm:inline">Close</span>
                 </button>
@@ -1284,59 +1981,70 @@ export default function SuperAdminOrgChart() {
                   onClick={() => setSearchOpen(true)}
                 >
                   <svg className="w-3 h-3" viewBox="0 0 13 13" fill="none">
-                    <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3" />
-                    <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    <circle
+                      cx="5.5"
+                      cy="5.5"
+                      r="4"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                    />
+                    <path
+                      d="M9 9l2.5 2.5"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                    />
                   </svg>
                   <span>Search</span>
                 </button>
                 <button
-  className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-black bg-black/10 text-black text-xs font-medium transition-all duration-300 hover:bg-black hover:text-white hover:border-black shrink-0 min-w-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-  onClick={exportPng}
-  disabled={loading || exporting}
->
-  {exporting ? (
-    <>
-      <svg
-        className="w-3.5 h-3.5 animate-spin"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="3"
-          opacity="0.25"
-        />
-        <path
-          d="M12 2a10 10 0 0 1 10 10"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="hidden sm:inline">Exporting…</span>
-    </>
-  ) : (
-    <>
-      <svg
-        className="w-3.5 h-3.5"
-        viewBox="0 0 16 16"
-        fill="none"
-      >
-        <path
-          d="M8 2v8m0 0L5 7m3 3l3-3M3 12.5h10"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="hidden sm:inline">Export PNG</span>
-    </>
-  )}
-</button>
+                  className="flex items-center gap-1.5 px-3 sm:px-4 h-10 sm:h-9 rounded-lg border border-black bg-black/10 text-black text-xs font-medium transition-all duration-300 hover:bg-black hover:text-white hover:border-black shrink-0 min-w-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={exportPng}
+                  disabled={loading || exporting}
+                >
+                  {exporting ? (
+                    <>
+                      <svg
+                        className="w-3.5 h-3.5 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          opacity="0.25"
+                        />
+                        <path
+                          d="M12 2a10 10 0 0 1 10 10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Exporting…</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-3.5 h-3.5"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <path
+                          d="M8 2v8m0 0L5 7m3 3l3-3M3 12.5h10"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">Export PNG</span>
+                    </>
+                  )}
+                </button>
               </>
             )}
           </div>
@@ -1344,13 +2052,14 @@ export default function SuperAdminOrgChart() {
       </header>
 
       <main className="w-full max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-5 sm:py-6 lg:py-8 min-w-0 flex-1">
-
         <div className="mb-5 sm:mb-6 lg:mb-8 min-w-0">
           <h2 className="text-lg sm:text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight truncate">
             Organisation Chart
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 mt-1 truncate">
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · auto-refreshes every 2 min`}
+            {loading
+              ? "Loading…"
+              : `${orgName} · ${totalNodes} nodes · auto-refreshes every 2 min`}
           </p>
         </div>
 
@@ -1359,33 +2068,51 @@ export default function SuperAdminOrgChart() {
             <div
               key={label}
               className="relative bg-white border border-gray-200 rounded-xl lg:rounded-2xl p-2.5 sm:p-4 lg:p-5 flex items-center gap-2 sm:gap-4 lg:gap-4 shadow-sm overflow-hidden hover:shadow-md transition-shadow min-w-0"
-              style={{ animation: `fadeUp 0.35s ease ${100 + i * 55}ms forwards`, opacity: 0 }}
+              style={{
+                animation: `fadeUp 0.35s ease ${100 + i * 55}ms forwards`,
+                opacity: 0,
+              }}
             >
-              <div className="absolute top-0 left-0 right-0 h-1" style={{ background: color }}></div>
+              <div
+                className="absolute top-0 left-0 right-0 h-1"
+                style={{ background: color }}
+              ></div>
               <div
                 className="w-7 h-7 sm:w-12 sm:h-12 rounded-lg lg:rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: `${color}12` }}
               >
                 <div
                   className="w-3 h-3 sm:w-5 sm:h-5 rounded-full"
-                  style={{ background: color, boxShadow: `0 2px 6px ${color}40` }}
+                  style={{
+                    background: color,
+                    boxShadow: `0 2px 6px ${color}40`,
+                  }}
                 />
               </div>
               <div className="min-w-0">
-                <div className="text-sm sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+                <div
+                  className="text-sm sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none truncate"
+                  style={{ fontFamily: "'JetBrains Mono',monospace" }}
+                >
                   {loading ? "—" : value}
                 </div>
-                <div className="text-[9px] sm:text-xs text-gray-400 mt-1 font-medium truncate">{label}</div>
+                <div className="text-[9px] sm:text-xs text-gray-400 mt-1 font-medium truncate">
+                  {label}
+                </div>
               </div>
             </div>
           ))}
         </div>
 
         <div className="w-full max-w-full min-w-0 bg-white border border-gray-200 rounded-xl lg:rounded-2xl shadow-sm overflow-hidden flex flex-col">
-
           <div className="w-full min-w-0 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-gray-100 flex flex-wrap items-center gap-2 bg-gradient-to-br from-gray-50 to-gray-100/50">
-            <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate">Hierarchy</span>
-            <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0" style={{ fontFamily: "'JetBrains Mono',monospace" }}>
+            <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate">
+              Hierarchy
+            </span>
+            <span
+              className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-semibold shrink-0"
+              style={{ fontFamily: "'JetBrains Mono',monospace" }}
+            >
               {loading ? "…" : `${totalNodes} nodes`}
             </span>
             {searchQuery && matchCount > 0 && (
@@ -1393,7 +2120,9 @@ export default function SuperAdminOrgChart() {
                 {matchCount} highlighted
               </span>
             )}
-            <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">Click any card for details</span>
+            <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">
+              Click any card for details
+            </span>
           </div>
 
           {/* Scroll viewport: width is capped to the page, extra width scrolls INSIDE this block (horizontal only) */}
@@ -1424,12 +2153,19 @@ export default function SuperAdminOrgChart() {
         {!loading && (
           <div className="flex gap-2 sm:gap-4 lg:gap-6 mt-4 lg:mt-6 justify-center flex-wrap min-w-0 max-w-full">
             {[
-              { dot: NODE_COLOR.sa,       label: "Super Admin", glow: true },
-              { dot: NODE_COLOR.admin,    label: "Admin"   },
-              { dot: NODE_COLOR.manager,  label: "Manager" },
-              { dot: NODE_COLOR.employee, label: "Employee", border: "#b0b8c8" },
+              { dot: NODE_COLOR.sa, label: "Super Admin", glow: true },
+              { dot: NODE_COLOR.admin, label: "Admin" },
+              { dot: NODE_COLOR.manager, label: "Manager" },
+              {
+                dot: NODE_COLOR.employee,
+                label: "Employee",
+                border: "#b0b8c8",
+              },
             ].map(({ dot, label, border, glow }) => (
-              <div key={label} className="flex items-center gap-1.5 text-[10px] sm:text-xs text-gray-400 shrink-0">
+              <div
+                key={label}
+                className="flex items-center gap-1.5 text-[10px] sm:text-xs text-gray-400 shrink-0"
+              >
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
@@ -1479,8 +2215,16 @@ export default function SuperAdminOrgChart() {
           className="fixed bottom-4 right-4 left-4 sm:left-auto z-[9999] flex items-center justify-center sm:justify-start gap-2 px-4 py-3 rounded-lg bg-slate-900 text-white text-sm font-medium shadow-2xl"
           style={{ animation: "fadeIn 0.2s ease forwards" }}
         >
-          <svg className="w-4 h-4 text-green-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clipRule="evenodd" />
+          <svg
+            className="w-4 h-4 text-green-400 shrink-0"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z"
+              clipRule="evenodd"
+            />
           </svg>
           PNG exported!
         </div>
