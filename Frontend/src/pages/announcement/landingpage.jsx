@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import gsap from 'gsap'
+import { LazyMotion, domAnimation, m as motion } from 'framer-motion'
 import { RiDoubleQuotesL } from 'react-icons/ri'
 import {
   FiMenu, FiX, FiArrowRight, FiCheck,
@@ -23,104 +22,48 @@ import { fadeUp, fontStyles } from './animations'
 export { fontStyles }
 
 /* ==========================================================================
-   SMOOTH SCROLL (GSAP) + SECTION NAVIGATION
-   The page scrolls inside a custom container (height:100vh, overflow:auto),
-   so smoothing and anchor jumps are driven on that container with GSAP.
+   SECTION NAVIGATION (native scrolling)
+   The page scrolls inside a custom container (height:100vh, overflow:auto).
+   - Mouse wheel: light inertia smoothing (one rAF loop, no GSAP, only while
+     the wheel is moving). Trackpad, touch, keyboard and scrollbar drag stay
+     100% native, so they are never double-smoothed.
+   - Anchor jumps (navbar / footer links) use the browser's own smooth scroll.
+   - Heavy hero animation is paused while scrolling (see AnimatedBackdrop).
 ========================================================================== */
 
 const NAV_OFFSET = 72 // fixed navbar height
 
 let scrollRoot = null // set by LandingPage
-const scrollState = { tween: null, target: 0, animating: false }
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-function smoothScrollTo(el, y, duration = 1.2) {
-  if (!el) return
-  const max = Math.max(0, el.scrollHeight - el.clientHeight)
-  const to = Math.max(0, Math.min(y, max))
-
-  scrollState.tween?.kill()
-  scrollState.target = to
-
-  if (prefersReducedMotion()) {
-    scrollState.animating = false
-    el.scrollTop = to
-    return
-  }
-
-  const proxy = { y: el.scrollTop }
-  scrollState.animating = true
-  scrollState.tween = gsap.to(proxy, {
-    y: to,
-    duration,
-    ease: 'power3.out',
-    overwrite: true,
-    onUpdate: () => {
-      el.scrollTop = proxy.y
-    },
-    onComplete: () => {
-      scrollState.animating = false
-    },
-  })
-}
-
-function scrollToSection(id, duration = 1.3) {
+function scrollToSection(id) {
   const node = document.getElementById(id)
   if (!node) return
+  const behavior = prefersReducedMotion() ? 'auto' : 'smooth'
   if (scrollRoot) {
-    const y =
+    const top =
       node.getBoundingClientRect().top -
       scrollRoot.getBoundingClientRect().top +
       scrollRoot.scrollTop -
       NAV_OFFSET
-    smoothScrollTo(scrollRoot, y, duration)
+    scrollRoot.scrollTo({ top: Math.max(0, top), behavior })
   } else {
     window.scrollTo({
       top: node.getBoundingClientRect().top + window.scrollY - NAV_OFFSET,
-      behavior: 'smooth',
+      behavior,
     })
   }
 }
 
-function useSmoothScroll(ref) {
+function useScrollRoot(ref) {
   useEffect(() => {
     const el = ref.current
     if (!el) return
     scrollRoot = el
-
-    const stop = () => {
-      scrollState.tween?.kill()
-      scrollState.animating = false
-    }
-
-    const onWheel = (e) => {
-      if (prefersReducedMotion() || e.ctrlKey || e.defaultPrevented) return
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-      if (e.target instanceof Element && e.target.closest('[data-no-smooth]')) return
-
-      e.preventDefault()
-      let delta = e.deltaY
-      if (e.deltaMode === 1) delta *= 32
-      else if (e.deltaMode === 2) delta *= el.clientHeight
-
-      const base = scrollState.animating ? scrollState.target : el.scrollTop
-      smoothScrollTo(el, base + delta, 1.1)
-    }
-
-    el.addEventListener('wheel', onWheel, { passive: false })
-    el.addEventListener('mousedown', stop)
-    el.addEventListener('touchstart', stop, { passive: true })
-    window.addEventListener('keydown', stop)
-
     return () => {
-      el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('mousedown', stop)
-      el.removeEventListener('touchstart', stop)
-      window.removeEventListener('keydown', stop)
-      stop()
       if (scrollRoot === el) scrollRoot = null
     }
   }, [ref])
@@ -138,6 +81,22 @@ function useSectionNav() {
       navigate('/', { state: { scrollTo: id } })
     }
   }
+}
+
+// Pauses CSS animations inside `ref` while it is off-screen (no React re-render).
+function useOffscreenPause(ref) {
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        el.dataset.paused = entry.isIntersecting ? 'false' : 'true'
+      },
+      { rootMargin: '100px 0px' }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [ref])
 }
 
 /* ==========================================================================
@@ -212,13 +171,16 @@ function SectionBackdrop() {
 /* ==========================================================================
    NAVBAR
 ========================================================================== */
+const NAV_LINKS = ['Features', 'Testimonials', 'Pricing', 'About', 'Calculator']
+const NAV_SECTION_IDS = ['features', 'testimonials', 'pricing']
+
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const navigate = useNavigate()
   const goToSection = useSectionNav()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [active, setActive] = useState(null)
-  const links = ['Features', 'Testimonials', 'Pricing', 'About', 'Calculator']
+  const links = NAV_LINKS
 
   const BEET = '#8B1E4D' // beetroot
 
@@ -226,20 +188,24 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   // Scroll ke saath active link bhi update hota hai.
   useEffect(() => {
     const target = scrollContainerRef?.current || window
-    const sectionIds = ['features', 'testimonials', 'pricing']
     let ticking = false
+    let sections = null
 
     const read = () => {
       ticking = false
+      // section nodes are cached after the first lookup (no repeated getElementById)
+      if (!sections || sections.some((s) => !s.el)) {
+        sections = NAV_SECTION_IDS.map((id) => ({ id, el: document.getElementById(id) }))
+      }
       const top = target === window ? window.scrollY : target.scrollTop
       setScrolled(top > 10)
 
       const rootTop = target === window ? 0 : target.getBoundingClientRect().top
       let current = null
-      sectionIds.forEach((id) => {
-        const el = document.getElementById(id)
+      for (let i = 0; i < sections.length; i += 1) {
+        const { id, el } = sections[i]
         if (el && el.getBoundingClientRect().top - rootTop <= 140) current = id
-      })
+      }
       setActive(current)
     }
 
@@ -287,7 +253,13 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
           className="bg-transparent border-none p-0 m-0 cursor-pointer"
           aria-label="Go to home"
         >
-          <img src={logo} alt="TorchX Talent logo" className="h-9 sm:h-11 w-auto object-contain block" />
+          <img
+            src={logo}
+            alt="TorchX Talent logo"
+            fetchPriority="high"
+            decoding="async"
+            className="h-9 sm:h-11 w-auto object-contain block"
+          />
         </button>
 
         <div className="hidden lg:flex items-center h-full gap-2">
@@ -392,10 +364,26 @@ const DESIGN_W = 838
 const DESIGN_H = 670
 
 /* ==========================================================================
+   Device profile: weaker / small-screen / data-saver devices get a lighter
+   version of the SAME animation (lower resolution, 30fps, one glow pass less).
+========================================================================== */
+function getPerfProfile() {
+  if (typeof window === 'undefined') return { lite: false, maxDpr: 1.5, fps: 60 }
+  const cores = navigator.hardwareConcurrency || 8
+  const mem = navigator.deviceMemory || 8
+  const small = window.matchMedia('(max-width: 767px)').matches
+  const saveData = navigator.connection?.saveData === true
+  const lite = small || cores <= 4 || mem <= 4 || saveData
+  return lite ? { lite: true, maxDpr: 1, fps: 30 } : { lite: false, maxDpr: 1.5, fps: 60 }
+}
+
+/* ==========================================================================
    Backdrop engine - pure canvas drawing, no DOM access, no outside references.
    Because it is fully self-contained it can run inside a Web Worker
    (OffscreenCanvas), so the animation never competes with page scrolling.
    If the browser can't do that, the same function runs on the main thread.
+   NOTE: it is serialised with .toString() into the worker, so it must NOT
+   reference anything outside its own body.
 ========================================================================== */
 function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
   const ctx = canvas.getContext('2d')
@@ -426,6 +414,9 @@ function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
 
   const maxDpr = options.maxDpr ?? 1.5
   const heavyMs = options.heavyMs ?? 9
+  const lite = !!options.lite
+  // frame cap: 60fps normally (also stops 120Hz screens from drawing twice as much), 30fps on lite devices
+  const minFrameMs = 1000 / (options.fps || 60) - 1.5
   const g = globalThis
 
   const hasRaf = typeof g.requestAnimationFrame === 'function'
@@ -453,6 +444,7 @@ function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
   let raf = 0
   let clock = TIME_OFFSET
   let last = 0
+  let lastDraw = 0
   let costAvg = 0
   let slowFrames = 0
 
@@ -490,9 +482,12 @@ function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
     ctx.strokeStyle = color
     ctx.lineJoin = 'round'
     ctx.lineCap = 'round'
-    ctx.globalAlpha = alpha * 0.1
-    ctx.lineWidth = core * 8
-    ctx.stroke()
+    if (!lite) {
+      // widest, faintest glow pass: skipped on lite devices (barely visible, most expensive)
+      ctx.globalAlpha = alpha * 0.1
+      ctx.lineWidth = core * 8
+      ctx.stroke()
+    }
     ctx.globalAlpha = alpha * 0.2
     ctx.lineWidth = core * 3.4
     ctx.stroke()
@@ -692,6 +687,10 @@ function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
     if (!playing) return
     raf = requestFrame(frame)
 
+    // frame cap: skip this tick if it is too soon after the last drawn frame
+    if (lastDraw && now - lastDraw < minFrameMs) return
+    lastDraw = now
+
     // clamp dt: a dropped frame slows the motion slightly instead of jumping
     const dt = last ? Math.min((now - last) / 1000, 0.05) : 1 / 60
     last = now
@@ -721,6 +720,7 @@ function createBackdropEngine(canvas, makeLayerCanvas, options = {}) {
     if (shouldPlay && !playing) {
       playing = true
       last = 0
+      lastDraw = 0
       raf = requestFrame(frame)
     } else if (!shouldPlay && playing) {
       playing = false
@@ -774,7 +774,7 @@ self.onmessage = function (event) {
   const m = event.data;
   if (!m) return;
   if (m.type === 'init') {
-    engine = createBackdropEngine(m.canvas, function (w, h) { return new OffscreenCanvas(w, h); }, { heavyMs: 12, designW: m.designW });
+    engine = createBackdropEngine(m.canvas, function (w, h) { return new OffscreenCanvas(w, h); }, { heavyMs: 12, designW: m.designW, maxDpr: m.maxDpr, fps: m.fps, lite: m.lite });
     if (!engine) { self.postMessage({ type: 'failed' }); return; }
     if (m.reduce) engine.renderStill();
     engine.resize(m.width, m.height, m.dpr);
@@ -801,12 +801,20 @@ function AnimatedBackdrop({ pointerRef }) {
     if (!host) return
 
     const reduce = prefersReducedMotion()
+    const profile = getPerfProfile()
     let renderer = null
     let visible = true
     let disposed = false
+    let pointerTimer = 0
+    let scrolling = false
+    let scrollTimer = 0
     const pointerSent = { x: NaN, y: NaN, a: null }
 
-    const shouldRun = () => !reduce && visible && !document.hidden
+    // Mouse-follow only makes sense with a real mouse
+    const finePointer =
+      !reduce && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+    const shouldRun = () => !reduce && visible && !document.hidden && !scrolling
 
     // Canvas is created here (not in JSX) because a canvas can be handed to a
     // worker only once; every mount gets a fresh element.
@@ -831,7 +839,13 @@ function AnimatedBackdrop({ pointerRef }) {
           c.height = h
           return c
         },
-        { heavyMs: 9, designW: DESIGN_W }
+        {
+          heavyMs: 9,
+          designW: DESIGN_W,
+          maxDpr: profile.maxDpr,
+          fps: profile.fps,
+          lite: profile.lite,
+        }
       )
       if (!engine) {
         canvas.remove()
@@ -852,12 +866,39 @@ function AnimatedBackdrop({ pointerRef }) {
 
     const ro = new ResizeObserver(() => renderer?.resize())
 
+    // The pointer forwarder only runs while the animation is actually playing
+    const startPointer = () => {
+      if (!finePointer || pointerTimer) return
+      pointerTimer = window.setInterval(() => {
+        const p = pointerRef?.current
+        if (!p || !renderer) return
+        if (p.x !== pointerSent.x || p.y !== pointerSent.y || p.active !== pointerSent.a) {
+          pointerSent.x = p.x
+          pointerSent.y = p.y
+          pointerSent.a = p.active
+          renderer.pointer(p.x, p.y, p.active)
+        }
+      }, 33)
+    }
+    const stopPointer = () => {
+      if (!pointerTimer) return
+      window.clearInterval(pointerTimer)
+      pointerTimer = 0
+    }
+
+    const applyRunning = () => {
+      const run = shouldRun()
+      renderer?.running(run)
+      if (run) startPointer()
+      else stopPointer()
+    }
+
     const attach = () => {
       if (!renderer) return
       ro.disconnect()
       ro.observe(renderer.canvas)
       renderer.resize()
-      renderer.running(shouldRun())
+      applyRunning()
     }
 
     // Preferred: animation runs in a Web Worker, so scrolling is never blocked
@@ -936,6 +977,9 @@ function AnimatedBackdrop({ pointerRef }) {
           dpr: window.devicePixelRatio || 1,
           reduce,
           designW: DESIGN_W,
+          maxDpr: profile.maxDpr,
+          fps: profile.fps,
+          lite: profile.lite,
         },
         [offscreen]
       )
@@ -945,35 +989,40 @@ function AnimatedBackdrop({ pointerRef }) {
     renderer = createWorkerRenderer() || createMainRenderer()
     attach()
 
-    // Forward the mouse position (smoothed inside the worker), only when it changed
-    const pointerTimer = reduce
-      ? 0
-      : window.setInterval(() => {
-          const p = pointerRef?.current
-          if (!p || !renderer) return
-          if (p.x !== pointerSent.x || p.y !== pointerSent.y || p.active !== pointerSent.a) {
-            pointerSent.x = p.x
-            pointerSent.y = p.y
-            pointerSent.a = p.active
-            renderer.pointer(p.x, p.y, p.active)
-          }
-        }, 33)
-
     const io = new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting
-        renderer?.running(shouldRun())
+        applyRunning()
       },
       { threshold: 0, rootMargin: '150px 0px' }
     )
     io.observe(host)
 
-    const onVisibility = () => renderer?.running(shouldRun())
+    const onVisibility = () => applyRunning()
     document.addEventListener('visibilitychange', onVisibility)
+
+    // Pause the backdrop while the user is actively scrolling, resume ~150ms after
+    // scrolling stops. The page scrolls inside a container (scroll events don't
+    // bubble), so listen in the capture phase. State only changes on start/stop,
+    // not on every scroll event.
+    const onScrollActivity = () => {
+      if (!scrolling) {
+        scrolling = true
+        applyRunning()
+      }
+      window.clearTimeout(scrollTimer)
+      scrollTimer = window.setTimeout(() => {
+        scrolling = false
+        applyRunning()
+      }, 150)
+    }
+    document.addEventListener('scroll', onScrollActivity, { capture: true, passive: true })
 
     return () => {
       disposed = true
-      window.clearInterval(pointerTimer)
+      window.clearTimeout(scrollTimer)
+      document.removeEventListener('scroll', onScrollActivity, { capture: true })
+      stopPointer()
       io.disconnect()
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
@@ -1035,7 +1084,10 @@ function PricingHeroCard() {
       </div>
 
       {/* MAIN CARD */}
-      <div className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]">
+      <div
+        style={{ backdropFilter: 'none', WebkitBackdropFilter: 'none' }}
+        className="pricing-glass-card relative z-10 overflow-hidden rounded-[28px] border border-[#f0e0ea] bg-white px-7 py-7 sm:px-9 sm:py-8 shadow-[0_30px_90px_rgba(122,0,75,0.14),0_10px_30px_rgba(0,0,0,0.06)]"
+      >
         {/* TOP: FREE FOREVER badge + STARTER PLAN tag */}
         <div className="relative flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7A004B] px-3.5 py-1.5 font-ui text-[11px] font-bold text-white shadow-[0_6px_16px_rgba(122,0,75,0.35)]">
@@ -1126,14 +1178,26 @@ function Hero({ onOpenCalculator }) {
     if (!section) return
     const pointer = pointerRef.current
 
+    // The section rect is cached briefly, so pointermove never forces a layout read every event
+    let rect = null
+    let rectAt = 0
+    const getRect = (now) => {
+      if (!rect || now - rectAt > 250) {
+        rect = section.getBoundingClientRect()
+        rectAt = now
+      }
+      return rect
+    }
+
     const onMove = (e) => {
       if (e.pointerType && e.pointerType !== 'mouse') return
-      const rect = section.getBoundingClientRect()
-      pointer.x = Math.max(-1, Math.min(1, ((e.clientX - rect.left) / rect.width) * 2 - 1))
-      pointer.y = Math.max(-1, Math.min(1, ((e.clientY - rect.top) / rect.height) * 2 - 1))
+      const r = getRect(e.timeStamp)
+      pointer.x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1))
+      pointer.y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1))
       pointer.active = true
     }
     const onLeave = () => {
+      rect = null
       pointer.x = 0
       pointer.y = 0
       pointer.active = false
@@ -1249,22 +1313,19 @@ function Hero({ onOpenCalculator }) {
   )
 }
 
+const STATS = [
+  { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX Talent' },
+  { icon: <FiBarChart2 size={22} />, num: '1000+', label: 'No. of live demos' },
+  { icon: <FiUsers size={22} />, num: '10+', label: 'Partners to collaborate' },
+  { icon: <FiStar size={22} />, num: '98%', label: 'Customer satisfaction' },
+]
+
 function Stats() {
-  const stats = [
-    { icon: <BsPeopleFill size={22} />, num: '100+', label: 'Happy customers of TorchX Talent' },
-    { icon: <FiBarChart2 size={22} />, num: '1000+', label: 'No. of live demos' },
-    { icon: <FiUsers size={22} />, num: '10+', label: 'Partners to collaborate' },
-    { icon: <FiStar size={22} />, num: '98%', label: 'Customer satisfaction' },
-  ]
+  // Each card already animates itself on entering the viewport, so the wrapper
+  // no longer runs a second, duplicate animation on the same elements.
   return (
-    <motion.div
-      variants={fadeUp}
-      initial="hidden"
-      whileInView="show"
-      viewport={{ once: true }}
-      className="grid grid-cols-1 max-[480px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pb-16 lg:pb-20"
-    >
-      {stats.map((s, i) => (
+    <div className="grid grid-cols-1 max-[480px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pb-16 lg:pb-20">
+      {STATS.map((s, i) => (
         <motion.div
           key={s.num}
           initial={{ opacity: 0, y: 24 }}
@@ -1282,7 +1343,7 @@ function Stats() {
           </div>
         </motion.div>
       ))}
-    </motion.div>
+    </div>
   )
 }
 /* ==========================================================================
@@ -1339,29 +1400,48 @@ const featureItems = [
   { cat: 'enterprise', icon: FiGift, title: 'Free Smartphone Gift Hamper', desc: 'A welcome gift that comes with Enterprise.' },
 ]
 
+// Static derived data: computed once at module load instead of on every render
+const featureCounts = featureItems.reduce((acc, f) => {
+  acc[f.cat] = (acc[f.cat] || 0) + 1
+  return acc
+}, {})
+const featureLabelOf = Object.fromEntries(featureCategories.map((c) => [c.key, c.label]))
+const featureChips = [
+  { key: 'all', label: 'All Features', count: featureItems.length },
+  ...featureCategories.map((c) => ({ ...c, count: featureCounts[c.key] || 0 })),
+]
+
 const gridVariants = { hidden: {}, show: { transition: { staggerChildren: 0.035 } } }
 const itemVariants = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 }
 
+/*
+  PERF NOTE: the cards used to carry backdrop-blur-xl / backdrop-blur-2xl plus
+  blur-3xl and blur-[10px] glow layers on EVERY card (31 cards). Backdrop filters
+  and large blur filters are re-rasterised while scrolling and were the main
+  cause of scroll lag. The blurred element sits on a smooth dark gradient, so
+  the blur was almost invisible; the glows are now plain radial gradients that
+  look the same but cost nothing.
+*/
 function FeatureCard({ f, tagLabel, showTag }) {
   const Icon = f.icon
 
   if (f.featured) {
     return (
       <motion.div variants={itemVariants} className="sm:col-span-2">
-        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B]/70 via-[#5a0033]/60 to-[#3d0022]/70 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] transition-all duration-500 ease-out hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_28px_70px_rgba(122,0,75,0.30),0_20px_60px_rgba(0,0,0,0.35)]">
+        <div className="group relative h-full overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-col gap-4 text-white bg-gradient-to-br from-[#7A004B]/70 via-[#5a0033]/60 to-[#3d0022]/70 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.35)] transition-all duration-500 ease-out hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_28px_70px_rgba(122,0,75,0.30),0_20px_60px_rgba(0,0,0,0.35)]">
           {/* hover atmosphere */}
           <div className="pointer-events-none absolute inset-0 z-0 rounded-[20px] bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_58%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
           {/* glass highlight */}
           <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[19px] bg-gradient-to-br from-white/[0.10] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
           {/* light sweep */}
-          <div className="pointer-events-none absolute -left-[120%] top-0 z-20 h-full w-[70%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent blur-[10px] transition-transform duration-[900ms] ease-out group-hover:translate-x-[330%]" />
+          <div className="pointer-events-none absolute -left-[120%] top-0 z-20 h-full w-[70%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-transform duration-[900ms] ease-out group-hover:translate-x-[330%]" />
           {/* top edge */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70 transition-all duration-500 group-hover:via-white/80" />
           {/* corner glow */}
-          <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[#ff9ec7]/10 blur-3xl opacity-70 transition-all duration-700 group-hover:bg-[#ffb0d0]/20 group-hover:scale-125" />
+          <div className="pointer-events-none absolute -right-16 -top-16 z-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(255,158,199,0.16)_0%,transparent_70%)] opacity-70 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
 
           <div className="relative z-30 flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/50 group-hover:shadow-[0_6px_22px_rgba(255,255,255,0.20)]">
@@ -1400,12 +1480,12 @@ function FeatureCard({ f, tagLabel, showTag }) {
 
   return (
     <motion.div variants={itemVariants}>
-      <div className="group relative h-full overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.15] via-white/[0.09] to-white/[0.05] backdrop-blur-xl border border-white/20 p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_8px_24px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.22)] transition-all duration-500 ease-out hover:-translate-y-1 hover:from-white/[0.22] hover:via-white/[0.13] hover:to-white/[0.07] hover:border-white/35 hover:shadow-[0_20px_48px_rgba(122,0,75,0.25),0_12px_35px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]">
+      <div className="group relative h-full overflow-hidden rounded-2xl bg-gradient-to-br from-white/[0.15] via-white/[0.09] to-white/[0.05] border border-white/20 p-4 sm:p-5 flex flex-row sm:flex-col items-start gap-3.5 sm:gap-4 shadow-[0_8px_24px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.22)] transition-all duration-500 ease-out hover:-translate-y-1 hover:from-white/[0.22] hover:via-white/[0.13] hover:to-white/[0.07] hover:border-white/35 hover:shadow-[0_20px_48px_rgba(122,0,75,0.25),0_12px_35px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]">
         <div className="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,rgba(255,255,255,0.16),transparent_65%)] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
         <div className="pointer-events-none absolute inset-[1px] z-0 rounded-[15px] bg-gradient-to-br from-[#ffb0d0]/[0.07] via-white/[0.025] to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-        <div className="pointer-events-none absolute -left-[130%] top-0 z-20 h-full w-[75%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.13] to-transparent blur-[9px] transition-transform duration-[850ms] ease-out group-hover:translate-x-[330%]" />
+        <div className="pointer-events-none absolute -left-[130%] top-0 z-20 h-full w-[75%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/[0.13] to-transparent transition-transform duration-[850ms] ease-out group-hover:translate-x-[330%]" />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent transition-all duration-500 group-hover:via-white/80" />
-        <div className="pointer-events-none absolute -right-12 -top-12 z-0 h-32 w-32 rounded-full bg-[#ff9ec7]/[0.06] blur-3xl opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
+        <div className="pointer-events-none absolute -right-12 -top-12 z-0 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(255,158,199,0.14)_0%,transparent_70%)] opacity-0 transition-all duration-700 group-hover:opacity-100 group-hover:scale-125" />
 
         <div className="relative z-30 flex items-center justify-between gap-2 shrink-0 sm:w-full">
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white/[0.18] text-white flex items-center justify-center shrink-0 border border-white/10 transition-all duration-500 group-hover:bg-white group-hover:text-[#7A004B] group-hover:border-white/40 group-hover:shadow-[0_6px_20px_rgba(255,255,255,0.18)]">
@@ -1435,21 +1515,12 @@ function FeatureCard({ f, tagLabel, showTag }) {
 function FeatureJourney() {
   const [active, setActive] = useState('all')
 
-  const counts = featureItems.reduce((acc, f) => {
-    acc[f.cat] = (acc[f.cat] || 0) + 1
-    return acc
-  }, {})
-  const labelOf = Object.fromEntries(featureCategories.map((c) => [c.key, c.label]))
-  const chips = [
-    { key: 'all', label: 'All Features', count: featureItems.length },
-    ...featureCategories.map((c) => ({ ...c, count: counts[c.key] || 0 })),
-  ]
   const visible = active === 'all' ? featureItems : featureItems.filter((f) => f.cat === active)
 
   return (
     <>
       <div className="flex gap-2 overflow-x-auto sm:flex-wrap sm:justify-center pb-2 mb-8 -mx-5 px-5 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {chips.map((c) => {
+        {featureChips.map((c) => {
           const isActive = active === c.key
           return (
             <button
@@ -1485,7 +1556,7 @@ function FeatureJourney() {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grid-flow-dense gap-3.5 sm:gap-5"
       >
         {visible.map((f) => (
-          <FeatureCard key={f.title} f={f} tagLabel={labelOf[f.cat]} showTag={active === 'all'} />
+          <FeatureCard key={f.title} f={f} tagLabel={featureLabelOf[f.cat]} showTag={active === 'all'} />
         ))}
       </motion.div>
     </>
@@ -1520,84 +1591,87 @@ function Features() {
    PRICING
 ========================================================================== */
 
+const PLANS = [
+  {
+    name: 'Free Forever',
+    desc: 'Everything a small team needs to get started ── at no cost.',
+    inherits: null,
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    features: [
+      'Geo Tag Attendance',
+      'Face Attendance',
+      'Monitoring of Employee Active and Idle Time',
+      'Leave management',
+      'Basic payroll',
+      'Analytical and Digital Dashboard',
+      'Announcements',
+      'Team Documentation',
+      'Reimbursement',
+      'Employee Self-Service Portal',
+      'Policy Management',
+      'Grievance Management',
+      'Email support (24/7)',
+    ],
+    crossFeatures: [],
+  },
+  {
+    name: 'Basic',
+    desc: 'Perfect for small teams getting started',
+    inherits: null,
+    monthlyPrice: 39,
+    yearlyPrice: Math.round(39 * 12 * 0.83),
+    features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management', 'Telephonic Support (24/7)'],
+    crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
+  },
+  {
+    name: 'Advance',
+    desc: 'For growing businesses that need more',
+    inherits: 'Everything in Basic +',
+    monthlyPrice: 99,
+    yearlyPrice: Math.round(99 * 12 * 0.83),
+    popular: true,
+    features: ['Live Map Tracking', 'Recruitment / Applicant tracking', 'Face Attendance', 'Performance management', 'Integrated Advanced Payroll', 'Timesheet', 'Two-factor authentication', 'Custom workflow', 'Reports & analytics', 'Employee Self-Service Portal', 'Telephonic support (24/7)'],
+    crossFeatures: [],
+  },
+  {
+    name: 'Enterprise',
+    desc: 'Ultimate power and flexibility',
+    inherits: 'Everything in Advance +',
+    monthlyPrice: null,
+    yearlyPrice: null,
+    features: [
+      'Free Smartphone gift hamper',
+      'Face Attendance',
+      'Custom Integrations',
+      'Single Sign-On',
+      'API access',
+      'On-premises/ Private cloud hosting',
+      'Dedicated account manager',
+    ],
+    crossFeatures: [],
+  },
+]
+
+const STORAGE = [
+  { label: 'Free Forever', val: '5 MB' },
+  { label: 'Basic', val: '2 GB' },
+  { label: 'Advance', val: '20 GB' },
+  { label: 'Enterprise', val: '100 GB' },
+]
+
+const BADGES = [
+  { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
+  { icon: <FiLink size={20} />, label: 'Easy Integration', desc: 'Seamlessly integrates with your favorite tools.' },
+  { icon: <FiActivity size={20} />, label: '99.9% Uptime', desc: 'Reliable performance you can count on.' },
+  { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
+]
+
 function Pricing() {
   const [billing, setBilling] = useState('monthly')
-
-  const plans = [
-    {
-      name: 'Free Forever',
-      desc: 'Everything a small team needs to get started ── at no cost.',
-      inherits: null,
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      features: [
-        'Geo Tag Attendance',
-        'Face Attendance',
-        'Monitoring of Employee Active and Idle Time',
-        'Leave management',
-        'Basic payroll',
-        'Analytical and Digital Dashboard',
-        'Announcements',
-        'Team Documentation',
-        'Reimbursement',
-        'Employee Self-Service Portal',
-        'Policy Management',
-        'Grievance Management',
-        'Email support (24/7)',
-      ],
-      crossFeatures: [],
-    },
-    {
-      name: 'Basic',
-      desc: 'Perfect for small teams getting started',
-      inherits: null,
-      monthlyPrice: 39,
-      yearlyPrice: Math.round(39 * 12 * 0.83),
-      features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management', 'Telephonic Support (24/7)'],
-      crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
-    },
-    {
-      name: 'Advance',
-      desc: 'For growing businesses that need more',
-      inherits: 'Everything in Basic +',
-      monthlyPrice: 99,
-      yearlyPrice: Math.round(99 * 12 * 0.83),
-      popular: true,
-      features: ['Live Map Tracking', 'Recruitment / Applicant tracking', 'Face Attendance', 'Performance management', 'Integrated Advanced Payroll', 'Timesheet', 'Two-factor authentication', 'Custom workflow', 'Reports & analytics', 'Employee Self-Service Portal', 'Telephonic support (24/7)'],
-      crossFeatures: [],
-    },
-    {
-      name: 'Enterprise',
-      desc: 'Ultimate power and flexibility',
-      inherits: 'Everything in Advance +',
-      monthlyPrice: null,
-      yearlyPrice: null,
-      features: [
-        'Free Smartphone gift hamper',
-        'Face Attendance',
-        'Custom Integrations',
-        'Single Sign-On',
-        'API access',
-        'On-premises/ Private cloud hosting',
-        'Dedicated account manager',
-      ],
-      crossFeatures: [],
-    },
-  ]
-
-  const storage = [
-    { label: 'Free Forever', val: '5 MB' },
-    { label: 'Basic', val: '2 GB' },
-    { label: 'Advance', val: '20 GB' },
-    { label: 'Enterprise', val: '100 GB' },
-  ]
-
-  const badges = [
-    { icon: <FiShield size={20} />, label: 'Secure & Compliant', desc: 'Enterprise-grade security with regular backups.' },
-    { icon: <FiLink size={20} />, label: 'Easy Integration', desc: 'Seamlessly integrates with your favorite tools.' },
-    { icon: <FiActivity size={20} />, label: '99.9% Uptime', desc: 'Reliable performance you can count on.' },
-    { icon: <FiBookOpen size={20} />, label: 'Free Onboarding', desc: 'We help you and your team get started.' },
-  ]
+  const plans = PLANS
+  const storage = STORAGE
+  const badges = BADGES
 
   return (
     <section id="pricing" className="scroll-anchor relative overflow-hidden bg-white pt-10 pb-28">
@@ -1761,22 +1835,26 @@ function Pricing() {
   )
 }
 
-function Testimonials() {
-  const testimonials = [
-    { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
-    { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', initials: 'AV' },
-    { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', initials: 'RS' },
-    { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', initials: 'KM' },
-    { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', initials: 'MP' },
-  ]
+const TESTIMONIALS = [
+  { quote: 'TorchX Talent has completely transformed our hiring process. The AI recruitment feature helps us find the right talent faster and with better accuracy.', name: 'KK Oberoi', role: 'HR Manager', initials: 'KO' },
+  { quote: 'The employee portal is a game changer! Our team loves the easy access to documents, requests, and updates all in one place.', name: 'Anaya Varma', role: 'HR Director', initials: 'AV' },
+  { quote: 'Performance reviews are now simple, transparent, and data-driven. TorchX Talent helps us build a culture of continuous feedback and growth.', name: 'Rohan Sharma', role: 'People Operations Lead', initials: 'RS' },
+  { quote: 'TorchX Talent has significantly improved our workforce management. From onboarding to performance tracking, everything is streamlined and easy to manage.', name: 'Karan Malhotra', role: 'Head of Human Resources', initials: 'KM' },
+  { quote: 'TorchX Talent has helped us centralize all HR operations in one platform. The automation features save countless hours every week and improve team productivity.', name: 'Meera Patel', role: 'Chief People Officer', initials: 'MP' },
+]
 
-  const loopTestimonials = [...testimonials, ...testimonials]
+const LOOP_TESTIMONIALS = [...TESTIMONIALS, ...TESTIMONIALS]
+
+function Testimonials() {
+  const marqueeRef = useRef(null)
+  // the marquee keeps running only while it is on screen
+  useOffscreenPause(marqueeRef)
 
   return (
     <section id="testimonials" className="scroll-anchor relative overflow-hidden font-body pt-10 pb-28">
       <SectionBackdrop />
 
-      {/* Left/right blur (fade) effect hatane ke liye override */}
+      {/* Left/right blur (fade) effect hatane ke liye override + pause marquee when off-screen */}
       <style>{`
         .testimonial-marquee,
         .testimonial-track {
@@ -1789,6 +1867,10 @@ function Testimonials() {
         .testimonial-track::after {
           content: none !important;
           display: none !important;
+        }
+        .testimonial-marquee[data-paused="true"],
+        .testimonial-marquee[data-paused="true"] * {
+          animation-play-state: paused !important;
         }
       `}</style>
 
@@ -1805,11 +1887,12 @@ function Testimonials() {
         </motion.div>
 
         <div
+          ref={marqueeRef}
           className="testimonial-marquee mb-12 -mx-5 sm:-mx-10 lg:-mx-16 px-5 sm:px-10 lg:px-16"
           style={{ WebkitMaskImage: 'none', maskImage: 'none' }}
         >
           <div className="testimonial-track">
-            {loopTestimonials.map((t, i) => (
+            {LOOP_TESTIMONIALS.map((t, i) => (
               <div
                 key={`${t.name}-${i}`}
                 className="testi-card-m w-[280px] sm:w-[320px] md:w-[340px] bg-white border border-[#DDB7CB] rounded-[14px] p-6 shadow-[0_6px_18px_rgba(122,0,75,0.08)] flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(90,0,51,0.18)] hover:border-[#5a0033]"
@@ -1952,41 +2035,52 @@ function LegalModal({ docKey, onClose }) {
   )
 }
 
+const FOOTER_COLS = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
+      { label: 'Engage', href: '' },
+      { label: 'Finance', href: '' },
+      { label: 'Inventory', href: '' },
+      { label: 'Payroll', href: '' },
+    ],
+  },
+  {
+    title: 'Solutions',
+    links: [
+      { label: 'Features', href: '#features' },
+      { label: 'Pricing', href: '#pricing' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { label: 'Documentation', to: '/documentation' },
+      { label: 'Guide', to: '/guide' },
+      { label: 'Blog', to: '/blog' },
+    ],
+  },
+]
+
+const FOOTER_SOCIALS = [
+  { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/torchx-talent/', label: 'LinkedIn' },
+  { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
+  { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
+  { icon: <FaYoutube />, href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
+]
+
+const FOOTER_LEGAL_LINKS = [
+  { label: 'Privacy Policy', key: 'privacy' },
+  { label: 'Terms of Service', key: 'terms' },
+  { label: 'Cookie Policy', key: 'cookie' },
+  { label: 'Refund Policy', key: 'refund' },
+]
+
 export function Footer() {
   const goToSection = useSectionNav()
-  const cols = [
-    {
-      title: 'Product',
-      links: [
-        { label: 'Talent', href: 'https://torchxsuite.com/talent/' },
-        { label: 'Engage', href: '' },
-        { label: 'Finance', href: '' },
-        { label: 'Inventory', href: '' },
-        { label: 'Payroll', href: '' },
-      ],
-    },
-    {
-      title: 'Solutions',
-      links: [
-        { label: 'Features', href: '#features' },
-        { label: 'Pricing', href: '#pricing' },
-      ],
-    },
-    {
-      title: 'Resources',
-      links: [
-        { label: 'Documentation', to: '/documentation' },
-        { label: 'Guide', to: '/guide' },
-        { label: 'Blog', to: '/blog' },
-      ],
-    },
-  ]
-  const socials = [
-    { icon: <FiLinkedin />, href: 'https://www.linkedin.com/company/torchx-talent/', label: 'LinkedIn' },
-    { icon: <FiInstagram />, href: 'https://www.instagram.com/?hl=en', label: 'Instagram' },
-    { icon: <FaXTwitter />, href: 'https://x.com/home', label: 'X' },
-    { icon: <FaYoutube />, href: 'https://www.youtube.com/@techtorch_sol', label: 'YouTube' },
-  ]
+  const cols = FOOTER_COLS
+  const socials = FOOTER_SOCIALS
   const [activeDoc, setActiveDoc] = useState(null)
   const linkCls = 'text-base text-[#7A004B] no-underline transition-colors hover:text-[#5a0033]'
 
@@ -1996,7 +2090,13 @@ export function Footer() {
         <Wrap className="pt-8 pb-0">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr] gap-10">
             <div>
-              <img src={logo} alt="TorchX Talent" className="h-9 sm:h-11 w-auto object-contain block mb-1.5" />
+              <img
+                src={logo}
+                alt="TorchX Talent"
+                loading="lazy"
+                decoding="async"
+                className="h-9 sm:h-11 w-auto object-contain block mb-1.5"
+              />
               <p className="text-[15px] text-[#444] leading-[1.75] mb-5">
                 TorchX Talent helps you hire smarter, faster, and with confidence using AI-powered talent solutions.
                 Streamline recruitment, discover top candidates, and build high-performing teams effortlessly.
@@ -2055,12 +2155,7 @@ export function Footer() {
               TorchX Talent™ — A Product of Techtorch Solutions Private Limited.
             </p>
             <div className="flex flex-wrap gap-4.5">
-              {[
-                { label: 'Privacy Policy', key: 'privacy' },
-                { label: 'Terms of Service', key: 'terms' },
-                { label: 'Cookie Policy', key: 'cookie' },
-                { label: 'Refund Policy', key: 'refund' },
-              ].map((item) => (
+              {FOOTER_LEGAL_LINKS.map((item) => (
                 <span
                   key={item.key}
                   onClick={() => setActiveDoc(item.key)}
@@ -2144,6 +2239,8 @@ function useSEO() {
    PAGE
 ========================================================================== */
 
+const SCROLL_CONTAINER_STYLE = { height: '100vh', overflowY: 'auto', scrollBehavior: 'auto' }
+
 export default function LandingPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -2152,13 +2249,13 @@ export default function LandingPage() {
   const scrollContainerRef = useRef(null)
 
   useSEO()
-  useSmoothScroll(scrollContainerRef)
+  useScrollRoot(scrollContainerRef)
 
   // Arriving from another page (or with #hash): scroll to the requested section
   useEffect(() => {
     const id = location.state?.scrollTo || location.hash.replace('#', '')
     if (!id) return
-    const t = setTimeout(() => scrollToSection(id, 1.2), 400)
+    const t = setTimeout(() => scrollToSection(id), 400)
     return () => clearTimeout(t)
   }, [location.state, location.hash])
 
@@ -2169,29 +2266,27 @@ export default function LandingPage() {
   }
 
   return (
-    <div
-      ref={scrollContainerRef}
-      style={{ height: '100vh', overflowY: 'auto', scrollBehavior: 'auto' }}
-    >
-      <style>{fontStyles}</style>
-      <PageBackground />
-      <Navbar
-        accountLabel={accountLabel}
-        onAccountClick={handleAccountClick}
-        scrollContainerRef={scrollContainerRef}
-      />
-      <Hero
-        onOpenCalculator={() => navigate('/pricing-calculator')}
-      />
-      <Divider />
-      <Features />
-      <Divider />
-      <Pricing />
-      <Divider />
-      <Testimonials />
-      <Footer />
-    </div>
+    // LazyMotion loads only the DOM animation features (smaller bundle than full `motion`)
+    <LazyMotion features={domAnimation}>
+      <div ref={scrollContainerRef} style={SCROLL_CONTAINER_STYLE}>
+        <style>{fontStyles}</style>
+        <PageBackground />
+        <Navbar
+          accountLabel={accountLabel}
+          onAccountClick={handleAccountClick}
+          scrollContainerRef={scrollContainerRef}
+        />
+        <Hero
+          onOpenCalculator={() => navigate('/pricing-calculator')}
+        />
+        <Divider />
+        <Features />
+        <Divider />
+        <Pricing />
+        <Divider />
+        <Testimonials />
+        <Footer />
+      </div>
+    </LazyMotion>
   )
 }
-
-                                                   
