@@ -3327,6 +3327,19 @@ const applyleave = async (req, res, next) => {
         : "pending_superadmin",
     });
 
+    if (req.admin.reporting_manager_model === "Admin" && req.admin.reporting_manager) {
+      notifyLeaveApplied({
+        requesterName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        handlerModel: "Admin",
+        handlerId: req.admin.reporting_manager,
+        leaveType: normalizedLeaveType,
+        startDate: start,
+        endDate: end,
+        days,
+        reason: reason.trim(),
+      });
+    }
+
     return res.status(201).json({
       success: true,
       message: "Leave applied successfully",
