@@ -382,6 +382,15 @@ const ROOT_LIMIT = 3; // top row of managers: the button only appears from the 4
 const BTN_W = 112;
 const BTN_SPACE = BTN_W + 12;
 
+// Same connector style as the Super Admin org chart
+const LINE_COLOR = "#c9d2e0";
+const LINE_W = 1.5;
+
+// An employee card is narrower than a manager card. Shifting the employee row right by this
+// amount puts the first employee's center exactly under the parent card's center, so a lone
+// child gets a perfectly straight line (no jog).
+const EMP_OFF = (CARD_W - EMP_W) / 2;
+
 // keys starting with "more-root" are top-level manager rows
 const limitOf = (key) => (key.startsWith("more-root") ? ROOT_LIMIT : LIMIT);
 
@@ -392,19 +401,18 @@ const btnSpace = (total, forceAll) =>
   !forceAll && total > LIMIT ? BTN_SPACE : 0;
 const hasBtn = (total, forceAll, limit = LIMIT) => !forceAll && total > limit;
 
-// reserve = true when this column also carries a "See more" button beside its card
-function colWOf(mgr, expanded, forceAll, reserve = false) {
+// Width of the single row that holds a manager's sub-managers AND employees
+function childrenRowW(mgr, expanded, forceAll) {
   const emps = mgr.employees || [];
   const subs = mgr.subManagers || [];
   const vEmps = visibleOf(emps, `more-emp-${mgr.id}`, expanded, forceAll);
   const vSubs = visibleOf(subs, `more-sub-${mgr.id}`, expanded, forceAll);
-  const empW = vEmps.length
-    ? vEmps.length * EMP_W +
-      (vEmps.length - 1) * EMP_GAP +
-      btnSpace(emps.length, forceAll)
-    : 0;
-  const subW = vSubs.length
-    ? vSubs.reduce(
+
+  let w = 0;
+  if (!vSubs.length && vEmps.length) w += EMP_OFF;
+  if (vSubs.length) {
+    w +=
+      vSubs.reduce(
         (s, sm, i) =>
           s +
           colWOf(
@@ -415,23 +423,59 @@ function colWOf(mgr, expanded, forceAll, reserve = false) {
           ),
         0,
       ) +
-      (vSubs.length - 1) * SUB_MGR_GAP
-    : 0;
-  return Math.max(CARD_W + (reserve ? BTN_SPACE : 0), empW, subW);
+      (vSubs.length - 1) * SUB_MGR_GAP;
+  }
+  if (vSubs.length && vEmps.length) w += SUB_MGR_GAP;
+  if (vEmps.length) {
+    w +=
+      vEmps.length * EMP_W +
+      (vEmps.length - 1) * EMP_GAP +
+      btnSpace(emps.length, forceAll);
+  }
+  return w;
+}
+
+// reserve = true when this column also carries a "See more" button beside its card
+function colWOf(mgr, expanded, forceAll, reserve = false) {
+  return Math.max(
+    CARD_W + (reserve ? BTN_SPACE : 0),
+    childrenRowW(mgr, expanded, forceAll),
+  );
+}
+
+// Width of a whole group of manager columns (used to size each co-admin column)
+function groupWOf(managers, key, expanded, forceAll) {
+  if (!managers.length) return CARD_W;
+  const vis = visibleOf(managers, key, expanded, forceAll);
+  const showBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
+  const w =
+    vis.reduce(
+      (s, m, i) =>
+        s + colWOf(m, expanded, forceAll, i === vis.length - 1 && showBtn),
+      0,
+    ) +
+    (vis.length - 1) * MGR_GAP;
+  return Math.max(CARD_W, w);
 }
 
 // Vertical stub, placed under the card's center (left-aligned layout)
 function VLine({ h = 24, x = CARD_W / 2 }) {
   return (
-    <div
-      style={{
-        width: 1,
-        height: h,
-        background: "#e2e8f0",
-        marginLeft: x,
-        flexShrink: 0,
-      }}
-    />
+    <svg
+      width={x + 2}
+      height={h}
+      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
+    >
+      <line
+        x1={x}
+        y1={-0.5}
+        x2={x}
+        y2={h + 0.5}
+        stroke={LINE_COLOR}
+        strokeWidth={LINE_W}
+        strokeLinecap="square"
+      />
+    </svg>
   );
 }
 
@@ -442,41 +486,28 @@ function Connector({ parentX = CARD_W / 2, xs, h = 20 }) {
   const minX = Math.min(parentX, ...xs);
   const maxX = Math.max(parentX, ...xs);
   const needBus = xs.length > 1 || Math.abs(xs[0] - parentX) > 1;
+  const common = {
+    stroke: LINE_COLOR,
+    strokeWidth: LINE_W,
+    strokeLinecap: "square",
+  };
   return (
     <svg
-      width={maxX + 1}
+      width={maxX + 2}
       height={h}
       style={{ display: "block", flexShrink: 0, overflow: "visible" }}
     >
       <line
         x1={parentX}
-        y1={0}
+        y1={-0.5}
         x2={parentX}
         y2={needBus ? mid : h}
-        stroke="#e2e8f0"
-        strokeWidth={1}
+        {...common}
       />
-      {needBus && (
-        <line
-          x1={minX}
-          y1={mid}
-          x2={maxX}
-          y2={mid}
-          stroke="#e2e8f0"
-          strokeWidth={1}
-        />
-      )}
+      {needBus && <line x1={minX} y1={mid} x2={maxX} y2={mid} {...common} />}
       {needBus &&
         xs.map((x, i) => (
-          <line
-            key={i}
-            x1={x}
-            y1={mid}
-            x2={x}
-            y2={h}
-            stroke="#e2e8f0"
-            strokeWidth={1}
-          />
+          <line key={i} x1={x} y1={mid} x2={x} y2={h} {...common} />
         ))}
     </svg>
   );
@@ -557,19 +588,25 @@ function ManagerColumn({
   const empKey = `more-emp-${mgr.id}`;
   const visSubs = visibleOf(subMgrs, subKey, expanded, forceAll);
   const visEmps = visibleOf(emps, empKey, expanded, forceAll);
+  const subHasBtn = hasBtn(subMgrs.length, forceAll);
 
   const mDelay = delayRef.current;
   delayRef.current += 55;
 
-  // x of each child card's center, measured from the left edge of this column
-  let off = 0;
-  const subXs = visSubs.map((sm, i) => {
-    const last = i === visSubs.length - 1 && hasBtn(subMgrs.length, forceAll);
-    const x = off + CARD_W / 2;
+  // Sub-managers and employees live in ONE row under this card, so a single connector
+  // reaches every child. xs = x of each child card's center, measured from this column's left.
+  const startOff = visSubs.length ? 0 : EMP_OFF;
+  let off = startOff;
+  const xs = [];
+  visSubs.forEach((sm, i) => {
+    const last = i === visSubs.length - 1 && subHasBtn;
+    xs.push(off + CARD_W / 2);
     off += colWOf(sm, expanded, forceAll, last) + SUB_MGR_GAP;
-    return x;
   });
-  const empXs = visEmps.map((_, i) => i * (EMP_W + EMP_GAP) + EMP_W / 2);
+  visEmps.forEach(() => {
+    xs.push(off + EMP_W / 2);
+    off += EMP_W + EMP_GAP;
+  });
 
   return (
     <div
@@ -599,65 +636,67 @@ function ManagerColumn({
 
       {moreBtn}
 
-      {subMgrs.length > 0 && (
+      {totalChildren > 0 && (
         <>
-          <Connector xs={subXs} h={20} />
+          <Connector xs={xs} h={20} />
           <div
             style={{
               display: "flex",
-              gap: SUB_MGR_GAP,
               alignItems: "flex-start",
+              paddingLeft: startOff,
             }}
           >
-            {visSubs.map((sm, i) => (
-              <ManagerColumn
-                key={sm.id}
-                mgr={sm}
-                q={q}
-                matches={matches}
-                dim={dim}
-                delayRef={delayRef}
-                expanded={expanded}
-                toggle={toggle}
-                forceAll={forceAll}
-                isSubMgr
-                moreBtn={
-                  i === visSubs.length - 1 &&
-                  hasBtn(subMgrs.length, forceAll) ? (
-                    <MoreBtn
-                      absolute
-                      total={subMgrs.length}
-                      k={subKey}
-                      expanded={expanded}
-                      toggle={toggle}
-                      forceAll={forceAll}
-                    />
-                  ) : null
-                }
-              />
-            ))}
-          </div>
-        </>
-      )}
+            {visSubs.map((sm, i) => {
+              const lastOverall =
+                i === visSubs.length - 1 && visEmps.length === 0;
+              return (
+                <div
+                  key={sm.id}
+                  style={{
+                    flexShrink: 0,
+                    marginRight: lastOverall ? 0 : SUB_MGR_GAP,
+                  }}
+                >
+                  <ManagerColumn
+                    mgr={sm}
+                    q={q}
+                    matches={matches}
+                    dim={dim}
+                    delayRef={delayRef}
+                    expanded={expanded}
+                    toggle={toggle}
+                    forceAll={forceAll}
+                    isSubMgr
+                    moreBtn={
+                      i === visSubs.length - 1 && subHasBtn ? (
+                        <MoreBtn
+                          absolute
+                          total={subMgrs.length}
+                          k={subKey}
+                          expanded={expanded}
+                          toggle={toggle}
+                          forceAll={forceAll}
+                        />
+                      ) : null
+                    }
+                  />
+                </div>
+              );
+            })}
 
-      {emps.length > 0 && (
-        <>
-          <Connector xs={empXs} h={18} />
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <div
-              style={{
-                display: "flex",
-                gap: EMP_GAP,
-                alignItems: "flex-start",
-              }}
-            >
-              {visEmps.map((emp) => {
-                const eKey = `e-${emp.id}`;
-                const eDelay = delayRef.current;
-                delayRef.current += 18;
-                return (
+            {visEmps.map((emp, i) => {
+              const eKey = `e-${emp.id}`;
+              const eDelay = delayRef.current;
+              delayRef.current += 18;
+              return (
+                <div
+                  key={emp.id}
+                  style={{
+                    flexShrink: 0,
+                    marginRight: i === visEmps.length - 1 ? 0 : EMP_GAP,
+                  }}
+                >
                   <Card
-                    key={emp.id}
                     level="emp"
                     name={emp.name}
                     department={
@@ -672,16 +711,19 @@ function ManagerColumn({
                     hl={matches.has(eKey)}
                     q={q}
                   />
-                );
-              })}
-            </div>
-            <MoreBtn
-              total={emps.length}
-              k={empKey}
-              expanded={expanded}
-              toggle={toggle}
-              forceAll={forceAll}
-            />
+                </div>
+              );
+            })}
+
+            {visEmps.length > 0 && (
+              <MoreBtn
+                total={emps.length}
+                k={empKey}
+                expanded={expanded}
+                toggle={toggle}
+                forceAll={forceAll}
+              />
+            )}
           </div>
         </>
       )}
@@ -711,9 +753,9 @@ function SkeletonTree() {
       style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
     >
       <Sk w={172} h={104} r={11} />
-      <div style={{ width: 1, height: 24, background: "#e2e8f0" }} />
+      <div style={{ width: 1.5, height: 24, background: LINE_COLOR }} />
       <Sk w={172} h={96} r={11} />
-      <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+      <div style={{ width: 1.5, height: 20, background: LINE_COLOR }} />
       <div style={{ display: "flex", gap: 28 }}>
         {[1, 2, 3].map((i) => (
           <div
@@ -725,7 +767,7 @@ function SkeletonTree() {
             }}
           >
             <Sk w={172} h={96} r={11} />
-            <div style={{ width: 1, height: 16, background: "#e2e8f0" }} />
+            <div style={{ width: 1.5, height: 16, background: LINE_COLOR }} />
             <div style={{ display: "flex", gap: 10 }}>
               <Sk w={152} h={92} r={11} />
               <Sk w={152} h={92} r={11} />
@@ -753,10 +795,12 @@ function ManagerGroup({
     return (
       <div
         style={{
-          padding: "14px 28px",
+          width: CARD_W,
+          padding: "12px 8px",
           borderRadius: 10,
           border: "1px dashed #e2e8f0",
-          fontSize: 13,
+          fontSize: 12,
+          textAlign: "center",
           color: "#cbd5e1",
           background: "#fafafa",
         }}
@@ -855,6 +899,29 @@ function OrgTree({ data, loading, q }) {
 
   const groupProps = { q, matches, dim, delayRef, expanded, toggle, forceAll };
 
+  // ---- Admin has co-admins: managers and co-admins are ONE row under the admin ----
+  // so a single connector links the admin to every card in it.
+  const rootKey = "more-root";
+  const visMgrs = visibleOf(managers, rootKey, expanded, forceAll);
+  const showRootBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
+  const coKey = (co) => `more-root-co-${co.id}`;
+  const coWidth = (co) =>
+    groupWOf(co.managers || [], coKey(co), expanded, forceAll);
+
+  const rowXs = [];
+  if (coAdmins.length > 0) {
+    let off = 0;
+    visMgrs.forEach((m, i) => {
+      const last = i === visMgrs.length - 1 && showRootBtn;
+      rowXs.push(off + CARD_W / 2);
+      off += colWOf(m, expanded, forceAll, last) + MGR_GAP;
+    });
+    coAdmins.forEach((co) => {
+      rowXs.push(off + CARD_W / 2);
+      off += coWidth(co) + MGR_GAP;
+    });
+  }
+
   return (
     <div
       style={{
@@ -910,21 +977,30 @@ function OrgTree({ data, loading, q }) {
 
       {coAdmins.length > 0 ? (
         <>
-          {managers.length > 0 && (
-            <>
-              <VLine h={18} />
-              <ManagerGroup
-                managers={managers}
-                groupKey="more-root"
-                {...groupProps}
-              />
-              <VLine h={18} />
-            </>
-          )}
-          <VLine h={22} />
+          <Connector xs={rowXs} h={20} />
           <div
             style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}
           >
+            {visMgrs.map((mgr, i) => (
+              <ManagerColumn
+                key={mgr.id}
+                mgr={mgr}
+                {...groupProps}
+                moreBtn={
+                  i === visMgrs.length - 1 && showRootBtn ? (
+                    <MoreBtn
+                      absolute
+                      total={managers.length}
+                      k={rootKey}
+                      expanded={expanded}
+                      toggle={toggle}
+                      forceAll={forceAll}
+                    />
+                  ) : null
+                }
+              />
+            ))}
+
             {coAdmins.map((coAdmin, index) => {
               const key = `coadmin-${coAdmin.id}`;
               const coAdminMatches =
@@ -932,6 +1008,7 @@ function OrgTree({ data, loading, q }) {
                 [coAdmin.name, coAdmin.designation, coAdmin.department].some(
                   (s) => s && norm(s).includes(q),
                 );
+              const coManagers = coAdmin.managers || [];
               return (
                 <div
                   key={coAdmin.id}
@@ -939,6 +1016,8 @@ function OrgTree({ data, loading, q }) {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "flex-start",
+                    width: coWidth(coAdmin),
+                    flexShrink: 0,
                   }}
                 >
                   <Card
@@ -959,10 +1038,10 @@ function OrgTree({ data, loading, q }) {
                     q={q}
                     you={coAdmin.isCurrentUser}
                   />
-                  <VLine h={18} />
+                  {coManagers.length === 0 && <VLine h={18} />}
                   <ManagerGroup
-                    managers={coAdmin.managers || []}
-                    groupKey={`more-root-co-${coAdmin.id}`}
+                    managers={coManagers}
+                    groupKey={coKey(coAdmin)}
                     {...groupProps}
                   />
                 </div>
