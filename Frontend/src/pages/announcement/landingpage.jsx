@@ -171,7 +171,7 @@ function SectionBackdrop() {
 /* ==========================================================================
    NAVBAR
 ========================================================================== */
-const NAV_LINKS = ['Features', 'Testimonials', 'Pricing', 'About', 'Calculator']
+const NAV_LINKS = ['Features','Pricing','Testimonials', 'About', 'Calculator']
 const NAV_SECTION_IDS = ['features', 'testimonials', 'pricing']
 
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
