@@ -150,13 +150,23 @@ const peekStorageStatus = (org) => {
 
 const roleCanUpgrade = (role) => ADMIN_ROLES.includes(role);
 
-const buildStorageLimitError = (status, role) => {
+// Single source of truth for every "storage full" message (login, getme,
+// plan-features, uploads). `extra` is an optional upload-specific sentence.
+const buildStorageMessage = (status, canUpgrade, extra = "") => {
+  const usage = `${status.usedFormatted} of its ${status.limitFormatted}`;
+  const lead = extra ? `${extra} ` : "";
+  return canUpgrade
+    ? `${lead}Your organisation is on the Free Forever plan and has used ${usage} free storage,` +
+        `so access to TorchX Talent is paused. To continue, upgrade to the Basic or Advance plan ` +
+        `at torchxsuite.com for unlimited storage, or free up space by deleting unused files and data.`
+    : `${lead}Your organisation's free storage is full, so access to TorchX Talent is paused. ` +
+        `Please ask your organisation's admin to upgrade the plan or free up space.`;
+};
+
+const buildStorageLimitError = (status, role, extra = "") => {
   const canUpgrade = roleCanUpgrade(role);
   const title = "Storage limit reached";
-  const message = canUpgrade
-    ? `Your organisation has used ${status.usedFormatted} of the ${status.limitFormatted} free storage. ` +
-      `Please upgrade to the Basic or Advance plan at torchxsuite.com for unlimited storage and to continue using TorchX Talent.`
-    : `Your organisation has reached its free storage limit. Please contact your organization.`;
+  const message = buildStorageMessage(status, canUpgrade, extra);
 
   return Object.assign(new Error(message), {
     statusCode: 403,
@@ -240,4 +250,6 @@ module.exports = {
   getStorageStatusForLogin,
   assertOrgAccess,
   storageGateMiddleware,
+  buildStorageMessage,
+  roleCanUpgrade,
 };

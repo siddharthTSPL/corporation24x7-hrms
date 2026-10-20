@@ -1,7 +1,12 @@
 const SuperAdminModel = require("../Models/superadmin.model");
 const imagekit = require("../utils/imagekit.utils");
 const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
-const { getPlanState, getStorageStatusForLogin } = require("../utils/planAccess");
+const {
+  getPlanState,
+  getStorageStatusForLogin,
+  buildStorageMessage,
+  roleCanUpgrade,
+} = require("../utils/planAccess");
 
 const uploadProfilePhoto = async (req, res, next) => {
   try {
@@ -31,7 +36,11 @@ const uploadProfilePhoto = async (req, res, next) => {
         return res.status(403).json({
           success: false,
           code: "STORAGE_LIMIT_REACHED",
-          message: "Your organisation has reached its free storage limit. Please contact your organization.",
+          message: buildStorageMessage(
+            storage,
+            roleCanUpgrade(req.superAdmin ? "superadmin" : req.admin ? "admin" : "employee"),
+            "Photo not uploaded.",
+          ),
         });
       }
     }

@@ -11,8 +11,13 @@ const errorHandler = (err, req, res, next) => {
 
   if (err.code === 11000) {
     statusCode = 400;
-    const field = Object.keys(err.keyValue);
-    message = `Duplicate field value: ${field}`;
+    const fields = Object.keys(err.keyValue || {}).filter(
+      (f) => f !== "organisation_id"
+    );
+    const values = fields.map((f) => `${f}: ${err.keyValue[f]}`).join(", ");
+    message = `Duplicate field value: ${values || fields.join(", ")}`;
+    // Log the exact index so stale/legacy indexes are easy to spot
+    console.error("[E11000] index:", err.keyPattern, "value:", err.keyValue);
   }
 
   if (err.name === "ValidationError") {

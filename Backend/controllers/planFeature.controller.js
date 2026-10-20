@@ -3,7 +3,11 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const {
   UNLOCKED_PLANS,
 } = require("../middleware/auth/planFeatureGate.middleware");
-const { getPlanState, peekStorageStatus } = require("../utils/planAccess");
+const {
+  getPlanState,
+  peekStorageStatus,
+  buildStorageMessage,
+} = require("../utils/planAccess");
 
 // Features gated by the org's torchx_talent plan tier. Keep this in sync
 // with middleware/auth/planFeatureGate.middleware.js — that middleware is
@@ -116,9 +120,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
           ...storageStatus,
           limitReached: storageStatus.exceeded,
           message: storageStatus.exceeded
-            ? isAdminRole
-              ? "Your free trial has ended and your organisation's free storage is full. Please upgrade to the Basic or Advance plan at torchxsuite.com for unlimited storage and to keep using TorchX Talent."
-              : "Your organisation's free storage is full. Please contact your organization."
+            ? buildStorageMessage(storageStatus, isAdminRole)
             : null,
         }
       : null;
