@@ -35,6 +35,69 @@ const ROLE_CONFIG = {
 
 const DAY = 24 * 60 * 60 * 1000;
 
+const isHalfDayLeaveType = (t) => typeof t === "string" && t.startsWith("half_day");
+
+/**
+ * Approved leave ALWAYS wins over the check-in based status - no matter when
+ * the leave was approved (before, during or after the person checked in/out):
+ *   - full-day leave (el/sl/ml/pl/lwp) -> status "leave" (paid or LWP is then
+ *     decided by isLwpDay). Check-in/out times stay visible for reference but
+ *     the day is counted as the leave, never as Present.
+ *   - half-day leave (half_day_el/sl)  -> a "present" day becomes "half_day"
+ *     (0.5 leave + 0.5 worked); isLwpDay says whether the leave half is unpaid.
+ *   - comp_off                         -> counts as a present (paid) day.
+ * Returns a NEW row; the input is not mutated.
+ */
+const applyLeaveToRow = (r, leave, date) => {
+  // isLwpDay: balance (EL/SL) ran out for this day, so the leave is unpaid.
+  const isLwpDay = leave.leaveType === "lwp" || isDateInLwpPortion(leave, date);
+  const base = { ...r, leaveType: leave.leaveType, isLwpDay };
+  if (leave.leaveType === "comp_off") return { ...base, status: "present", isLwpDay: false };
+  if (isHalfDayLeaveType(leave.leaveType)) {
+    return { ...base, status: r.status === "present" ? "half_day" : r.status };
+  }
+  return { ...base, status: "leave" };
+};
+
+/**
+ * Who is on an APPROVED leave on `date` (default today)?
+ * people: [{ id, roleKey: "admin" | "manager" | "employee" }]
+ * returns Map(personId -> { leaveType, isLwp, isHalfDay })
+ * comp_off is skipped on purpose - it is a present (worked-equivalent) day.
+ */
+const fetchLeaveMapForDate = async ({ organisation_id, people, date = new Date() }) => {
+  const d = startOfDay(date);
+  const out = new Map();
+  for (const roleKey of Object.keys(ROLE_CONFIG)) {
+    const ids = people.filter((p) => p.roleKey === roleKey).map((p) => p.id);
+    if (!ids.length) continue;
+    const cfg = ROLE_CONFIG[roleKey];
+    const leaves = await cfg.LeaveModel.find({
+      organisation_id,
+      [cfg.leaveField]: { $in: ids },
+      status: { $in: cfg.approved },
+      // widened by a day each side, exact check is done below with startOfDay
+      startDate: { $lte: new Date(d.getTime() + DAY) },
+      endDate: { $gte: new Date(d.getTime() - DAY) },
+    })
+      .select(`${cfg.leaveField} startDate endDate leaveType lwpDays`)
+      .lean();
+    for (const l of leaves) {
+      if (l.leaveType === "comp_off") continue;
+      if (d < startOfDay(l.startDate) || d > startOfDay(l.endDate)) continue;
+      const id = String(l[cfg.leaveField]);
+      const entry = {
+        leaveType: l.leaveType,
+        isLwp: l.leaveType === "lwp" || isDateInLwpPortion(l, d),
+        isHalfDay: isHalfDayLeaveType(l.leaveType),
+      };
+      // if two leaves overlap, a full-day one wins over a half-day one
+      if (!out.has(id) || (out.get(id).isHalfDay && !entry.isHalfDay)) out.set(id, entry);
+    }
+  }
+  return out;
+};
+
 /**
  * The admin/superadmin "Attendance History" only listed days that have an
  * Attendance record, so week-offs, holidays, approved-leave days and no-show
@@ -66,12 +129,9 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
   const out = rows.map((r) => {
     const d = startOfDay(r.date);
     const l = leaveFor(d);
-    // isLwpDay: balance (EL/SL) ran out for this day, so the leave is unpaid.
-    // Without this flag a half_day_sl / half_day_el with NO balance left was
-    // still shown (and counted) as a fully paid day.
-    return l
-      ? { ...r, leaveType: l.leaveType, isLwpDay: l.leaveType === "lwp" || isDateInLwpPortion(l, d) }
-      : r;
+    // An APPROVED leave always outranks whatever check-in/check-out produced.
+    // See applyLeaveToRow - this is what stops "Present - LWP" rows.
+    return l ? applyLeaveToRow(r, l, d) : r;
   });
 
   const today = startOfDay(new Date());
@@ -218,7 +278,6 @@ const applyTimesheetFallback = async ({ organisation_id, personId, onModel, rows
 //   - no check-in at all       -> only the leave half can be paid -> 0.5 / 0
 // Late penalty (4th+ late check-in of the month) is a plain half_day row
 // with no leave -> 0.5.
-const isHalfDayLeaveType = (t) => typeof t === "string" && t.startsWith("half_day");
 const dayPaidValue = (r) => {
   const paidLeave = !!r.leaveType && r.leaveType !== "lwp" && !r.isLwpDay;
   if (r.status === "present") return 1;
@@ -285,4 +344,4 @@ const computeMonthPaidDays = async ({ organisation_id, people, month, year }) =>
   return result;
 };
 
-module.exports = { fillHistoryGaps, computeMonthPaidDays, dayPaidValue };
+module.exports = { fillHistoryGaps, computeMonthPaidDays, dayPaidValue, fetchLeaveMapForDate, applyLeaveToRow };
