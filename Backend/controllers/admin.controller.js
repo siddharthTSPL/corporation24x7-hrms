@@ -41,7 +41,7 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
 const { logAudit } = require("../utils/auditLog.utils");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
-const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
+const { fillHistoryGaps, computeMonthPaidDays, fetchLeaveMapForDate } = require("../utils/attendanceHistoryFill.utils");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const {
@@ -4518,17 +4518,28 @@ const getAttendanceOverview = async (req, res, next) => {
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      // Approved leave for today outranks check-in state: a person on leave is
+      // "on_leave" - never "Not Checked In" / "On Duty" / "Present". A half-day
+      // leave only takes over while the person has not checked in.
+      const leaveMap = await fetchLeaveMapForDate({ organisation_id, people, date: today });
       const data = people.map((p) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
-        const status = checkedIn
+        const lv = leaveMap.get(p.id) || null;
+        const onLeave = !!lv && (!lv.isHalfDay || !checkedIn);
+        const status = onLeave
+          ? "on_leave"
+          : checkedIn
           ? checkedOut
             ? r.status || "absent"
             : "on_duty"
           : "absent";
         return {
           ...p,
+          leaveType: lv?.leaveType || null,
+          isLwpLeave: !!lv?.isLwp,
+          isHalfDayLeave: !!lv?.isHalfDay,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
           status,

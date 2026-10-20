@@ -20,7 +20,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
-const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
+const { fillHistoryGaps, computeMonthPaidDays, fetchLeaveMapForDate } = require("../utils/attendanceHistoryFill.utils");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
@@ -2307,10 +2307,14 @@ const getAttendanceOverview = async (req, res, next) => {
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      // Approved leave for today outranks check-in state (see admin controller).
+      const leaveMap = await fetchLeaveMapForDate({ organisation_id, people, date: today });
       const data = people.map((p) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
+        const lv = leaveMap.get(p.id) || null;
+        const onLeave = !!lv && (!lv.isHalfDay || !checkedIn);
         // Once checked out, trust the stored `status` (present/half_day/absent)
         // instead of re-deriving it from checkIn/checkOut presence. `status`
         // is computed at checkout time from activeMinutes vs the shift's
@@ -2319,9 +2323,14 @@ const getAttendanceOverview = async (req, res, next) => {
         // "half_day" even though both timestamps are set. The old logic
         // treated any checkIn+checkOut pair as "present" regardless of how
         // little time was actually worked.
-        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
+        const status = onLeave
+          ? "on_leave"
+          : checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
         return {
           ...p,
+          leaveType: lv?.leaveType || null,
+          isLwpLeave: !!lv?.isLwp,
+          isHalfDayLeave: !!lv?.isHalfDay,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
           status,
