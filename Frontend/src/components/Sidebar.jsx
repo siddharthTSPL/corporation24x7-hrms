@@ -27,6 +27,9 @@ import {
   FaMapMarkedAlt,
   FaFileContract,
   FaBusinessTime,
+  FaUserCheck,      // NEW: Face Attendance icon
+  FaRegFolderOpen,  // NEW: Team Documents icon
+  FaBookOpen,       // NEW: My Policies icon
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -54,7 +57,7 @@ const superAdminMenu = [
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt />, blurb: "See and manage leave requests across every organisation." },
   { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations.", planFeature: "review" },
   {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history.", planFeature: "asset" },
-  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt />, blurb: "Access documents uploaded by teams across organisations." },
+  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaRegFolderOpen />, blurb: "Access documents uploaded by teams across organisations." },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide.", planFeature: "timesheet" },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
@@ -64,7 +67,7 @@ const superAdminMenu = [
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
   { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies published by your admins." },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies published by your admins." },
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
      { name: "Training Records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
@@ -82,7 +85,7 @@ const adminMenu = [
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review pending requests, check your own leave balance, or apply for your own leave and WFH." } },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", planFeature: "asset" },
-  { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt />, blurb: "Enroll employee faces for kiosk-based attendance." },
+  { name: "Face Attendance", path: "/face-enrollment", icon: <FaUserCheck />, blurb: "Enroll employee faces for kiosk-based attendance." },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, blurb: "Post hiring requisitions and track candidates.",
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
   { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
@@ -93,10 +96,10 @@ const adminMenu = [
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File your own overtime, and review team overtime if you are the designated HR." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "Team Document", path: "/document-admin-team", icon: <FaRegFolderOpen />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
   { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you." },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
   { name: "Training", path: "/training-admin", icon: <FaClipboardCheck />, blurb: "Assign training, manage stages and approve completion." },
 ];
@@ -120,7 +123,7 @@ const managerMenu = [
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "Manage sessions for training assignments where you are the trainer." },
 ];
@@ -143,7 +146,7 @@ const employeeMenu = [
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
    { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "View your training assignments, schedules and certificates.", permissionGroup: ["navigation.can_view_training"] },
   { name: "Payroll", path: "/payroll", icon: <FaFileInvoiceDollar />, blurb: "Manage organisation-wide payroll and salary details.", permissionGroup: ["payroll.can_manage_payroll"] },
   { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track company policy acknowledgements.", permissionGroup: ["adminAccess.can_manage_policy_management"] },
