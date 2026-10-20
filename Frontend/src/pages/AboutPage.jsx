@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -14,6 +14,49 @@ import { fadeUp, stagger, cardVariant } from "./announcement/animations";
 import slideWhiteOffice from '../assets/Office-meeting.png'
 import slideTeam from '../assets/Team-work.jpg'
 
+/* ------------------------------------------------------------------ */
+/* Image preloading                                                    */
+/* Hero image ka download module load hote hi start ho jata hai,       */
+/* component render hone ka wait nahi karta.                           */
+/* ------------------------------------------------------------------ */
+if (typeof window !== 'undefined') {
+  const heroPreload = new Image()
+  heroPreload.decoding = 'async'
+  heroPreload.src = slideWhiteOffice
+}
+
+/* ------------------------------------------------------------------ */
+/* FadeImage: placeholder dikhata hai, load hone par smooth fade-in    */
+/* ------------------------------------------------------------------ */
+function FadeImage({ src, alt, priority = false, className = '' }) {
+  const [loaded, setLoaded] = useState(false)
+  const imgRef = useRef(null)
+
+  // Agar image cache se already load ho chuki hai to onLoad fire nahi hota,
+  // isliye complete check karte hain.
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) setLoaded(true)
+  }, [])
+
+  return (
+    <div className="relative w-full h-full bg-[#F3E4EC]">
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        width={1200}
+        height={900}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
+        className={`w-full h-full object-cover ${priority ? '' : 'transition-opacity duration-300'} ${loaded || priority ? 'opacity-100' : 'opacity-0'} ${className}`}
+      />
+    </div>
+  )
+}
+
 function HeroBadge({ children }) {
   return (
     <span className="inline-flex items-center gap-2 bg-[#FDF4F8] border border-[#EAC7D7] text-[#7A004B] text-[12px] font-ui font-semibold uppercase tracking-[1px] px-4 py-2 rounded-full">
@@ -24,7 +67,7 @@ function HeroBadge({ children }) {
 }
 
 function AboutHero({ onExplore }) {
- 
+
   return (
     <section className="bg-white pt-24 pb-12 overflow-hidden">
       <Wrap>
@@ -59,13 +102,10 @@ function AboutHero({ onExplore }) {
             className="relative"
           >
             <div className="rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_24px_64px_rgba(115,0,66,0.16)] aspect-[4/3]">
-              <img
+              <FadeImage
                 src={slideWhiteOffice}
                 alt="TorchX Talent workforce analytics"
-                className="w-full h-full object-cover"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
+                priority
               />
             </div>
 
@@ -151,15 +191,12 @@ function OriginStory({ scrollContainerRef }) {
     <section className="bg-[#F8F5F7] py-12">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
-         
+
           <div className="relative">
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
-              <img
+              <FadeImage
                 src={slideTeam}
                 alt="TorchX Talent engineering lab"
-                className="w-full h-full object-cover"
-                loading="eager"
-                decoding="async"
               />
             </div>
             <div className="flex items-center justify-between mt-3 px-1">
@@ -357,6 +394,22 @@ export default function AboutPage() {
   const { data: auth } = useAuth()
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
+
+  // Hero image load hone ke baad, browser idle hone par neeche wali image
+  // background me preload kar dete hain, taaki scroll karte hi ready mile.
+  useEffect(() => {
+    const preloadTeam = () => {
+      const img = new Image()
+      img.decoding = 'async'
+      img.src = slideTeam
+    }
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(preloadTeam, { timeout: 2000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = setTimeout(preloadTeam, 800)
+    return () => clearTimeout(t)
+  }, [])
 
   const accountLabel = isAuthenticated ? 'Access Your Talent Account' : 'Sign in to your Talent Account'
   const handleAccountClick = () => navigate(isAuthenticated ? '/redirect' : '/login')

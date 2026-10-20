@@ -22,6 +22,8 @@ import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { setAgentToken } from "../../pages/utils/Desktopagent";
 import { pollChallengeStatus, finalizeApprovedLogin } from "../../auth/api/singleSignIn/singleSignIn.api";
+// NOTE: adjust this path to wherever you saved AppToast.jsx
+import { showApiError, showErrorToast, showInfoToast } from "../../components/AppToast";
 
 // Prefer the backend's explicit account-type bucket (superadmin/admin/manager/employee).
 // Falls back to normalizing the raw role string for older responses that don't send accountType.
@@ -47,7 +49,6 @@ function Login() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
-  const [notice, setNotice] = useState(location.state?.notice || "");
 
   const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
   const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
@@ -56,6 +57,7 @@ function Login() {
 
   const [form, setForm] = useState({ email: "", password: "", otp: "", newPassword: "", confirmPassword: "" });
   const [verifiedAuthPayload, setVerifiedAuthPayload] = useState(null);
+  // errors is now used ONLY to highlight input borders. Messages are shown in popups.
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -63,7 +65,6 @@ function Login() {
   const [showLoader, setShowLoader] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt }
-  const [approvalError, setApprovalError] = useState("");
 
   const images = [slide1, slide2, slide3];
 
@@ -78,10 +79,11 @@ function Login() {
     if (!authLoading && authData) navigateByRole(authData.role);
   }, [authData, authLoading]);
 
-  // Clear the router state right after reading it so the notice doesn't
-  // reappear on a refresh or when navigating back to this page later.
+  // Show the router-state notice as a popup, then clear it so it doesn't
+  // reappear on refresh or when navigating back to this page later.
   useEffect(() => {
     if (location.state?.notice) {
+      showInfoToast(location.state.notice);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,15 +106,23 @@ function Login() {
     setErrors({});
   };
 
-  const getErrorMessage = (err) =>
-    err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
+  // Highlights the field(s) and shows the first message as a popup.
+  const failField = (fieldErrors) => {
+    setErrors(fieldErrors);
+    const firstMessage = Object.values(fieldErrors)[0];
+    if (firstMessage) showErrorToast(firstMessage, "Please check your input");
+  };
 
   const validate = () => {
     const newErrors = {};
     if (!form.email) newErrors.email = "Email is required";
     if (!form.password) newErrors.password = "Password is required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) {
+      failField(newErrors);
+      return false;
+    }
+    setErrors({});
+    return true;
   };
 
   const syncProfileToCache = async (role, fallbackData) => {
@@ -133,10 +143,19 @@ function Login() {
     }
   };
 
+  const finishPostAuth = async (data) => {
+    const role = normalizeRole(data);
+    if (data?.token) {
+      setAgentToken(data.token);
+    }
+    await syncProfileToCache(role, data);
+    setShowLoader(false);
+    navigateByRole(role);
+  };
+
   const handleLogin = () => {
     if (!validate()) return;
     setShowLoader(true);
-    setApprovalError("");
 
     loginFn(
       { email: form.email, password: form.password },
@@ -155,7 +174,7 @@ function Login() {
         },
         onError: (err) => {
           setShowLoader(false);
-          setErrors({ general: getErrorMessage(err) });
+          showApiError(err, "Sign in failed"); // storage limit => special popup, others => error popup
         },
       }
     );
@@ -183,10 +202,11 @@ function Login() {
           clearInterval(interval);
           setApprovalChallenge(null);
           setStep("login");
-          setApprovalError(
+          showErrorToast(
             result.reason === "expired"
               ? "The approval request timed out. Please try signing in again."
-              : "Sign-in was denied from your other device."
+              : "Sign-in was denied from your other device.",
+            "Sign in failed"
           );
         }
       } catch (err) {
@@ -208,28 +228,24 @@ function Login() {
 
   const handleSendOtp = () => {
     if (!form.email) {
-      setErrors({ email: "Email is required" });
+      failField({ email: "Email is required" });
       return;
     }
     sendOtpFn(form.email, {
-      onSuccess: () => setStep("otp"),
-      onError: (err) => setErrors({ email: getErrorMessage(err) }),
+      onSuccess: () => {
+        setErrors({});
+        setStep("otp");
+      },
+      onError: (err) => {
+        setErrors({ email: true });
+        showApiError(err, "Could not send OTP");
+      },
     });
-  };
-
-  const finishPostAuth = async (data) => {
-    const role = normalizeRole(data);
-    if (data?.token) {
-      setAgentToken(data.token);
-    }
-    await syncProfileToCache(role, data);
-    setShowLoader(false);
-    navigateByRole(role);
   };
 
   const handleVerifyOtp = () => {
     if (!form.otp) {
-      setErrors({ otp: "OTP is required" });
+      failField({ otp: "OTP is required" });
       return;
     }
 
@@ -252,22 +268,25 @@ function Login() {
           setErrors({});
           setStep("reset");
         },
-        onError: (err) => setErrors({ otp: getErrorMessage(err) }),
+        onError: (err) => {
+          setErrors({ otp: true });
+          showApiError(err, "OTP verification failed");
+        },
       }
     );
   };
 
   const handleSetNewPassword = () => {
     if (!form.newPassword || !form.confirmPassword) {
-      setErrors({ newPassword: "Both password fields are required" });
+      failField({ newPassword: "Both password fields are required" });
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
-      setErrors({ newPassword: "Passwords do not match" });
+      failField({ newPassword: "Passwords do not match" });
       return;
     }
     if (form.newPassword.length < 8) {
-      setErrors({ newPassword: "Password must be at least 8 characters" });
+      failField({ newPassword: "Password must be at least 8 characters" });
       return;
     }
 
@@ -280,7 +299,8 @@ function Login() {
         },
         onError: (err) => {
           setShowLoader(false);
-          setErrors({ newPassword: getErrorMessage(err) });
+          setErrors({ newPassword: true });
+          showApiError(err, "Could not update password");
         },
       }
     );
@@ -290,6 +310,8 @@ function Login() {
     setShowLoader(true);
     await finishPostAuth(verifiedAuthPayload);
   };
+
+  const errBorder = (field) => (errors[field] ? "border-red-400" : "");
 
   return (
     <div
@@ -312,35 +334,14 @@ function Login() {
                 <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
                 <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
 
-                {notice && (
-                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between gap-2">
-                    <p className="text-blue-700 text-sm">{notice}</p>
-                    <button
-                      type="button"
-                      onClick={() => setNotice("")}
-                      className="text-blue-400 hover:text-blue-600 text-sm leading-none"
-                      aria-label="Dismiss"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-
-                {(errors.general || approvalError) && (
-                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{errors.general || approvalError}</p>
-                  </div>
-                )}
-
                 <input
                   type="text"
                   name="email"
                   placeholder="Email address"
                   value={form.email}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-1 p-3 border rounded-lg ${errBorder("email")}`}
                 />
-                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
 
                 <div className="relative mt-2 mb-1">
                   <input
@@ -349,7 +350,7 @@ function Login() {
                     placeholder="Password"
                     value={form.password}
                     onChange={handleChange}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042]"
+                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042] ${errBorder("password")}`}
                   />
                   <span
                     onClick={() => setShowPassword(!showPassword)}
@@ -358,7 +359,6 @@ function Login() {
                     {showPassword ? "🙈" : "👁️"}
                   </span>
                 </div>
-                {errors.password && <p className="text-red-500 text-sm mb-2">{errors.password}</p>}
 
                 <button
                   onClick={handleLogin}
@@ -373,11 +373,11 @@ function Login() {
                     Forgot Password?
                   </p>
                   <p
-  onClick={() => (window.location.href = "https://torchxsuite.com/signup")}
-  className="cursor-pointer hover:text-[#730042] ml-auto"
->
-  Sign Up
-</p>
+                    onClick={() => (window.location.href = "https://torchxsuite.com/signup")}
+                    className="cursor-pointer hover:text-[#730042] ml-auto"
+                  >
+                    Sign Up
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3 my-4">
@@ -425,9 +425,8 @@ function Login() {
                   placeholder="Enter your email"
                   value={form.email}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-3 p-3 border rounded-lg ${errBorder("email")}`}
                 />
-                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
                 <button
                   onClick={handleSendOtp}
                   disabled={isSendingOtp}
@@ -453,9 +452,8 @@ function Login() {
                   placeholder="Enter OTP"
                   value={form.otp}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-3 p-3 border rounded-lg ${errBorder("otp")}`}
                 />
-                {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
                 <button
                   onClick={handleVerifyOtp}
                   disabled={isVerifyingOtp}
@@ -484,7 +482,7 @@ function Login() {
                   placeholder="New password"
                   value={form.newPassword}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-1 p-3 border rounded-lg ${errBorder("newPassword")}`}
                 />
                 <input
                   type="password"
@@ -492,9 +490,8 @@ function Login() {
                   placeholder="Confirm new password"
                   value={form.confirmPassword}
                   onChange={handleChange}
-                  className="w-full mt-2 mb-1 p-3 border rounded-lg"
+                  className={`w-full mt-2 mb-1 p-3 border rounded-lg ${errBorder("newPassword")}`}
                 />
-                {errors.newPassword && <p className="text-red-500 text-sm mb-2">{errors.newPassword}</p>}
                 <button
                   onClick={handleSetNewPassword}
                   disabled={isResettingPassword}

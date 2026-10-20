@@ -1,13 +1,26 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Crown, Users, Building2, User,
-  Download, Search, X, Loader2, CheckCircle2,
+  Crown,
+  Users,
+  Building2,
+  User,
+  Download,
+  Search,
+  X,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 
 import { useGetOrgInfo } from "../../auth/server-state/adminother/adminother.hook";
 
 const initials = (name = "") =>
-  name.split(" ").filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  name
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
 const norm = (s = "") => s.toLowerCase().trim();
 
@@ -122,7 +135,18 @@ const STYLES = `
 
 function Sk({ w, h, r = 8 }) {
   return (
-    <div style={{ width: w, height: h, borderRadius: r, flexShrink: 0, background: "linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize: "600px 100%", animation: "shimmer 1.4s infinite linear" }} />
+    <div
+      style={{
+        width: w,
+        height: h,
+        borderRadius: r,
+        flexShrink: 0,
+        background:
+          "linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)",
+        backgroundSize: "600px 100%",
+        animation: "shimmer 1.4s infinite linear",
+      }}
+    />
   );
 }
 
@@ -133,13 +157,35 @@ function Avatar({ name, size = 40, bg, color, image }) {
       <img
         src={image}
         alt={name}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, background: bg }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: "50%",
+          objectFit: "cover",
+          flexShrink: 0,
+          background: bg,
+        }}
         onError={() => setErrored(true)}
       />
     );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: bg, color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0, fontFamily: "'Syne',sans-serif" }}>
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: bg,
+        color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        flexShrink: 0,
+        fontFamily: "'Syne',sans-serif",
+      }}
+    >
       {initials(name)}
     </div>
   );
@@ -152,7 +198,16 @@ function Hi({ text = "", q = "", style = {} }) {
   return (
     <span style={style}>
       {text.slice(0, idx)}
-      <mark style={{ background: "#fef08a", color: "#713f12", borderRadius: 2, padding: "0 1px" }}>{text.slice(idx, idx + q.length)}</mark>
+      <mark
+        style={{
+          background: "#fef08a",
+          color: "#713f12",
+          borderRadius: 2,
+          padding: "0 1px",
+        }}
+      >
+        {text.slice(idx, idx + q.length)}
+      </mark>
       {text.slice(idx + q.length)}
     </span>
   );
@@ -163,107 +218,407 @@ function YouPill() {
 }
 
 const CFG = {
-  org:     { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
-  admin:   { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
+  org: { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
+  admin: { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
   manager: { accent: "#475569", avBg: "#f1f5f9", avColor: "#475569" },
-  subMgr:  { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b" },
-  emp:     { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
+  subMgr: { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b" },
+  emp: { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
 };
 
-function Card({ level, name, department, designation, empid, isOrg, width = 172, delay = 0, dim, hl, q, you, empCount, image }) {
+function Card({
+  level,
+  name,
+  department,
+  designation,
+  empid,
+  isOrg,
+  width = 172,
+  delay = 0,
+  dim,
+  hl,
+  q,
+  you,
+  empCount,
+  image,
+}) {
   const c = CFG[level] || CFG.emp;
   return (
-    <div style={{ animation: `scaleIn 0.26s ease ${delay}ms forwards`, opacity: 0, flexShrink: 0 }}>
+    <div
+      style={{
+        animation: `scaleIn 0.26s ease ${delay}ms forwards`,
+        opacity: 0,
+        flexShrink: 0,
+      }}
+    >
       <div
-        className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : ""].filter(Boolean).join(" ")}
-        style={{ width, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "14px 12px 11px", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", alignItems: "center", position: "relative", overflow: "hidden" }}
+        className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        style={{
+          width,
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 11,
+          padding: "14px 12px 11px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
         {you && <YouPill />}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: c.accent, borderRadius: "11px 11px 0 0" }} />
-        <Avatar name={name} size={38} bg={c.avBg} color={c.avColor} image={image} />
-        <div style={{ marginTop: 8, marginBottom: 6, textAlign: "center", width: "100%" }}>
-          <Hi text={name} q={q} style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", display: "block", lineHeight: 1.3, fontFamily: "'Syne',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: c.accent,
+            borderRadius: "11px 11px 0 0",
+          }}
+        />
+        <Avatar
+          name={name}
+          size={38}
+          bg={c.avBg}
+          color={c.avColor}
+          image={image}
+        />
+        <div
+          style={{
+            marginTop: 8,
+            marginBottom: 6,
+            textAlign: "center",
+            width: "100%",
+          }}
+        >
+          <Hi
+            text={name}
+            q={q}
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#0f172a",
+              display: "block",
+              lineHeight: 1.3,
+              fontFamily: "'Syne',sans-serif",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          />
           {!isOrg && (
             <>
-              <Hi text={department || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-              <Hi text={designation || "—"} q={q} style={{ fontSize: 10, color: "#64748b", display: "block", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
-              <span style={{ fontSize: 9, color: "#94a3b8", display: "block", marginTop: 2, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empid || "—"}</span>
+              <Hi
+                text={department || "—"}
+                q={q}
+                style={{
+                  fontSize: 10,
+                  color: "#64748b",
+                  display: "block",
+                  marginTop: 2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              />
+              <Hi
+                text={designation || "—"}
+                q={q}
+                style={{
+                  fontSize: 10,
+                  color: "#64748b",
+                  display: "block",
+                  marginTop: 2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 9,
+                  color: "#94a3b8",
+                  display: "block",
+                  marginTop: 2,
+                  fontFamily: "'DM Mono',monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {empid || "—"}
+              </span>
             </>
           )}
-          {empCount !== undefined && <span style={{ fontSize: 10, color: "#94a3b8", display: "block", marginTop: 2 }}>{empCount} report{empCount !== 1 ? "s" : ""}</span>}
+          {empCount !== undefined && (
+            <span
+              style={{
+                fontSize: 10,
+                color: "#94a3b8",
+                display: "block",
+                marginTop: 2,
+              }}
+            >
+              {empCount} report{empCount !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function VLine({ h = 24 }) {
-  return <div style={{ width: 1, height: h, background: "#e2e8f0", margin: "0 auto", flexShrink: 0 }} />;
+const CARD_W = 172;
+const EMP_W = 152;
+const MGR_GAP = 28;
+const EMP_GAP = 10;
+const SUB_MGR_GAP = 20;
+const LIMIT = 2; // employees / sub-managers rows
+const ROOT_LIMIT = 3; // top row of managers: the button only appears from the 4th card
+const BTN_W = 112;
+const BTN_SPACE = BTN_W + 12;
+
+// Same connector style as the Super Admin org chart
+const LINE_COLOR = "#c9d2e0";
+const LINE_W = 1.5;
+
+// An employee card is narrower than a manager card. Shifting the employee row right by this
+// amount puts the first employee's center exactly under the parent card's center, so a lone
+// child gets a perfectly straight line (no jog).
+const EMP_OFF = (CARD_W - EMP_W) / 2;
+
+// keys starting with "more-root" are top-level manager rows
+const limitOf = (key) => (key.startsWith("more-root") ? ROOT_LIMIT : LIMIT);
+
+const visibleOf = (list, key, expanded, forceAll) =>
+  forceAll || expanded.has(key) ? list : list.slice(0, limitOf(key));
+
+const btnSpace = (total, forceAll) =>
+  !forceAll && total > LIMIT ? BTN_SPACE : 0;
+const hasBtn = (total, forceAll, limit = LIMIT) => !forceAll && total > limit;
+
+// Width of the single row that holds a manager's sub-managers AND employees
+function childrenRowW(mgr, expanded, forceAll) {
+  const emps = mgr.employees || [];
+  const subs = mgr.subManagers || [];
+  const vEmps = visibleOf(emps, `more-emp-${mgr.id}`, expanded, forceAll);
+  const vSubs = visibleOf(subs, `more-sub-${mgr.id}`, expanded, forceAll);
+
+  let w = 0;
+  if (!vSubs.length && vEmps.length) w += EMP_OFF;
+  if (vSubs.length) {
+    w +=
+      vSubs.reduce(
+        (s, sm, i) =>
+          s +
+          colWOf(
+            sm,
+            expanded,
+            forceAll,
+            i === vSubs.length - 1 && hasBtn(subs.length, forceAll),
+          ),
+        0,
+      ) +
+      (vSubs.length - 1) * SUB_MGR_GAP;
+  }
+  if (vSubs.length && vEmps.length) w += SUB_MGR_GAP;
+  if (vEmps.length) {
+    w +=
+      vEmps.length * EMP_W +
+      (vEmps.length - 1) * EMP_GAP +
+      btnSpace(emps.length, forceAll);
+  }
+  return w;
 }
 
-function ManagerTBar({ mgrW, empCount, empW, empGap }) {
-  if (empCount === 0) return null;
-  const total = Math.max(mgrW, empCount * empW + (empCount - 1) * empGap);
-  const barY = 14;
-  const offset = (total - (empCount * empW + (empCount - 1) * empGap)) / 2;
+// reserve = true when this column also carries a "See more" button beside its card
+function colWOf(mgr, expanded, forceAll, reserve = false) {
+  return Math.max(
+    CARD_W + (reserve ? BTN_SPACE : 0),
+    childrenRowW(mgr, expanded, forceAll),
+  );
+}
+
+// Width of a whole group of manager columns (used to size each co-admin column)
+function groupWOf(managers, key, expanded, forceAll) {
+  if (!managers.length) return CARD_W;
+  const vis = visibleOf(managers, key, expanded, forceAll);
+  const showBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
+  const w =
+    vis.reduce(
+      (s, m, i) =>
+        s + colWOf(m, expanded, forceAll, i === vis.length - 1 && showBtn),
+      0,
+    ) +
+    (vis.length - 1) * MGR_GAP;
+  return Math.max(CARD_W, w);
+}
+
+// Vertical stub, placed under the card's center (left-aligned layout)
+function VLine({ h = 24, x = CARD_W / 2 }) {
   return (
-    <svg width={total} height={barY + 4} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-      <line x1={total / 2} y1={0} x2={total / 2} y2={barY} stroke="#e2e8f0" strokeWidth={1} />
-      {empCount > 1 && (
-        <line x1={offset + empW / 2} y1={barY} x2={total - offset - empW / 2} y2={barY} stroke="#e2e8f0" strokeWidth={1} />
-      )}
-      {Array.from({ length: empCount }).map((_, i) => {
-        const cx = offset + i * (empW + empGap) + empW / 2;
-        return <line key={i} x1={cx} y1={barY} x2={cx} y2={barY + 4} stroke="#e2e8f0" strokeWidth={1} />;
-      })}
+    <svg
+      width={x + 2}
+      height={h}
+      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
+    >
+      <line
+        x1={x}
+        y1={-0.5}
+        x2={x}
+        y2={h + 0.5}
+        stroke={LINE_COLOR}
+        strokeWidth={LINE_W}
+        strokeLinecap="square"
+      />
     </svg>
   );
 }
 
-const CARD_W = 172;
-const EMP_W  = 152;
-const MGR_GAP = 28;
-const EMP_GAP = 10;
-const SUB_MGR_GAP = 20;
+// Parent card center -> bus line -> a stem down to each child card center
+function Connector({ parentX = CARD_W / 2, xs, h = 20 }) {
+  if (!xs.length) return null;
+  const mid = h / 2;
+  const minX = Math.min(parentX, ...xs);
+  const maxX = Math.max(parentX, ...xs);
+  const needBus = xs.length > 1 || Math.abs(xs[0] - parentX) > 1;
+  const common = {
+    stroke: LINE_COLOR,
+    strokeWidth: LINE_W,
+    strokeLinecap: "square",
+  };
+  return (
+    <svg
+      width={maxX + 2}
+      height={h}
+      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
+    >
+      <line
+        x1={parentX}
+        y1={-0.5}
+        x2={parentX}
+        y2={needBus ? mid : h}
+        {...common}
+      />
+      {needBus && <line x1={minX} y1={mid} x2={maxX} y2={mid} {...common} />}
+      {needBus &&
+        xs.map((x, i) => (
+          <line key={i} x1={x} y1={mid} x2={x} y2={h} {...common} />
+        ))}
+    </svg>
+  );
+}
+
+function MoreBtn({ total, k, expanded, toggle, forceAll, absolute = false }) {
+  const limit = limitOf(k);
+  if (forceAll || total <= limit) return null;
+  const open = expanded.has(k);
+  return (
+    <div
+      style={
+        absolute
+          ? { position: "absolute", left: CARD_W + 12, top: 48, width: BTN_W }
+          : {
+              flexShrink: 0,
+              alignSelf: "flex-start",
+              paddingTop: 48,
+              width: BTN_W,
+              marginLeft: 12,
+            }
+      }
+      data-html2canvas-ignore
+    >
+      <button
+        type="button"
+        className="hb"
+        onClick={() => toggle(k)}
+        style={{ fontWeight: 600 }}
+      >
+        {open ? "← See less" : `See ${total - limit} more →`}
+      </button>
+    </div>
+  );
+}
 
 function collectMatchKeys(nodes, q, matches, prefix = "m") {
   if (!q) return;
   nodes.forEach((mgr) => {
     const key = `${prefix}-${mgr.id}`;
-    if ([mgr.name, mgr.designation, mgr.department].some(s => s && norm(s).includes(q)))
+    if (
+      [mgr.name, mgr.designation, mgr.department].some(
+        (s) => s && norm(s).includes(q),
+      )
+    )
       matches.add(key);
-    (mgr.employees || []).forEach(e => {
-      if ([e.name, e.designation, e.department].some(s => s && norm(s).includes(q)))
+    (mgr.employees || []).forEach((e) => {
+      if (
+        [e.name, e.designation, e.department].some(
+          (s) => s && norm(s).includes(q),
+        )
+      )
         matches.add(`e-${e.id}`);
     });
-    if (mgr.subManagers?.length) collectMatchKeys(mgr.subManagers, q, matches, `m`);
+    if (mgr.subManagers?.length)
+      collectMatchKeys(mgr.subManagers, q, matches, `m`);
   });
 }
 
-function colWOf(mgr) {
-  const empCount = (mgr.employees || []).length;
-  const empW = Math.max(CARD_W, empCount > 0 ? empCount * EMP_W + (empCount - 1) * EMP_GAP : 0);
-  const subMgrs = mgr.subManagers || [];
-  const subW = subMgrs.length > 0
-    ? subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP
-    : 0;
-  return Math.max(CARD_W, empW, subW);
-}
-
-function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
+function ManagerColumn({
+  mgr,
+  q,
+  matches,
+  dim,
+  delayRef,
+  expanded,
+  toggle,
+  forceAll,
+  isSubMgr = false,
+  moreBtn = null,
+}) {
   const key = `m-${mgr.id}`;
   const emps = mgr.employees || [];
   const subMgrs = mgr.subManagers || [];
   const totalChildren = emps.length + subMgrs.length;
   const level = isSubMgr ? "subMgr" : "manager";
-
-  const cw = colWOf(mgr);
+  const subKey = `more-sub-${mgr.id}`;
+  const empKey = `more-emp-${mgr.id}`;
+  const visSubs = visibleOf(subMgrs, subKey, expanded, forceAll);
+  const visEmps = visibleOf(emps, empKey, expanded, forceAll);
+  const subHasBtn = hasBtn(subMgrs.length, forceAll);
 
   const mDelay = delayRef.current;
   delayRef.current += 55;
 
+  // Sub-managers and employees live in ONE row under this card, so a single connector
+  // reaches every child. xs = x of each child card's center, measured from this column's left.
+  const startOff = visSubs.length ? 0 : EMP_OFF;
+  let off = startOff;
+  const xs = [];
+  visSubs.forEach((sm, i) => {
+    const last = i === visSubs.length - 1 && subHasBtn;
+    xs.push(off + CARD_W / 2);
+    off += colWOf(sm, expanded, forceAll, last) + SUB_MGR_GAP;
+  });
+  visEmps.forEach(() => {
+    xs.push(off + EMP_W / 2);
+    off += EMP_W + EMP_GAP;
+  });
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cw, flexShrink: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        position: "relative",
+        width: colWOf(mgr, expanded, forceAll, !!moreBtn),
+        flexShrink: 0,
+      }}
+    >
       <Card
         level={level}
         name={mgr.name}
@@ -279,63 +634,112 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
         empCount={totalChildren > 0 ? totalChildren : undefined}
       />
 
-      {subMgrs.length > 0 && (
-        <>
-          <VLine h={18} />
-          {subMgrs.length > 1 && (() => {
-            const totalSubW = subMgrs.reduce((s, sm) => s + colWOf(sm), 0) + (subMgrs.length - 1) * SUB_MGR_GAP;
-            return (
-              <svg width={totalSubW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-                <line x1={totalSubW / 2} y1={0} x2={totalSubW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-                <line x1={colWOf(subMgrs[0]) / 2} y1={10} x2={totalSubW - colWOf(subMgrs[subMgrs.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-                {subMgrs.map((sm, i) => {
-                  let cx = 0;
-                  for (let j = 0; j < i; j++) cx += colWOf(subMgrs[j]) + SUB_MGR_GAP;
-                  cx += colWOf(sm) / 2;
-                  return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
-                })}
-              </svg>
-            );
-          })()}
-          <div style={{ display: "flex", gap: SUB_MGR_GAP, alignItems: "flex-start" }}>
-            {subMgrs.map(sm => (
-              <ManagerColumn key={sm.id} mgr={sm} q={q} matches={matches} dim={dim} delayRef={delayRef} isSubMgr />
-            ))}
-          </div>
-        </>
-      )}
+      {moreBtn}
 
-      {emps.length > 0 && (
+      {totalChildren > 0 && (
         <>
-          <ManagerTBar mgrW={CARD_W} empCount={emps.length} empW={EMP_W} empGap={EMP_GAP} />
-          <div style={{ display: "flex", gap: EMP_GAP, alignItems: "flex-start" }}>
-            {emps.map(emp => {
+          <Connector xs={xs} h={20} />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              paddingLeft: startOff,
+            }}
+          >
+            {visSubs.map((sm, i) => {
+              const lastOverall =
+                i === visSubs.length - 1 && visEmps.length === 0;
+              return (
+                <div
+                  key={sm.id}
+                  style={{
+                    flexShrink: 0,
+                    marginRight: lastOverall ? 0 : SUB_MGR_GAP,
+                  }}
+                >
+                  <ManagerColumn
+                    mgr={sm}
+                    q={q}
+                    matches={matches}
+                    dim={dim}
+                    delayRef={delayRef}
+                    expanded={expanded}
+                    toggle={toggle}
+                    forceAll={forceAll}
+                    isSubMgr
+                    moreBtn={
+                      i === visSubs.length - 1 && subHasBtn ? (
+                        <MoreBtn
+                          absolute
+                          total={subMgrs.length}
+                          k={subKey}
+                          expanded={expanded}
+                          toggle={toggle}
+                          forceAll={forceAll}
+                        />
+                      ) : null
+                    }
+                  />
+                </div>
+              );
+            })}
+
+            {visEmps.map((emp, i) => {
               const eKey = `e-${emp.id}`;
               const eDelay = delayRef.current;
               delayRef.current += 18;
               return (
-                <Card
+                <div
                   key={emp.id}
-                  level="emp"
-                  name={emp.name}
-                  department={emp.department ? getDepartmentName(emp.department) : "—"}
-                  designation={emp.designation || "—"}
-                  empid={emp.empid}
-                  image={emp.profile_image}
-                  width={EMP_W}
-                  delay={eDelay}
-                  dim={dim(eKey)}
-                  hl={matches.has(eKey)}
-                  q={q}
-                />
+                  style={{
+                    flexShrink: 0,
+                    marginRight: i === visEmps.length - 1 ? 0 : EMP_GAP,
+                  }}
+                >
+                  <Card
+                    level="emp"
+                    name={emp.name}
+                    department={
+                      emp.department ? getDepartmentName(emp.department) : "—"
+                    }
+                    designation={emp.designation || "—"}
+                    empid={emp.empid}
+                    image={emp.profile_image}
+                    width={EMP_W}
+                    delay={eDelay}
+                    dim={dim(eKey)}
+                    hl={matches.has(eKey)}
+                    q={q}
+                  />
+                </div>
               );
             })}
+
+            {visEmps.length > 0 && (
+              <MoreBtn
+                total={emps.length}
+                k={empKey}
+                expanded={expanded}
+                toggle={toggle}
+                forceAll={forceAll}
+              />
+            )}
           </div>
         </>
       )}
 
       {emps.length === 0 && subMgrs.length === 0 && (
-        <div style={{ marginTop: 10, padding: "6px 14px", borderRadius: 8, border: "1px dashed #e2e8f0", fontSize: 11, color: "#cbd5e1", background: "#fafafa" }}>
+        <div
+          style={{
+            marginTop: 10,
+            padding: "6px 14px",
+            borderRadius: 8,
+            border: "1px dashed #e2e8f0",
+            fontSize: 11,
+            color: "#cbd5e1",
+            background: "#fafafa",
+          }}
+        >
           No reports
         </div>
       )}
@@ -345,16 +749,25 @@ function ManagerColumn({ mgr, q, matches, dim, delayRef, isSubMgr = false }) {
 
 function SkeletonTree() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+    >
       <Sk w={172} h={104} r={11} />
-      <div style={{ width: 1, height: 24, background: "#e2e8f0" }} />
+      <div style={{ width: 1.5, height: 24, background: LINE_COLOR }} />
       <Sk w={172} h={96} r={11} />
-      <div style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+      <div style={{ width: 1.5, height: 20, background: LINE_COLOR }} />
       <div style={{ display: "flex", gap: 28 }}>
-        {[1, 2, 3].map(i => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <Sk w={172} h={96} r={11} />
-            <div style={{ width: 1, height: 16, background: "#e2e8f0" }} />
+            <div style={{ width: 1.5, height: 16, background: LINE_COLOR }} />
             <div style={{ display: "flex", gap: 10 }}>
               <Sk w={152} h={92} r={11} />
               <Sk w={152} h={92} r={11} />
@@ -366,53 +779,111 @@ function SkeletonTree() {
   );
 }
 
-function ManagerGroup({ managers, q, matches, dim, delayRef }) {
-  const totalW = managers.reduce((s, m) => s + colWOf(m), 0) + Math.max(0, managers.length - 1) * MGR_GAP;
-  const topBarW = Math.max(CARD_W, totalW);
+// groupKey must start with "more-root" and be unique per group (main managers / each co-admin)
+function ManagerGroup({
+  managers,
+  q,
+  matches,
+  dim,
+  delayRef,
+  expanded,
+  toggle,
+  forceAll,
+  groupKey,
+}) {
+  if (managers.length === 0) {
+    return (
+      <div
+        style={{
+          width: CARD_W,
+          padding: "12px 8px",
+          borderRadius: 10,
+          border: "1px dashed #e2e8f0",
+          fontSize: 12,
+          textAlign: "center",
+          color: "#cbd5e1",
+          background: "#fafafa",
+        }}
+      >
+        No managers added yet
+      </div>
+    );
+  }
+
+  const vis = visibleOf(managers, groupKey, expanded, forceAll);
+  const showBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
+
+  let off = 0;
+  const xs = vis.map((m, i) => {
+    const last = i === vis.length - 1 && showBtn;
+    const x = off + CARD_W / 2;
+    off += colWOf(m, expanded, forceAll, last) + MGR_GAP;
+    return x;
+  });
 
   return (
     <>
-      {managers.length > 1 && (
-        <svg width={topBarW} height={20} style={{ display: "block", flexShrink: 0, overflow: "visible" }}>
-          <line x1={topBarW / 2} y1={0} x2={topBarW / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-          <line x1={colWOf(managers[0]) / 2} y1={10} x2={topBarW - colWOf(managers[managers.length - 1]) / 2} y2={10} stroke="#e2e8f0" strokeWidth={1} />
-          {managers.map((mgr, i) => {
-            let cx = 0;
-            for (let j = 0; j < i; j++) cx += colWOf(managers[j]) + MGR_GAP;
-            cx += colWOf(mgr) / 2;
-            return <line key={i} x1={cx} y1={10} x2={cx} y2={20} stroke="#e2e8f0" strokeWidth={1} />;
-          })}
-        </svg>
-      )}
-
+      <Connector xs={xs} h={20} />
       <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
-        {managers.map(mgr => (
-          <ManagerColumn key={mgr.id} mgr={mgr} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+        {vis.map((mgr, i) => (
+          <ManagerColumn
+            key={mgr.id}
+            mgr={mgr}
+            q={q}
+            matches={matches}
+            dim={dim}
+            delayRef={delayRef}
+            expanded={expanded}
+            toggle={toggle}
+            forceAll={forceAll}
+            moreBtn={
+              i === vis.length - 1 && showBtn ? (
+                <MoreBtn
+                  absolute
+                  total={managers.length}
+                  k={groupKey}
+                  expanded={expanded}
+                  toggle={toggle}
+                  forceAll={forceAll}
+                />
+              ) : null
+            }
+          />
         ))}
-        {managers.length === 0 && (
-          <div style={{ padding: "14px 28px", borderRadius: 10, border: "1px dashed #e2e8f0", fontSize: 13, color: "#cbd5e1", background: "#fafafa" }}>
-            No managers added yet
-          </div>
-        )}
       </div>
     </>
   );
 }
 
 function OrgTree({ data, loading, q }) {
+  // Which "See more" rows are open. Must stay above the early returns.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const toggle = (k) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+
   if (loading) return <SkeletonTree />;
   if (!data) return null;
 
   const hasQ = q.length > 0;
+  const forceAll = hasQ; // while searching, show everything so a match is never hidden
   const matches = new Set();
 
   if (hasQ) {
-    const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
+    const chk = (...ss) => ss.some((s) => s && norm(s).includes(q));
     if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
-    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department)) matches.add("admin");
+    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department))
+      matches.add("admin");
     collectMatchKeys(data.managers || [], q, matches);
     (data.coAdmins || []).forEach((coAdmin) => {
-      if ([coAdmin.name, coAdmin.designation, coAdmin.department].some(s => s && norm(s).includes(q)))
+      if (
+        [coAdmin.name, coAdmin.designation, coAdmin.department].some(
+          (s) => s && norm(s).includes(q),
+        )
+      )
         matches.add(`coadmin-${coAdmin.id}`);
       collectMatchKeys(coAdmin.managers || [], q, matches);
     });
@@ -426,10 +897,57 @@ function OrgTree({ data, loading, q }) {
 
   const delayRef = { current: 160 };
 
+  const groupProps = { q, matches, dim, delayRef, expanded, toggle, forceAll };
+
+  // ---- Admin has co-admins: managers and co-admins are ONE row under the admin ----
+  // so a single connector links the admin to every card in it.
+  const rootKey = "more-root";
+  const visMgrs = visibleOf(managers, rootKey, expanded, forceAll);
+  const showRootBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
+  const coKey = (co) => `more-root-co-${co.id}`;
+  const coWidth = (co) =>
+    groupWOf(co.managers || [], coKey(co), expanded, forceAll);
+
+  const rowXs = [];
+  if (coAdmins.length > 0) {
+    let off = 0;
+    visMgrs.forEach((m, i) => {
+      const last = i === visMgrs.length - 1 && showRootBtn;
+      rowXs.push(off + CARD_W / 2);
+      off += colWOf(m, expanded, forceAll, last) + MGR_GAP;
+    });
+    coAdmins.forEach((co) => {
+      rowXs.push(off + CARD_W / 2);
+      off += coWidth(co) + MGR_GAP;
+    });
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "max-content", minWidth: "100%" }}>
-      <div style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}>
-        <Card level="org" name={data.organisation_name || "Organisation"} department="—" designation={data.super_admin?.name || "—"} image={data.organisation_logo} isOrg width={CARD_W} delay={0} dim={dim("org")} hl={matches.has("org")} q={q} />
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        width: "max-content",
+        minWidth: "max-content",
+      }}
+    >
+      <div
+        style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}
+      >
+        <Card
+          level="org"
+          name={data.organisation_name || "Organisation"}
+          department="—"
+          designation={data.super_admin?.name || "—"}
+          image={data.organisation_logo}
+          isOrg
+          width={CARD_W}
+          delay={0}
+          dim={dim("org")}
+          hl={matches.has("org")}
+          q={q}
+        />
       </div>
       <VLine h={22} />
 
@@ -438,7 +956,11 @@ function OrgTree({ data, loading, q }) {
           <Card
             level="admin"
             name={data.admin.name}
-            department={data.admin.department ? getDepartmentName(data.admin.department) : "—"}
+            department={
+              data.admin.department
+                ? getDepartmentName(data.admin.department)
+                : "—"
+            }
             designation={data.admin.designation || "—"}
             empid={data.admin.empid}
             image={data.admin.profile_image}
@@ -455,25 +977,57 @@ function OrgTree({ data, loading, q }) {
 
       {coAdmins.length > 0 ? (
         <>
-          {managers.length > 0 && (
-            <>
-              <VLine h={18} />
-              <ManagerGroup managers={managers} q={q} matches={matches} dim={dim} delayRef={delayRef} />
-              <VLine h={18} />
-            </>
-          )}
-          <VLine h={22} />
-          <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
+          <Connector xs={rowXs} h={20} />
+          <div
+            style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}
+          >
+            {visMgrs.map((mgr, i) => (
+              <ManagerColumn
+                key={mgr.id}
+                mgr={mgr}
+                {...groupProps}
+                moreBtn={
+                  i === visMgrs.length - 1 && showRootBtn ? (
+                    <MoreBtn
+                      absolute
+                      total={managers.length}
+                      k={rootKey}
+                      expanded={expanded}
+                      toggle={toggle}
+                      forceAll={forceAll}
+                    />
+                  ) : null
+                }
+              />
+            ))}
+
             {coAdmins.map((coAdmin, index) => {
               const key = `coadmin-${coAdmin.id}`;
-              const coAdminMatches = hasQ && [coAdmin.name, coAdmin.designation, coAdmin.department]
-                .some(s => s && norm(s).includes(q));
+              const coAdminMatches =
+                hasQ &&
+                [coAdmin.name, coAdmin.designation, coAdmin.department].some(
+                  (s) => s && norm(s).includes(q),
+                );
+              const coManagers = coAdmin.managers || [];
               return (
-                <div key={coAdmin.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div
+                  key={coAdmin.id}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    width: coWidth(coAdmin),
+                    flexShrink: 0,
+                  }}
+                >
                   <Card
                     level="admin"
                     name={coAdmin.name}
-                    department={coAdmin.department ? getDepartmentName(coAdmin.department) : "—"}
+                    department={
+                      coAdmin.department
+                        ? getDepartmentName(coAdmin.department)
+                        : "—"
+                    }
                     designation={coAdmin.designation || "—"}
                     empid={coAdmin.empid}
                     image={coAdmin.profile_image}
@@ -484,15 +1038,23 @@ function OrgTree({ data, loading, q }) {
                     q={q}
                     you={coAdmin.isCurrentUser}
                   />
-                  <VLine h={18} />
-                  <ManagerGroup managers={coAdmin.managers || []} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+                  {coManagers.length === 0 && <VLine h={18} />}
+                  <ManagerGroup
+                    managers={coManagers}
+                    groupKey={coKey(coAdmin)}
+                    {...groupProps}
+                  />
                 </div>
               );
             })}
           </div>
         </>
       ) : (
-        <ManagerGroup managers={managers} q={q} matches={matches} dim={dim} delayRef={delayRef} />
+        <ManagerGroup
+          managers={managers}
+          groupKey="more-root"
+          {...groupProps}
+        />
       )}
     </div>
   );
@@ -500,14 +1062,74 @@ function OrgTree({ data, loading, q }) {
 
 function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
   return (
-    <div className="stat-h" style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards`, opacity: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 11, padding: "13px 14px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.04)", position: "relative", overflow: "hidden", minWidth: 0 }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: accent }} />
-      <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${accent}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div
+      className="stat-h"
+      style={{
+        animation: `fadeUp 0.3s ease ${delay}ms forwards`,
+        opacity: 0,
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 11,
+        padding: "13px 14px",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+        position: "relative",
+        overflow: "hidden",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2,
+          background: accent,
+        }}
+      />
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          flexShrink: 0,
+          background: `${accent}18`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Icon size={14} style={{ color: accent }} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 12.5, fontWeight: 600, color: "#0f172a", lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'Syne',sans-serif" }}>{text || "—"}</p>
-        <p style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 500, margin: "3px 0 0" }}>{label}</p>
+        <p
+          style={{
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: "#0f172a",
+            lineHeight: 1.2,
+            margin: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontFamily: "'Syne',sans-serif",
+          }}
+        >
+          {text || "—"}
+        </p>
+        <p
+          style={{
+            fontSize: 10.5,
+            color: "#94a3b8",
+            fontWeight: 500,
+            margin: "3px 0 0",
+          }}
+        >
+          {label}
+        </p>
       </div>
     </div>
   );
@@ -550,20 +1172,30 @@ export default function OrganizationPageAdmin() {
       const r = sc.getBoundingClientRect();
       const vh = window.innerHeight;
       setBar((prev) => {
-        const next = { sw: inner.scrollWidth, show: inner.scrollWidth > sc.clientWidth + 1 };
+        const next = {
+          sw: inner.scrollWidth,
+          show: inner.scrollWidth > sc.clientWidth + 1,
+        };
         return prev.sw === next.sw && prev.show === next.show ? prev : next;
       });
       // Bar is always pinned to the bottom edge of the screen; only shown while the chart block is on screen
       const visible = r.bottom > 0 && r.top < vh - BAR_H;
       setPos((prev) =>
-        prev.left === r.left && prev.width === r.width && prev.visible === visible
+        prev.left === r.left &&
+        prev.width === r.width &&
+        prev.visible === visible
           ? prev
-          : { left: r.left, width: r.width, top: 0, visible }
+          : { left: r.left, width: r.width, top: 0, visible },
       );
     };
-    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
     measure();
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(schedule)
+        : null;
     ro?.observe(inner);
     ro?.observe(sc);
     window.addEventListener("resize", schedule);
@@ -577,21 +1209,26 @@ export default function OrganizationPageAdmin() {
   }, [data, loading, searchOpen]);
 
   const syncScroll = (from, to) => {
-    if (from && to && to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
+    if (from && to && to.scrollLeft !== from.scrollLeft)
+      to.scrollLeft = from.scrollLeft;
   };
 
   const matchCount = useMemo(() => {
     if (!searchQuery || !data) return 0;
     const q = norm(searchQuery);
     let n = 0;
-    const chk = (...ss) => ss.some(s => s && norm(s).includes(q));
+    const chk = (...ss) => ss.some((s) => s && norm(s).includes(q));
     if (chk(data.organisation_name)) n++;
-    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department)) n++;
-    const walk = (nodes) => nodes.forEach(mgr => {
-      if (chk(mgr.name, mgr.department, mgr.designation)) n++;
-      (mgr.employees || []).forEach(e => { if (chk(e.name, e.designation, e.department)) n++; });
-      if (mgr.subManagers?.length) walk(mgr.subManagers);
-    });
+    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department))
+      n++;
+    const walk = (nodes) =>
+      nodes.forEach((mgr) => {
+        if (chk(mgr.name, mgr.department, mgr.designation)) n++;
+        (mgr.employees || []).forEach((e) => {
+          if (chk(e.name, e.designation, e.department)) n++;
+        });
+        if (mgr.subManagers?.length) walk(mgr.subManagers);
+      });
     walk(data.managers || []);
     (data.coAdmins || []).forEach((coAdmin) => {
       if (chk(coAdmin.name, coAdmin.designation, coAdmin.department)) n++;
@@ -606,14 +1243,21 @@ export default function OrganizationPageAdmin() {
     if (data.admin) n++;
     n += (data.coAdmins || []).length;
     n += countNodes(data.managers || []);
-    (data.coAdmins || []).forEach((coAdmin) => { n += countNodes(coAdmin.managers || []); });
+    (data.coAdmins || []).forEach((coAdmin) => {
+      n += countNodes(coAdmin.managers || []);
+    });
     return n;
   }, [data]);
 
   const adminInfo = data?.admin || null;
 
   useEffect(() => {
-    const fn = (e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } };
+    const fn = (e) => {
+      if (e.key === "Escape") {
+        setSearchOpen(false);
+        setSearchQuery("");
+      }
+    };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, []);
@@ -631,13 +1275,17 @@ export default function OrganizationPageAdmin() {
       if (!window.html2canvas) {
         await new Promise((res, rej) => {
           const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-          s.onload = res; s.onerror = rej;
+          s.src =
+            "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+          s.onload = res;
+          s.onerror = rej;
           document.head.appendChild(s);
         });
       }
       target.classList.add("export-mode");
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r)),
+      );
       const canvas = await window.html2canvas(target, {
         backgroundColor: "#ffffff",
         scale: 2,
@@ -652,7 +1300,10 @@ export default function OrganizationPageAdmin() {
         scrollY: 0,
         onclone: (doc) => {
           const sc = doc.querySelector("[data-org-scroll]");
-          if (sc) { sc.style.overflow = "visible"; sc.style.maxWidth = "none"; }
+          if (sc) {
+            sc.style.overflow = "visible";
+            sc.style.maxWidth = "none";
+          }
         },
       });
       target.classList.remove("export-mode");
@@ -668,73 +1319,182 @@ export default function OrganizationPageAdmin() {
     }
   }, [exportStatus, orgName]);
 
-  const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+  };
 
   return (
     <div className="org-root">
       <style>{STYLES}</style>
 
-      <div className="shrink-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-0 sm:h-[54px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4" style={{ animation: "fadeIn 0.3s ease forwards" }}>
+      <div
+        className="shrink-0 bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 sm:py-0 sm:h-[54px] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-4"
+        style={{ animation: "fadeIn 0.3s ease forwards" }}
+      >
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink min-w-0 overflow-hidden">
-          <span className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">{orgName}</span>
+          <span className="text-[11px] sm:text-xs text-slate-400 font-medium truncate">
+            {orgName}
+          </span>
           <span className="text-slate-200 flex-shrink-0">›</span>
-          <span className="text-[12px] sm:text-[13px] text-slate-900 font-semibold flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Org Chart</span>
+          <span
+            className="text-[12px] sm:text-[13px] text-slate-900 font-semibold flex-shrink-0"
+            style={{ fontFamily: "'Syne',sans-serif" }}
+          >
+            Org Chart
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
           {searchOpen ? (
-            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
+            <div
+              className="flex items-center gap-2 w-full sm:w-auto flex-wrap"
+              style={{ animation: "slideDown 0.2s ease forwards" }}
+            >
               <div className="sw">
                 <Search size={13} style={{ color: "#94a3b8", flexShrink: 0 }} />
-                <input ref={inputRef} className="si" placeholder="Search name, role, department…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                {searchQuery && <button className="cb" onClick={() => setSearchQuery("")}><X size={13} /></button>}
+                <input
+                  ref={inputRef}
+                  className="si"
+                  placeholder="Search name, role, department…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button className="cb" onClick={() => setSearchQuery("")}>
+                    <X size={13} />
+                  </button>
+                )}
               </div>
-              {searchQuery && <div className="mp">{matchCount} match{matchCount !== 1 ? "es" : ""}</div>}
-              <button className="hb" onClick={closeSearch}><X size={13} /> Close</button>
+              {searchQuery && (
+                <div className="mp">
+                  {matchCount} match{matchCount !== 1 ? "es" : ""}
+                </div>
+              )}
+              <button className="hb" onClick={closeSearch}>
+                <X size={13} /> Close
+              </button>
             </div>
           ) : (
-            <button className="hb" onClick={() => setSearchOpen(true)}><Search size={13} /> Search</button>
+            <button className="hb" onClick={() => setSearchOpen(true)}>
+              <Search size={13} /> Search
+            </button>
           )}
-          <button className="hb hb-p" onClick={handleExport} disabled={loading || exportStatus === "loading"}>
-            {exportStatus === "loading"
-              ? <><Loader2 size={13} style={{ animation: "spin 0.8s linear infinite" }} /> <span className="hidden xs:inline">Exporting…</span></>
-              : <><Download size={13} /> <span className="hidden xs:inline">Export PNG</span></>}
+          <button
+            className="hb hb-p"
+            onClick={handleExport}
+            disabled={loading || exportStatus === "loading"}
+          >
+            {exportStatus === "loading" ? (
+              <>
+                <Loader2
+                  size={13}
+                  style={{ animation: "spin 0.8s linear infinite" }}
+                />{" "}
+                <span className="hidden xs:inline">Exporting…</span>
+              </>
+            ) : (
+              <>
+                <Download size={13} />{" "}
+                <span className="hidden xs:inline">Export PNG</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
       <div className="max-w-[1600px] w-full min-w-0 mx-auto px-3 sm:px-6 pt-4 sm:pt-[22px] pb-6 sm:pb-8">
-        <div className="shrink-0 mb-4 sm:mb-[18px]" style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0 }}>
-          <h1 className="text-[17px] sm:text-[19px] font-bold text-slate-900 m-0 tracking-[-0.3px]" style={{ fontFamily: "'Syne',sans-serif" }}>Organisation Chart</h1>
+        <div
+          className="shrink-0 mb-4 sm:mb-[18px]"
+          style={{ animation: "fadeUp 0.3s ease 50ms forwards", opacity: 0 }}
+        >
+          <h1
+            className="text-[17px] sm:text-[19px] font-bold text-slate-900 m-0 tracking-[-0.3px]"
+            style={{ fontFamily: "'Syne',sans-serif" }}
+          >
+            Organisation Chart
+          </h1>
           <p className="text-[11px] sm:text-xs text-slate-400 mt-1 mb-0">
-            {loading ? "Loading…" : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} top-level manager${(data?.managers || []).length !== 1 ? "s" : ""}`}
+            {loading
+              ? "Loading…"
+              : `${orgName} · ${totalNodes} nodes · ${(data?.managers || []).length} top-level manager${(data?.managers || []).length !== 1 ? "s" : ""}`}
           </p>
         </div>
 
         <div className="shrink-0 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-4 sm:mb-5">
-          <StatCard label="Organisation"  text={orgName}                                icon={Building2} accent="#0f172a" delay={60}  />
-          <StatCard label="Admin name"    text={adminInfo?.name}                        icon={User}      accent="#334155" delay={95}  />
-          <StatCard label="Department"    text={adminInfo?.department ? getDepartmentName(adminInfo.department) : undefined} icon={Users}     accent="#475569" delay={130} />
-          <StatCard label="Designation"   text={adminInfo?.designation}                 icon={Crown}     accent="#64748b" delay={165} />
+          <StatCard
+            label="Organisation"
+            text={orgName}
+            icon={Building2}
+            accent="#0f172a"
+            delay={60}
+          />
+          <StatCard
+            label="Admin name"
+            text={adminInfo?.name}
+            icon={User}
+            accent="#334155"
+            delay={95}
+          />
+          <StatCard
+            label="Department"
+            text={
+              adminInfo?.department
+                ? getDepartmentName(adminInfo.department)
+                : undefined
+            }
+            icon={Users}
+            accent="#475569"
+            delay={130}
+          />
+          <StatCard
+            label="Designation"
+            text={adminInfo?.designation}
+            icon={Crown}
+            accent="#64748b"
+            delay={165}
+          />
         </div>
 
         {searchOpen && searchQuery && matchCount === 0 && (
-          <div className="shrink-0 mb-3.5 px-3 sm:px-3.5 py-2.5 rounded-lg bg-yellow-100 border border-yellow-200 text-[12px] text-amber-800 flex items-center gap-2 flex-wrap" style={{ animation: "slideDown 0.2s ease forwards" }}>
-            <Search size={13} className="flex-shrink-0" />No results for <strong className="ml-0.5 break-all">"{searchQuery}"</strong>
+          <div
+            className="shrink-0 mb-3.5 px-3 sm:px-3.5 py-2.5 rounded-lg bg-yellow-100 border border-yellow-200 text-[12px] text-amber-800 flex items-center gap-2 flex-wrap"
+            style={{ animation: "slideDown 0.2s ease forwards" }}
+          >
+            <Search size={13} className="flex-shrink-0" />
+            No results for{" "}
+            <strong className="ml-0.5 break-all">"{searchQuery}"</strong>
           </div>
         )}
 
         {/* Full hierarchy block: width is capped to the page, extra width scrolls INSIDE this block */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden" style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0 }}>
+        <div
+          className="bg-white border border-slate-200 rounded-2xl shadow-sm w-full max-w-full min-w-0 overflow-hidden"
+          style={{ animation: "fadeIn 0.3s ease 240ms forwards", opacity: 0 }}
+        >
           <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-[11px] border-b border-slate-100 flex items-center justify-between bg-[#fafafa] flex-wrap gap-2">
             <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-              <Crown size={13} style={{ color: "#94a3b8" }} className="flex-shrink-0" />
-              <span className="text-[12px] font-semibold text-slate-600 flex-shrink-0" style={{ fontFamily: "'Syne',sans-serif" }}>Full hierarchy</span>
-              <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-slate-100 text-slate-400 font-semibold flex-shrink-0" style={{ fontFamily: "'DM Mono',monospace" }}>
+              <Crown
+                size={13}
+                style={{ color: "#94a3b8" }}
+                className="flex-shrink-0"
+              />
+              <span
+                className="text-[12px] font-semibold text-slate-600 flex-shrink-0"
+                style={{ fontFamily: "'Syne',sans-serif" }}
+              >
+                Full hierarchy
+              </span>
+              <span
+                className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-slate-100 text-slate-400 font-semibold flex-shrink-0"
+                style={{ fontFamily: "'DM Mono',monospace" }}
+              >
                 {loading ? "—" : `${totalNodes} nodes`}
               </span>
               {searchQuery && matchCount > 0 && (
-                <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold flex-shrink-0">{matchCount} highlighted</span>
+                <span className="text-[10px] px-1.5 sm:px-[7px] py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold flex-shrink-0">
+                  {matchCount} highlighted
+                </span>
               )}
             </div>
           </div>
@@ -744,7 +1504,12 @@ export default function OrganizationPageAdmin() {
             ref={scrollRef}
             onScroll={() => syncScroll(scrollRef.current, barRef.current)}
             className="sc-hide bg-white"
-            style={{ width: "100%", maxWidth: "100%", overflowX: "auto", overflowY: "hidden" }}
+            style={{
+              width: "100%",
+              maxWidth: "100%",
+              overflowX: "auto",
+              overflowY: "hidden",
+            }}
           >
             <div
               ref={exportRef}
@@ -780,9 +1545,19 @@ export default function OrganizationPageAdmin() {
 
       {exportStatus && (
         <div className="et">
-          {exportStatus === "loading"
-            ? <><Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} /> Generating PNG…</>
-            : <><CheckCircle2 size={14} style={{ color: "#4ade80" }} /> Exported!</>}
+          {exportStatus === "loading" ? (
+            <>
+              <Loader2
+                size={14}
+                style={{ animation: "spin 0.8s linear infinite" }}
+              />{" "}
+              Generating PNG…
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={14} style={{ color: "#4ade80" }} /> Exported!
+            </>
+          )}
         </div>
       )}
     </div>
