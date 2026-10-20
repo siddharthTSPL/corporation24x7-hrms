@@ -46,15 +46,11 @@ function AdminCard({ admin, selected, onClick }) {
         boxShadow: isSelected ? `0 0 0 3px ${BRAND.pink}22, 0 4px 24px #00000015` : "0 2px 8px #00000010",
       }}
     >
-      <div
-        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold shrink-0 border"
-        style={{
-          background: isSelected ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})` : `linear-gradient(135deg, #C9829E, ${BRAND.pink})`,
-          fontFamily: "'Playfair Display', Georgia, serif",
-          borderColor: isSelected ? BRAND.pink : BRAND.accentBorder,
-        }}
-      >
-        {getInitials(admin)}
+      <div className="relative h-9 w-9 sm:h-10 sm:w-10 shrink-0 overflow-hidden rounded-full border" style={{ borderColor: isSelected ? BRAND.pink : BRAND.accentBorder }}>
+        <div className="flex h-full w-full items-center justify-center text-white text-xs sm:text-sm font-bold" style={{ background: isSelected ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})` : `linear-gradient(135deg, #C9829E, ${BRAND.pink})`, fontFamily: "'Playfair Display', Georgia, serif" }}>
+          {getInitials(admin)}
+        </div>
+        {admin.profile_image && <img src={admin.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
       </div>
       <div className="text-left min-w-0 flex-1">
         <p className="m-0 text-sm font-semibold truncate" style={{ color: BRAND.textPrimary, fontFamily: "'Playfair Display', Georgia, serif" }}>

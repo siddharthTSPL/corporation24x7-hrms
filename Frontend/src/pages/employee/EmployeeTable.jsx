@@ -1021,7 +1021,7 @@ function AddressFields({ form, onChange, errors }) {
   );
 }
 
-function Avatar({ name, size = "md" }) {
+function Avatar({ name, size = "md", image }) {
   const safe = name || "??";
   const initials = safe
     .split(" ")
@@ -1039,10 +1039,11 @@ function Avatar({ name, size = "md" }) {
         : "w-8 h-8 text-xs";
   return (
     <div
-      className={`${sz} rounded-full flex items-center justify-center font-bold text-white flex-shrink-0`}
+      className={`${sz} relative overflow-hidden rounded-full flex items-center justify-center font-bold text-white flex-shrink-0`}
       style={{ background: color }}
     >
       {initials}
+      {image && <img src={image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
     </div>
   );
 }
@@ -2169,6 +2170,7 @@ function AccountSummaryDrawer({
                   <Avatar
                     name={`${person.f_name ?? ""} ${person.l_name ?? ""}`}
                     size="lg"
+                    image={person.profile_image}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[#730042] text-base leading-tight">
@@ -2432,6 +2434,7 @@ function AccountSummaryDrawer({
                           <Avatar
                             name={`${(person.Under_manager || person.reporting_manager)?.f_name ?? ""} ${(person.Under_manager || person.reporting_manager)?.l_name ?? ""}`}
                             size="sm"
+                            image={(person.Under_manager || person.reporting_manager)?.profile_image}
                           />
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-[#730042] truncate">
@@ -3321,7 +3324,7 @@ function MobileCard({
       onClick={() => onView(u._id, u.role)}
     >
       <div className="relative flex-shrink-0">
-        <Avatar name={`${u.f_name ?? ""} ${u.l_name ?? ""}`} />
+        <Avatar name={`${u.f_name ?? ""} ${u.l_name ?? ""}`} image={u.profile_image} />
         {isInactive && (
           <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#6B7280] border border-white flex items-center justify-center">
             <FaBan size={6} className="text-white" />
@@ -5560,6 +5563,7 @@ export default function EmployeeTable() {
                             <div className="relative flex-shrink-0">
                               <Avatar
                                 name={`${u.f_name ?? ""} ${u.l_name ?? ""}`}
+                                image={u.profile_image}
                               />
                               {isInactive && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#6B7280] border border-white flex items-center justify-center">

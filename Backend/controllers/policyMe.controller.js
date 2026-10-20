@@ -8,6 +8,7 @@ const {
   getPolicyStatusListForActor,
   getPendingMandatoryPolicies,
   ensureAcknowledgementRecord,
+  resolveAssignmentMatch,
 } = require("../utils/policyAssignment.utils");
 
 const getClientIp = (req) =>
@@ -115,7 +116,12 @@ const viewPolicy = async (req, res) => {
     }).populate("currentVersion");
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
 
-    const acknowledgement = await ensureAcknowledgementRecord(policy, actor);
+    // Only create/track an acknowledgement when the policy is actually
+    // assigned to this person. A SuperAdmin can open any published policy
+    // of the org in view-only mode.
+    const acknowledgement = resolveAssignmentMatch(policy, actor)
+      ? await ensureAcknowledgementRecord(policy, actor)
+      : null;
     if (acknowledgement && acknowledgement.status === "PENDING") {
       acknowledgement.status = "VIEWED";
       acknowledgement.viewedAt = new Date();
@@ -149,7 +155,9 @@ const acknowledgePolicy = async (req, res) => {
       });
     }
 
-    const acknowledgement = await ensureAcknowledgementRecord(policy, actor);
+    const acknowledgement = resolveAssignmentMatch(policy, actor)
+      ? await ensureAcknowledgementRecord(policy, actor)
+      : null;
     if (!acknowledgement) {
       return res.status(400).json({ success: false, message: "This policy does not require acknowledgement" });
     }

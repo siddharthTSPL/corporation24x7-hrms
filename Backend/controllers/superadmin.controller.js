@@ -20,7 +20,7 @@ const generateUID = require("../automatic/uidgeneration");
 const assignDefaultLeave = require("../automatic/bydefaultleaveset");
 const LeavePolicy = require("../Models/Leavepolicy.model");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
-const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
+const { fillHistoryGaps, computeMonthPaidDays, fetchLeaveMapForDate } = require("../utils/attendanceHistoryFill.utils");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { sendEmail } = require("../utils/nodemailer.utils");
@@ -1690,7 +1690,7 @@ const getperticularemployee = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -1735,7 +1735,7 @@ const getperticularemanager = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -2162,8 +2162,8 @@ const getAllReviewsForSuperAdmin = async (req, res, next) => {
   if (monthYear) filter.monthYear = monthYear;
 
   const reviews = await Review.find(filter)
-    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
-    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department" })
+    .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
+    .populate({ path: "reviewee", select: "f_name l_name work_email role designation department profile_image" })
     .sort({ createdAt: -1 })
     .lean();
 
@@ -2307,10 +2307,14 @@ const getAttendanceOverview = async (req, res, next) => {
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      // Approved leave for today outranks check-in state (see admin controller).
+      const leaveMap = await fetchLeaveMapForDate({ organisation_id, people, date: today });
       const data = people.map((p) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
+        const lv = leaveMap.get(p.id) || null;
+        const onLeave = !!lv && (!lv.isHalfDay || !checkedIn);
         // Once checked out, trust the stored `status` (present/half_day/absent)
         // instead of re-deriving it from checkIn/checkOut presence. `status`
         // is computed at checkout time from activeMinutes vs the shift's
@@ -2319,9 +2323,14 @@ const getAttendanceOverview = async (req, res, next) => {
         // "half_day" even though both timestamps are set. The old logic
         // treated any checkIn+checkOut pair as "present" regardless of how
         // little time was actually worked.
-        const status = checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
+        const status = onLeave
+          ? "on_leave"
+          : checkedIn ? (checkedOut ? (r.status || "absent") : "on_duty") : "absent";
         return {
           ...p,
+          leaveType: lv?.leaveType || null,
+          isLwpLeave: !!lv?.isLwp,
+          isHalfDayLeave: !!lv?.isHalfDay,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
           status,
@@ -2708,7 +2717,7 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   const documents = await Document.find({ organisation_id, fileType: "personal" })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2738,6 +2747,7 @@ const getAllPersonalDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            profile_image: doc.uploader.profile_image,
           }
         : null,
     })),
@@ -2751,7 +2761,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
   const organisation_id = req.superAdmin._id;
 
   const documents = await Document.find({ organisation_id, fileType: "expense" })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation")
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image")
     .sort({ uploadedAt: -1 })
     .lean();
 
@@ -2781,6 +2791,7 @@ const getAllExpenseDocumentsSuperAdmin = async (req, res, next) => {
             contact: doc.uploader.personal_contact,
             department: doc.uploader.department,
             designation: doc.uploader.designation,
+            profile_image: doc.uploader.profile_image,
             role: doc.uploader.role,
           }
         : null,
@@ -2799,7 +2810,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
     return next(Object.assign(new Error("Document ID is required"), { statusCode: 400 }));
 
   const document = await Document.findOne({ _id: id, organisation_id })
-    .populate("uploader", "f_name l_name work_email personal_contact department designation");
+    .populate("uploader", "f_name l_name work_email personal_contact department designation profile_image");
     
   if (!document)
     return next(Object.assign(new Error("Document not found"), { statusCode: 404 }));
@@ -2826,6 +2837,7 @@ const getDocumentDetailsSuperAdmin = async (req, res, next) => {
             email: document.uploader.work_email,
             department: document.uploader.department,
             designation: document.uploader.designation,
+            profile_image: document.uploader.profile_image,
             role: document.uploader.role,
           }
         : null,
@@ -3181,7 +3193,7 @@ const getperticularadmin = async (req, res, next) => {
     leavebalanceModel.findOne({ employee: uid, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: uid, organisation_id, revieweeRoleModel: "Admin" })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 

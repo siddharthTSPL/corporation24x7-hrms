@@ -41,7 +41,7 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const FieldAssignment = require("../Models/fieldAssignment.model");
 const { logAudit } = require("../utils/auditLog.utils");
 const { processLeaveDeduction } = require("../automatic/calculateleave");
-const { fillHistoryGaps, computeMonthPaidDays } = require("../utils/attendanceHistoryFill.utils");
+const { fillHistoryGaps, computeMonthPaidDays, fetchLeaveMapForDate } = require("../utils/attendanceHistoryFill.utils");
 const AttendanceSummary = require("../Models/attendancesummary.model");
 const WFH = require("../Models/wfh.model");
 const {
@@ -806,7 +806,7 @@ const findallmanagers = async (req, res, next) => {
         .lean(),
       Adminmodel.find({ organisation_id, working_status: "working" })
         .select(
-          "uid f_name l_name work_email designation department office_location role organisation_id"
+          "uid f_name l_name work_email designation department office_location role organisation_id profile_image"
         )
         .lean(),
     ]);
@@ -841,7 +841,7 @@ const findallemployeesfull = async (req, res, next) => {
       working_status: "working",
     })
       .select(EXCLUDE)
-      .populate("Under_manager", "f_name l_name work_email designation")
+      .populate("Under_manager", "f_name l_name work_email designation profile_image")
       .lean();
 
     return res.status(200).json({
@@ -975,7 +975,57 @@ const getAdminAttendanceScope = async (adminId, organisation_id) => {
     getAdminReportingIds(adminId, organisation_id),
     getAdminTeamManagerIds(adminId, organisation_id),
   ]);
-  return { adminIds, managerIds: [...managerIds] };
+
+  const adminsInScope = await Adminmodel.find({
+    organisation_id,
+    _id: { $in: [adminId, ...adminIds] },
+  })
+    .select("reporting_manager reporting_manager_model")
+    .lean();
+  const visibleAdminIds = new Set(adminIds.map(String));
+  const managerIdsInScope = new Set([...managerIds].map(String));
+
+  // Include reporting admins for every visible co-admin so both sides see
+  // the reporting relationship and the manager's attendance row.
+  const parentAdminIds = adminsInScope
+    .filter((admin) =>
+      admin.reporting_manager_model === "Admin" &&
+      admin.reporting_manager
+    )
+    .map((admin) => String(admin.reporting_manager));
+  parentAdminIds.forEach((id) => visibleAdminIds.add(id));
+
+  const parentAdminDocs = parentAdminIds.length
+    ? await Adminmodel.find({ organisation_id, _id: { $in: parentAdminIds } })
+        .select("reporting_manager reporting_manager_model")
+        .lean()
+    : [];
+
+  // Include reporting managers above the visible admins so their attendance
+  // rows can be shown as well as the managers already in the team scope.
+  const reportingManagerIds = [...adminsInScope, ...parentAdminDocs]
+    .filter((admin) => admin.reporting_manager_model === "Manager" && admin.reporting_manager)
+    .map((admin) => String(admin.reporting_manager));
+  let managerFrontier = reportingManagerIds;
+  const allManagers = managerFrontier.length
+    ? await Managermodel.find({ organisation_id })
+        .select("_id reporting_manager reporting_manager_model")
+        .lean()
+    : [];
+  while (managerFrontier.length) {
+    const next = allManagers
+      .filter((manager) => managerFrontier.includes(String(manager._id)))
+      .map((manager) => {
+        managerIdsInScope.add(String(manager._id));
+        return manager.reporting_manager_model === "Manager" && manager.reporting_manager
+          ? String(manager.reporting_manager)
+          : null;
+      })
+      .filter((id) => id && !managerIdsInScope.has(id));
+    managerFrontier = [...new Set(next)];
+  }
+
+  return { adminIds: [...visibleAdminIds], managerIds: [...managerIdsInScope] };
 };
 
 const getallemployee = async (req, res, next) => {
@@ -990,20 +1040,20 @@ const getallemployee = async (req, res, next) => {
     const [users, managers] = await Promise.all([
       Usermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id gender e_contact personal_contact"
+          "empid uid f_name l_name work_email role department designation office_location Under_manager organisation_id gender e_contact personal_contact profile_image"
         )
         .populate({
           path: "Under_manager",
-          select: "empid uid f_name l_name work_email role",
+          select: "empid uid f_name l_name work_email role profile_image",
         })
         .lean(),
       Managermodel.find({ organisation_id, working_status: "working" })
         .select(
-          "empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id"
+          "empid uid f_name l_name work_email role designation office_location department gender personal_contact e_contact reporting_manager reporting_manager_model organisation_id profile_image"
         )
         .populate({
           path: "reporting_manager",
-          select: "empid uid f_name l_name work_email role",
+          select: "empid uid f_name l_name work_email role profile_image",
         })
         .lean(),
     ]);
@@ -2554,14 +2604,14 @@ const getperticularemployee = async (req, res, next) => {
     Usermodel.findOne({ _id: id, organisation_id })
       .populate({
         path: "Under_manager",
-        select: "empid uid f_name l_name work_email role",
+        select: "empid uid f_name l_name work_email role profile_image",
       })
       .select(PROFILE_EXCLUDE)
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -2616,12 +2666,12 @@ const getperticularemanager = async (req, res, next) => {
   const [manager, leaveBalance, reviews] = await Promise.all([
     Managermodel.findOne({ _id: id, organisation_id })
       .select(PROFILE_EXCLUDE)
-      .populate("reporting_manager", "empid uid f_name l_name work_email role")
+      .populate("reporting_manager", "empid uid f_name l_name work_email role profile_image")
       .lean(),
     leavebalanceModel.findOne({ employee: id, organisation_id }).lean(),
     reviewModel
       .find({ reviewee: id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .lean(),
   ]);
 
@@ -3327,6 +3377,19 @@ const applyleave = async (req, res, next) => {
         : "pending_superadmin",
     });
 
+    if (req.admin.reporting_manager_model === "Admin" && req.admin.reporting_manager) {
+      notifyLeaveApplied({
+        requesterName: `${req.admin.f_name} ${req.admin.l_name || ""}`.trim(),
+        handlerModel: "Admin",
+        handlerId: req.admin.reporting_manager,
+        leaveType: normalizedLeaveType,
+        startDate: start,
+        endDate: end,
+        days,
+        reason: reason.trim(),
+      });
+    }
+
     return res.status(201).json({
       success: true,
       message: "Leave applied successfully",
@@ -3832,10 +3895,10 @@ const getAllReviewsForAdmin = async (req, res, next) => {
   if (monthYear) filter.monthYear = monthYear;
 
   const reviews = await Review.find(filter)
-    .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+    .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
     .populate({
       path: "reviewee",
-      select: "f_name l_name work_email role designation department",
+      select: "f_name l_name work_email role designation department profile_image",
     })
     .sort({ createdAt: -1 })
     .lean();
@@ -4037,10 +4100,10 @@ const getme = async (req, res, next) => {
       .lean(),
     reviewModel
       .find({ reviewee: req.admin._id, organisation_id })
-      .populate({ path: "reviewer", select: "f_name l_name work_email role" })
+      .populate({ path: "reviewer", select: "f_name l_name work_email role profile_image" })
       .populate({
         path: "reviewee",
-        select: "f_name l_name work_email role designation department",
+        select: "f_name l_name work_email role designation department profile_image",
       })
       .lean(),
   ]);
@@ -4169,7 +4232,11 @@ const editadminprofile = async (req, res, next) => {
           statusCode: 400,
         })
       );
-    if (profile_image === "" || profile_image.includes("api.dicebear.com")) {
+    if (
+      profile_image === "" ||
+      profile_image === admin.profile_image ||
+      profile_image.includes("api.dicebear.com")
+    ) {
       admin.profile_image = profile_image;
     } else {
       return next(
@@ -4413,14 +4480,12 @@ const getAttendanceOverview = async (req, res, next) => {
     const [admins, managers, employees] = await Promise.all([
       teamAdminIds.length
         ? Adminmodel.find({ organisation_id, working_status: "working", _id: { $in: teamAdminIds } })
-            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager")
-            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
             .lean()
         : [],
       teamManagerIds.length
   ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
-            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
             .lean()
         : [],
      teamManagerIds.length
@@ -4430,6 +4495,31 @@ const getAttendanceOverview = async (req, res, next) => {
             .lean()
         : [],
     ]);
+
+    const reportingManagerIds = [...new Set([...admins, ...managers]
+      .filter((person) => person.reporting_manager)
+      .map((person) => String(person.reporting_manager)))];
+    const [reportingAdmins, reportingManagers, reportingSuperAdmins] = await Promise.all([
+      Adminmodel.find({
+        organisation_id,
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+      Managermodel.find({
+        organisation_id,
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+      SuperAdminModel.find({
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+    ]);
+    const reportingManagerNames = new Map(
+      [...reportingAdmins, ...reportingManagers, ...reportingSuperAdmins].map((manager) => [
+        String(manager._id),
+        [manager.f_name, manager.l_name].filter(Boolean).join(" "),
+      ])
+    );
+    const getReportingManagerName = (person) =>
+      (person.reporting_manager && reportingManagerNames.get(String(person.reporting_manager))) || "—";
 
     const people = [
       ...admins.map((a) => ({
@@ -4443,9 +4533,7 @@ const getAttendanceOverview = async (req, res, next) => {
         department: a.department,
         office_location: a.office_location,
         avatar: a.profile_image || null,
-        reportingManager: a.reporting_manager
-          ? [a.reporting_manager.f_name, a.reporting_manager.l_name].filter(Boolean).join(" ")
-          : "—",
+        reportingManager: getReportingManagerName(a),
       })),
       ...managers.map((m) => ({
         id: String(m._id),
@@ -4458,11 +4546,7 @@ const getAttendanceOverview = async (req, res, next) => {
         department: m.department,
         office_location: m.office_location,
         avatar: m.profile_image || null,
-        reportingManager: m.reporting_manager
-          ? [m.reporting_manager.f_name, m.reporting_manager.l_name]
-              .filter(Boolean)
-              .join(" ")
-          : "—",
+        reportingManager: getReportingManagerName(m),
       })),
       ...employees.map((u) => ({
         id: String(u._id),
@@ -4501,17 +4585,28 @@ const getAttendanceOverview = async (req, res, next) => {
         .lean();
 
       const byEmp = new Map(records.map((r) => [String(r.employee), r]));
+      // Approved leave for today outranks check-in state: a person on leave is
+      // "on_leave" - never "Not Checked In" / "On Duty" / "Present". A half-day
+      // leave only takes over while the person has not checked in.
+      const leaveMap = await fetchLeaveMapForDate({ organisation_id, people, date: today });
       const data = people.map((p) => {
         const r = byEmp.get(p.id);
         const checkedIn = !!r?.checkIn;
         const checkedOut = !!r?.checkOut;
-        const status = checkedIn
+        const lv = leaveMap.get(p.id) || null;
+        const onLeave = !!lv && (!lv.isHalfDay || !checkedIn);
+        const status = onLeave
+          ? "on_leave"
+          : checkedIn
           ? checkedOut
             ? r.status || "absent"
             : "on_duty"
           : "absent";
         return {
           ...p,
+          leaveType: lv?.leaveType || null,
+          isLwpLeave: !!lv?.isLwp,
+          isHalfDayLeave: !!lv?.isHalfDay,
           checkIn: r?.checkIn || null,
           checkOut: r?.checkOut || null,
           status,
@@ -5763,7 +5858,7 @@ const getInactiveUsers = async (req, res, next) => {
         working_status: { $in: inactiveStatuses },
       })
         .select(
-          "uid f_name l_name work_email role department designation working_status status"
+          "uid f_name l_name work_email role department designation working_status status profile_image"
         )
         .lean(),
       Usermodel.find({
@@ -5771,7 +5866,7 @@ const getInactiveUsers = async (req, res, next) => {
         working_status: { $in: inactiveStatuses },
       })
         .select(
-          "uid f_name l_name work_email role department designation working_status status"
+          "uid f_name l_name work_email role department designation working_status status profile_image"
         )
         .lean(),
     ]);

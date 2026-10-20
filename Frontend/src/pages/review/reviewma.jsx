@@ -49,7 +49,7 @@ function PersonCard({ person, selected, onClick }) {
       }}
     >
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 border"
+        className="relative w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0 border overflow-hidden"
         style={{
           background: isSelected ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})` : `linear-gradient(135deg, #C9829E, ${BRAND.pink})`,
           fontFamily: "'Playfair Display', Georgia, serif",
@@ -57,6 +57,7 @@ function PersonCard({ person, selected, onClick }) {
         }}
       >
         {getInitials(person)}
+        {person.profile_image && <img src={person.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
       </div>
       <div className="text-left min-w-0 flex-1">
         <p className="m-0 text-sm font-semibold truncate" style={{ color: BRAND.textPrimary, fontFamily: "'Playfair Display', Georgia, serif" }}>

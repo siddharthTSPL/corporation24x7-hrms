@@ -4,6 +4,8 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
+const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
+const { uploadProfilePhoto } = require("../controllers/profilePhoto.controller");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -104,6 +106,7 @@ superAdminRouter.get(
   asyncHandler(getMe)
 );
 superAdminRouter.put("/update-profile", superAdminAuth, asyncHandler(updateSuperAdmin));
+superAdminRouter.post("/profile-photo", superAdminAuth, profilePhotoUpload, asyncHandler(uploadProfilePhoto));
 superAdminRouter.put(
   "/changepassword",
   superAdminAuth,

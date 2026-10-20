@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useEffect } from "react";
 import React from "react";
 import talent from "../assets/Talent.png";
 import TechTorchLogo from "../../src/assets/TechTorchLogo.png"
@@ -152,6 +153,62 @@ const employeeMenu = [
   { name: "Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", permissionGroup: ["adminAccess.can_manage_asset_management"], planFeature: "asset" },
 ];
 
+// Sidebar display order. Every role's menu is sorted by this list so the
+// sidebar looks the same everywhere. Items that are not listed here (Onboarding,
+// Face Attendance, TorchX Voice, Policies, Training, ...) are NOT dropped -
+// they keep their original relative order and are placed right after the
+// listed items, just above Settings. Settings is always the last item
+// (Logout is rendered right below it).
+const SIDEBAR_ORDER = [
+  "dashboard",
+  "self service portal",
+  "recruitment",
+  "leave",
+  "field operations",
+  "timesheet",
+  "overtime",
+  "reimbursement",
+  "payroll",
+  "asset management",
+  "team document",
+  "document",
+  "announcement",
+  "review",
+  "torchx management",
+  "organisation",
+  "settings",
+];
+
+// Aliases so role-specific names land on the right slot.
+const SIDEBAR_ALIASES = {
+  "field duty": "field operations",
+  "file": "document",
+  "organization": "organisation",
+};
+
+const sidebarKey = (name = "") => {
+  let k = name.trim().toLowerCase();
+  if (SIDEBAR_ALIASES[k]) return SIDEBAR_ALIASES[k];
+  if (SIDEBAR_ORDER.includes(k)) return k;
+  // plural -> singular (Leaves, Reviews, Documents, Reimbursements ...)
+  if (k === "leaves") return "leave";
+  const singular = k.replace(/s$/, "");
+  return SIDEBAR_ALIASES[singular] ?? singular;
+};
+
+const sortSidebarMenu = (items) => {
+  const settingsRank = SIDEBAR_ORDER.indexOf("settings");
+  const rankOf = (item) => {
+    const idx = SIDEBAR_ORDER.indexOf(sidebarKey(item.name));
+    // unlisted items sit just before Settings
+    return idx === -1 ? settingsRank - 0.5 : idx;
+  };
+  return items
+    .map((item, i) => ({ item, i, r: rankOf(item) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.item);
+};
+
 const menuByRole = {
   superadmin: superAdminMenu,
   admin:      adminMenu,
@@ -169,6 +226,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
+  const profilePerson = role === "superadmin" ? auth?.data?.superAdmin
+    : role === "manager" ? auth?.data?.manager
+      : role === "employee" ? auth?.data?.employee
+        : auth?.data?.user || auth?.data?.admin || auth?.data;
+  const [logoutAvatarFailed, setLogoutAvatarFailed] = useState(false);
+  useEffect(() => setLogoutAvatarFailed(false), [profilePerson?.profile_image]);
   const isCoAdmin = role === "admin" && auth?.data?.user?.reporting_manager_model === "Admin";
 
   const can = usePermissionStore((state) => state.can);
@@ -238,11 +301,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // Admins only see items they can open. Employees keep their own menus
   // visible with locks, while delegated admin menus stay hidden unless granted.
   const isDelegatedAdminMenu = (item) => delegatedAdminMenus.includes(item);
-  const menu = role === "admin"
+  const filteredMenu = role === "admin"
     ? roleMenu.filter((item) => isAllowed(item))
     : role === "employee" || role === "manager"
       ? roleMenu.filter((item) => !isDelegatedAdminMenu(item) || isAllowed(item))
       : roleMenu;
+  const menu = sortSidebarMenu(filteredMenu);
 
   // Review / Timesheet / Recruitment / Asset Management / TorchX Voice (tickets)
   // are locked on the Basic plan and open on Advance/enterprise (or during
@@ -473,8 +537,14 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 disabled={isPending}
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800 transition-colors"
               >
-                <FaSignOutAlt />
-                {!collapsed && (isPending ? "Logging out..." : "Logout")}
+                <span className="text-sm flex-shrink-0">
+                  <FaSignOutAlt />
+                </span>
+                {!collapsed && (
+                  <span className="flex-1 text-left text-sm">
+                    {isPending ? "Logging out..." : "Logout"}
+                  </span>
+                )}
               </button>
             </nav>
           )}
@@ -514,7 +584,16 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
           <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#F4C0D1] bg-white shadow-2xl">
             <div className="px-6 pt-6 pb-4" style={{ background: "#FBEAF0" }}>
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
-                <FaSignOutAlt className="text-[#730042]" size={16} />
+                {profilePerson?.profile_image && !logoutAvatarFailed ? (
+                  <img
+                    src={profilePerson.profile_image}
+                    alt="Your profile"
+                    className="h-full w-full rounded-full object-cover"
+                    onError={() => setLogoutAvatarFailed(true)}
+                  />
+                ) : (
+                  <FaSignOutAlt className="text-[#730042]" size={16} />
+                )}
               </div>
               <h3 className="text-center text-[15px] font-semibold text-[#730042]">
                 {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}

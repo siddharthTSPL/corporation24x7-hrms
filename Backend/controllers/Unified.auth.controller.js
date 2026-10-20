@@ -480,6 +480,9 @@ const dismissWelcomeMessage = async (req, res, next) => {
   });
 };
 
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
+const { getISTDateParts } = require("../utils/Istdate.utils");
+
 // Marks this year's "Happy Birthday" popup as seen — one popup per person per
 // calendar year, regardless of how many times they log in that day.
 const dismissBirthdayWish = async (req, res, next) => {
@@ -487,11 +490,17 @@ const dismissBirthdayWish = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const currentYear = new Date().getFullYear();
+  // IST calendar year - same clock the birthday cron and the popup use, so a
+  // server running in UTC can't disagree with them around New Year.
+  const currentYear = getISTDateParts(new Date()).year;
 
   if ("lastBirthdayWishYear" in req.user && req.user.lastBirthdayWishYear !== currentYear) {
     req.user.lastBirthdayWishYear = currentYear;
     await req.user.save({ validateBeforeSave: false });
+    // getme is cached for 30s per person - without this, a refresh right after
+    // closing the popup is served the old (un-dismissed) profile and the popup
+    // shows again.
+    invalidateUserCache(req.user._id);
   }
 
   return res.status(200).json({

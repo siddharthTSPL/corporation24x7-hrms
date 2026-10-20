@@ -45,6 +45,21 @@ const CHIP = "rounded-full border px-2.5 py-1";
 const CHIP_STYLE = { borderColor: BRAND.border, background: "#FCFAFB" };
 
 const personKey = (person) => `${person.model}:${person.id}`;
+function ParticipantAvatar({ name, image }) {
+  const initials = String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+  return (
+    <span className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8B1A4A] text-[9px] font-bold text-white">
+      {initials}
+      {image && <img src={image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
+    </span>
+  );
+}
+
 const localDateTimeMin = () => {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -813,23 +828,14 @@ export default function TrainingPage({ superAdminView = false }) {
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            {organisation?.logo ? (
-              <img
-                src={organisation.logo}
-                alt=""
-                className="h-14 w-14 rounded-2xl border bg-white object-contain p-1.5 shadow-sm"
-                style={{ borderColor: BRAND.border }}
-              />
-            ) : (
-              <div
-                className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
-                }}
-              >
-                <GraduationCap size={26} />
-              </div>
-            )}
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
+              style={{
+                background: `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`,
+              }}
+            >
+              <GraduationCap size={26} />
+            </div>
             <div>
               <p
                 className="text-[11px] font-bold uppercase tracking-[0.18em]"
@@ -1321,14 +1327,14 @@ export default function TrainingPage({ superAdminView = false }) {
                         style={{ color: BRAND.muted }}
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          <UserRound size={14} style={{ color: BRAND.pink }} />
+                          <ParticipantAvatar name={training.participant_details?.trainee} image={training.participant_details?.trainee_image} />
                           <strong style={{ color: BRAND.text }}>
                             Trainee:
                           </strong>{" "}
                           {training.participant_details?.trainee || "Employee"}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
-                          <UsersRound size={14} style={{ color: BRAND.pink }} />
+                          <ParticipantAvatar name={training.participant_details?.trainer} image={training.participant_details?.trainer_image} />
                           <strong style={{ color: BRAND.text }}>
                             Trainer:
                           </strong>{" "}

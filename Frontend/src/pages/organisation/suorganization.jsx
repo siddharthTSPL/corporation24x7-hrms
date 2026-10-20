@@ -127,6 +127,17 @@ const fmtDate = (iso) => {
   });
 };
 
+// Date of birth for display. Formatted on the IST calendar (same clock the
+// birthday reminders use) so it shows the intended day whether it was saved as
+// UTC-midnight or IST-midnight. Returns null when there is no (valid) DOB so the
+// caller can leave the row out entirely instead of showing "—".
+const fmtDob = (iso) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+};
+
 const getInitials = (f = "", l = "") =>
   `${f[0] || ""}${l[0] || ""}`.toUpperCase();
 const normalize = (s = "") => s.toLowerCase().trim();
@@ -859,7 +870,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
 
   const leaveBalance = detailData?.leaveBalance || null;
 
-  const fields = useMemo(() => {
+  const baseFields = useMemo(() => {
     if (isSA) {
       const activeLicense = person.licenses?.find(
         (l) => l.isActive && new Date(l.expiresAt) > new Date(),
@@ -943,6 +954,25 @@ function EmployeeDetailPanel({ person, type, onClose }) {
     ];
   }, [person, detailData, isSA, isAdmin, isManager]);
 
+  // Date of birth: shown only if the person has filled it in. Admin/manager
+  // lists already carry it; employees get it from the particular-user call.
+  const dobIso = isSA
+    ? null
+    : isAdmin
+      ? detailData?.admin?.date_of_birth ?? person.date_of_birth
+      : isManager
+        ? detailData?.manager?.date_of_birth ?? person.date_of_birth
+        : detailData?.user?.date_of_birth ?? person.date_of_birth;
+  const dobLabel = fmtDob(dobIso);
+
+  const fields = useMemo(() => {
+    if (!dobLabel) return baseFields; // no DOB on file -> no DOB row at all
+    const row = ["Date of birth", dobLabel];
+    const at = baseFields.findIndex(([label]) => label === "Marital");
+    if (at === -1) return [...baseFields, row];
+    return [...baseFields.slice(0, at + 1), row, ...baseFields.slice(at + 1)];
+  }, [baseFields, dobLabel]);
+
   return (
     <>
       <div
@@ -977,10 +1007,7 @@ function EmployeeDetailPanel({ person, type, onClose }) {
           >
             <div
               className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold text-white shrink-0"
-              style={{
-                background: accentColor,
-                boxShadow: `0 4px 16px ${accentColor}35`,
-              }}
+              style={{ background: accentColor, boxShadow: `0 4px 16px ${accentColor}35` }}
             >
               {getInitials(person.f_name, person.l_name)}
             </div>
@@ -1092,9 +1119,17 @@ function ReviewsTab({ uid, role }) {
           className="bg-[#fafbfc] rounded-xl border border-gray-100 p-3 sm:p-4 min-w-0"
         >
           <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
-            <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
-              {r.reviewer?.f_name} {r.reviewer?.l_name}
-            </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <Avatar
+                initials={getInitials(r.reviewer?.f_name, r.reviewer?.l_name)}
+                image={r.reviewer?.profile_image}
+                sizeClass="w-7 h-7"
+                textClass="text-[9px]"
+              />
+              <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate min-w-0">
+                {r.reviewer?.f_name} {r.reviewer?.l_name}
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-xs sm:text-sm font-bold text-slate-900">
                 {r.overallScore != null ? r.overallScore.toFixed(1) : "–"}/5

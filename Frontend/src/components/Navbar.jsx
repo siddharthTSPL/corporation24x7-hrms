@@ -8,10 +8,16 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
 
   const employee = auth?.data?.employee;
   const manager = auth?.data?.manager;
-  const admin = auth?.data;
+  const superAdmin = auth?.data?.superAdmin;
+  const admin = auth?.data?.user || auth?.data?.admin || auth?.data;
+  const person = auth?.role === "superadmin" ? superAdmin
+    : auth?.role === "manager" ? manager
+      : auth?.role === "employee" ? employee
+        : admin;
 
   const [dateTime, setDateTime] = useState("");
   const [search, setSearch] = useState("");
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -48,7 +54,7 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
 
   const displayName = useMemo(() => {
     if (auth?.role === "admin")
-      return admin?.organisation_name || admin?.email || "Admin";
+      return `${admin?.f_name || ""} ${admin?.l_name || ""}`.trim() || admin?.organisation_name || admin?.email || "Admin";
 
     if (auth?.role === "manager")
       return (
@@ -62,15 +68,17 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
         "Employee"
       );
 
+    if (auth?.role === "superadmin")
+      return `${superAdmin?.f_name || ""} ${superAdmin?.l_name || ""}`.trim() || superAdmin?.organisation_name || superAdmin?.email || "Super Admin";
+
     return "";
-  }, [auth, employee, manager, admin]);
+  }, [auth, employee, manager, admin, superAdmin]);
 
   const initial = displayName?.trim().charAt(0).toUpperCase() || "U";
 
-  const profileImage = useMemo(() => {
-    if (auth?.role === "admin") return admin?.profile_image || null;
-    return null;
-  }, [auth, admin]);
+  const profileImage = person?.profile_image || null;
+
+  useEffect(() => setAvatarFailed(false), [profileImage]);
 
   return (
     <div className="w-full bg-white border-b px-4 md:px-6 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -101,11 +109,12 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
 
         <NotificationBell />
 
-        {profileImage ? (
+        {profileImage && !avatarFailed ? (
           <img
             src={profileImage}
             alt="avatar"
             className="w-10 h-10 rounded-full object-cover"
+            onError={() => setAvatarFailed(true)}
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-gray-500 text-white flex items-center justify-center font-semibold">

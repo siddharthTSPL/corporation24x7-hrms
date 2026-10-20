@@ -10,9 +10,9 @@ const TABS = [
 ];
 
 export default function MyPolicies() {
-  const { data, isLoading } = useMyPolicies();
+  const { data, isLoading, isError, error } = useMyPolicies();
   const { data: historyData } = useMyAcknowledgementHistory();
-  const [tab, setTab] = useState("pending");
+  const [tab, setTab] = useState(null); // null = pick automatically (Pending if any, else All)
   const [selected, setSelected] = useState(null);
 
   const policies = data?.policies || [];
@@ -20,7 +20,8 @@ export default function MyPolicies() {
     (p) => p.acknowledgement && p.acknowledgement.status !== "ACKNOWLEDGED"
   );
   const acknowledged = policies.filter((p) => p.acknowledgement?.status === "ACKNOWLEDGED");
-  const list = tab === "pending" ? pending : tab === "acknowledged" ? acknowledged : policies;
+  const activeTab = tab ?? (pending.length > 0 ? "pending" : "all");
+  const list = activeTab === "pending" ? pending : activeTab === "acknowledged" ? acknowledged : policies;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -46,7 +47,7 @@ export default function MyPolicies() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              tab === t.key ? "bg-[#730042] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+              activeTab === t.key ? "bg-[#730042] text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
             {t.label} {t.key === "pending" && pending.length > 0 && `(${pending.length})`}
@@ -57,7 +58,12 @@ export default function MyPolicies() {
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-3">
           {isLoading && <p className="text-sm text-gray-500">Loading policies...</p>}
-          {!isLoading && list.length === 0 && (
+          {isError && (
+            <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-4">
+              Could not load policies: {error?.response?.data?.message || error?.message || "please try again."}
+            </p>
+          )}
+          {!isLoading && !isError && list.length === 0 && (
             <p className="text-sm text-gray-500 bg-white border border-gray-100 rounded-xl p-4">
               Nothing here right now.
             </p>
@@ -76,8 +82,10 @@ export default function MyPolicies() {
                   <span className="flex items-center gap-1 text-xs text-green-600">
                     <FaCheckCircle /> Acknowledged
                   </span>
-                ) : (
+                ) : entry.acknowledgement ? (
                   <span className="text-xs text-amber-600 font-medium">Action needed</span>
+                ) : (
+                  <span className="text-xs text-gray-400 font-medium">View only</span>
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-1">

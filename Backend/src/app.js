@@ -13,6 +13,7 @@ require('../automatic/fieldOperationsRetention');
 require('../automatic/Subscriptionexpiryreminder');
 require('../automatic/Offerlifecycle');
 require('../automatic/Trainingreminders');
+require('../automatic/Hourlyleavesync');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
