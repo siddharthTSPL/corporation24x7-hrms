@@ -975,7 +975,57 @@ const getAdminAttendanceScope = async (adminId, organisation_id) => {
     getAdminReportingIds(adminId, organisation_id),
     getAdminTeamManagerIds(adminId, organisation_id),
   ]);
-  return { adminIds, managerIds: [...managerIds] };
+
+  const adminsInScope = await Adminmodel.find({
+    organisation_id,
+    _id: { $in: [adminId, ...adminIds] },
+  })
+    .select("reporting_manager reporting_manager_model")
+    .lean();
+  const visibleAdminIds = new Set(adminIds.map(String));
+  const managerIdsInScope = new Set([...managerIds].map(String));
+
+  // Include reporting admins for every visible co-admin so both sides see
+  // the reporting relationship and the manager's attendance row.
+  const parentAdminIds = adminsInScope
+    .filter((admin) =>
+      admin.reporting_manager_model === "Admin" &&
+      admin.reporting_manager
+    )
+    .map((admin) => String(admin.reporting_manager));
+  parentAdminIds.forEach((id) => visibleAdminIds.add(id));
+
+  const parentAdminDocs = parentAdminIds.length
+    ? await Adminmodel.find({ organisation_id, _id: { $in: parentAdminIds } })
+        .select("reporting_manager reporting_manager_model")
+        .lean()
+    : [];
+
+  // Include reporting managers above the visible admins so their attendance
+  // rows can be shown as well as the managers already in the team scope.
+  const reportingManagerIds = [...adminsInScope, ...parentAdminDocs]
+    .filter((admin) => admin.reporting_manager_model === "Manager" && admin.reporting_manager)
+    .map((admin) => String(admin.reporting_manager));
+  let managerFrontier = reportingManagerIds;
+  const allManagers = managerFrontier.length
+    ? await Managermodel.find({ organisation_id })
+        .select("_id reporting_manager reporting_manager_model")
+        .lean()
+    : [];
+  while (managerFrontier.length) {
+    const next = allManagers
+      .filter((manager) => managerFrontier.includes(String(manager._id)))
+      .map((manager) => {
+        managerIdsInScope.add(String(manager._id));
+        return manager.reporting_manager_model === "Manager" && manager.reporting_manager
+          ? String(manager.reporting_manager)
+          : null;
+      })
+      .filter((id) => id && !managerIdsInScope.has(id));
+    managerFrontier = [...new Set(next)];
+  }
+
+  return { adminIds: [...visibleAdminIds], managerIds: [...managerIdsInScope] };
 };
 
 const getallemployee = async (req, res, next) => {
@@ -4430,14 +4480,12 @@ const getAttendanceOverview = async (req, res, next) => {
     const [admins, managers, employees] = await Promise.all([
       teamAdminIds.length
         ? Adminmodel.find({ organisation_id, working_status: "working", _id: { $in: teamAdminIds } })
-            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager")
-            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
+            .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
             .lean()
         : [],
       teamManagerIds.length
   ? Managermodel.find({ organisation_id, working_status: "working", _id: { $in: teamManagerIds } })
             .select("empid f_name l_name work_email role designation department office_location profile_image reporting_manager reporting_manager_model")
-            .populate({ path: "reporting_manager", select: "f_name l_name empid" })
             .lean()
         : [],
      teamManagerIds.length
@@ -4447,6 +4495,31 @@ const getAttendanceOverview = async (req, res, next) => {
             .lean()
         : [],
     ]);
+
+    const reportingManagerIds = [...new Set([...admins, ...managers]
+      .filter((person) => person.reporting_manager)
+      .map((person) => String(person.reporting_manager)))];
+    const [reportingAdmins, reportingManagers, reportingSuperAdmins] = await Promise.all([
+      Adminmodel.find({
+        organisation_id,
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+      Managermodel.find({
+        organisation_id,
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+      SuperAdminModel.find({
+        _id: { $in: reportingManagerIds },
+      }).select("_id f_name l_name").lean(),
+    ]);
+    const reportingManagerNames = new Map(
+      [...reportingAdmins, ...reportingManagers, ...reportingSuperAdmins].map((manager) => [
+        String(manager._id),
+        [manager.f_name, manager.l_name].filter(Boolean).join(" "),
+      ])
+    );
+    const getReportingManagerName = (person) =>
+      (person.reporting_manager && reportingManagerNames.get(String(person.reporting_manager))) || "—";
 
     const people = [
       ...admins.map((a) => ({
@@ -4460,9 +4533,7 @@ const getAttendanceOverview = async (req, res, next) => {
         department: a.department,
         office_location: a.office_location,
         avatar: a.profile_image || null,
-        reportingManager: a.reporting_manager
-          ? [a.reporting_manager.f_name, a.reporting_manager.l_name].filter(Boolean).join(" ")
-          : "—",
+        reportingManager: getReportingManagerName(a),
       })),
       ...managers.map((m) => ({
         id: String(m._id),
@@ -4475,11 +4546,7 @@ const getAttendanceOverview = async (req, res, next) => {
         department: m.department,
         office_location: m.office_location,
         avatar: m.profile_image || null,
-        reportingManager: m.reporting_manager
-          ? [m.reporting_manager.f_name, m.reporting_manager.l_name]
-              .filter(Boolean)
-              .join(" ")
-          : "—",
+        reportingManager: getReportingManagerName(m),
       })),
       ...employees.map((u) => ({
         id: String(u._id),
