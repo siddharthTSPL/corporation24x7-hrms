@@ -5006,6 +5006,10 @@ export default function EmployeeTable() {
         : true) &&
       matchType
     );
+  }).sort((a, b) => {
+    const nameA = `${a.f_name ?? ""} ${a.l_name ?? ""}`.trim();
+    const nameB = `${b.f_name ?? ""} ${b.l_name ?? ""}`.trim();
+    return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
   });
 
   const clearFilters = () =>

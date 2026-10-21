@@ -29,7 +29,14 @@ const STORAGE_FRESH_MS = 15 * 60 * 1000;
 // back to the last known number (fail-open — never lock people out on a hiccup).
 const STORAGE_LOGIN_WAIT_MS = 20 * 1000;
 
-const ADMIN_ROLES = ["superadmin", "super_admin", "admin", "senior_admin", "official"];
+// Only these roles are told the full story (which plan expired, when, how to
+// upgrade). Every other role just sees "plan expired, ask your superadmin".
+const SUPERADMIN_ROLES = ["superadmin", "super_admin"];
+
+// The message says "TorchX Store"; the frontend turns that text into a link to
+// STORE_URL (sent in meta.storeUrl).
+const STORE_LABEL = "TorchX Store";
+const STORE_URL = process.env.TORCHX_STORE_URL || "https://torchxsuite.com";
 
 const findActiveTalentLicense = (org) =>
   (org?.licenses || []).find(
@@ -39,19 +46,40 @@ const findActiveTalentLicense = (org) =>
       new Date(l.expiresAt) > new Date()
   ) || null;
 
+// Most recent TorchX Talent license (used to tell the user WHAT expired and WHEN).
+const findLastTalentLicense = (org) =>
+  (org?.licenses || [])
+    .filter((l) => l.product === "torchx_talent")
+    .sort((a, b) => new Date(b.expiresAt) - new Date(a.expiresAt))[0] || null;
+
 const isTrialActive = (org) =>
   !!org && !!org.is_trial_active && new Date() < new Date(org.trial_expires_at);
 
 const getPlanState = (org) => {
   const trialActive = isTrialActive(org);
   const license = findActiveTalentLicense(org);
+  const isFreeTier = !trialActive && !license;
+
+  // Why is the org on the free tier?
+  //   "license_expired" → had a paid license, it ran out
+  //   "trial_expired"   → never had a paid license, the trial ended
+  let inactiveReason = null;
+  let lastLicense = null;
+  if (isFreeTier) {
+    lastLicense = findLastTalentLicense(org);
+    inactiveReason = lastLicense ? "license_expired" : "trial_expired";
+  }
+
   return {
     trialActive,
     trialExpired: !trialActive,
     license,
+    lastLicense,
     plan: license?.plan || null,
     // free tier = trial is over and no paid license is running
-    isFreeTier: !trialActive && !license,
+    isFreeTier,
+    inactiveReason,
+    trialEndedAt: org?.trial_expires_at || null,
   };
 };
 
@@ -148,25 +176,59 @@ const peekStorageStatus = (org) => {
 
 // ── Blocking error ───────────────────────────────────────────────────────
 
-const roleCanUpgrade = (role) => ADMIN_ROLES.includes(role);
+// Only the superadmin can renew / upgrade the plan.
+const roleCanUpgrade = (role) => SUPERADMIN_ROLES.includes(role);
 
-// Single source of truth for every "storage full" message (login, getme,
-// plan-features, uploads). `extra` is an optional upload-specific sentence.
-const buildStorageMessage = (status, canUpgrade, extra = "") => {
-  const usage = `${status.usedFormatted} of its ${status.limitFormatted}`;
-  const lead = extra ? `${extra} ` : "";
-  return canUpgrade
-    ? `${lead}Your organisation is on the Free Forever plan and has used ${usage} free storage,` +
-        `so access to TorchX Talent is paused. To continue, upgrade to the Basic or Advance plan ` +
-        `at torchxsuite.com for unlimited storage, or free up space by deleting unused files and data.`
-    : `${lead}Your organisation's free storage is full, so access to TorchX Talent is paused. ` +
-        `Please ask your organisation's admin to upgrade the plan or free up space.`;
+const fmtDate = (d) =>
+  new Date(d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
+
+const planLabel = (plan) =>
+  plan ? `${String(plan).charAt(0).toUpperCase()}${String(plan).slice(1)} ` : "";
+
+// First sentence of the superadmin message: WHAT ended, WHEN, and where the org is now.
+const buildPlanExpiredLine = (state) => {
+  if (state?.inactiveReason === "license_expired" && state.lastLicense?.expiresAt) {
+    return `Your ${planLabel(state.lastLicense.plan)}plan expired on ${fmtDate(state.lastLicense.expiresAt)}, so your organisation is now on the Free Forever plan.`;
+  }
+  if (state?.inactiveReason === "trial_expired") {
+    return state.trialEndedAt
+      ? `Your free trial ended on ${fmtDate(state.trialEndedAt)}, so your organisation is now on the Free Forever plan.`
+      : `Your free trial has ended, so your organisation is now on the Free Forever plan.`;
+  }
+  return `Your organisation is on the Free Forever plan.`;
 };
 
-const buildStorageLimitError = (status, role, extra = "") => {
+// Single source of truth for every "access paused" message (login, getme,
+// plan-features, uploads). `extra` is an optional upload-specific sentence.
+// `state` is getPlanState(org) — optional, falls back to a generic message.
+//
+//   superadmin  → full detail: which plan expired, on what date, what to do
+//   other roles → short: plan expired, ask your organisation's superadmin
+const buildStorageMessage = (status, canUpgrade, extra = "", state = null) => {
+  const lead = extra ? `${extra} ` : "";
+  return canUpgrade
+    ? `${lead}${buildPlanExpiredLine(state)} Access to TorchX Talent is temporarily unavailable. ` +
+        `Please renew or upgrade your plan from the ${STORE_LABEL} to restore access.`
+    : `${lead}Your organisation's plan has expired, and access to TorchX Talent is temporarily unavailable. ` +
+        `Please contact your organisation's superadmin to renew or upgrade the plan and restore access.`;
+};
+
+const buildStorageTitle = (state, canUpgrade) => {
+  if (!canUpgrade) return "Plan expired";
+  if (state?.inactiveReason === "license_expired") return "Plan expired";
+  if (state?.inactiveReason === "trial_expired") return "Free trial ended";
+  return "Storage limit reached";
+};
+
+const buildStorageLimitError = (status, role, extra = "", state = null) => {
   const canUpgrade = roleCanUpgrade(role);
-  const title = "Storage limit reached";
-  const message = buildStorageMessage(status, canUpgrade, extra);
+  const title = buildStorageTitle(state, canUpgrade);
+  const message = buildStorageMessage(status, canUpgrade, extra, state);
 
   return Object.assign(new Error(message), {
     statusCode: 403,
@@ -174,6 +236,11 @@ const buildStorageLimitError = (status, role, extra = "") => {
     meta: {
       title,
       canUpgrade,
+      storeLabel: canUpgrade ? STORE_LABEL : null,
+      storeUrl: canUpgrade ? STORE_URL : null,
+      reason: state?.inactiveReason || null,
+      planExpiredAt: state?.lastLicense?.expiresAt || null,
+      trialEndedAt: state?.trialEndedAt || null,
       usedBytes: status.usedBytes,
       limitBytes: status.limitBytes,
       usedFormatted: status.usedFormatted,
@@ -200,7 +267,7 @@ const assertOrgAccess = async (org, role, { wait = true } = {}) => {
     ? await getStorageStatusForLogin(org)
     : peekStorageStatus(org);
 
-  if (status.exceeded) throw buildStorageLimitError(status, role);
+  if (status.exceeded) throw buildStorageLimitError(status, role, "", state);
 };
 
 // Express middleware version for "already logged in" endpoints (getme).
@@ -240,7 +307,10 @@ module.exports = {
   FREE_USER_LIMIT,
   FREE_STORAGE_LIMIT_MB,
   FREE_STORAGE_LIMIT_BYTES,
+  STORE_LABEL,
+  STORE_URL,
   findActiveTalentLicense,
+  findLastTalentLicense,
   isTrialActive,
   getPlanState,
   getAllowedUsers,
@@ -251,5 +321,6 @@ module.exports = {
   assertOrgAccess,
   storageGateMiddleware,
   buildStorageMessage,
+  buildStorageLimitError,
   roleCanUpgrade,
 };
