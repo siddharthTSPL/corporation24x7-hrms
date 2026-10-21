@@ -1,10 +1,10 @@
 import toast from "react-hot-toast";
 
 /**
- * Popup stays until the user closes it with the × button.
- * For auto-close, set a number here (e.g. 10000 = 10 seconds).
+ * Popup stays for 15 seconds and then closes automatically.
+ * The user can still close it earlier with the × button.
  */
-const AUTO_CLOSE_MS = Infinity;
+const AUTO_CLOSE_MS = 15000;
 
 // Beetroot theme
 const BEET = "#730042"; // border / icon / button
@@ -137,7 +137,7 @@ const showToast = ({ type, title, message, showUpgrade = false }) => {
     {
       id: `${type}-${title}-${message}`, // same popup never stacks twice
       position: "top-right",
-      duration: AUTO_CLOSE_MS,
+      duration: AUTO_CLOSE_MS, // 15 seconds
     }
   );
 };
