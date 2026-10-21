@@ -240,7 +240,7 @@ function OrgCard({ node, emp = false }) {
         ))}
         {node.empid && <span className="ot-id">{node.empid}</span>}
         <span className="ot-rep">
-          {kids.length} report{kids.length !== 1 ? "s" : ""}
+          {kids.length} Reportee{kids.length !== 1 ? "s" : ""}
         </span>
       </div>
 
