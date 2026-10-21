@@ -59,8 +59,8 @@ const HTML_TO_IMAGE_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
 
 const TREE_THEME = {
-  acc: "#0f172a",
-  ring: "rgba(15,23,42,0.10)",
+  acc: "#730042",
+  ring: "rgba(115,0,66,0.12)",
   line: "#c9d2e0",
   pill: "#730042",
   head: "'Inter',sans-serif",

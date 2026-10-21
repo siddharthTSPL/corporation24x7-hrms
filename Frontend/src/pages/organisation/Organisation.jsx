@@ -28,8 +28,8 @@ const DEPT_FULL_FORMS = {
 const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
 
 const TREE_THEME = {
-  acc: "#1e293b",
-  ring: "rgba(30,41,59,0.10)",
+  acc: "#730042",
+  ring: "rgba(115,0,66,0.12)",
   line: "#c9d2e0",
   pill: "#730042",
   head: "'Syne',sans-serif",
@@ -170,7 +170,7 @@ function buildAdminTree(data) {
     key: "org",
     kind: "org",
     name: data.organisation_name || "Organisation",
-    lines: [],
+    lines: data.super_admin?.name ? [data.super_admin.name] : [],
     image: data.organisation_logo,
     hay: [data.super_admin?.name],
     children: admin ? [admin] : [...managers, ...coAdmins],

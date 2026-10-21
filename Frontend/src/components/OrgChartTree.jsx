@@ -105,6 +105,8 @@ export const TREE_STYLES = `
 
   /* ---------- card ---------- */
   .ot-cardwrap { position:relative; flex-shrink:0; }
+  /* Only the Super Admin / organisation node is highlighted in black; everyone else uses the theme colour (beetroot) */
+  .ot-cardwrap--root { --ot-acc:#0f172a; --ot-ring:rgba(15,23,42,.12); }
   .ot-card {
     width:var(--w-card); background:#fff; border:1.5px solid #e5e7eb; border-radius:12px;
     padding:13px 10px 14px; display:flex; flex-direction:column; align-items:center;
@@ -112,6 +114,13 @@ export const TREE_STYLES = `
     transition:opacity .18s, border-color .15s, box-shadow .15s;
   }
   .ot-card--emp { width:var(--w-emp); padding:11px 8px 10px; }
+
+  /* Super Admin / organisation node: a bit bigger, full organisation name shown (wraps, never cut) */
+  .ot-card--root { width:240px; padding:18px 16px 16px; border-radius:14px; }
+  .ot-card--root .ot-av { width:50px; height:50px; font-size:16px; }
+  .ot-card--root .ot-name { margin-top:10px; font-size:14px; line-height:1.35; white-space:normal; overflow:visible; text-overflow:clip; text-align:center; overflow-wrap:anywhere; }
+  .ot-card--root .ot-sub { margin-top:3px; font-size:11.5px; font-weight:600; line-height:1.35; white-space:normal; overflow:visible; text-overflow:clip; text-align:center; overflow-wrap:anywhere; }
+  .ot-card--root .ot-rep { font-size:11px; }
   .ot-card.is-click { cursor:pointer; }
 
   .ot-bar { position:absolute; top:0; left:0; right:0; height:3px; background:#d1d5db; transition:background .15s; }
@@ -208,6 +217,7 @@ function OrgCard({ node, emp = false }) {
   const cls = [
     "ot-card",
     emp ? "ot-card--emp" : "",
+    node.kind === "sa" || node.kind === "org" ? "ot-card--root" : "",
     active ? "is-active" : "is-muted",
     hl ? "is-hl" : "",
     dim ? "is-dim" : "",
@@ -217,7 +227,9 @@ function OrgCard({ node, emp = false }) {
     .join(" ");
 
   return (
-    <div className="ot-cardwrap">
+    <div
+      className={`ot-cardwrap${node.kind === "sa" || node.kind === "org" ? " ot-cardwrap--root" : ""}`}
+    >
       {node.isYou && <span className="ot-you">You</span>}
       <div className={cls} onClick={node.onClick}>
         <span className="ot-bar" />

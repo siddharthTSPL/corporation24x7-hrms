@@ -131,7 +131,7 @@ function buildMgrTree(data) {
     key: "org",
     kind: "org",
     name: data.organisation_name || "Organisation",
-    lines: [],
+    lines: data.super_admin?.name ? [data.super_admin.name] : [],
     image: data.organisation_logo,
     hay: [data.super_admin?.name],
     children: admin ? [admin] : managers,
