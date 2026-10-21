@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useGetMeSuperAdmin } from "../../auth/server-state/superadmin/auth/suauth.hook";
 import {
   useGetAllEmployees,
@@ -9,6 +9,8 @@ import {
   useGetParticularManager,
   useGetParticularAdmin,
 } from "../../auth/server-state/superadmin/other/suother.hook";
+// Shared collapsible tree (put OrgChartTree.jsx in src/components, or fix this path)
+import { OrgTreeView, collectMatches } from "../../components/OrgChartTree";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -21,41 +23,7 @@ const STYLES = `
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
-  @keyframes scaleIn   { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
   @keyframes slideR    { from { opacity:0; transform:translateX(28px); } to { opacity:1; transform:translateX(0); } }
-  @keyframes ringPulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(15,23,42,0.2), 0 4px 20px rgba(15,23,42,0.08); }
-    50%      { box-shadow: 0 0 0 7px rgba(15,23,42,0.05), 0 8px 28px rgba(15,23,42,0.15); }
-  }
-  @keyframes pulseYou {
-    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25); }
-    50%      { box-shadow: 0 0 0 6px rgba(115,0,66,0.06); }
-  }
-
-  .su-card-hover { transition: transform 0.16s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.16s ease, border-color 0.14s ease; cursor: pointer; touch-action: manipulation; }
-  .su-card-hover:hover { transform: translateY(-4px) scale(1.015); }
-  .su-card-highlight { outline: 2px solid #0f172a !important; outline-offset: 3px; box-shadow: 0 0 0 6px rgba(15,23,42,0.08) !important; }
-  .su-card-dim { opacity: 0.15; filter: grayscale(0.5) blur(0.3px); transition: opacity 0.22s, filter 0.22s; }
-  .su-card-sa  { animation: ringPulse 3s ease-in-out infinite !important; }
-
-  .su-you-pill {
-    position: absolute;
-    top: -9px;
-    right: -9px;
-    z-index: 30;
-    background: #730042;
-    color: #ffffff;
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    padding: 3px 9px;
-    border-radius: 999px;
-    box-shadow: 0 2px 8px rgba(115,0,66,0.45), 0 0 0 2px #ffffff;
-    white-space: nowrap;
-    animation: pulseYou 2.6s ease-in-out infinite;
-    pointer-events: none;
-  }
 
   /* Chart scroll area: native bars hidden, the fixed bar at the bottom of the screen drives horizontal scroll */
   .su-scroll {
@@ -82,16 +50,6 @@ const STYLES = `
   .su-field-val {
     flex: 1 1 auto;
   }
-
-   /* Force the whole chart to start from the left */
-  .org-tree-root {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start !important;
-    width: max-content;
-    margin: 0 !important;
-  }
-  .org-tree-root .org-branch { align-items: flex-start !important; }
 `;
 
 const BRAND = "#730042";
@@ -99,7 +57,15 @@ const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS = 1000 * 60 * 2;
 const HTML_TO_IMAGE_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
-const LINE_COLOR = "#c9d2e0";
+
+const TREE_THEME = {
+  acc: "#0f172a",
+  ring: "rgba(15,23,42,0.10)",
+  line: "#c9d2e0",
+  pill: "#730042",
+  head: "'Inter',sans-serif",
+  mono: "'JetBrains Mono',monospace",
+};
 
 const NODE_COLOR = {
   sa: "#0f172a",
@@ -174,193 +140,6 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-function Skeleton({ w, h, r = 8 }) {
-  return (
-    <div
-      className="shrink-0 bg-gray-200 animate-pulse"
-      style={{ width: w, height: h, borderRadius: r }}
-    />
-  );
-}
-
-function OrgConnectorGroup({
-  parentRef,
-  children,
-  gapClassName = "gap-4",
-  verticalSpace = 26,
-}) {
-  const items = (Array.isArray(children) ? children : [children]).filter(
-    Boolean,
-  );
-  const containerRef = useRef(null);
-  const rowRef = useRef(null);
-  const [lines, setLines] = useState(null);
-
-  useLayoutEffect(() => {
-    if (!containerRef.current || !rowRef.current || !parentRef.current)
-      return undefined;
-
-    const measure = () => {
-      if (!containerRef.current || !rowRef.current || !parentRef.current)
-        return;
-      const cRect = containerRef.current.getBoundingClientRect();
-
-      const parentCard =
-        parentRef.current.querySelector(".su-card-hover") || parentRef.current;
-      const pRect = parentCard.getBoundingClientRect();
-      const parentX = pRect.left + pRect.width / 2 - cRect.left;
-      const parentY = pRect.bottom - cRect.top;
-
-      const collectKids = () =>
-        Array.from(rowRef.current.children)
-          .map((el) => {
-            const card = el.querySelector(".su-card-hover") || el;
-            const r = card.getBoundingClientRect();
-            if (!r.width && !r.height) return null;
-            return {
-              x: r.left + r.width / 2 - cRect.left,
-              y: r.top - cRect.top,
-              left: r.left - cRect.left,
-              right: r.right - cRect.left,
-            };
-          })
-          .filter(Boolean);
-
-      let kids = collectKids();
-
-      // Cards at different levels have different widths, so a parent's center and its
-      // first child's center don't line up. Nudge the child row right so the first child
-      // sits exactly under the parent's center. The lines then meet both cards dead-center.
-      if (kids.length) {
-        const rowEl = rowRef.current;
-        const cur = parseFloat(rowEl.style.marginLeft) || 0;
-        const want = Math.max(0, cur + (parentX - kids[0].x));
-        if (Math.abs(want - cur) > 0.5) {
-          rowEl.style.marginLeft = `${want}px`;
-          kids = collectKids();
-        }
-      }
-
-      if (!kids.length) {
-        setLines(null);
-        return;
-      }
-
-      // One child whose card sits under the parent's center: draw one straight line.
-      const straight =
-        kids.length === 1 &&
-        parentX >= kids[0].left + 6 &&
-        parentX <= kids[0].right - 6;
-
-      const minKidY = Math.min(...kids.map((k) => k.y));
-      const busY = parentY + Math.max(12, (minKidY - parentY) / 2);
-      const minX = Math.min(parentX, ...kids.map((k) => k.x));
-      const maxX = Math.max(parentX, ...kids.map((k) => k.x));
-      const needBus =
-        !straight && (kids.length > 1 || Math.abs(kids[0].x - parentX) > 1);
-
-      setLines({ parentX, parentY, busY, kids, minX, maxX, needBus, straight });
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(containerRef.current);
-    ro.observe(rowRef.current);
-    ro.observe(parentRef.current);
-    Array.from(rowRef.current.children).forEach((el) => ro.observe(el));
-
-    // Re-measure when a card's entrance animation ends, so lines don't use mid-animation sizes.
-    const rowEl = rowRef.current;
-    const parentEl = parentRef.current;
-    rowEl.addEventListener("animationend", measure, true);
-    parentEl.addEventListener("animationend", measure, true);
-
-    window.addEventListener("resize", measure);
-    const t1 = setTimeout(measure, 120);
-    const t2 = setTimeout(measure, 450);
-    document.fonts?.ready?.then(measure).catch(() => {});
-
-    return () => {
-      ro.disconnect();
-      rowEl.removeEventListener("animationend", measure, true);
-      parentEl.removeEventListener("animationend", measure, true);
-      window.removeEventListener("resize", measure);
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [items.length, verticalSpace]);
-
-  if (items.length === 0) return null;
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full flex flex-col items-start"
-    >
-      <div aria-hidden style={{ height: verticalSpace }} />
-      {lines && (
-        <svg
-          className="absolute inset-0 pointer-events-none"
-          style={{ overflow: "visible", width: "100%", height: "100%" }}
-        >
-          {lines.straight ? (
-            <line
-              x1={lines.parentX}
-              y1={lines.parentY}
-              x2={lines.parentX}
-              y2={lines.kids[0].y}
-              stroke={LINE_COLOR}
-              strokeWidth="1.5"
-            />
-          ) : (
-            <>
-              <line
-                x1={lines.parentX}
-                y1={lines.parentY}
-                x2={lines.parentX}
-                y2={lines.busY}
-                stroke={LINE_COLOR}
-                strokeWidth="1.5"
-              />
-              {lines.needBus && (
-                <line
-                  x1={lines.minX}
-                  y1={lines.busY}
-                  x2={lines.maxX}
-                  y2={lines.busY}
-                  stroke={LINE_COLOR}
-                  strokeWidth="1.5"
-                />
-              )}
-              {lines.kids.map((k, i) => (
-                <line
-                  key={i}
-                  x1={k.x}
-                  y1={lines.needBus ? lines.busY : lines.parentY}
-                  x2={k.x}
-                  y2={k.y}
-                  stroke={LINE_COLOR}
-                  strokeWidth="1.5"
-                />
-              ))}
-            </>
-          )}
-        </svg>
-      )}
-      <div
-        ref={rowRef}
-        className={`su-conn-row flex flex-row flex-nowrap items-start justify-start ${gapClassName}`}
-      >
-        {items.map((item, i) => (
-          <div key={item?.key ?? i} className="min-w-0">
-            {item}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Avatar({
   initials,
   sizeClass = "w-11 h-11 sm:w-12 sm:h-12",
@@ -411,220 +190,6 @@ function LiveDot() {
       <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
       Live
     </span>
-  );
-}
-
-function YouPill() {
-  return <span className="su-you-pill"></span>;
-}
-
-const SuperAdminNode = ({
-  nodeRef,
-  name,
-  role,
-  initials,
-  image,
-  delay = 0,
-  onClick,
-  isYou,
-}) => {
-  return (
-    <div
-      ref={nodeRef}
-      className="opacity-0 shrink-0"
-      style={{
-        animation: `scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`,
-      }}
-    >
-      <div
-        className="su-card-hover su-card-sa w-[164px] sm:w-[190px] md:w-[210px] lg:w-[225px] bg-white border-[1.5px] border-[#e8edf5] rounded-2xl p-3 sm:p-4 md:p-5 flex flex-col items-center relative overflow-hidden shadow-sm"
-        onClick={onClick}
-      >
-        {isYou && <YouPill />}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0f172a] to-[#334155] rounded-t-2xl" />
-        <Avatar
-          initials={initials}
-          image={image}
-          sizeClass="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 lg:w-[52px] lg:h-[52px]"
-          textClass="text-sm sm:text-base md:text-lg"
-          bg={NODE_COLOR.sa}
-        />
-        <p className="text-xs sm:text-sm md:text-base font-bold text-slate-900 mt-2.5 sm:mt-3 text-center break-words">
-          {name}
-        </p>
-        <p className="text-[10px] sm:text-[11px] md:text-xs text-gray-500 mt-1 text-center break-words">
-          {role}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const AdminNode = ({
-  nodeRef,
-  admin,
-  delay = 0,
-  dimmed,
-  highlighted,
-  onClick,
-}) => {
-  const name = fullName(admin);
-  return (
-    <div
-      ref={nodeRef}
-      className="opacity-0 shrink-0"
-      style={{
-        animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${delay}ms forwards`,
-      }}
-    >
-      <div
-        className={`su-card-hover w-[136px] sm:w-[158px] md:w-[174px] lg:w-[184px] bg-white border-[1.5px] border-[#e8edf5] rounded-xl p-2.5 sm:p-3 md:p-4 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
-        onClick={onClick}
-      >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-500 to-slate-400 rounded-t-xl" />
-        <Avatar
-          initials={getInitials(admin.f_name, admin.l_name)}
-          image={admin.profile_image}
-          sizeClass="w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 lg:w-11 lg:h-11"
-          textClass="text-xs sm:text-[13px]"
-          bg={NODE_COLOR.admin}
-        />
-        <p className="text-[11px] sm:text-xs md:text-[13px] font-semibold text-slate-900 mt-2 sm:mt-2.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
-          {name}
-        </p>
-        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-1 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
-          {getDepartmentName(admin.department)}
-        </p>
-        <p className="text-[9.5px] sm:text-[10px] md:text-[11px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full">
-          {admin.designation || "—"}
-        </p>
-        <p
-          className="text-[9px] sm:text-[9.5px] md:text-[10px] text-gray-400 mt-0.5 text-center max-w-[108px] sm:max-w-[130px] md:max-w-[140px] truncate w-full"
-          style={{ fontFamily: "'JetBrains Mono',monospace" }}
-        >
-          {admin.empid || "—"}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const ManagerNode = ({
-  nodeRef,
-  manager,
-  delay = 0,
-  dimmed,
-  highlighted,
-  onClick,
-}) => {
-  const name = fullName(manager);
-  return (
-    <div
-      ref={nodeRef}
-      className="opacity-0 shrink-0"
-      style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}
-    >
-      <div
-        className={`su-card-hover w-[118px] sm:w-[138px] md:w-[152px] lg:w-[160px] bg-[#f9fbfe] border-[1.5px] border-[#e4edf6] rounded-lg p-2 sm:p-2.5 md:p-3 flex flex-col items-center relative overflow-hidden shadow-sm ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
-        onClick={onClick}
-      >
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-300 rounded-t-lg" />
-        <Avatar
-          initials={getInitials(manager.f_name, manager.l_name)}
-          image={manager.profile_image}
-          sizeClass="w-7 h-7 sm:w-8 sm:h-8 md:w-[34px] md:h-[34px]"
-          textClass="text-[10px] sm:text-[11px] md:text-xs"
-          bg={NODE_COLOR.manager}
-        />
-        <p className="text-[10px] sm:text-[11px] md:text-xs font-semibold text-slate-800 mt-1.5 sm:mt-2 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
-          {name}
-        </p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
-          {manager.department ? getDepartmentName(manager.department) : "—"}
-        </p>
-        <p className="text-[9px] sm:text-[9.5px] md:text-[10.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full">
-          {manager.designation || "—"}
-        </p>
-        <p
-          className="text-[8.5px] sm:text-[9px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[94px] sm:max-w-[110px] md:max-w-[120px] truncate w-full"
-          style={{ fontFamily: "'JetBrains Mono',monospace" }}
-        >
-          {manager.empid || "—"}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const EmployeeNode = ({
-  nodeRef,
-  employee,
-  delay = 0,
-  dimmed,
-  highlighted,
-  onClick,
-}) => {
-  const name = fullName(employee);
-  return (
-    <div
-      ref={nodeRef}
-      className="opacity-0 shrink-0"
-      style={{ animation: `fadeUp 0.3s ease ${delay}ms forwards` }}
-    >
-      <div
-        className={`su-card-hover w-[100px] sm:w-[116px] md:w-[132px] lg:w-[140px] bg-[#fafbfc] border-[1.5px] border-[#e8edf5] rounded-lg p-1.5 sm:p-2 md:p-2.5 flex flex-col items-center relative ${highlighted ? "su-card-highlight" : ""} ${dimmed ? "su-card-dim" : ""}`}
-        onClick={onClick}
-      >
-        <Avatar
-          initials={getInitials(employee.f_name, employee.l_name)}
-          image={employee.profile_image}
-          sizeClass="w-6 h-6 sm:w-7 sm:h-7 md:w-7 md:h-7"
-          textClass="text-[8px] sm:text-[9px]"
-          bg={NODE_COLOR.employee}
-        />
-        <p className="text-[9px] sm:text-[10px] md:text-[11px] font-semibold text-slate-800 mt-1 sm:mt-1.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
-          {name}
-        </p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
-          {employee.department ? getDepartmentName(employee.department) : "—"}
-        </p>
-        <p className="text-[8.5px] sm:text-[9px] md:text-[10px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full">
-          {employee.designation || "—"}
-        </p>
-        <p
-          className="text-[8px] sm:text-[8.5px] md:text-[9.5px] text-slate-400 mt-0.5 text-center max-w-[80px] sm:max-w-[92px] md:max-w-[100px] truncate w-full"
-          style={{ fontFamily: "'JetBrains Mono',monospace" }}
-        >
-          {employee.empid || "—"}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-function SkeletonTree() {
-  return (
-    <div className="flex flex-col items-center gap-0 w-full min-w-0">
-      <Skeleton w={164} h={110} r={16} />
-      <div className="w-1.5 h-6 sm:h-7 bg-gray-200 mx-auto" />
-      <div className="flex gap-3 sm:gap-4 md:gap-5 justify-center w-full min-w-0">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex flex-col items-center min-w-0">
-            <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
-            <Skeleton w={136} h={92} r={13} />
-            <div className="w-1.5 h-4 sm:h-5 bg-gray-200 mx-auto" />
-            <div className="flex gap-2 sm:gap-2.5 md:gap-3.5 justify-center w-full min-w-0">
-              {[1, 2].map((j) => (
-                <div key={j} className="flex flex-col items-center min-w-0">
-                  <div className="w-1.5 h-3 sm:h-4 bg-gray-200 mx-auto" />
-                  <Skeleton w={100} h={70} r={10} />
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -1167,341 +732,106 @@ function ReviewsTab({ uid, role }) {
   );
 }
 
-function useLimited(items, limit = 2, forceAll = false) {
-  const [expanded, setExpanded] = useState(false);
-  const showAll = expanded || forceAll;
-  const visible = showAll ? items : items.slice(0, limit);
-  return {
-    visible,
-    hiddenCount: items.length - visible.length,
-    canCollapse: expanded && !forceAll && items.length > limit,
-    toggle: () => setExpanded((v) => !v),
-  };
-}
+// ---------------------------------------------------------------------------
+// Build the tree (same relations as before, nothing in the data is changed):
+// Super Admin -> admins -> (co-admins / managers) -> (sub-managers / employees)
+// ---------------------------------------------------------------------------
+function buildOrgTree({ superAdmin, admins, managers, employees, open }) {
+  const seen = new Set(); // guards against a bad reporting loop in the data
 
-// The See more / See less button is positioned right next to the last visible card
-// of this row (not at the far end of the row's subtree), at that card's vertical center.
-function LimitedRow({ limit, children }) {
-  const wrapRef = useRef(null);
-  const [btn, setBtn] = useState(null);
-  const showBtn = limit.hiddenCount > 0 || limit.canCollapse;
-  const BTN_W = 120;
-  const GAP = 12;
+  const empNode = (e) => ({
+    key: `e-${idStr(e._id)}`,
+    kind: "emp",
+    name: fullName(e),
+    initials: getInitials(e.f_name, e.l_name),
+    lines: [e.department ? getDepartmentName(e.department) : "—", e.designation || "—"],
+    empid: e.empid || "—",
+    image: e.profile_image,
+    hay: [e.department, e.designation],
+    onClick: () => open(e, "employee"),
+    children: [],
+  });
 
-  useLayoutEffect(() => {
-    const wrap = wrapRef.current;
-    if (!wrap || !showBtn) {
-      setBtn(null);
-      return undefined;
-    }
-
-    const measure = () => {
-      const row = wrap.querySelector(".su-conn-row");
-      const lastCol = row?.lastElementChild;
-      const card = lastCol?.querySelector(".su-card-hover");
-      if (!card) return;
-      const w = wrap.getBoundingClientRect();
-      const c = card.getBoundingClientRect();
-      const next = {
-        left: Math.round(c.right - w.left + GAP),
-        top: Math.round(c.top - w.top + c.height / 2),
-      };
-      setBtn((prev) =>
-        prev && prev.left === next.left && prev.top === next.top ? prev : next,
-      );
-    };
-
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(wrap);
-    const row = wrap.querySelector(".su-conn-row");
-    if (row) {
-      ro.observe(row);
-      Array.from(row.children).forEach((el) => ro.observe(el));
-    }
-    wrap.addEventListener("animationend", measure, true);
-    window.addEventListener("resize", measure);
-    const t1 = setTimeout(measure, 120);
-    const t2 = setTimeout(measure, 450);
-    document.fonts?.ready?.then(measure).catch(() => {});
-
-    return () => {
-      ro.disconnect();
-      wrap.removeEventListener("animationend", measure, true);
-      window.removeEventListener("resize", measure);
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [showBtn, limit.visible.length]);
-
-  return (
-    <div
-      ref={wrapRef}
-      className="relative flex items-start justify-start"
-      style={btn && showBtn ? { minWidth: btn.left + BTN_W } : undefined}
-    >
-      <div className="shrink-0 [&>div]:w-auto">{children}</div>
-      {showBtn && btn && (
-        <button
-          type="button"
-          onClick={limit.toggle}
-          className="su-seemore absolute inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
-          style={{
-            left: btn.left,
-            top: btn.top,
-            transform: "translateY(-50%)",
-            zIndex: 5,
-          }}
-        >
-          {limit.canCollapse ? "← See less" : `See ${limit.hiddenCount} more →`}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ManagerBranch({
-  manager,
-  allManagers,
-  employees,
-  matchName,
-  hasQ,
-  parentMatched,
-  onNodeClick,
-  delay = 0,
-}) {
-  const nodeRef = useRef(null);
-  const mgrMatch =
-    hasQ &&
-    matchName(
-      manager.f_name,
-      manager.l_name,
-      manager.department,
-      manager.designation,
-    );
-  const mgrDimmed = hasQ && !mgrMatch && !parentMatched;
-  const mgrId = idStr(manager._id);
-
-  const subManagers = allManagers.filter(
-    (m) =>
-      idStr(m.reporting_manager) === mgrId &&
-      m.reporting_manager_model === "Manager",
-  );
-  const mgrEmps = employees.filter((e) => idStr(e.Under_manager) === mgrId);
-
-  // Sub-managers and employees share one row, so they share one limit.
-  const children = [
-    ...subManagers.map((item) => ({ type: "manager", item })),
-    ...mgrEmps.map((item) => ({ type: "employee", item })),
-  ];
-  const childLimit = useLimited(children, 2, hasQ);
-
-  return (
-    <div className="org-branch px-2">
-      <ManagerNode
-        nodeRef={nodeRef}
-        manager={manager}
-        delay={delay}
-        highlighted={mgrMatch}
-        dimmed={mgrDimmed}
-        onClick={() => onNodeClick(manager, "manager")}
-      />
-
-      {children.length > 0 && (
-        <LimitedRow limit={childLimit}>
-          <OrgConnectorGroup parentRef={nodeRef} gapClassName="gap-3 sm:gap-4">
-            {childLimit.visible.map((child, i) => {
-              if (child.type === "manager") {
-                const sub = child.item;
-                return (
-                  <ManagerBranch
-                    key={sub._id}
-                    manager={sub}
-                    allManagers={allManagers}
-                    employees={employees}
-                    matchName={matchName}
-                    hasQ={hasQ}
-                    parentMatched={mgrMatch || parentMatched}
-                    onNodeClick={onNodeClick}
-                    delay={i * 50}
-                  />
-                );
-              }
-              const emp = child.item;
-              const empMatch =
-                hasQ &&
-                matchName(
-                  emp.f_name,
-                  emp.l_name,
-                  emp.department,
-                  emp.designation,
-                );
-              const empDimmed =
-                hasQ && !empMatch && !mgrMatch && !parentMatched;
-              return (
-                <EmployeeBranch
-                  key={emp._id}
-                  employee={emp}
-                  delay={i * 45}
-                  highlighted={empMatch}
-                  dimmed={empDimmed}
-                  onClick={() => onNodeClick(emp, "employee")}
-                />
-              );
-            })}
-          </OrgConnectorGroup>
-        </LimitedRow>
-      )}
-    </div>
-  );
-}
-
-function EmployeeBranch({ employee, delay, highlighted, dimmed, onClick }) {
-  const nodeRef = useRef(null);
-  return (
-    <div className="org-branch px-2">
-      <EmployeeNode
-        nodeRef={nodeRef}
-        employee={employee}
-        delay={delay}
-        highlighted={highlighted}
-        dimmed={dimmed}
-        onClick={onClick}
-      />
-    </div>
-  );
-}
-
-function AdminBranch({
-  admin,
-  allAdmins,
-  managers,
-  employees,
-  matchName,
-  hasQ,
-  onNodeClick,
-  delay = 0,
-}) {
-  const nodeRef = useRef(null);
-  const admMatch =
-    hasQ && matchName(admin.f_name, admin.l_name, "", admin.designation);
-  const admDimmed = hasQ && !admMatch;
-  const adminId = idStr(admin._id);
-
-  const coAdmins = allAdmins.filter(
-    (a) =>
-      idStr(a.reporting_manager) === adminId &&
-      a.reporting_manager_model === "Admin",
-  );
-  const coAdminParent =
-    admin.reporting_manager_model === "Admin"
-      ? allAdmins.find((a) => idStr(a._id) === idStr(admin.reporting_manager))
-      : null;
-  const parentCoAdmins = coAdminParent
-    ? allAdmins.filter(
-        (a) =>
-          idStr(a.reporting_manager) === idStr(coAdminParent._id) &&
-          a.reporting_manager_model === "Admin",
+  const mgrNode = (m) => {
+    const id = idStr(m._id);
+    const key = `m-${id}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const subs = managers
+      .filter(
+        (x) =>
+          idStr(x.reporting_manager) === id &&
+          x.reporting_manager_model === "Manager",
       )
-    : [];
-  const isOnlyCoAdminForParent =
-    parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === adminId;
-  const managerAdminId = isOnlyCoAdminForParent
-    ? idStr(coAdminParent._id)
-    : adminId;
-  const admManagers = managers.filter(
-    (m) =>
-      idStr(m.reporting_manager) === managerAdminId &&
-      m.reporting_manager_model === "Admin",
-  );
-  const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
+      .map(mgrNode)
+      .filter(Boolean);
+    const emps = employees
+      .filter((e) => idStr(e.Under_manager) === id)
+      .map(empNode);
+    return {
+      key,
+      kind: "mgr",
+      name: fullName(m),
+      initials: getInitials(m.f_name, m.l_name),
+      lines: [m.department ? getDepartmentName(m.department) : "—", m.designation || "—"],
+      empid: m.empid || "—",
+      image: m.profile_image,
+      hay: [m.department, m.designation],
+      onClick: () => open(m, "manager"),
+      children: [...subs, ...emps],
+    };
+  };
 
-  // Managers directly under an admin: show 2, then "See N more →"
-  const managerLimit = useLimited(admManagers, 2, hasQ);
+  const adminNode = (a) => {
+    const id = idStr(a._id);
+    const key = `a-${id}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
 
-  // Co-admins directly under an admin: show 2, then "See N more →"
-  const coAdminLimit = useLimited(coAdmins, 2, hasQ);
+    const coAdmins = admins.filter(
+      (x) =>
+        idStr(x.reporting_manager) === id &&
+        x.reporting_manager_model === "Admin",
+    );
+    const coAdminParent =
+      a.reporting_manager_model === "Admin"
+        ? admins.find((x) => idStr(x._id) === idStr(a.reporting_manager))
+        : null;
+    const parentCoAdmins = coAdminParent
+      ? admins.filter(
+          (x) =>
+            idStr(x.reporting_manager) === idStr(coAdminParent._id) &&
+            x.reporting_manager_model === "Admin",
+        )
+      : [];
+    const isOnlyCoAdminForParent =
+      parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === id;
+    const managerAdminId = isOnlyCoAdminForParent
+      ? idStr(coAdminParent._id)
+      : id;
+    const admManagers = managers.filter(
+      (m) =>
+        idStr(m.reporting_manager) === managerAdminId &&
+        m.reporting_manager_model === "Admin",
+    );
+    const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
 
-  return (
-    <div className="org-branch">
-      <AdminNode
-        nodeRef={nodeRef}
-        admin={admin}
-        delay={delay}
-        highlighted={admMatch}
-        dimmed={admDimmed}
-        onClick={() => onNodeClick(admin, "admin")}
-      />
-
-      {coAdmins.length > 0 && (
-        <LimitedRow limit={coAdminLimit}>
-          <OrgConnectorGroup
-            parentRef={nodeRef}
-            gapClassName="gap-3 sm:gap-4 md:gap-5"
-            verticalSpace={44}
-          >
-            {coAdminLimit.visible.map((coAdmin, index) => (
-              <AdminBranch
-                key={coAdmin._id}
-                admin={coAdmin}
-                allAdmins={allAdmins}
-                managers={managers}
-                employees={employees}
-                matchName={matchName}
-                hasQ={hasQ}
-                onNodeClick={onNodeClick}
-                delay={delay + 340 + index * 60}
-              />
-            ))}
-          </OrgConnectorGroup>
-        </LimitedRow>
-      )}
-
-      {showManagersHere && admManagers.length > 0 && (
-        <LimitedRow limit={managerLimit}>
-          <OrgConnectorGroup
-            parentRef={nodeRef}
-            gapClassName="gap-2 sm:gap-3 md:gap-3.5"
-          >
-            {managerLimit.visible.map((mgr, mi) => (
-              <ManagerBranch
-                key={mgr._id}
-                manager={mgr}
-                allManagers={managers}
-                employees={employees}
-                matchName={matchName}
-                hasQ={hasQ}
-                parentMatched={admMatch}
-                onNodeClick={onNodeClick}
-                delay={mi * 55}
-              />
-            ))}
-          </OrgConnectorGroup>
-        </LimitedRow>
-      )}
-
-      {admManagers.length === 0 && coAdmins.length === 0 && (
-        <p className="mt-3 text-[10px] sm:text-[11px] text-gray-300 italic">
-          No managers under this admin
-        </p>
-      )}
-    </div>
-  );
-}
-
-function OrgTree({
-  superAdmin,
-  admins,
-  managers,
-  employees,
-  loading,
-  searchQuery,
-  onNodeClick,
-}) {
-  const saRef = useRef(null);
-
-  const q = normalize(searchQuery);
-  const hasQ = q.length > 0;
+    return {
+      key,
+      kind: "admin",
+      name: fullName(a),
+      initials: getInitials(a.f_name, a.l_name),
+      lines: [getDepartmentName(a.department), a.designation || "—"],
+      empid: a.empid || "—",
+      image: a.profile_image,
+      hay: [a.department, a.designation],
+      onClick: () => open(a, "admin"),
+      children: [
+        ...coAdmins.map(adminNode).filter(Boolean),
+        ...(showManagersHere ? admManagers.map(mgrNode).filter(Boolean) : []),
+      ],
+    };
+  };
 
   const rootAdmins = admins.filter(
     (admin) =>
@@ -1511,61 +841,44 @@ function OrgTree({
       ),
   );
 
-  // Admins directly under the Super Admin: show 2, then "See N more →".
-  // Must be called before the early return below (hook rules).
-  const adminLimit = useLimited(rootAdmins, 2, hasQ);
-
-  if (loading) return <SkeletonTree />;
-
-  const matchName = (f = "", l = "", dept = "", desig = "") => {
-    if (!hasQ) return false;
-    return (
-      normalize(`${f} ${l}`).includes(q) ||
-      normalize(dept).includes(q) ||
-      normalize(desig).includes(q)
-    );
+  return {
+    key: "sa",
+    kind: "sa",
+    isYou: true,
+    name: fullName(superAdmin) || "Super Admin",
+    initials: getInitials(superAdmin?.f_name, superAdmin?.l_name),
+    lines: [superAdmin?.organisation_name || "Super Admin"],
+    image: superAdmin?.profile_image,
+    hay: [],
+    onClick: () => open(superAdmin, "superadmin"),
+    children: rootAdmins.map(adminNode).filter(Boolean),
   };
+}
 
+function OrgTree({
+  root,
+  loading,
+  q,
+  matches,
+  admins,
+  managers,
+  employees,
+  onNodeClick,
+}) {
   return (
-    <div className="org-tree-root">
-      <SuperAdminNode
-        nodeRef={saRef}
-        name={fullName(superAdmin) || "Super Admin"}
-        role={superAdmin?.organisation_name || "Super Admin"}
-        initials={getInitials(superAdmin?.f_name, superAdmin?.l_name)}
-        image={superAdmin?.profile_image}
-        delay={60}
-        isYou
-        onClick={() => onNodeClick(superAdmin, "superadmin")}
+    <>
+      <OrgTreeView
+        root={root}
+        loading={loading}
+        q={q}
+        matches={matches}
+        theme={TREE_THEME}
       />
 
-      {rootAdmins.length > 0 ? (
-        <LimitedRow limit={adminLimit}>
-          <OrgConnectorGroup
-            parentRef={saRef}
-            gapClassName="gap-3 sm:gap-4 md:gap-5"
-          >
-            {adminLimit.visible.map((admin, ai) => (
-              <AdminBranch
-                key={admin._id}
-                admin={admin}
-                allAdmins={admins}
-                managers={managers}
-                employees={employees}
-                matchName={matchName}
-                hasQ={hasQ}
-                onNodeClick={onNodeClick}
-                delay={340 + ai * 60}
-              />
-            ))}
-          </OrgConnectorGroup>
-        </LimitedRow>
-      ) : (
-        !loading && (
-          <div className="mt-9 px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
-            No admins created yet
-          </div>
-        )
+      {!loading && root && root.children.length === 0 && (
+        <div className="mt-9 mx-auto w-fit px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
+          No admins created yet
+        </div>
       )}
 
       <OrphanNotice
@@ -1574,7 +887,7 @@ function OrgTree({
         employees={employees}
         onNodeClick={onNodeClick}
       />
-    </div>
+    </>
   );
 }
 
@@ -1686,28 +999,25 @@ export default function SuperAdminOrgChart() {
   const loading = loadingSA || loadingAdm || loadingMgr || loadingEmp;
   const totalNodes = 1 + admins.length + managers.length + employees.length;
 
-  const matchCount = useMemo(() => {
-    if (!searchQuery) return 0;
-    const q = normalize(searchQuery);
-    let n = 0;
-    const check = (f, l, dept, desig) => {
-      if (
-        normalize(`${f} ${l}`).includes(q) ||
-        normalize(dept || "").includes(q) ||
-        normalize(desig || "").includes(q)
-      )
-        n++;
-    };
-    if (superAdmin) check(superAdmin.f_name, superAdmin.l_name, "", "");
-    admins.forEach((a) => check(a.f_name, a.l_name, "", a.designation));
-    managers.forEach((m) =>
-      check(m.f_name, m.l_name, m.department, m.designation),
-    );
-    employees.forEach((e) =>
-      check(e.f_name, e.l_name, e.department, e.designation),
-    );
-    return n;
-  }, [searchQuery, superAdmin, admins, managers, employees]);
+  const handleNodeClick = (person, type) => setSelected({ person, type });
+
+  const root = useMemo(
+    () =>
+      superAdmin
+        ? buildOrgTree({
+            superAdmin,
+            admins,
+            managers,
+            employees,
+            open: (person, type) => setSelected({ person, type }),
+          })
+        : null,
+    [superAdmin, admins, managers, employees],
+  );
+
+  const q = normalize(searchQuery);
+  const matches = useMemo(() => collectMatches(root, q), [root, q]);
+  const matchCount = matches.size;
 
   useEffect(() => {
     const onKey = (e) => {
@@ -2172,7 +1482,7 @@ export default function SuperAdminOrgChart() {
               </span>
             )}
             <span className="hidden sm:block ml-auto text-xs text-gray-400 truncate">
-              Click any card for details
+              Click + / − to expand · click any card for details
             </span>
           </div>
 
@@ -2189,13 +1499,14 @@ export default function SuperAdminOrgChart() {
               style={{ width: "max-content", minWidth: "100%" }}
             >
               <OrgTree
-                superAdmin={superAdmin}
+                root={root}
+                loading={loading}
+                q={q}
+                matches={matches}
                 admins={admins}
                 managers={managers}
                 employees={employees}
-                loading={loading}
-                searchQuery={searchQuery}
-                onNodeClick={(person, type) => setSelected({ person, type })}
+                onNodeClick={handleNodeClick}
               />
             </div>
           </div>

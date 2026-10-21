@@ -12,15 +12,8 @@ import {
 } from "lucide-react";
 
 import { useGetOrgInfo } from "../../auth/server-state/adminother/adminother.hook";
-
-const initials = (name = "") =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+// Shared collapsible tree (put OrgChartTree.jsx in src/components, or fix this path)
+import { OrgTreeView, collectMatches } from "../../components/OrgChartTree";
 
 const norm = (s = "") => s.toLowerCase().trim();
 
@@ -33,6 +26,15 @@ const DEPT_FULL_FORMS = {
 };
 
 const getDepartmentName = (dept) => DEPT_FULL_FORMS[dept] || dept || "—";
+
+const TREE_THEME = {
+  acc: "#1e293b",
+  ring: "rgba(30,41,59,0.10)",
+  line: "#c9d2e0",
+  pill: "#730042",
+  head: "'Syne',sans-serif",
+  mono: "'DM Mono',monospace",
+};
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -51,38 +53,8 @@ const STYLES = `
 
   @keyframes fadeUp    { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
-  @keyframes scaleIn   { from { opacity:0; transform:scale(0.94); } to { opacity:1; transform:scale(1); } }
-  @keyframes shimmer   { 0% { background-position:-600px 0; } 100% { background-position:600px 0; } }
   @keyframes spin      { to { transform:rotate(360deg); } }
   @keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes pulseYou  {
-    0%,100% { box-shadow: 0 0 0 0 rgba(115,0,66,0.25); }
-    50%      { box-shadow: 0 0 0 6px rgba(115,0,66,0.06); }
-  }
-
-  .nd { transition: transform 0.16s ease, box-shadow 0.16s ease; cursor: default; }
-  .nd:hover { transform: translateY(-2px); }
-  .nd-hl  { outline: 2px solid #1e293b !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(30,41,59,0.1) !important; }
-  .nd-dim { opacity: 0.15; filter: grayscale(0.4); transition: opacity 0.2s, filter 0.2s; }
-
-  .you-pill {
-    position: absolute;
-    top: -9px;
-    right: -9px;
-    z-index: 30;
-    background: #730042;
-    color: #ffffff;
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    padding: 3px 9px;
-    border-radius: 999px;
-    box-shadow: 0 2px 8px rgba(115,0,66,0.45), 0 0 0 2px #ffffff;
-    white-space: nowrap;
-    animation: pulseYou 2.6s ease-in-out infinite;
-    pointer-events: none;
-  }
 
   .stat-h { transition: transform 0.14s ease; }
   .stat-h:hover { transform: translateY(-2px); }
@@ -133,931 +105,76 @@ const STYLES = `
   }
 `;
 
-function Sk({ w, h, r = 8 }) {
-  return (
-    <div
-      style={{
-        width: w,
-        height: h,
-        borderRadius: r,
-        flexShrink: 0,
-        background:
-          "linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)",
-        backgroundSize: "600px 100%",
-        animation: "shimmer 1.4s infinite linear",
-      }}
-    />
-  );
-}
+// ---------------------------------------------------------------------------
+// Build the tree from the same API data (nothing in the data is changed):
+// Organisation -> Admin -> (managers + co-admins) -> (sub-managers / employees)
+// ---------------------------------------------------------------------------
+const empNode = (e) => ({
+  key: `e-${e.id}`,
+  kind: "emp",
+  name: e.name,
+  lines: [e.department ? getDepartmentName(e.department) : "—", e.designation || "—"],
+  empid: e.empid || "—",
+  image: e.profile_image,
+  hay: [e.department, e.designation],
+  children: [],
+});
 
-function Avatar({ name, size = 40, bg, color, image }) {
-  const [errored, setErrored] = useState(false);
-  if (image && !errored) {
-    return (
-      <img
-        src={image}
-        alt={name}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          objectFit: "cover",
-          flexShrink: 0,
-          background: bg,
-        }}
-        onError={() => setErrored(true)}
-      />
-    );
-  }
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: bg,
-        color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        fontWeight: 700,
-        flexShrink: 0,
-        fontFamily: "'Syne',sans-serif",
-      }}
-    >
-      {initials(name)}
-    </div>
-  );
-}
+const mgrNode = (m) => ({
+  key: `m-${m.id}`,
+  kind: "mgr",
+  name: m.name,
+  lines: [m.department ? getDepartmentName(m.department) : "—", m.designation || "—"],
+  empid: m.empid || "—",
+  image: m.profile_image,
+  hay: [m.department, m.designation],
+  children: [
+    ...(m.subManagers || []).map(mgrNode),
+    ...(m.employees || []).map(empNode),
+  ],
+});
 
-function Hi({ text = "", q = "", style = {} }) {
-  if (!q) return <span style={style}>{text}</span>;
-  const idx = norm(text).indexOf(q);
-  if (idx === -1) return <span style={style}>{text}</span>;
-  return (
-    <span style={style}>
-      {text.slice(0, idx)}
-      <mark
-        style={{
-          background: "#fef08a",
-          color: "#713f12",
-          borderRadius: 2,
-          padding: "0 1px",
-        }}
-      >
-        {text.slice(idx, idx + q.length)}
-      </mark>
-      {text.slice(idx + q.length)}
-    </span>
-  );
-}
-
-function YouPill() {
-  return <span className="you-pill"></span>;
-}
-
-const CFG = {
-  org: { accent: "#0f172a", avBg: "#0f172a", avColor: "#f8fafc" },
-  admin: { accent: "#334155", avBg: "#e2e8f0", avColor: "#334155" },
-  manager: { accent: "#475569", avBg: "#f1f5f9", avColor: "#475569" },
-  subMgr: { accent: "#64748b", avBg: "#f8fafc", avColor: "#64748b" },
-  emp: { accent: "#94a3b8", avBg: "#f8fafc", avColor: "#64748b" },
-};
-
-function Card({
-  level,
-  name,
-  department,
-  designation,
-  empid,
-  isOrg,
-  width = 172,
-  delay = 0,
-  dim,
-  hl,
-  q,
-  you,
-  empCount,
-  image,
-}) {
-  const c = CFG[level] || CFG.emp;
-  return (
-    <div
-      style={{
-        animation: `scaleIn 0.26s ease ${delay}ms forwards`,
-        opacity: 0,
-        flexShrink: 0,
-      }}
-    >
-      <div
-        className={["nd", hl ? "nd-hl" : "", dim ? "nd-dim" : ""]
-          .filter(Boolean)
-          .join(" ")}
-        style={{
-          width,
-          background: "#fff",
-          border: "1px solid #e2e8f0",
-          borderRadius: 11,
-          padding: "14px 12px 11px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {you && <YouPill />}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: c.accent,
-            borderRadius: "11px 11px 0 0",
-          }}
-        />
-        <Avatar
-          name={name}
-          size={38}
-          bg={c.avBg}
-          color={c.avColor}
-          image={image}
-        />
-        <div
-          style={{
-            marginTop: 8,
-            marginBottom: 6,
-            textAlign: "center",
-            width: "100%",
-          }}
-        >
-          <Hi
-            text={name}
-            q={q}
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#0f172a",
-              display: "block",
-              lineHeight: 1.3,
-              fontFamily: "'Syne',sans-serif",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          />
-          {!isOrg && (
-            <>
-              <Hi
-                text={department || "—"}
-                q={q}
-                style={{
-                  fontSize: 10,
-                  color: "#64748b",
-                  display: "block",
-                  marginTop: 2,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              />
-              <Hi
-                text={designation || "—"}
-                q={q}
-                style={{
-                  fontSize: 10,
-                  color: "#64748b",
-                  display: "block",
-                  marginTop: 2,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 9,
-                  color: "#94a3b8",
-                  display: "block",
-                  marginTop: 2,
-                  fontFamily: "'DM Mono',monospace",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {empid || "—"}
-              </span>
-            </>
-          )}
-          {empCount !== undefined && (
-            <span
-              style={{
-                fontSize: 10,
-                color: "#94a3b8",
-                display: "block",
-                marginTop: 2,
-              }}
-            >
-              {empCount} report{empCount !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const CARD_W = 172;
-const EMP_W = 152;
-const MGR_GAP = 28;
-const EMP_GAP = 10;
-const SUB_MGR_GAP = 20;
-const LIMIT = 2; // employees / sub-managers rows
-const ROOT_LIMIT = 3; // top row of managers: the button only appears from the 4th card
-const BTN_W = 112;
-const BTN_SPACE = BTN_W + 12;
-
-// Same connector style as the Super Admin org chart
-const LINE_COLOR = "#c9d2e0";
-const LINE_W = 1.5;
-
-// An employee card is narrower than a manager card. Shifting the employee row right by this
-// amount puts the first employee's center exactly under the parent card's center, so a lone
-// child gets a perfectly straight line (no jog).
-const EMP_OFF = (CARD_W - EMP_W) / 2;
-
-// keys starting with "more-root" are top-level manager rows
-const limitOf = (key) => (key.startsWith("more-root") ? ROOT_LIMIT : LIMIT);
-
-const visibleOf = (list, key, expanded, forceAll) =>
-  forceAll || expanded.has(key) ? list : list.slice(0, limitOf(key));
-
-const btnSpace = (total, forceAll) =>
-  !forceAll && total > LIMIT ? BTN_SPACE : 0;
-const hasBtn = (total, forceAll, limit = LIMIT) => !forceAll && total > limit;
-
-// Width of the single row that holds a manager's sub-managers AND employees
-function childrenRowW(mgr, expanded, forceAll) {
-  const emps = mgr.employees || [];
-  const subs = mgr.subManagers || [];
-  const vEmps = visibleOf(emps, `more-emp-${mgr.id}`, expanded, forceAll);
-  const vSubs = visibleOf(subs, `more-sub-${mgr.id}`, expanded, forceAll);
-
-  let w = 0;
-  if (!vSubs.length && vEmps.length) w += EMP_OFF;
-  if (vSubs.length) {
-    w +=
-      vSubs.reduce(
-        (s, sm, i) =>
-          s +
-          colWOf(
-            sm,
-            expanded,
-            forceAll,
-            i === vSubs.length - 1 && hasBtn(subs.length, forceAll),
-          ),
-        0,
-      ) +
-      (vSubs.length - 1) * SUB_MGR_GAP;
-  }
-  if (vSubs.length && vEmps.length) w += SUB_MGR_GAP;
-  if (vEmps.length) {
-    w +=
-      vEmps.length * EMP_W +
-      (vEmps.length - 1) * EMP_GAP +
-      btnSpace(emps.length, forceAll);
-  }
-  return w;
-}
-
-// reserve = true when this column also carries a "See more" button beside its card
-function colWOf(mgr, expanded, forceAll, reserve = false) {
-  return Math.max(
-    CARD_W + (reserve ? BTN_SPACE : 0),
-    childrenRowW(mgr, expanded, forceAll),
-  );
-}
-
-// Width of a whole group of manager columns (used to size each co-admin column)
-function groupWOf(managers, key, expanded, forceAll) {
-  if (!managers.length) return CARD_W;
-  const vis = visibleOf(managers, key, expanded, forceAll);
-  const showBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
-  const w =
-    vis.reduce(
-      (s, m, i) =>
-        s + colWOf(m, expanded, forceAll, i === vis.length - 1 && showBtn),
-      0,
-    ) +
-    (vis.length - 1) * MGR_GAP;
-  return Math.max(CARD_W, w);
-}
-
-// Vertical stub, placed under the card's center (left-aligned layout)
-function VLine({ h = 24, x = CARD_W / 2 }) {
-  return (
-    <svg
-      width={x + 2}
-      height={h}
-      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
-    >
-      <line
-        x1={x}
-        y1={-0.5}
-        x2={x}
-        y2={h + 0.5}
-        stroke={LINE_COLOR}
-        strokeWidth={LINE_W}
-        strokeLinecap="square"
-      />
-    </svg>
-  );
-}
-
-// Parent card center -> bus line -> a stem down to each child card center
-function Connector({ parentX = CARD_W / 2, xs, h = 20 }) {
-  if (!xs.length) return null;
-  const mid = h / 2;
-  const minX = Math.min(parentX, ...xs);
-  const maxX = Math.max(parentX, ...xs);
-  const needBus = xs.length > 1 || Math.abs(xs[0] - parentX) > 1;
-  const common = {
-    stroke: LINE_COLOR,
-    strokeWidth: LINE_W,
-    strokeLinecap: "square",
-  };
-  return (
-    <svg
-      width={maxX + 2}
-      height={h}
-      style={{ display: "block", flexShrink: 0, overflow: "visible" }}
-    >
-      <line
-        x1={parentX}
-        y1={-0.5}
-        x2={parentX}
-        y2={needBus ? mid : h}
-        {...common}
-      />
-      {needBus && <line x1={minX} y1={mid} x2={maxX} y2={mid} {...common} />}
-      {needBus &&
-        xs.map((x, i) => (
-          <line key={i} x1={x} y1={mid} x2={x} y2={h} {...common} />
-        ))}
-    </svg>
-  );
-}
-
-function MoreBtn({ total, k, expanded, toggle, forceAll, absolute = false }) {
-  const limit = limitOf(k);
-  if (forceAll || total <= limit) return null;
-  const open = expanded.has(k);
-  return (
-    <div
-      style={
-        absolute
-          ? { position: "absolute", left: CARD_W + 12, top: 48, width: BTN_W }
-          : {
-              flexShrink: 0,
-              alignSelf: "flex-start",
-              paddingTop: 48,
-              width: BTN_W,
-              marginLeft: 12,
-            }
-      }
-      data-html2canvas-ignore
-    >
-      <button
-        type="button"
-        className="hb"
-        onClick={() => toggle(k)}
-        style={{ fontWeight: 600 }}
-      >
-        {open ? "← See less" : `See ${total - limit} more →`}
-      </button>
-    </div>
-  );
-}
-
-function collectMatchKeys(nodes, q, matches, prefix = "m") {
-  if (!q) return;
-  nodes.forEach((mgr) => {
-    const key = `${prefix}-${mgr.id}`;
-    if (
-      [mgr.name, mgr.designation, mgr.department].some(
-        (s) => s && norm(s).includes(q),
-      )
-    )
-      matches.add(key);
-    (mgr.employees || []).forEach((e) => {
-      if (
-        [e.name, e.designation, e.department].some(
-          (s) => s && norm(s).includes(q),
-        )
-      )
-        matches.add(`e-${e.id}`);
-    });
-    if (mgr.subManagers?.length)
-      collectMatchKeys(mgr.subManagers, q, matches, `m`);
-  });
-}
-
-function ManagerColumn({
-  mgr,
-  q,
-  matches,
-  dim,
-  delayRef,
-  expanded,
-  toggle,
-  forceAll,
-  isSubMgr = false,
-  moreBtn = null,
-}) {
-  const key = `m-${mgr.id}`;
-  const emps = mgr.employees || [];
-  const subMgrs = mgr.subManagers || [];
-  const totalChildren = emps.length + subMgrs.length;
-  const level = isSubMgr ? "subMgr" : "manager";
-  const subKey = `more-sub-${mgr.id}`;
-  const empKey = `more-emp-${mgr.id}`;
-  const visSubs = visibleOf(subMgrs, subKey, expanded, forceAll);
-  const visEmps = visibleOf(emps, empKey, expanded, forceAll);
-  const subHasBtn = hasBtn(subMgrs.length, forceAll);
-
-  const mDelay = delayRef.current;
-  delayRef.current += 55;
-
-  // Sub-managers and employees live in ONE row under this card, so a single connector
-  // reaches every child. xs = x of each child card's center, measured from this column's left.
-  const startOff = visSubs.length ? 0 : EMP_OFF;
-  let off = startOff;
-  const xs = [];
-  visSubs.forEach((sm, i) => {
-    const last = i === visSubs.length - 1 && subHasBtn;
-    xs.push(off + CARD_W / 2);
-    off += colWOf(sm, expanded, forceAll, last) + SUB_MGR_GAP;
-  });
-  visEmps.forEach(() => {
-    xs.push(off + EMP_W / 2);
-    off += EMP_W + EMP_GAP;
-  });
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        position: "relative",
-        width: colWOf(mgr, expanded, forceAll, !!moreBtn),
-        flexShrink: 0,
-      }}
-    >
-      <Card
-        level={level}
-        name={mgr.name}
-        department={mgr.department ? getDepartmentName(mgr.department) : "—"}
-        designation={mgr.designation || "—"}
-        empid={mgr.empid}
-        image={mgr.profile_image}
-        width={CARD_W}
-        delay={mDelay}
-        dim={dim(key)}
-        hl={matches.has(key)}
-        q={q}
-        empCount={totalChildren > 0 ? totalChildren : undefined}
-      />
-
-      {moreBtn}
-
-      {totalChildren > 0 && (
-        <>
-          <Connector xs={xs} h={20} />
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              paddingLeft: startOff,
-            }}
-          >
-            {visSubs.map((sm, i) => {
-              const lastOverall =
-                i === visSubs.length - 1 && visEmps.length === 0;
-              return (
-                <div
-                  key={sm.id}
-                  style={{
-                    flexShrink: 0,
-                    marginRight: lastOverall ? 0 : SUB_MGR_GAP,
-                  }}
-                >
-                  <ManagerColumn
-                    mgr={sm}
-                    q={q}
-                    matches={matches}
-                    dim={dim}
-                    delayRef={delayRef}
-                    expanded={expanded}
-                    toggle={toggle}
-                    forceAll={forceAll}
-                    isSubMgr
-                    moreBtn={
-                      i === visSubs.length - 1 && subHasBtn ? (
-                        <MoreBtn
-                          absolute
-                          total={subMgrs.length}
-                          k={subKey}
-                          expanded={expanded}
-                          toggle={toggle}
-                          forceAll={forceAll}
-                        />
-                      ) : null
-                    }
-                  />
-                </div>
-              );
-            })}
-
-            {visEmps.map((emp, i) => {
-              const eKey = `e-${emp.id}`;
-              const eDelay = delayRef.current;
-              delayRef.current += 18;
-              return (
-                <div
-                  key={emp.id}
-                  style={{
-                    flexShrink: 0,
-                    marginRight: i === visEmps.length - 1 ? 0 : EMP_GAP,
-                  }}
-                >
-                  <Card
-                    level="emp"
-                    name={emp.name}
-                    department={
-                      emp.department ? getDepartmentName(emp.department) : "—"
-                    }
-                    designation={emp.designation || "—"}
-                    empid={emp.empid}
-                    image={emp.profile_image}
-                    width={EMP_W}
-                    delay={eDelay}
-                    dim={dim(eKey)}
-                    hl={matches.has(eKey)}
-                    q={q}
-                  />
-                </div>
-              );
-            })}
-
-            {visEmps.length > 0 && (
-              <MoreBtn
-                total={emps.length}
-                k={empKey}
-                expanded={expanded}
-                toggle={toggle}
-                forceAll={forceAll}
-              />
-            )}
-          </div>
-        </>
-      )}
-
-      {emps.length === 0 && subMgrs.length === 0 && (
-        <div
-          style={{
-            marginTop: 10,
-            padding: "6px 14px",
-            borderRadius: 8,
-            border: "1px dashed #e2e8f0",
-            fontSize: 11,
-            color: "#cbd5e1",
-            background: "#fafafa",
-          }}
-        >
-          No reports
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SkeletonTree() {
-  return (
-    <div
-      style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
-    >
-      <Sk w={172} h={104} r={11} />
-      <div style={{ width: 1.5, height: 24, background: LINE_COLOR }} />
-      <Sk w={172} h={96} r={11} />
-      <div style={{ width: 1.5, height: 20, background: LINE_COLOR }} />
-      <div style={{ display: "flex", gap: 28 }}>
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            <Sk w={172} h={96} r={11} />
-            <div style={{ width: 1.5, height: 16, background: LINE_COLOR }} />
-            <div style={{ display: "flex", gap: 10 }}>
-              <Sk w={152} h={92} r={11} />
-              <Sk w={152} h={92} r={11} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// groupKey must start with "more-root" and be unique per group (main managers / each co-admin)
-function ManagerGroup({
-  managers,
-  q,
-  matches,
-  dim,
-  delayRef,
-  expanded,
-  toggle,
-  forceAll,
-  groupKey,
-}) {
-  if (managers.length === 0) {
-    return (
-      <div
-        style={{
-          width: CARD_W,
-          padding: "12px 8px",
-          borderRadius: 10,
-          border: "1px dashed #e2e8f0",
-          fontSize: 12,
-          textAlign: "center",
-          color: "#cbd5e1",
-          background: "#fafafa",
-        }}
-      >
-        No managers added yet
-      </div>
-    );
-  }
-
-  const vis = visibleOf(managers, groupKey, expanded, forceAll);
-  const showBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
-
-  let off = 0;
-  const xs = vis.map((m, i) => {
-    const last = i === vis.length - 1 && showBtn;
-    const x = off + CARD_W / 2;
-    off += colWOf(m, expanded, forceAll, last) + MGR_GAP;
-    return x;
-  });
-
-  return (
-    <>
-      <Connector xs={xs} h={20} />
-      <div style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}>
-        {vis.map((mgr, i) => (
-          <ManagerColumn
-            key={mgr.id}
-            mgr={mgr}
-            q={q}
-            matches={matches}
-            dim={dim}
-            delayRef={delayRef}
-            expanded={expanded}
-            toggle={toggle}
-            forceAll={forceAll}
-            moreBtn={
-              i === vis.length - 1 && showBtn ? (
-                <MoreBtn
-                  absolute
-                  total={managers.length}
-                  k={groupKey}
-                  expanded={expanded}
-                  toggle={toggle}
-                  forceAll={forceAll}
-                />
-              ) : null
-            }
-          />
-        ))}
-      </div>
-    </>
-  );
-}
-
-function OrgTree({ data, loading, q }) {
-  // Which "See more" rows are open. Must stay above the early returns.
-  const [expanded, setExpanded] = useState(() => new Set());
-  const toggle = (k) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
-      return next;
-    });
-
-  if (loading) return <SkeletonTree />;
+function buildAdminTree(data) {
   if (!data) return null;
+  const managers = (data.managers || []).map(mgrNode);
+  const coAdmins = (data.coAdmins || []).map((co) => ({
+    key: `ca-${co.id}`,
+    kind: "admin",
+    isYou: !!co.isCurrentUser,
+    name: co.name,
+    lines: [co.department ? getDepartmentName(co.department) : "—", co.designation || "—"],
+    empid: co.empid || "—",
+    image: co.profile_image,
+    hay: [co.department, co.designation],
+    children: (co.managers || []).map(mgrNode),
+  }));
 
-  const hasQ = q.length > 0;
-  const forceAll = hasQ; // while searching, show everything so a match is never hidden
-  const matches = new Set();
+  const admin = data.admin
+    ? {
+        key: "admin",
+        kind: "admin",
+        isYou: !!data.admin.isCurrentUser,
+        name: data.admin.name,
+        lines: [
+          data.admin.department ? getDepartmentName(data.admin.department) : "—",
+          data.admin.designation || "—",
+        ],
+        empid: data.admin.empid || "—",
+        image: data.admin.profile_image,
+        hay: [data.admin.department, data.admin.designation],
+        children: [...managers, ...coAdmins],
+      }
+    : null;
 
-  if (hasQ) {
-    const chk = (...ss) => ss.some((s) => s && norm(s).includes(q));
-    if (chk(data.organisation_name, data.super_admin?.name)) matches.add("org");
-    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department))
-      matches.add("admin");
-    collectMatchKeys(data.managers || [], q, matches);
-    (data.coAdmins || []).forEach((coAdmin) => {
-      if (
-        [coAdmin.name, coAdmin.designation, coAdmin.department].some(
-          (s) => s && norm(s).includes(q),
-        )
-      )
-        matches.add(`coadmin-${coAdmin.id}`);
-      collectMatchKeys(coAdmin.managers || [], q, matches);
-    });
-  }
-
-  const anyMatch = matches.size > 0;
-  const dim = (k) => hasQ && anyMatch && !matches.has(k);
-
-  const managers = data.managers || [];
-  const coAdmins = data.coAdmins || [];
-
-  const delayRef = { current: 160 };
-
-  const groupProps = { q, matches, dim, delayRef, expanded, toggle, forceAll };
-
-  // ---- Admin has co-admins: managers and co-admins are ONE row under the admin ----
-  // so a single connector links the admin to every card in it.
-  const rootKey = "more-root";
-  const visMgrs = visibleOf(managers, rootKey, expanded, forceAll);
-  const showRootBtn = hasBtn(managers.length, forceAll, ROOT_LIMIT);
-  const coKey = (co) => `more-root-co-${co.id}`;
-  const coWidth = (co) =>
-    groupWOf(co.managers || [], coKey(co), expanded, forceAll);
-
-  const rowXs = [];
-  if (coAdmins.length > 0) {
-    let off = 0;
-    visMgrs.forEach((m, i) => {
-      const last = i === visMgrs.length - 1 && showRootBtn;
-      rowXs.push(off + CARD_W / 2);
-      off += colWOf(m, expanded, forceAll, last) + MGR_GAP;
-    });
-    coAdmins.forEach((co) => {
-      rowXs.push(off + CARD_W / 2);
-      off += coWidth(co) + MGR_GAP;
-    });
-  }
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        width: "max-content",
-        minWidth: "max-content",
-      }}
-    >
-      <div
-        style={{ animation: `scaleIn 0.26s ease 40ms forwards`, opacity: 0 }}
-      >
-        <Card
-          level="org"
-          name={data.organisation_name || "Organisation"}
-          department="—"
-          designation={data.super_admin?.name || "—"}
-          image={data.organisation_logo}
-          isOrg
-          width={CARD_W}
-          delay={0}
-          dim={dim("org")}
-          hl={matches.has("org")}
-          q={q}
-        />
-      </div>
-      <VLine h={22} />
-
-      {data.admin && (
-        <>
-          <Card
-            level="admin"
-            name={data.admin.name}
-            department={
-              data.admin.department
-                ? getDepartmentName(data.admin.department)
-                : "—"
-            }
-            designation={data.admin.designation || "—"}
-            empid={data.admin.empid}
-            image={data.admin.profile_image}
-            width={CARD_W}
-            delay={80}
-            dim={dim("admin")}
-            hl={matches.has("admin")}
-            q={q}
-            you={data.admin.isCurrentUser}
-          />
-          <VLine h={22} />
-        </>
-      )}
-
-      {coAdmins.length > 0 ? (
-        <>
-          <Connector xs={rowXs} h={20} />
-          <div
-            style={{ display: "flex", gap: MGR_GAP, alignItems: "flex-start" }}
-          >
-            {visMgrs.map((mgr, i) => (
-              <ManagerColumn
-                key={mgr.id}
-                mgr={mgr}
-                {...groupProps}
-                moreBtn={
-                  i === visMgrs.length - 1 && showRootBtn ? (
-                    <MoreBtn
-                      absolute
-                      total={managers.length}
-                      k={rootKey}
-                      expanded={expanded}
-                      toggle={toggle}
-                      forceAll={forceAll}
-                    />
-                  ) : null
-                }
-              />
-            ))}
-
-            {coAdmins.map((coAdmin, index) => {
-              const key = `coadmin-${coAdmin.id}`;
-              const coAdminMatches =
-                hasQ &&
-                [coAdmin.name, coAdmin.designation, coAdmin.department].some(
-                  (s) => s && norm(s).includes(q),
-                );
-              const coManagers = coAdmin.managers || [];
-              return (
-                <div
-                  key={coAdmin.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    width: coWidth(coAdmin),
-                    flexShrink: 0,
-                  }}
-                >
-                  <Card
-                    level="admin"
-                    name={coAdmin.name}
-                    department={
-                      coAdmin.department
-                        ? getDepartmentName(coAdmin.department)
-                        : "—"
-                    }
-                    designation={coAdmin.designation || "—"}
-                    empid={coAdmin.empid}
-                    image={coAdmin.profile_image}
-                    width={CARD_W}
-                    delay={130 + index * 55}
-                    dim={dim(key)}
-                    hl={matches.has(key) || coAdminMatches}
-                    q={q}
-                    you={coAdmin.isCurrentUser}
-                  />
-                  {coManagers.length === 0 && <VLine h={18} />}
-                  <ManagerGroup
-                    managers={coManagers}
-                    groupKey={coKey(coAdmin)}
-                    {...groupProps}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <ManagerGroup
-          managers={managers}
-          groupKey="more-root"
-          {...groupProps}
-        />
-      )}
-    </div>
-  );
+  return {
+    key: "org",
+    kind: "org",
+    name: data.organisation_name || "Organisation",
+    lines: [],
+    image: data.organisation_logo,
+    hay: [data.super_admin?.name],
+    children: admin ? [admin] : [...managers, ...coAdmins],
+  };
 }
 
 function StatCard({ label, text, icon: Icon, accent, delay = 0 }) {
@@ -1213,29 +330,10 @@ export default function OrganizationPageAdmin() {
       to.scrollLeft = from.scrollLeft;
   };
 
-  const matchCount = useMemo(() => {
-    if (!searchQuery || !data) return 0;
-    const q = norm(searchQuery);
-    let n = 0;
-    const chk = (...ss) => ss.some((s) => s && norm(s).includes(q));
-    if (chk(data.organisation_name)) n++;
-    if (chk(data.admin?.name, data.admin?.designation, data.admin?.department))
-      n++;
-    const walk = (nodes) =>
-      nodes.forEach((mgr) => {
-        if (chk(mgr.name, mgr.department, mgr.designation)) n++;
-        (mgr.employees || []).forEach((e) => {
-          if (chk(e.name, e.designation, e.department)) n++;
-        });
-        if (mgr.subManagers?.length) walk(mgr.subManagers);
-      });
-    walk(data.managers || []);
-    (data.coAdmins || []).forEach((coAdmin) => {
-      if (chk(coAdmin.name, coAdmin.designation, coAdmin.department)) n++;
-      walk(coAdmin.managers || []);
-    });
-    return n;
-  }, [searchQuery, data]);
+  const root = useMemo(() => buildAdminTree(data), [data]);
+  const q = norm(searchQuery);
+  const matches = useMemo(() => collectMatches(root, q), [root, q]);
+  const matchCount = matches.size;
 
   const totalNodes = useMemo(() => {
     if (!data) return 0;
@@ -1497,6 +595,9 @@ export default function OrganizationPageAdmin() {
                 </span>
               )}
             </div>
+            <span className="hidden sm:block text-[11px] text-slate-400">
+              Click + / − to expand or collapse
+            </span>
           </div>
 
           <div
@@ -1516,7 +617,13 @@ export default function OrganizationPageAdmin() {
               className="bg-white px-4 sm:px-10 py-7 sm:py-9"
               style={{ width: "max-content", minWidth: "100%" }}
             >
-              <OrgTree data={data} loading={loading} q={norm(searchQuery)} />
+              <OrgTreeView
+                root={root}
+                loading={loading}
+                q={q}
+                matches={matches}
+                theme={TREE_THEME}
+              />
             </div>
           </div>
         </div>
