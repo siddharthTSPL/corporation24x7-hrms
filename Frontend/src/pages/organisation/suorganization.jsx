@@ -10,7 +10,11 @@ import {
   useGetParticularAdmin,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 // Shared collapsible tree (put OrgChartTree.jsx in src/components, or fix this path)
-import { OrgTreeView, collectMatches } from "../../components/OrgChartTree";
+import {
+  OrgTreeView,
+  collectMatches,
+  exportOrgChartPng,
+} from "../../components/OrgChartTree";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -55,8 +59,6 @@ const STYLES = `
 const BRAND = "#730042";
 const BRAND_LIGHT = "rgba(115,0,66,0.07)";
 const REFRESH_MS = 1000 * 60 * 2;
-const HTML_TO_IMAGE_CDN =
-  "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
 
 const TREE_THEME = {
   acc: "#730042",
@@ -113,17 +115,6 @@ function idStr(v) {
   if (!v) return "";
   if (typeof v === "string") return v;
   return v._id ? v._id.toString() : v.toString();
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) return resolve();
-    const s = document.createElement("script");
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.body.appendChild(s);
-  });
 }
 
 function csvCell(v) {
@@ -876,7 +867,7 @@ function OrgTree({
       />
 
       {!loading && root && root.children.length === 0 && (
-        <div className="mt-9 mx-auto w-fit px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
+        <div data-export-ignore className="mt-9 mx-auto w-fit px-6 py-4 rounded-xl border-[1.5px] border-dashed border-gray-200 text-xs sm:text-sm text-gray-300 bg-[#fafbfc] min-w-0">
           No admins created yet
         </div>
       )}
@@ -911,7 +902,7 @@ function OrphanNotice({ admins, managers, employees, onNodeClick }) {
   if (total === 0) return null;
 
   return (
-    <div className="mt-9 w-full max-w-xl px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
+    <div data-export-ignore className="mt-9 w-full max-w-xl px-4 sm:px-5 py-3 sm:py-4 rounded-xl border-[1.5px] border-dashed border-amber-300 bg-amber-50 min-w-0">
       <p className="text-xs sm:text-sm font-semibold text-amber-800">
         {total} unassigned {total === 1 ? "record" : "records"} not shown in the
         chart above
@@ -1187,31 +1178,18 @@ export default function SuperAdminOrgChart() {
   }
 
   async function exportPng() {
-    // Export the full-width inner content (not the clipped scroll viewport)
-    const target = exportRef.current;
-    if (!target || exporting) return;
+    if (exporting) return;
     setExporting(true);
     try {
-      await loadScript(HTML_TO_IMAGE_CDN);
-      target.classList.add("su-export-flat");
-      const dataUrl = await window.htmlToImage.toPng(target, {
-        backgroundColor: "#ffffff",
-        pixelRatio: 2,
-        cacheBust: true,
-        width: target.scrollWidth,
-        height: target.scrollHeight,
+      // exports exactly what is expanded on screen, with full details
+      await exportOrgChartPng({
+        target: exportRef.current,
+        scroller: treeRef.current,
+        filename: `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`,
       });
-      target.classList.remove("su-export-flat");
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      downloadBlob(
-        blob,
-        `${normalize(orgName).replace(/\s+/g, "-") || "organisation"}-org-chart-${Date.now()}.png`,
-      );
       setExportDone(true);
       setTimeout(() => setExportDone(false), 2600);
     } catch (err) {
-      exportRef.current?.classList.remove("su-export-flat");
       window.alert("Could not generate the image export. Please try again.");
     } finally {
       setExporting(false);

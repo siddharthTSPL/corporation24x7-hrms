@@ -58,6 +58,139 @@ function selfPath(root) {
   return walk(root, []);
 }
 
+/* ==========================================================================
+   PNG EXPORT (shared by all roles)
+   Exports EXACTLY what is expanded on screen - every visible node - with all
+   details readable (nothing cut with "...", nothing faded/greyed out, no +/-
+   buttons, avatars that cannot load fall back to initials).
+
+   Usage:
+     await exportOrgChartPng({
+       target: exportRef.current,     // full-width content inside the scroller
+       scroller: scrollRef.current,   // the horizontally scrolling viewport (optional)
+       filename: "org-chart.png",
+     });
+   ========================================================================== */
+const H2C_CDN =
+  "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+
+function loadHtml2Canvas() {
+  return new Promise((resolve, reject) => {
+    if (window.html2canvas) return resolve();
+    const s = document.createElement("script");
+    s.src = H2C_CDN;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("html2canvas failed to load"));
+    document.head.appendChild(s);
+  });
+}
+
+const twoFrames = () =>
+  new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+function canLoadWithCors(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
+
+export async function exportOrgChartPng({ target, scroller, filename }) {
+  if (!target) throw new Error("Nothing to export");
+  await loadHtml2Canvas();
+
+  const prevScroll = scroller ? scroller.scrollLeft : 0;
+  if (scroller) scroller.scrollLeft = 0;
+
+  target.setAttribute("data-org-export", "1");
+  target.classList.add("ot-exporting");
+
+  try {
+    await twoFrames();
+    if (document.fonts?.ready) await document.fonts.ready;
+
+    // avatars that the browser cannot read with CORS would be dropped by the
+    // canvas -> swap those for the initials circle
+    const imgs = Array.from(target.querySelectorAll("img.ot-av"));
+    const badSrc = new Set();
+    await Promise.all(
+      imgs.map(async (im) => {
+        const src = im.getAttribute("src");
+        if (src && !(await canLoadWithCors(src))) badSrc.add(src);
+      }),
+    );
+
+    // measure AFTER export styles are applied (text now wraps, so size changes)
+    const w = Math.ceil(target.scrollWidth);
+    const h = Math.ceil(target.scrollHeight);
+
+    // big charts: keep the canvas inside browser limits so nothing gets cut off
+    const scale = Math.max(
+      0.3,
+      Math.min(2, 16000 / w, 16000 / h, Math.sqrt(100e6 / (w * h))),
+    );
+
+    const canvas = await window.html2canvas(target, {
+      backgroundColor: "#ffffff",
+      scale,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      width: w,
+      height: h,
+      windowWidth: Math.max(w, window.innerWidth),
+      windowHeight: Math.max(h, window.innerHeight),
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (el) =>
+        el.hasAttribute && el.hasAttribute("data-export-ignore"),
+      onclone: (doc) => {
+        const t = doc.querySelector("[data-org-export]");
+        // un-clip / un-hide every ancestor so the whole chart is rendered
+        let el = t;
+        while (el && el !== doc.documentElement) {
+          el.style.overflow = "visible";
+          el.style.contain = "none";
+          el.style.maxWidth = "none";
+          el.style.opacity = "1";
+          el.style.animation = "none";
+          el = el.parentElement;
+        }
+        if (t) {
+          t.querySelectorAll("img.ot-av").forEach((im) => {
+            if (badSrc.has(im.getAttribute("src"))) {
+              const d = doc.createElement("div");
+              d.className = "ot-av";
+              d.textContent = initialsOf(im.getAttribute("alt") || "");
+              im.replaceWith(d);
+            }
+          });
+        }
+      },
+    });
+
+    const blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("PNG too large"))),
+        "image/png",
+      ),
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "org-chart.png";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } finally {
+    target.classList.remove("ot-exporting");
+    target.removeAttribute("data-org-export");
+    if (scroller) scroller.scrollLeft = prevScroll;
+  }
+}
+
 export const TREE_STYLES = `
   @keyframes otIn    { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
   @keyframes otPulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
@@ -176,6 +309,32 @@ export const TREE_STYLES = `
     box-shadow:0 1px 3px rgba(15,23,42,.12); transition:background .14s, color .14s, border-color .14s;
   }
   .ot-toggle:hover { background:var(--ot-acc); border-color:var(--ot-acc); color:#fff; }
+
+  /* ---------- PNG export mode ----------
+     Everything that is expanded is drawn at full strength with ALL text visible
+     (wrapped, never cut with "..."), no faded / greyed cards, no +/- buttons. */
+  .ot-exporting, .ot-exporting * { animation:none !important; transition:none !important; }
+  .ot-exporting .ot-toggle { display:none !important; }
+  .ot-exporting .ot-card { opacity:1 !important; overflow:visible; height:auto; box-shadow:none; }
+  .ot-exporting .ot-card.is-active { box-shadow:0 0 0 3px var(--ot-ring); }
+  .ot-exporting .ot-card.is-muted { border-color:#cbd5e1; }
+  .ot-exporting .ot-card.is-muted img.ot-av { filter:none; }
+  .ot-exporting .ot-card.is-muted .ot-bar { background:#94a3b8; }
+  .ot-exporting .ot-card.is-muted .ot-av { background:#64748b; color:#fff; }
+  .ot-exporting .ot-card.is-muted .ot-name { color:#0f172a; }
+  .ot-exporting .ot-card.is-muted .ot-sub { color:#475569; }
+  .ot-exporting .ot-card.is-muted .ot-id { color:#334155; background:#eef0f3; }
+  .ot-exporting .ot-card.is-muted .ot-rep { color:#475569; }
+  .ot-exporting .ot-name,
+  .ot-exporting .ot-sub,
+  .ot-exporting .ot-id {
+    white-space:normal !important; overflow:visible !important; text-overflow:clip !important;
+    text-align:center; word-break:break-word; overflow-wrap:anywhere;
+  }
+  .ot-exporting .ot-sub { font-size:10.5px; line-height:1.35; }
+  .ot-exporting .ot-id { font-size:9.5px; }
+  .ot-exporting .ot-card.is-hl { outline:0; }
+  .ot-exporting .ot-card.is-dim { opacity:1 !important; }
 `;
 
 const Ctx = createContext(null);
@@ -200,6 +359,7 @@ function Av({ node }) {
         className="ot-av"
         src={node.image}
         alt={node.name}
+        crossOrigin="anonymous"
         onError={() => setErr(true)}
       />
     );

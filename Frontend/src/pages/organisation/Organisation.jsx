@@ -13,7 +13,11 @@ import {
 
 import { useGetOrgInfo } from "../../auth/server-state/adminother/adminother.hook";
 // Shared collapsible tree (put OrgChartTree.jsx in src/components, or fix this path)
-import { OrgTreeView, collectMatches } from "../../components/OrgChartTree";
+import {
+  OrgTreeView,
+  collectMatches,
+  exportOrgChartPng,
+} from "../../components/OrgChartTree";
 
 const norm = (s = "") => s.toLowerCase().trim();
 
@@ -365,54 +369,18 @@ export default function OrganizationPageAdmin() {
   }, [searchOpen]);
 
   const handleExport = useCallback(async () => {
-    // Export the full-width inner content (not the clipped scroll viewport)
-    const target = exportRef.current;
-    if (!target || exportStatus === "loading") return;
+    if (exportStatus === "loading") return;
     setExportStatus("loading");
     try {
-      if (!window.html2canvas) {
-        await new Promise((res, rej) => {
-          const s = document.createElement("script");
-          s.src =
-            "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-          s.onload = res;
-          s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-      target.classList.add("export-mode");
-      await new Promise((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(r)),
-      );
-      const canvas = await window.html2canvas(target, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        logging: false,
-        width: target.scrollWidth,
-        height: target.scrollHeight,
-        windowWidth: Math.max(target.scrollWidth, window.innerWidth),
-        windowHeight: Math.max(target.scrollHeight, window.innerHeight),
-        scrollX: 0,
-        scrollY: 0,
-        onclone: (doc) => {
-          const sc = doc.querySelector("[data-org-scroll]");
-          if (sc) {
-            sc.style.overflow = "visible";
-            sc.style.maxWidth = "none";
-          }
-        },
+      // exports exactly what is expanded on screen, with full details
+      await exportOrgChartPng({
+        target: exportRef.current,
+        scroller: scrollRef.current,
+        filename: `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`,
       });
-      target.classList.remove("export-mode");
-      const link = document.createElement("a");
-      link.download = `org-chart-${orgName.replace(/\s+/g, "-").toLowerCase()}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
       setExportStatus("done");
       setTimeout(() => setExportStatus(null), 2600);
     } catch {
-      exportRef.current?.classList.remove("export-mode");
       setExportStatus(null);
     }
   }, [exportStatus, orgName]);
