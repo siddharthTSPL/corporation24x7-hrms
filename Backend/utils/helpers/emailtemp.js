@@ -641,6 +641,33 @@ function buildOnboardingAccountsEmail({ recipientName, joiner = {}, bankDetailsA
   });
 }
 
+function buildFeatureLaunchEmail({ recipientName, featureName, description, hasAttachment = false, portalLink }) {
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      We have just launched a new feature on ${PRODUCT_NAME}.
+    </p>
+    <div style="margin-bottom:20px;">
+      <span style="display:inline-block;padding:6px 18px;border-radius:3px;background:${BRAND.approvedBg};color:${BRAND.approvedText};font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+        New feature
+      </span>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${detailRow("Feature", featureName)}</table>
+    <p style="margin:16px 0 0;color:${BRAND.text};font-size:14px;line-height:1.7;white-space:pre-line;">${escapeHtml(description)}</p>
+    ${hasAttachment ? `<p style="margin:16px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">A PDF guide for this feature is attached to this email.</p>` : ""}
+    <p style="margin:20px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      You are receiving this because you are an administrator of your organisation on ${PRODUCT_NAME}.
+    </p>
+    ${plainLink(portalLink)}
+  `;
+
+  return emailShell({
+    preheader: `New feature: ${featureName}`,
+    headerTitle: "New Feature Launched",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
   buildOnboardingItEmail,
   buildOnboardingAccountsEmail,
@@ -654,6 +681,7 @@ module.exports = {
   buildSupportAckEmail,
   buildSubscriptionExpiringEmail,
   buildBirthdayReminderEmail,
+  buildFeatureLaunchEmail,
   leaveTypeLabel,
   formatDate,
   emailShell,
