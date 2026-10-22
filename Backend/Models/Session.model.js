@@ -13,7 +13,11 @@ const deviceInfoSchema = new mongoose.Schema(
     // Parsed from the User-Agent at sign-in time (see parseUserAgent in
     // utils/singleSignIn.utils.js). Older sessions won't have these — the UI
     // falls back to `label` for them.
-    deviceName: { type: String, default: "" }, // e.g. "iPhone", "Samsung SM-S918B", "Windows PC"
+    // Friendly, owner-based name shown in the UI, e.g. "Ashish's Phone",
+    // "Ashish's Desktop", "Ashish's iPhone".
+    deviceName: { type: String, default: "" },
+    // Technical model behind it, e.g. "Samsung SM-S918B", "Windows PC".
+    deviceModel: { type: String, default: "" },
     deviceType: {
       type: String,
       enum: ["desktop", "mobile", "tablet", "unknown"],
