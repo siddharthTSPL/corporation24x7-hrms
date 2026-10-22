@@ -58,6 +58,7 @@ const applySingleSignInGate = async ({ organisation, role, accountId, req, res }
       challenge: true,
       sessionId: result.sessionId,
       expiresAt: result.expiresAt,
+      activeDevice: result.activeDevice || null,
       message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
     });
     return { sid: null, handled: true };
@@ -196,7 +197,7 @@ const buildLoginToken = async (role, account, req) => {
       throw Object.assign(new Error(result.message), { statusCode: 409, code: "ANOTHER_SESSION_ACTIVE" });
     }
     if (result.outcome === "pending") {
-      return { challenge: true, sessionId: result.sessionId, expiresAt: result.expiresAt };
+      return { challenge: true, sessionId: result.sessionId, expiresAt: result.expiresAt, activeDevice: result.activeDevice || null };
     }
     return { sid: result.sessionId };
   };
@@ -589,6 +590,7 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
       challenge: true,
       sessionId: token.sessionId,
       expiresAt: token.expiresAt,
+      activeDevice: token.activeDevice || null,
       message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
     });
   }

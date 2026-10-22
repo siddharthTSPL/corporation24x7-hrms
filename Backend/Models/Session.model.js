@@ -10,6 +10,17 @@ const deviceInfoSchema = new mongoose.Schema(
     userAgent: { type: String, default: "" },
     ip: { type: String, default: "" },
     label: { type: String, default: "" },
+    // Parsed from the User-Agent at sign-in time (see parseUserAgent in
+    // utils/singleSignIn.utils.js). Older sessions won't have these — the UI
+    // falls back to `label` for them.
+    deviceName: { type: String, default: "" }, // e.g. "iPhone", "Samsung SM-S918B", "Windows PC"
+    deviceType: {
+      type: String,
+      enum: ["desktop", "mobile", "tablet", "unknown"],
+      default: "unknown",
+    },
+    browser: { type: String, default: "" }, // e.g. "Chrome 126"
+    os: { type: String, default: "" }, // e.g. "Windows 10/11", "Android 14", "iOS 17.5"
     geo: {
       latitude: { type: Number, default: null },
       longitude: { type: Number, default: null },

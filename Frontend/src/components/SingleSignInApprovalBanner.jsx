@@ -4,7 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   FaShieldAlt,
   FaDesktop,
+  FaMobileAlt,
+  FaTabletAlt,
+  FaGlobe,
   FaMapMarkerAlt,
+  FaNetworkWired,
+  FaClock,
   FaCheck,
   FaTimes,
   FaExclamationTriangle,
@@ -26,6 +31,56 @@ const formatCountdown = (seconds) => {
   const mins = Math.floor(clamped / 60);
   const secs = clamped % 60;
   return `${mins}:${String(secs).padStart(2, "0")}`;
+};
+
+const DEVICE_TYPE_LABEL = { desktop: "Desktop / Laptop", mobile: "Mobile", tablet: "Tablet" };
+
+const DeviceIcon = ({ type }) => {
+  const cls = "text-[#b0948a] text-xs shrink-0";
+  if (type === "mobile") return <FaMobileAlt className={cls} />;
+  if (type === "tablet") return <FaTabletAlt className={cls} />;
+  return <FaDesktop className={cls} />;
+};
+
+// "IN" -> "India". Falls back to the raw code if Intl can't resolve it.
+const countryName = (code) => {
+  if (!code) return "";
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) || code;
+  } catch {
+    return code;
+  }
+};
+
+const formatLocation = (geo) => {
+  if (!geo) return "";
+  return [geo.city, countryName(geo.country)].filter(Boolean).join(", ");
+};
+
+const formatRequestedAt = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+// One label/value row inside the device details card.
+const DetailRow = ({ icon, label, value }) => {
+  if (!value) return null;
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2.5">
+      {icon}
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wide text-[#b0948a]">{label}</p>
+        <p className="text-xs font-medium text-[#2a1a16] break-words">{value}</p>
+      </div>
+    </div>
+  );
 };
 
 // Mount once inside an already-authenticated layout (e.g. MainLayout).
@@ -51,7 +106,11 @@ export default function SingleSignInApprovalBanner() {
     try {
       const res = await getMyPendingChallenge();
       if (res?.pending) {
-        setPending({ deviceInfo: res.deviceInfo, expiresAt: res.expiresAt });
+        setPending({
+          deviceInfo: res.deviceInfo,
+          requestedAt: res.requestedAt,
+          expiresAt: res.expiresAt,
+        });
       } else {
         setPending(null);
       }
@@ -122,6 +181,8 @@ export default function SingleSignInApprovalBanner() {
 
   if (!pending) return null;
 
+  const device = pending.deviceInfo;
+
   const progressPct = Math.min(100, Math.max(0, (secondsLeft / CHALLENGE_TTL_SECONDS) * 100));
 
   return (
@@ -148,26 +209,42 @@ export default function SingleSignInApprovalBanner() {
           </div>
 
           <div className="mx-4 mb-3 rounded-xl border border-[#f0e8e4] bg-[#faf8f6] divide-y divide-[#f0e8e4]">
-            <div className="flex items-center gap-2.5 px-3 py-2.5">
-              <FaDesktop className="text-[#b0948a] text-xs shrink-0" />
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wide text-[#b0948a]">Device</p>
-                <p className="text-xs font-medium text-[#2a1a16] truncate">
-                  {pending.deviceInfo?.label || "Unrecognized device"}
-                </p>
-              </div>
-            </div>
-            {pending.deviceInfo?.ip && (
-              <div className="flex items-center gap-2.5 px-3 py-2.5">
-                <FaMapMarkerAlt className="text-[#b0948a] text-xs shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-[#b0948a]">IP address</p>
-                  <p className="text-xs font-medium text-[#2a1a16] truncate">
-                    {pending.deviceInfo.ip}
-                  </p>
-                </div>
-              </div>
-            )}
+            <DetailRow
+              icon={<DeviceIcon type={device?.deviceType} />}
+              label="Device name"
+              value={
+                device?.deviceName && device.deviceName !== "Unknown device"
+                  ? `${device.deviceName}${
+                      DEVICE_TYPE_LABEL[device.deviceType] ? ` (${DEVICE_TYPE_LABEL[device.deviceType]})` : ""
+                    }`
+                  : device?.label || "Unrecognized device"
+              }
+            />
+            <DetailRow
+              icon={<FaGlobe className="text-[#b0948a] text-xs shrink-0" />}
+              label="Browser"
+              value={device?.browser}
+            />
+            <DetailRow
+              icon={<FaDesktop className="text-[#b0948a] text-xs shrink-0" />}
+              label="Operating system"
+              value={device?.os}
+            />
+            <DetailRow
+              icon={<FaMapMarkerAlt className="text-[#b0948a] text-xs shrink-0" />}
+              label="Approx. location"
+              value={formatLocation(device?.geo)}
+            />
+            <DetailRow
+              icon={<FaNetworkWired className="text-[#b0948a] text-xs shrink-0" />}
+              label="IP address"
+              value={device?.ip}
+            />
+            <DetailRow
+              icon={<FaClock className="text-[#b0948a] text-xs shrink-0" />}
+              label="Requested at"
+              value={formatRequestedAt(pending.requestedAt)}
+            />
           </div>
 
           <div className="mx-4 mb-3 flex items-start gap-2 text-[11px] text-[#8a5a3a] bg-[#fdf6f2] border border-[#f0dcd0] rounded-lg px-3 py-2">

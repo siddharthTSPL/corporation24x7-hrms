@@ -22,6 +22,7 @@ import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { setAgentToken } from "../../pages/utils/Desktopagent";
 import { pollChallengeStatus, finalizeApprovedLogin } from "../../auth/api/singleSignIn/singleSignIn.api";
+import WaitingForApprovalPanel from "../../components/Waitingforapprovalpanel";
 // NOTE: adjust this path to wherever you saved AppToast.jsx
 import { showApiError, showErrorToast, showInfoToast } from "../../components/AppToast";
 
@@ -64,7 +65,7 @@ function Login() {
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt }
+  const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt, activeDevice }
 
   const images = [slide1, slide2, slide3];
 
@@ -166,7 +167,11 @@ function Login() {
             // signed in. Wait here instead of logging in — the person
             // approves/denies from that other device.
             setShowLoader(false);
-            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setApprovalChallenge({
+              sessionId: data.sessionId,
+              expiresAt: data.expiresAt,
+              activeDevice: data.activeDevice || null,
+            });
             setStep("waiting-approval");
             return;
           }
@@ -257,7 +262,11 @@ function Login() {
             // Same Single Sign-In approval gate as password login — the OTP
             // is verified, but another device holds the active session.
             setErrors({});
-            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setApprovalChallenge({
+              sessionId: data.sessionId,
+              expiresAt: data.expiresAt,
+              activeDevice: data.activeDevice || null,
+            });
             setStep("waiting-approval");
             return;
           }
@@ -401,19 +410,11 @@ function Login() {
             )}
 
             {step === "waiting-approval" && (
-              <div className="flex flex-col items-center text-center py-8">
-                <div className="w-12 h-12 border-4 border-[#730042]/20 border-t-[#730042] rounded-full animate-spin mb-5" />
-                <h2 className="text-xl font-bold text-[#730042] mb-1">Waiting for approval</h2>
-                <p className="text-gray-500 text-sm mb-6 max-w-xs">
-                  We've sent a sign-in request to your other device. Approve it there to continue — this page checks automatically.
-                </p>
-                <button
-                  onClick={cancelApprovalWait}
-                  className="text-sm text-[#730042] font-medium hover:underline"
-                >
-                  Cancel and go back
-                </button>
-              </div>
+              <WaitingForApprovalPanel
+                activeDevice={approvalChallenge?.activeDevice}
+                expiresAt={approvalChallenge?.expiresAt}
+                onCancel={cancelApprovalWait}
+              />
             )}
 
             {step === "email" && (
