@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -15,45 +15,24 @@ import slideWhiteOffice from '../assets/Office-meeting.png'
 import slideTeam from '../assets/Team-work.jpg'
 
 /* ------------------------------------------------------------------ */
-/* Image preloading                                                    */
-/* Hero image ka download module load hote hi start ho jata hai,       */
-/* component render hone ka wait nahi karta.                           */
+/* StaticImage: no fade-in or opacity hiding.                          */
+/* Images are requested eagerly and decoded asynchronously.           */
+/* Note: the browser still needs to download each image at least once. */
 /* ------------------------------------------------------------------ */
-if (typeof window !== 'undefined') {
-  const heroPreload = new Image()
-  heroPreload.decoding = 'async'
-  heroPreload.src = slideWhiteOffice
-}
-
-/* ------------------------------------------------------------------ */
-/* FadeImage: placeholder dikhata hai, load hone par smooth fade-in    */
-/* ------------------------------------------------------------------ */
-function FadeImage({ src, alt, priority = false, className = '' }) {
-  const [loaded, setLoaded] = useState(false)
-  const imgRef = useRef(null)
-
-  // Agar image cache se already load ho chuki hai to onLoad fire nahi hota,
-  // isliye complete check karte hain.
-  useEffect(() => {
-    if (imgRef.current && imgRef.current.complete) setLoaded(true)
-  }, [])
-
+function StaticImage({ src, alt, className = '', priority = false }) {
   return (
-    <div className="relative w-full h-full bg-[#F3E4EC]">
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        width={1200}
-        height={900}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
-        className={`w-full h-full object-cover ${priority ? '' : 'transition-opacity duration-300'} ${loaded || priority ? 'opacity-100' : 'opacity-0'} ${className}`}
-      />
-    </div>
+    <img
+      src={src}
+      alt={alt}
+      width={1200}
+      height={900}
+      loading="eager"
+      fetchPriority={priority ? 'high' : 'auto'}
+      decoding="async"
+      draggable={false}
+      className={`block w-full h-full object-cover ${className}`}
+      style={{ display: 'block', backgroundColor: '#F8F5F7' }}
+    />
   )
 }
 
@@ -97,12 +76,10 @@ function AboutHero({ onExplore }) {
             </div>
           </motion.div>
 
-          <motion.div
-            variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }}
-            className="relative"
-          >
+          {/* Image block: plain div (no animation), so the picture is simply there from the first paint */}
+          <div className="relative">
             <div className="rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_24px_64px_rgba(115,0,66,0.16)] aspect-[4/3]">
-              <FadeImage
+              <StaticImage
                 src={slideWhiteOffice}
                 alt="TorchX Talent workforce analytics"
                 priority
@@ -131,7 +108,7 @@ function AboutHero({ onExplore }) {
                 <div className="text-[12px] font-display font-bold text-[#111]">ISO 27001 &amp; SOC 2 Ready</div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </Wrap>
     </section>
@@ -194,9 +171,10 @@ function OriginStory({ scrollContainerRef }) {
 
           <div className="relative">
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
-              <FadeImage
+              <StaticImage
                 src={slideTeam}
                 alt="TorchX Talent engineering lab"
+                priority
               />
             </div>
             <div className="flex items-center justify-between mt-3 px-1">
@@ -394,22 +372,6 @@ export default function AboutPage() {
   const { data: auth } = useAuth()
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
-
-  // Hero image load hone ke baad, browser idle hone par neeche wali image
-  // background me preload kar dete hain, taaki scroll karte hi ready mile.
-  useEffect(() => {
-    const preloadTeam = () => {
-      const img = new Image()
-      img.decoding = 'async'
-      img.src = slideTeam
-    }
-    if ('requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(preloadTeam, { timeout: 2000 })
-      return () => window.cancelIdleCallback(id)
-    }
-    const t = setTimeout(preloadTeam, 800)
-    return () => clearTimeout(t)
-  }, [])
 
   const accountLabel = isAuthenticated ? 'Access Your Talent Account' : 'Sign in to your Talent Account'
   const handleAccountClick = () => navigate(isAuthenticated ? '/redirect' : '/login')
