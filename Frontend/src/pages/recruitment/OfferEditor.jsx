@@ -50,6 +50,7 @@ const initForm = (letter, kind) => ({
   annual_ctc: kind === "OFFER" ? letter.ctc?.annual_ctc || "" : "",
   ctc_options: kind === "OFFER" ? { ...(letter.ctc?.options || {}) } : {},
   ctc_overrides: kind === "OFFER" ? { ...(letter.ctc_overrides || {}) } : {},
+  refresh_salary_config: false,
 });
 
 const cleanOverrides = (o) =>
@@ -77,11 +78,12 @@ const buildPayload = (form, kind) => {
     payload.annual_ctc = Number(form.annual_ctc);
     payload.ctc_options = form.ctc_options;
     payload.ctc_overrides = cleanOverrides(form.ctc_overrides);
+    payload.refresh_salary_config = form.refresh_salary_config === true;
   }
   return payload;
 };
 
-const CtcPreview = ({ form }) => {
+const CtcPreview = ({ form, config }) => {
   const previewMut = usePreviewCtc();
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
@@ -95,7 +97,7 @@ const CtcPreview = ({ form }) => {
     }
     timer.current = setTimeout(() => {
       previewMut.mutate(
-        { annual_ctc: Number(form.annual_ctc), options: form.ctc_options, overrides: cleanOverrides(form.ctc_overrides) },
+        { annual_ctc: Number(form.annual_ctc), options: form.ctc_options, overrides: cleanOverrides(form.ctc_overrides), config: config || undefined },
         {
           onSuccess: (res) => {
             setResult(res.data);
@@ -109,7 +111,7 @@ const CtcPreview = ({ form }) => {
       );
     }, 450);
     return () => clearTimeout(timer.current);
-  }, [form.annual_ctc, form.ctc_options, form.ctc_overrides]);
+  }, [form.annual_ctc, form.ctc_options, form.ctc_overrides, config]);
 
   if (err) return <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{err}</div>;
   if (!result) return <div className="text-xs text-gray-400">Enter annual CTC to see the break-up.</div>;
@@ -245,6 +247,13 @@ const OfferEditor = ({ kind = "OFFER", letter, meta, issues: initialIssues, onCl
   const setNested = (group, key) => (e) => setForm((f) => ({ ...f, [group]: { ...f[group], [key]: e.target.value } }));
   const setOption = (key, value) => setForm((f) => ({ ...f, ctc_options: { ...f.ctc_options, [key]: value } }));
   const setOverride = (key, value) => setForm((f) => ({ ...f, ctc_overrides: { ...f.ctc_overrides, [key]: value } }));
+
+  const orgConfig = meta?.salary_config;
+  const letterConfig = letter.ctc?.source === "COMPANY_CONFIG" ? letter.ctc.config : null;
+  const usingConfig = isOffer && (form.refresh_salary_config ? !!orgConfig?.is_custom : !!letterConfig);
+  const activeConfig = usingConfig ? (form.refresh_salary_config ? orgConfig.components : letterConfig) : null;
+  const configOutdated = isOffer && !!orgConfig?.is_custom && !form.refresh_salary_config && JSON.stringify(letterConfig || null) !== JSON.stringify(orgConfig.components || null);
+  const configOverrideFields = (activeConfig || []).filter((c) => c.enabled !== false && c.method !== "BALANCE");
 
   const tabs = [
     { key: "details", label: "Details" },
@@ -383,6 +392,31 @@ const OfferEditor = ({ kind = "OFFER", letter, meta, issues: initialIssues, onCl
 
           {tab === "ctc" && isOffer && (
             <div className="space-y-5">
+              {configOutdated && (
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                  <p className="text-xs text-amber-800">{letterConfig ? "Your company salary structure has changed since this offer was prepared." : "Your company has a custom salary structure. This offer still uses the default break-up."}</p>
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, refresh_salary_config: true, ctc_overrides: {} }))} className="text-xs font-semibold text-[#730042] border border-[#eedde8] bg-white px-3 py-1.5 rounded-lg hover:bg-[#730042] hover:text-white transition-colors">Apply company salary structure</button>
+                </div>
+              )}
+              {usingConfig ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Field label="Annual CTC (INR)"><input type="number" min="0" className={inputCls} value={form.annual_ctc} onChange={set("annual_ctc")} /></Field>
+                  </div>
+                  <details className="border border-gray-100 rounded-xl px-4 py-3">
+                    <summary className="text-xs font-bold text-gray-600 cursor-pointer">Manual overrides (optional)</summary>
+                    <p className="text-[11px] text-gray-400 mt-2 mb-3">Leave blank to follow your company salary structure. The balancing component adjusts so the total always matches the CTC.</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {configOverrideFields.map((c) => (
+                        <Field key={c.key} label={`${c.label} (annual)`}>
+                          <input type="number" min="0" className={inputCls} value={form.ctc_overrides[c.key] ?? ""} onChange={(e) => setOverride(c.key, e.target.value)} />
+                        </Field>
+                      ))}
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label="Annual CTC (INR)"><input type="number" min="0" className={inputCls} value={form.annual_ctc} onChange={set("annual_ctc")} /></Field>
                 <Field label="Basic (% of CTC)"><input type="number" min="0" max="100" className={inputCls} value={form.ctc_options.basic_percent ?? ""} onChange={(e) => setOption("basic_percent", e.target.value)} /></Field>
@@ -426,8 +460,10 @@ const OfferEditor = ({ kind = "OFFER", letter, meta, issues: initialIssues, onCl
                   ))}
                 </div>
               </details>
+                </>
+              )}
 
-              <CtcPreview form={form} />
+              <CtcPreview form={form} config={activeConfig} />
             </div>
           )}
 

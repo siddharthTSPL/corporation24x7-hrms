@@ -1,3 +1,5 @@
+const { computeBreakup } = require("./salaryStructure.utils");
+
 const round = (n) => Math.round(Number(n) || 0);
 
 const DEFAULT_OPTIONS = {
@@ -45,7 +47,8 @@ const build = (annualCtc, opts, overrides) => {
   return { basic, hra, conveyance, lta, variable, insurance, pf, gratuity };
 };
 
-const calculateCtc = ({ annual_ctc, options = {}, overrides = {} }) => {
+const calculateCtc = ({ annual_ctc, options = {}, overrides = {}, config = null }) => {
+  if (Array.isArray(config) && config.length) return computeBreakup({ annual_ctc, components: config, overrides });
   const annualCtc = round(annual_ctc);
   if (!annualCtc || annualCtc <= 0) {
     const err = new Error("Annual CTC must be greater than zero");
