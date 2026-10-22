@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
+import TimesheetNotificationSettings from "./TimesheetNotificationSettings";
 import toast from "react-hot-toast";
 import { generateCSV, downloadCSV, buildExportFilename } from "../utils/timesheetReportExport";
 import {
@@ -127,6 +128,7 @@ const TABS = [
   { id: "org-logs", label: "All Logs", icon: "logs" },
   { id: "org-sheets", label: "All Timesheets", icon: "sheets" },
   { id: "report", label: "Time Sheet Report", icon: "report" },
+  { id: "email-alerts", label: "Email Alerts", icon: "alerts" },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -263,6 +265,7 @@ const ICON_PATHS = {
   overview: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>,
   jobs: <><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></>,
   approvals: <><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></>,
+  alerts: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>,
   insights: <><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></>,
   mywork: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   timesheets: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
@@ -2295,6 +2298,8 @@ export default function AdminTimesheet() {
               )}
             </div>
           )}
+
+          {tab === "email-alerts" && <TimesheetNotificationSettings />}
 
           {tab === "report" && (
             <div className="min-w-0">
