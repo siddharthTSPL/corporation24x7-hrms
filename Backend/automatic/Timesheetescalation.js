@@ -3,6 +3,7 @@ const Timesheet = require("../Models/Timesheet.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
 const { resolveDefaultAdminHandler } = require("../utils/approvalFlow.utils");
+const { notifyTimesheetPending } = require("../utils/Timesheetnotify.utils");
 
 const ESCALATION_HOURS_THRESHOLD = 48;
 const MAX_ESCALATION_LEVEL = 3;
@@ -94,6 +95,7 @@ const escalateStuckTimesheets = async () => {
       timesheet.escalation_level += 1;
       timesheet.last_escalated_at = new Date();
       await timesheet.save();
+      await notifyTimesheetPending({ timesheetId: timesheet._id, escalated: true });
       escalatedCount += 1;
     }
 

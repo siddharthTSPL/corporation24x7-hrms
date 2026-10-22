@@ -12,6 +12,7 @@ const TSJob = require("../Models/Tsjob.model");
 const { resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
 const { getISTDateParts, istDateFromYMD, parseISTDateOnly, endOfISTDay, toISTKey } = require("../utils/Istdate.utils");
 const { getWeekOffMapForRange, getDayTypeMapForRange } = require("../automatic/weekoffcalendar");
+const { notifyTimesheetPending, notifyTimesheetDecision } = require("../utils/Timesheetnotify.utils");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -226,6 +227,12 @@ const submitTimesheet = async (req, res, next) => {
     { $set: { status: "submitted", timesheet: timesheet._id } }
   );
 
+  if (timesheet.status === "approved") {
+    notifyTimesheetDecision({ timesheetId: timesheet._id });
+  } else {
+    notifyTimesheetPending({ timesheetId: timesheet._id });
+  }
+
   res.status(200).json({ success: true, message: "Timesheet submitted", timesheet });
 };
 
@@ -311,6 +318,7 @@ const approveTimesheet = async (req, res, next) => {
     timesheet.status = nextHandler.status;
     timesheet.remarks = remarks || "Approved and sent to the next approver";
     await timesheet.save();
+    notifyTimesheetPending({ timesheetId: timesheet._id });
     return res.status(200).json({
       success: true,
       message: "Timesheet approved and sent to the next approver",
@@ -327,6 +335,8 @@ const approveTimesheet = async (req, res, next) => {
 
   await timesheet.save();
   await TimeLog.updateMany({ timesheet: timesheet._id }, { $set: { status: "approved" } });
+
+  notifyTimesheetDecision({ timesheetId: timesheet._id });
 
   res.status(200).json({ success: true, message: "Timesheet approved", timesheet });
 };
@@ -367,6 +377,8 @@ const rejectTimesheet = async (req, res, next) => {
     { timesheet: timesheet._id },
     { $set: { status: "draft", timesheet: null } }
   );
+
+  notifyTimesheetDecision({ timesheetId: timesheet._id });
 
   res.status(200).json({ success: true, message: "Timesheet rejected", timesheet });
 };
@@ -444,6 +456,8 @@ const forwardTimesheet = async (req, res, next) => {
   timesheet.remarks = remarks || "";
 
   await timesheet.save();
+
+  notifyTimesheetPending({ timesheetId: timesheet._id });
 
   res.status(200).json({ success: true, message: "Timesheet forwarded", timesheet });
 };

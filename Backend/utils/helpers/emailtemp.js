@@ -656,4 +656,10 @@ module.exports = {
   buildBirthdayReminderEmail,
   leaveTypeLabel,
   formatDate,
+  emailShell,
+  detailRow,
+  sectionLabel,
+  plainLink,
+  escapeHtml,
+  BRAND,
 };
