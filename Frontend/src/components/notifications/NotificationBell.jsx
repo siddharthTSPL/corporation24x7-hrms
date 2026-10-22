@@ -12,6 +12,7 @@ import {
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, getTypeMeta } from "./notificationUtils";
 import NotificationItem from "./NotificationItem";
+import FeatureNotificationModal from "./FeatureNotificationModal";
 import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
 
 const LIVE_POLL_MS = 20000;
@@ -35,6 +36,7 @@ function BellSkeleton() {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const [soundOn, setSoundOn] = useState(isSoundEnabled);
   const containerRef = useRef(null);
   const navigate = useNavigate();
@@ -140,6 +142,10 @@ export default function NotificationBell() {
       markAsRead.mutate(notification._id);
     }
     setOpen(false);
+    if (notification.meta?.featureLaunchId) {
+      setSelectedFeature(notification);
+      return;
+    }
     if (notification.link) {
       navigate(notification.link);
     }
@@ -161,6 +167,7 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={containerRef}>
+      <FeatureNotificationModal notification={selectedFeature} onClose={() => setSelectedFeature(null)} />
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"

@@ -66,7 +66,11 @@ const announceLaunch = async (launch) => {
       message,
       priority: "medium",
       createdByModel: "System",
-      meta: { featureLaunchId: String(launch._id), featureName: launch.name },
+      meta: {
+        featureLaunchId: String(launch._id),
+        featureName: launch.name,
+        featureDescription: launch.description,
+      },
     });
     bells += Array.isArray(created) ? created.length : 0;
 

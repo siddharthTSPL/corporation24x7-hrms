@@ -11,6 +11,7 @@ import {
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, TYPE_META } from "../../components/notifications/notificationUtils";
 import NotificationItem from "../../components/notifications/NotificationItem";
+import FeatureNotificationModal from "../../components/notifications/FeatureNotificationModal";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -22,6 +23,7 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState("all");
   const [type, setType] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const limit = 15;
 
   const { data, isLoading, isFetching, isError } = useNotifications({ page, limit, filter, type: type || undefined });
@@ -37,6 +39,10 @@ export default function NotificationsPage() {
 
   const handleOpenNotification = (notification) => {
     if (!notification.isRead) markAsRead.mutate(notification._id);
+    if (notification.meta?.featureLaunchId) {
+      setSelectedFeature(notification);
+      return;
+    }
     if (notification.link) navigate(notification.link);
   };
 
@@ -63,6 +69,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <FeatureNotificationModal notification={selectedFeature} onClose={() => setSelectedFeature(null)} />
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Notifications</h1>
