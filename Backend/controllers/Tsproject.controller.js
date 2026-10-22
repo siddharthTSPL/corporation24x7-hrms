@@ -1,6 +1,7 @@
 const TSProject = require("../Models/tsproject.model");
 const TSClient = require("../Models/tsclient.model");
 const { assertCanAssign, resolveActor, resolveOrgId, getDirectReportIds, httpError } = require("../utils/heirarchy.utils");
+const { notifyProjectMembersAdded } = require("../utils/Timesheetnotify.utils");
 
 const createProject = async (req, res, next) => {
   const actor = resolveActor(req);
@@ -78,6 +79,13 @@ const createProject = async (req, res, next) => {
   }
 
   const project = await TSProject.create(projectData);
+
+  if (members.length) {
+    notifyProjectMembersAdded({
+      projectId: project._id,
+      memberIds: members.map((m) => m.member),
+    });
+  }
 
   res.status(201).json({ success: true, message: "Project created", project });
 };
@@ -177,6 +185,8 @@ const addProjectMembers = async (req, res, next) => {
   });
   const reportMap = new Map(reportIds.map((r) => [r.id.toString(), r.model]));
 
+  const newlyAdded = [];
+
   for (const entry of member_ids) {
     const targetId = typeof entry === "string" ? entry : entry.id;
     const memberModel = reportMap.get(targetId?.toString());
@@ -185,10 +195,16 @@ const addProjectMembers = async (req, res, next) => {
     }
     if (!project.hasMember(targetId)) {
       project.members.push({ member: targetId, member_model: memberModel });
+      newlyAdded.push(targetId);
     }
   }
 
   await project.save();
+
+  if (newlyAdded.length) {
+    notifyProjectMembersAdded({ projectId: project._id, memberIds: newlyAdded });
+  }
+
   res.status(200).json({ success: true, message: "Members added", project });
 };
 
