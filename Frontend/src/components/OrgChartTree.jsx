@@ -63,13 +63,6 @@ function selfPath(root) {
    Exports EXACTLY what is expanded on screen - every visible node - with all
    details readable (nothing cut with "...", nothing faded/greyed out, no +/-
    buttons, avatars that cannot load fall back to initials).
-
-   Usage:
-     await exportOrgChartPng({
-       target: exportRef.current,     // full-width content inside the scroller
-       scroller: scrollRef.current,   // the horizontally scrolling viewport (optional)
-       filename: "org-chart.png",
-     });
    ========================================================================== */
 const H2C_CDN =
   "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
@@ -98,6 +91,134 @@ function canLoadWithCors(src) {
   });
 }
 
+/*
+  html2canvas places small text (avatar initials, "YOU", employee-ID) lower than
+  the browser does, so it never looks centred inside its circle / pill. To fix
+  that for good we do NOT let html2canvas draw those three texts: they are made
+  transparent in the cloned DOM, and after the canvas is ready we draw them
+  ourselves, mathematically centred in the exact box of their circle / pill.
+*/
+function collectCenteredTexts(target, badSrc) {
+  const tr = target.getBoundingClientRect();
+  const headFont =
+    getComputedStyle(target.querySelector(".ot-name") || target).fontFamily;
+  const out = [];
+  const push = (el, text, font, color, ls = 0, shape = null) => {
+    if (!text) return;
+    const r = el.getBoundingClientRect();
+    out.push({
+      text,
+      font,
+      color,
+      ls,
+      // circle / pill behind the text: we draw it too, so shape and text always match
+      shape: shape && {
+        ...shape,
+        x: r.left - tr.left,
+        y: r.top - tr.top,
+        w: r.width,
+        h: r.height,
+      },
+      cx: r.left - tr.left + r.width / 2,
+      cy: r.top - tr.top + r.height / 2,
+    });
+  };
+
+  target.querySelectorAll(".ot-av").forEach((el) => {
+    if (el.tagName === "IMG") {
+      if (!badSrc.has(el.getAttribute("src"))) return; // real photo, nothing to draw
+      const w = el.getBoundingClientRect().width;
+      const size = w >= 48 ? 16 : w >= 36 ? 13 : 11;
+      const card = el.closest(".ot-card");
+      const wrap = el.closest(".ot-cardwrap");
+      const bg =
+        card && card.classList.contains("is-active") && wrap
+          ? getComputedStyle(wrap).getPropertyValue("--ot-acc").trim() || "#64748b"
+          : "#64748b";
+      push(el, initialsOf(el.getAttribute("alt") || ""), `700 ${size}px ${headFont}`, "#ffffff", 0, {
+        kind: "circle",
+        bg,
+      });
+    } else {
+      const cs = getComputedStyle(el);
+      push(
+        el,
+        el.textContent.trim(),
+        `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+        cs.color,
+        0,
+        { kind: "circle", bg: cs.backgroundColor },
+      );
+    }
+  });
+
+  target.querySelectorAll(".ot-you, .ot-id").forEach((el) => {
+    const cs = getComputedStyle(el);
+    let text = el.textContent.trim();
+    if (cs.textTransform === "uppercase") text = text.toUpperCase();
+    const ls = parseFloat(cs.letterSpacing) || 0;
+    const isYou = el.classList.contains("ot-you");
+    push(
+      el,
+      text,
+      `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`,
+      cs.color,
+      ls,
+      isYou ? { kind: "pill", bg: cs.backgroundColor, ring: true } : null,
+    );
+  });
+
+  return out;
+}
+
+function drawCenteredTexts(canvas, scale, items) {
+  const ctx = canvas.getContext("2d");
+  ctx.save();
+  // html2canvas leaves its own scale on this context, so set the transform
+  // absolutely (ctx.scale() would multiply it again -> 2x size / wrong place)
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const rr = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+  // shapes first (white ring + coloured circle / pill), then all texts on top
+  items.forEach((it) => {
+    const s = it.shape;
+    if (!s) return;
+    if (s.ring) {
+      ctx.fillStyle = "#ffffff";
+      rr(s.x - 2, s.y - 2, s.w + 4, s.h + 4, (s.h + 4) / 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = s.bg;
+    if (s.kind === "circle") {
+      ctx.beginPath();
+      ctx.arc(s.x + s.w / 2, s.y + s.h / 2, Math.min(s.w, s.h) / 2, 0, Math.PI * 2);
+      ctx.closePath();
+    } else {
+      rr(s.x, s.y, s.w, s.h, s.h / 2);
+    }
+    ctx.fill();
+  });
+  items.forEach((it) => {
+    ctx.font = it.font;
+    ctx.fillStyle = it.color;
+    if ("letterSpacing" in ctx) ctx.letterSpacing = `${it.ls}px`;
+    const m = ctx.measureText(it.text);
+    // centre the visible glyphs (not the font's line box) inside the circle / pill
+    const y = it.cy + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+    ctx.fillText(it.text, it.cx + it.ls / 2, y);
+  });
+  ctx.restore();
+}
+
 export async function exportOrgChartPng({ target, scroller, filename }) {
   if (!target) throw new Error("Nothing to export");
   await loadHtml2Canvas();
@@ -122,6 +243,9 @@ export async function exportOrgChartPng({ target, scroller, filename }) {
         if (src && !(await canLoadWithCors(src))) badSrc.add(src);
       }),
     );
+
+    // texts that we draw ourselves (perfectly centred) after html2canvas is done
+    const centered = collectCenteredTexts(target, badSrc);
 
     // measure AFTER export styles are applied (text now wraps, so size changes)
     const w = Math.ceil(target.scrollWidth);
@@ -160,6 +284,7 @@ export async function exportOrgChartPng({ target, scroller, filename }) {
           el = el.parentElement;
         }
         if (t) {
+          t.classList.add("ot-h2c"); // hides initials / YOU / emp-id text in the clone
           t.querySelectorAll("img.ot-av").forEach((im) => {
             if (badSrc.has(im.getAttribute("src"))) {
               const d = doc.createElement("div");
@@ -171,6 +296,8 @@ export async function exportOrgChartPng({ target, scroller, filename }) {
         }
       },
     });
+
+    drawCenteredTexts(canvas, scale, centered);
 
     const blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
@@ -191,6 +318,17 @@ export async function exportOrgChartPng({ target, scroller, filename }) {
   }
 }
 
+/*
+  Connector notes (why this version is export-safe):
+  - No :first-child / :last-child / :only-child selectors any more. html2canvas
+    clones the DOM and these pseudo-classes were the reason the Super Admin ->
+    Admin line broke (an extra 20px gap appeared). Every position is now an
+    explicit class (--first / --last / --only / --mid) set from JS.
+  - The vertical stem under a card is its own real element (.ot-stem), not a
+    pseudo-element, so it always reaches the next card.
+  - The coloured line on top of a card is an inset "tab" (not full width), so
+    it never pokes out of the rounded corners (overflow stays visible).
+*/
 export const TREE_STYLES = `
   @keyframes otIn    { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
   @keyframes otPulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
@@ -199,6 +337,7 @@ export const TREE_STYLES = `
   .ot-root {
     --w-card: 176px;
     --w-emp: 152px;
+    --gap: 24px;
     width: max-content;
     margin: 0 auto;
     display: flex;
@@ -210,53 +349,62 @@ export const TREE_STYLES = `
   .ot-node { display:flex; flex-direction:column; align-items:center; position:relative; }
   .ot-node--v { align-items:flex-start; }
 
-  .ot-row { display:flex; justify-content:center; align-items:flex-start; position:relative; padding-top:20px; animation:otIn .22s ease; }
-  .ot-row::before { content:""; position:absolute; top:0; left:50%; height:20px; border-left:1.5px solid var(--ot-line); }
+  /* vertical stem from a card down to its children */
+  .ot-stem { width:0; height:var(--gap); border-left:1.5px solid var(--ot-line); flex-shrink:0; }
 
-  .ot-col { position:relative; display:flex; flex-direction:column; align-items:center; padding:20px 9px 0; }
-  .ot-col::before, .ot-col::after { content:""; position:absolute; top:0; right:50%; width:50%; height:20px; border-top:1.5px solid var(--ot-line); }
-  .ot-col::after { right:auto; left:50%; border-left:1.5px solid var(--ot-line); }
-  .ot-col:first-child::before, .ot-col:last-child::after { border:0 none; }
-  .ot-col:last-child::before { right:calc(50% - 1.5px); width:calc(50% + 1.5px); border-right:1.5px solid var(--ot-line); }
-  .ot-col:only-child { padding-top:0; }
-  .ot-col:only-child::before, .ot-col:only-child::after { display:none; }
+  .ot-row { display:flex; justify-content:center; align-items:flex-start; position:relative; animation:otIn .22s ease; }
+
+  .ot-col { position:relative; display:flex; flex-direction:column; align-items:center; padding:var(--gap) 9px 0; }
+  /* left half / right half of the horizontal bar + the drop line to the card */
+  .ot-col::before, .ot-col::after { content:""; position:absolute; top:0; height:var(--gap); }
+  .ot-col::before { right:50%; width:50%; border-top:1.5px solid var(--ot-line); }
+  .ot-col::after  { left:50%;  width:50%; border-top:1.5px solid var(--ot-line); border-left:1.5px solid var(--ot-line); }
+  .ot-col--first::before { border-top:0; }
+  .ot-col--last::after   { border-top:0; }
+  .ot-col--only { padding-top:0; }
+  .ot-col--only::before, .ot-col--only::after { display:none; }
 
   /* employees: stacked vertically with a bracket line on the left */
   .ot-vlist { display:flex; flex-direction:column; gap:12px; position:relative; padding:18px 0 0 calc(var(--w-card) - var(--w-emp)); animation:otIn .22s ease; }
   .ot-vitem { position:relative; }
   .ot-vitem::before { content:""; position:absolute; top:50%; left:-13px; width:13px; border-top:1.5px solid var(--ot-line); }
   .ot-vitem::after { content:""; position:absolute; left:-13px; top:-12px; height:calc(100% + 12px); border-left:1.5px solid var(--ot-line); }
-  .ot-vitem:first-child::after { top:-18px; height:calc(100% + 18px); }
-  .ot-vitem:last-child::after { height:calc(50% + 12px); }
-  .ot-vitem:first-child:last-child::after { top:-18px; height:calc(50% + 18px); }
+  .ot-vitem--first::after { top:-18px; height:calc(100% + 18px); }
+  .ot-vitem--last::after  { height:calc(50% + 12px); }
+  .ot-vitem--only::after  { top:-18px; height:calc(50% + 18px); }
 
   /* employees next to sub-managers: plain vertical chain under the shared connector */
   .ot-vlist--chain { align-items:center; padding:0; gap:14px; }
   .ot-vlist--chain .ot-vitem::before { top:-14px; left:50%; width:0; height:14px; border-top:0; border-left:1.5px solid var(--ot-line); }
   .ot-vlist--chain .ot-vitem::after { display:none; }
-  .ot-vlist--chain .ot-vitem:first-child::before { display:none; }
+  .ot-vlist--chain .ot-vitem--first::before { display:none; }
 
   /* ---------- card ---------- */
   .ot-cardwrap { position:relative; flex-shrink:0; }
-  /* Only the Super Admin / organisation node is highlighted in black; everyone else uses the theme colour (beetroot) */
+  /* Only the Super Admin / organisation node is highlighted in black; everyone else uses the theme colour */
   .ot-cardwrap--root { --ot-acc:#0f172a; --ot-ring:rgba(15,23,42,.12); }
   .ot-card {
     width:var(--w-card); background:#fff; border:1.5px solid #e5e7eb; border-radius:12px;
-    padding:13px 10px 14px; display:flex; flex-direction:column; align-items:center;
-    position:relative; overflow:hidden; box-shadow:0 1px 4px rgba(15,23,42,.05);
+    padding:16px 10px 14px; display:flex; flex-direction:column; align-items:center;
+    position:relative; overflow:visible; box-shadow:0 1px 4px rgba(15,23,42,.05);
     transition:opacity .18s, border-color .15s, box-shadow .15s;
   }
-  .ot-card--emp { width:var(--w-emp); padding:11px 8px 10px; }
+  .ot-card--emp { width:var(--w-emp); padding:14px 8px 10px; }
 
-  /* Super Admin / organisation node: a bit bigger, full organisation name shown (wraps, never cut) */
-  .ot-card--root { width:240px; padding:18px 16px 16px; border-radius:14px; }
+  /* Super Admin / organisation node: a bit bigger, full name shown (wraps, never cut) */
+  .ot-card--root { width:240px; padding:22px 16px 16px; border-radius:14px; }
   .ot-card--root .ot-av { width:50px; height:50px; font-size:16px; }
   .ot-card--root .ot-name { margin-top:10px; font-size:14px; line-height:1.35; white-space:normal; overflow:visible; text-overflow:clip; text-align:center; overflow-wrap:anywhere; }
   .ot-card--root .ot-sub { margin-top:3px; font-size:11.5px; font-weight:600; line-height:1.35; white-space:normal; overflow:visible; text-overflow:clip; text-align:center; overflow-wrap:anywhere; }
   .ot-card--root .ot-rep { font-size:11px; }
   .ot-card.is-click { cursor:pointer; }
 
-  .ot-bar { position:absolute; top:0; left:0; right:0; height:3px; background:#d1d5db; transition:background .15s; }
+  /* top accent: a small inset tab sitting on the card's top border (never sticks out of the corners) */
+  .ot-bar {
+    position:absolute; top:-1.5px; left:50%; width:44px; height:4px; margin-left:-22px;
+    border-radius:0 0 4px 4px; background:#d1d5db; transition:background .15s;
+  }
+  .ot-card--root .ot-bar { width:64px; margin-left:-32px; }
   .ot-av {
     width:38px; height:38px; border-radius:50%; object-fit:cover; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
@@ -267,8 +415,16 @@ export const TREE_STYLES = `
   .ot-card--emp .ot-av { width:32px; height:32px; font-size:11px; }
   .ot-name { display:block; max-width:100%; margin-top:8px; font-size:12px; font-weight:600; line-height:1.3; color:#94a3b8; font-family:var(--ot-head); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:color .15s; }
   .ot-sub  { display:block; max-width:100%; margin-top:2px; font-size:10px; color:#a8b0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; transition:color .15s; }
-  .ot-id   { display:block; max-width:100%; margin-top:4px; padding:1px 6px; border-radius:4px; background:#f3f4f6; font-family:var(--ot-mono); font-size:9px; color:#b7bdc8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ot-rep  { display:block; margin-top:5px; font-size:10px; font-weight:500; color:#a8b0bd; transition:color .15s; }
+
+  /* Employee-ID pill: flex + fixed line-height keeps the grey background exactly behind the text */
+  .ot-id {
+    display:flex; align-items:center; justify-content:center;
+    width:fit-content; max-width:100%; min-height:18px; margin-top:6px; padding:0 8px;
+    border-radius:5px; background:#f3f4f6;
+    font-family:var(--ot-mono); font-size:9px; line-height:1; letter-spacing:.02em; color:#b7bdc8;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .ot-rep  { display:block; margin-top:6px; font-size:10px; font-weight:500; color:#a8b0bd; transition:color .15s; }
 
   /* normal (not in the highlighted line) */
   .ot-card.is-muted { opacity:.8; }
@@ -294,10 +450,10 @@ export const TREE_STYLES = `
   .ot-name mark, .ot-sub mark { background:#fde68a; color:#78350f; border-radius:2px; padding:0 1px; }
 
   .ot-you {
-    position:absolute; top:-9px; right:-9px; z-index:6; background:var(--ot-pill); color:#fff;
-    font-size:9px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
-    padding:3px 9px; border-radius:999px; white-space:nowrap; pointer-events:none;
-    box-shadow:0 2px 8px rgba(115,0,66,.45), 0 0 0 2px #fff;
+    position:absolute; top:-10px; right:14px; z-index:6; background:var(--ot-pill); color:#fff;
+    font-size:9px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; line-height:1;
+    padding:5px 10px; border-radius:999px; white-space:nowrap; pointer-events:none;
+    box-shadow:0 2px 8px rgba(115,0,66,.35), 0 0 0 2px #fff;
   }
 
   /* + / - button, bottom centre of the card */
@@ -326,13 +482,17 @@ export const TREE_STYLES = `
   .ot-exporting .ot-card.is-muted .ot-id { color:#334155; background:#eef0f3; }
   .ot-exporting .ot-card.is-muted .ot-rep { color:#475569; }
   .ot-exporting .ot-name,
-  .ot-exporting .ot-sub,
-  .ot-exporting .ot-id {
+  .ot-exporting .ot-sub {
     white-space:normal !important; overflow:visible !important; text-overflow:clip !important;
     text-align:center; word-break:break-word; overflow-wrap:anywhere;
   }
+  .ot-exporting .ot-id { white-space:nowrap !important; overflow:visible !important; text-overflow:clip !important; }
   .ot-exporting .ot-sub { font-size:10.5px; line-height:1.35; }
   .ot-exporting .ot-id { font-size:9.5px; }
+  /* in the html2canvas clone these texts are transparent - they are drawn centred by drawCenteredTexts() */
+  .ot-h2c .ot-av, .ot-h2c .ot-you, .ot-h2c .ot-id { color:transparent !important; }
+  /* circle + YOU pill are drawn by drawCenteredTexts() together with their text */
+  .ot-h2c div.ot-av, .ot-h2c .ot-you { background:transparent !important; box-shadow:none !important; }
   .ot-exporting .ot-card.is-hl { outline:0; }
   .ot-exporting .ot-card.is-dim { opacity:1 !important; }
 `;
@@ -374,10 +534,11 @@ function OrgCard({ node, emp = false }) {
   const hl = c.hasQ && c.matches.has(node.key);
   const dim = c.hasQ && c.anyMatch && !hl;
   const active = c.chain.has(node.key) || hl;
+  const isRoot = node.kind === "sa" || node.kind === "org";
   const cls = [
     "ot-card",
     emp ? "ot-card--emp" : "",
-    node.kind === "sa" || node.kind === "org" ? "ot-card--root" : "",
+    isRoot ? "ot-card--root" : "",
     active ? "is-active" : "is-muted",
     hl ? "is-hl" : "",
     dim ? "is-dim" : "",
@@ -387,9 +548,7 @@ function OrgCard({ node, emp = false }) {
     .join(" ");
 
   return (
-    <div
-      className={`ot-cardwrap${node.kind === "sa" || node.kind === "org" ? " ot-cardwrap--root" : ""}`}
-    >
+    <div className={`ot-cardwrap${isRoot ? " ot-cardwrap--root" : ""}`}>
       {node.isYou && <span className="ot-you">You</span>}
       <div className={cls} onClick={node.onClick}>
         <span className="ot-bar" />
@@ -426,11 +585,18 @@ function OrgCard({ node, emp = false }) {
   );
 }
 
+// position class used instead of :first-child / :last-child / :only-child
+const posClass = (i, n) =>
+  n === 1 ? "only" : i === 0 ? "first" : i === n - 1 ? "last" : "mid";
+
 function EmpList({ emps, chain = false }) {
   return (
     <div className={`ot-vlist${chain ? " ot-vlist--chain" : ""}`}>
-      {emps.map((e) => (
-        <div className="ot-vitem" key={e.key}>
+      {emps.map((e, i) => (
+        <div
+          className={`ot-vitem ot-vitem--${posClass(i, emps.length)}`}
+          key={e.key}
+        >
           <OrgCard node={e} emp />
         </div>
       ))}
@@ -447,6 +613,9 @@ function TreeNode({ node }) {
   const showKids = isOpen && kids.length > 0;
   const bracket = showKids && hKids.length === 0;
 
+  // columns under this node: every sub-manager/admin + (optionally) one column holding the employees
+  const colCount = hKids.length + (eKids.length > 0 ? 1 : 0);
+
   return (
     <div className={`ot-node${bracket ? " ot-node--v" : ""}`}>
       <OrgCard node={node} />
@@ -454,18 +623,26 @@ function TreeNode({ node }) {
         (hKids.length === 0 ? (
           <EmpList emps={eKids} />
         ) : (
-          <div className="ot-row">
-            {hKids.map((k) => (
-              <div className="ot-col" key={k.key}>
-                <TreeNode node={k} />
-              </div>
-            ))}
-            {eKids.length > 0 && (
-              <div className="ot-col">
-                <EmpList emps={eKids} chain />
-              </div>
-            )}
-          </div>
+          <>
+            <div className="ot-stem" />
+            <div className="ot-row">
+              {hKids.map((k, i) => (
+                <div
+                  className={`ot-col ot-col--${posClass(i, colCount)}`}
+                  key={k.key}
+                >
+                  <TreeNode node={k} />
+                </div>
+              ))}
+              {eKids.length > 0 && (
+                <div
+                  className={`ot-col ot-col--${posClass(hKids.length, colCount)}`}
+                >
+                  <EmpList emps={eKids} chain />
+                </div>
+              )}
+            </div>
+          </>
         ))}
     </div>
   );
