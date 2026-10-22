@@ -36,6 +36,7 @@ const PLANS = [
       "Core HR (employee info, documents, onboarding)",
       "Letters & mail merge",
       "Basic attendance tracking",
+      "Field Operations",
     ],
   },
   {
@@ -51,6 +52,7 @@ const PLANS = [
       "Advanced attendance",
       "Recruitment / ATS",
       "Advanced payroll",
+      "Training Management",
     ],
   },
   {
@@ -76,10 +78,12 @@ const FEATURE_MATRIX = [
   { name: "Core HR (employee info, documents, onboarding)", tier: 0 },
   { name: "Letters & mail merge", tier: 0 },
   { name: "Basic attendance tracking", tier: 0 },
+  { name: "Field Operations", tier: 0 },
   { name: "Shift & roster management", tier: 1 },
   { name: "Advanced attendance", tier: 1 },
   { name: "Recruitment / ATS", tier: 1 },
   { name: "Advanced payroll", tier: 1 },
+  { name: "Training Management", tier: 1 },
   { name: "Custom integrations", tier: 2 },
   { name: "Single sign-on (SSO)", tier: 2 },
   { name: "REST API access", tier: 2 },
