@@ -69,7 +69,7 @@ const superAdminMenu = [
   { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
   { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies published by your admins." },
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
-     { name: "Training Records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
+     { name: "Training Management", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
 
 const adminMenu = [
