@@ -1354,93 +1354,35 @@ const getOrgInfo = async (req, res, next) => {
       .select("f_name l_name email organisation_name profile_image")
       .lean();
 
-    const admins = await Adminmodel.find({
-      organisation_id,
-      working_status: "working",
-    })
-      .select("f_name l_name work_email designation profile_image")
-      .lean();
-
-    const managers = await Managermodel.find({
-      organisation_id,
-      working_status: "working",
-    })
-      .select(
-        "f_name l_name work_email designation department office_location reporting_manager reporting_manager_model profile_image",
-      )
-      .lean();
-
-    const employees = managers.length
-      ? await usermodel
-          .find({
-            Under_manager: { $in: managers.map((m) => m._id) },
-            organisation_id,
-            working_status: "working",
-          })
-          .select(
-            "f_name l_name work_email designation department office_location Under_manager profile_image",
-          )
-          .lean()
-      : [];
-
-    const topLevelManagers = managers
-      .filter(
-        (mgr) =>
-          !mgr.reporting_manager || mgr.reporting_manager_model === "Admin",
-      )
-      .map((mgr) => ({
-        id: mgr._id,
-        name: `${mgr.f_name} ${mgr.l_name}`,
-        email: mgr.work_email,
-        designation: mgr.designation,
-        department: mgr.department,
-        profile_image: mgr.profile_image || null,
-        isCurrentUserManager:
-          req.employee.Under_manager?.toString() === mgr._id.toString(),
-        employees: employees
-          .filter((emp) => emp.Under_manager?.toString() === mgr._id.toString())
-          .map((emp) => ({
-            id: emp._id,
-            name: `${emp.f_name} ${emp.l_name}`,
-            email: emp.work_email,
-            designation: emp.designation,
-            department: emp.department,
-            profile_image: emp.profile_image || null,
-            isCurrentUser: emp._id.toString() === req.employee._id.toString(),
-          })),
-        subManagers: buildManagerTreeWithCurrentFlags(
-          managers,
-          mgr._id,
-          "Manager",
-          employees,
-          null,
-          req.employee._id,
-        ),
-      }));
+    // only people who are currently working (terminated / fired / resigned are excluded)
+    const WORKING = { $in: ["working", null] };
+    // Same pipeline as the SuperAdmin org chart: send flat lists with their
+    // reporting fields, the page builds the tree (co-admin = Admin reporting to an Admin).
+    const [admins, managers, employees] = await Promise.all([
+      Adminmodel.find({ organisation_id, working_status: WORKING }).select("empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image").lean(),
+      Managermodel.find({ organisation_id, working_status: WORKING }).select("empid f_name l_name work_email designation department office_location role reporting_manager reporting_manager_model profile_image").lean(),
+      usermodel.find({ organisation_id, working_status: WORKING }).select("empid f_name l_name work_email designation department office_location Under_manager profile_image").lean(),
+    ]);
 
     return res.status(200).json({
       success: true,
+      organisation_id,
       organisation_name: superAdmin?.organisation_name || "",
       organisation_logo: superAdmin?.profile_image || null,
       super_admin: superAdmin
         ? {
             id: superAdmin._id,
+            f_name: superAdmin.f_name,
+            l_name: superAdmin.l_name,
             name: `${superAdmin.f_name} ${superAdmin.l_name}`,
             email: superAdmin.email,
             profile_image: superAdmin.profile_image || null,
           }
         : null,
-      admin: admins[0]
-        ? {
-            id: admins[0]._id,
-            name: `${admins[0].f_name} ${admins[0].l_name}`,
-            email: admins[0].work_email,
-            designation: admins[0].designation,
-            profile_image: admins[0].profile_image || null,
-          }
-        : null,
-      managers: topLevelManagers,
       currentUserId: req.employee._id,
+      admins,
+      managers,
+      employees,
     });
   } catch (error) {
     next(error);

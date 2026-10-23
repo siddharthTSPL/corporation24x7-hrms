@@ -11,6 +11,7 @@ import {
   FiCreditCard, FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
   FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
   FiKey, FiCode, FiCloud, FiUserCheck, FiGift, FiBell,
+  FiBriefcase, FiAward,
 } from 'react-icons/fi'
 import { FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { HiOutlineSparkles } from 'react-icons/hi'
@@ -342,6 +343,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
 const freeForeverFeatures = [
   { text: 'Geo Tag Attendance' },
   { text: 'Face Attendance' },
+  { text: 'Field Operations'},
   { text: 'Monitoring of Employee Active & Idle Time' },
   { text: 'Leave management' },
   { text: 'Basic payroll' },
@@ -1371,9 +1373,11 @@ const featureItems = [
   },
   { cat: 'hiring', icon: FiSearch, title: 'Applicant Tracking', desc: 'Follow every candidate from application to offer.' },
   { cat: 'hiring', icon: BsGraphUp, title: 'Performance Management', desc: 'Goals, KPIs and continuous feedback in one place.' },
+  { cat: 'hiring', icon: FiAward, title: 'Training Management', desc: 'Plan trainings, track progress and build employee skills.' },
   { cat: 'hiring', icon: FiUserPlus, title: 'Onboarding & Offboarding', desc: 'Guided checklists for every first day and last day.' },
   { cat: 'attendance', icon: FiMapPin, title: 'Geo Tag Attendance', desc: 'GPS-verified check-ins for every site and shift.' },
   { cat: 'attendance', icon: FiCamera, title: 'Face Attendance', desc: 'Contactless face recognition. No buddy punching.' },
+  { cat: 'attendance', icon: FiBriefcase, title: 'Field Operations', desc: 'Assign visits and track on-ground teams, all from one place.' },
   { cat: 'attendance', icon: FiNavigation, title: 'Live Map Tracking', desc: 'See field teams and visit routes in real time.' },
   { cat: 'attendance', icon: FiMonitor, title: 'Active & Idle Time', desc: 'Monitor active and idle time across your team.' },
   { cat: 'attendance', icon: FiClock, title: 'Timesheet', desc: 'Track working hours accurately for every employee.' },
@@ -1601,6 +1605,7 @@ const PLANS = [
     features: [
       'Geo Tag Attendance',
       'Face Attendance',
+      'Field Operations',
       'Monitoring of Employee Active and Idle Time',
       'Leave management',
       'Basic payroll',
@@ -1621,8 +1626,8 @@ const PLANS = [
     inherits: null,
     monthlyPrice: 39,
     yearlyPrice: Math.round(39 * 12 * 0.83),
-    features: ['Geo Tag Attendance', 'Face Attendance', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management', 'Telephonic Support (24/7)'],
-    crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
+    features: ['Geo Tag Attendance', 'Face Attendance', 'Field Operations', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management','Training Management', 'Telephonic Support (24/7)'],
+    crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Training Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
   },
   {
     name: 'Advance',
@@ -1631,7 +1636,7 @@ const PLANS = [
     monthlyPrice: 99,
     yearlyPrice: Math.round(99 * 12 * 0.83),
     popular: true,
-    features: ['Live Map Tracking', 'Recruitment / Applicant tracking', 'Face Attendance', 'Performance management', 'Integrated Advanced Payroll', 'Timesheet', 'Two-factor authentication', 'Custom workflow', 'Reports & analytics', 'Employee Self-Service Portal', 'Telephonic support (24/7)'],
+    features: ['Live Map Tracking', 'Recruitment / Applicant tracking', 'Face Attendance', 'Performance management', 'Training Management', 'Integrated Advanced Payroll', 'Timesheet', 'Two-factor authentication', 'Custom workflow', 'Reports & analytics', 'Employee Self-Service Portal', 'Telephonic support (24/7)'],
     crossFeatures: [],
   },
   {

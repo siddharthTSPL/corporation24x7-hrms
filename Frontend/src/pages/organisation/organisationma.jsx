@@ -86,59 +86,126 @@ const STYLES = `
 // Build the tree from the same API data (nothing in the data is changed):
 // Organisation -> Admin -> managers -> (sub-managers / employees)
 // ---------------------------------------------------------------------------
-const empNode = (e) => ({
-  key: `e-${e.id}`,
-  kind: "emp",
-  name: e.name,
-  lines: [e.department ? getDepartmentName(e.department) : "—", e.designation || "—"],
-  empid: e.empid || "—",
-  image: e.profile_image,
-  hay: [e.department, e.designation],
-  children: [],
-});
+const idStr = (v) => (v ? String(v._id || v) : "");
+const fullName = (p) => `${p?.f_name || ""} ${p?.l_name || ""}`.trim();
 
-const mgrNode = (m) => ({
-  key: `m-${m.id}`,
-  kind: "mgr",
-  isYou: !!m.isCurrentManager,
-  name: m.name,
-  lines: [m.department ? getDepartmentName(m.department) : "—", m.designation || "—"],
-  empid: m.empid || "—",
-  image: m.profile_image,
-  hay: [m.department, m.designation],
-  children: [
-    ...(m.subManagers || []).map(mgrNode),
-    ...(m.employees || []).map(empNode),
-  ],
-});
+// Same pipeline as the SuperAdmin org chart (flat lists -> tree built here):
+// Org -> admins -> (co-admins / managers) -> (sub-managers / employees)
+// "Co-admin" is not a role: it is just an Admin whose reporting_manager is another Admin.
+function buildOrgTree({ data, lines, mark }) {
+  const admins = data.admins || [];
+  const managers = data.managers || [];
+  const employees = data.employees || [];
+  const seen = new Set(); // guards against a bad reporting loop in the data
 
-function buildMgrTree(data) {
-  if (!data) return null;
-  const managers = (data.managers || []).map(mgrNode);
-  const admin = data.admin
-    ? {
-        key: "admin",
-        kind: "admin",
-        name: data.admin.name,
-        lines: [
-          data.admin.department ? getDepartmentName(data.admin.department) : "—",
-          data.admin.designation || "—",
-        ],
-        empid: data.admin.empid || "—",
-        image: data.admin.profile_image,
-        hay: [data.admin.department, data.admin.designation],
-        children: managers,
-      }
-    : null;
+  const empNode = (e) => ({
+    key: `e-${idStr(e._id)}`,
+    kind: "emp",
+    isYou: mark.emp(e),
+    name: fullName(e),
+    lines: lines(e),
+    empid: e.empid || "—",
+    image: e.profile_image,
+    hay: [e.department, e.designation],
+    children: [],
+  });
+
+  const mgrNode = (m) => {
+    const id = idStr(m._id);
+    const key = `m-${id}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const subs = managers
+      .filter((x) => idStr(x.reporting_manager) === id && x.reporting_manager_model === "Manager")
+      .map(mgrNode)
+      .filter(Boolean);
+    const emps = employees.filter((e) => idStr(e.Under_manager) === id).map(empNode);
+    return {
+      key,
+      kind: "mgr",
+      isYou: mark.mgr(m),
+      name: fullName(m),
+      lines: lines(m),
+      empid: m.empid || "—",
+      image: m.profile_image,
+      hay: [m.department, m.designation],
+      children: [...subs, ...emps],
+    };
+  };
+
+  const adminNode = (a) => {
+    const id = idStr(a._id);
+    const key = `a-${id}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+
+    const coAdmins = admins.filter(
+      (x) => idStr(x.reporting_manager) === id && x.reporting_manager_model === "Admin",
+    );
+    const coAdminParent =
+      a.reporting_manager_model === "Admin"
+        ? admins.find((x) => idStr(x._id) === idStr(a.reporting_manager))
+        : null;
+    const parentCoAdmins = coAdminParent
+      ? admins.filter(
+          (x) =>
+            idStr(x.reporting_manager) === idStr(coAdminParent._id) &&
+            x.reporting_manager_model === "Admin",
+        )
+      : [];
+    const isOnlyCoAdminForParent =
+      parentCoAdmins.length === 1 && idStr(parentCoAdmins[0]._id) === id;
+    const managerAdminId = isOnlyCoAdminForParent ? idStr(coAdminParent._id) : id;
+    const admManagers = managers.filter(
+      (m) => idStr(m.reporting_manager) === managerAdminId && m.reporting_manager_model === "Admin",
+    );
+    const showManagersHere = coAdmins.length === 0 || coAdmins.length > 1;
+
+    return {
+      key,
+      kind: "admin",
+      name: fullName(a),
+      lines: lines(a),
+      empid: a.empid || "—",
+      image: a.profile_image,
+      hay: [a.department, a.designation],
+      children: [
+        ...coAdmins.map(adminNode).filter(Boolean),
+        ...(showManagersHere ? admManagers.map(mgrNode).filter(Boolean) : []),
+      ],
+    };
+  };
+
+  const rootAdmins = admins.filter(
+    (admin) =>
+      admin.reporting_manager_model !== "Admin" ||
+      !admins.some((parent) => idStr(parent._id) === idStr(admin.reporting_manager)),
+  );
+
+  // managers whose parent is missing (same as SuperAdmin "unassigned") still show at top level
+  const orphanManagers = managers.filter((m) => {
+    if (!m.reporting_manager) return true;
+    if (m.reporting_manager_model === "Admin")
+      return !admins.some((a) => idStr(a._id) === idStr(m.reporting_manager));
+    if (m.reporting_manager_model === "Manager")
+      return !managers.some((x) => idStr(x._id) === idStr(m.reporting_manager));
+    return false;
+  });
+
+  const children = rootAdmins.map(adminNode).filter(Boolean);
+  orphanManagers.forEach((m) => {
+    const n = mgrNode(m);
+    if (n) children.push(n);
+  });
 
   return {
     key: "org",
     kind: "org",
     name: data.organisation_name || "Organisation",
-    lines: data.super_admin?.name ? [data.super_admin.name] : [],
+    lines: data.super_admin ? [fullName(data.super_admin) || data.super_admin.name] : [],
     image: data.organisation_logo,
     hay: [data.super_admin?.name],
-    children: admin ? [admin] : managers,
+    children,
   };
 }
 
@@ -171,15 +238,6 @@ function StatCard({
   );
 }
 
-function countNodes(managers) {
-  let n = 0;
-  for (const mgr of managers) {
-    n += 1 + (mgr.employees?.length || 0);
-    if (mgr.subManagers?.length) n += countNodes(mgr.subManagers);
-  }
-  return n;
-}
-
 export default function OrganizationPageManager() {
   const { data, isLoading: loading } = useGetOrgInfoManager();
 
@@ -199,32 +257,36 @@ export default function OrganizationPageManager() {
   const orgName = data?.organisation_name || "My Organisation";
 
   const myInfo = useMemo(() => {
-    if (!data) return null;
-    const walk = (nodes) => {
-      for (const mgr of nodes) {
-        if (mgr.isCurrentManager) return mgr;
-        if (mgr.subManagers?.length) {
-          const found = walk(mgr.subManagers);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    return walk(data.managers || []);
+    const m = (data?.managers || []).find(
+      (x) => idStr(x._id) === idStr(data?.currentManagerId),
+    );
+    return m ? { ...m, name: fullName(m) } : null;
   }, [data]);
 
-  const root = useMemo(() => buildMgrTree(data), [data]);
+  const root = useMemo(
+    () =>
+      data
+        ? buildOrgTree({
+            data,
+            lines: (p) => [p.department ? getDepartmentName(p.department) : "—", p.designation || "—"],
+            mark: {
+              emp: () => false,
+              mgr: (m) => idStr(m._id) === idStr(data.currentManagerId),
+            },
+          })
+        : null,
+    [data],
+  );
   const q = norm(searchQuery);
   const matches = useMemo(() => collectMatches(root, q), [root, q]);
   const matchCount = matches.size;
 
-  const totalNodes = useMemo(() => {
-    if (!data) return 0;
-    let n = 1;
-    if (data.admin) n++;
-    n += countNodes(data.managers || []);
-    return n;
-  }, [data]);
+  const totalNodes = data
+    ? 1 +
+      (data.admins || []).length +
+      (data.managers || []).length +
+      (data.employees || []).length
+    : 0;
 
   useEffect(() => {
     const fn = (e) => {
