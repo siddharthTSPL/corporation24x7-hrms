@@ -1140,13 +1140,14 @@ const getPayslip = async (req, res) => {
   res.status(200).json({ success: true, payslip });
 };
 
-// Self-service endpoint: lets the logged-in Employee/Manager/Admin see and
+// Self-service endpoint: lets the logged-in SuperAdmin/Employee/Manager/Admin see and
 // download their OWN payslips — but only once payroll has actually been
 // marked "paid". This is deliberately plan-independent (no restrictPlanFeature
 // gate on its route) so it works on every plan, including Basic.
-const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin" };
+const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin", superadmin: "SuperAdmin" };
 
 const resolveSelfServiceActor = (req) => {
+  if (req.superAdmin) return { actor: req.superAdmin, employeeModel: SELF_SERVICE_ROLE_MODEL.superadmin, organisation_id: req.superAdmin._id };
   if (req.employee) return { actor: req.employee, employeeModel: SELF_SERVICE_ROLE_MODEL.employee, organisation_id: req.employee.organisation_id };
   if (req.manager) return { actor: req.manager, employeeModel: SELF_SERVICE_ROLE_MODEL.manager, organisation_id: req.manager.organisation_id };
   if (req.admin) return { actor: req.admin, employeeModel: SELF_SERVICE_ROLE_MODEL.admin, organisation_id: req.admin.organisation_id };
@@ -1160,13 +1161,29 @@ const getMyPayslips = async (req, res, next) => {
 
     const { actor, employeeModel, organisation_id } = resolved;
 
-    const payslips = await Payroll.find({
+    const filter = {
       organisation_id,
       employee: actor._id,
       employeeModel,
       status: "paid",
-    })
+    };
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    if (req.query.year && Number.isInteger(year)) filter.year = year;
+    if (req.query.month && Number.isInteger(month) && month >= 1 && month <= 12) filter.month = month;
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const requestedPageSize = Number.parseInt(req.query.pageSize, 10) || 5;
+    const pageSize = [5, 10, 20].includes(requestedPageSize) ? requestedPageSize : 5;
+    const [total, years] = await Promise.all([
+      Payroll.countDocuments(filter),
+      Payroll.distinct("year", { organisation_id, employee: actor._id, employeeModel, status: "paid" }),
+    ]);
+    const totalPages = Math.ceil(total / pageSize);
+    const payslips = await Payroll.find(filter)
       .sort({ year: -1, month: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
       .lean();
 
     if (payslips.length) {
@@ -1184,7 +1201,13 @@ const getMyPayslips = async (req, res, next) => {
       }
     }
 
-    res.status(200).json({ success: true, count: payslips.length, payslips });
+    res.status(200).json({
+      success: true,
+      count: total,
+      payslips,
+      pagination: { page, pageSize, total, totalPages },
+      filters: { years: years.sort((a, b) => b - a) },
+    });
   } catch (err) {
     next(err);
   }
