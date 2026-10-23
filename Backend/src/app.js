@@ -106,6 +106,7 @@ const policyrouter = require('../routes/policy.route');
 const trainingRouter = require('../routes/training.routes');
 const overtimeRouter = require('../routes/overtime.routes');
 const orgTeamRouter = require('../routes/orgteam.routes');
+const reportRouter = require('../reports/report.routes')
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -143,6 +144,7 @@ app.use('/field-operations', fieldOperationsRouter);
 app.use('/single-sign-in', singleSignInRouter);
 app.use('/attendance-settings', attendanceSettingsRouter);
 app.use('/admin/analytics', analyticsrouter);
+app.use('/admin/reports', reportRouter);
 app.use('/superadmin/analytics', analyticsrouter);
 // TorchX Policy — Policy Management (create/publish/report for
 // SuperAdmin+Admin under /policy/manage, viewer+acknowledgement for every
