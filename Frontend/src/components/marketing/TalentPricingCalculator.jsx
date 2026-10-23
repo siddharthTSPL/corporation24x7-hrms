@@ -101,11 +101,11 @@ const FAQS = [
   },
   {
     q: 'How is the "compare with another tool" number calculated?',
-    a: "Pick a tool from the dropdown (or enter a custom quote), confirm the employee count, then press Run Comparison. We line that up against your TorchX estimate for the same headcount.",
+    a: "Pick a tool from the dropdown (or enter a custom quote), confirm the employee count, then press Run Comparison. We line that up against your TorchX estimate for the same headcount. If Yearly billing is selected, the 17% yearly discount is applied to your TorchX estimate.",
   },
   {
     q: "Where do the competitor prices in the dropdown come from?",
-    a: "Where possible (greytHR), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, Zoho People), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
+    a: "Where possible (greytHR), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, Zoho People, Tankhwa Patra), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
   },
 ];
 
@@ -166,6 +166,20 @@ const COMPETITORS = [
       "Indicative from RazorpayX published pricing: roughly ₹100 per user/month. Offers 100% automated direct salary disbursement & tax filings.",
     calculate: (count) => 100 * count,
   },
+  {
+    id: "weekmate",
+    name: "WeekMate HRMS",
+    description:
+      "Based on Capterra's listed pricing: starts at ₹80 per user/month. Confirm the live number with WeekMate directly.",
+    calculate: (count) => 80 * count,
+  },
+  {
+    id: "tankhwa-patra",
+    name: "Tankhwa Patra",
+    description:
+      "Indicative estimate from third-party listings: about ₹885/month for 10 users (≈ ₹88.5 per user/month). Tankhwa Patra doesn't publish exact pricing — confirm with the vendor.",
+    calculate: (count) => Math.round(88.5 * Math.max(count, 10)),
+  },
 ];
 
 const YEARLY_DISCOUNT_PERCENT = 17;
@@ -194,7 +208,8 @@ const pageFontStyles = `
 function ComparePanel({
   plan,
   employees,
-  monthlyTotal,
+  monthlyTotal: listMonthlyTotal,
+  billing,
   competitorId,
   onCompetitorSelect,
   competitorName,
@@ -206,6 +221,12 @@ function ComparePanel({
   onReset,
 }) {
   const [hasRun, setHasRun] = useState(false);
+
+  // When yearly billing is selected, TorchX gets the yearly discount.
+  const monthlyTotal =
+    listMonthlyTotal !== null && billing === "yearly"
+      ? listMonthlyTotal * (1 - YEARLY_DISCOUNT_PERCENT / 100)
+      : listMonthlyTotal;
 
   const competitorMonthly = Number(competitorCost);
 
@@ -405,7 +426,11 @@ function ComparePanel({
 
               <p className="mt-1 font-body text-xs text-white/80">
                 Comparison uses your selected {plan.name} plan and {employees}{" "}
-                TorchX employees.
+                TorchX employees
+                {billing === "yearly"
+                  ? ` (yearly billing, ${YEARLY_DISCOUNT_PERCENT}% off applied)`
+                  : ""}
+                .
               </p>
             </div>
 
@@ -430,6 +455,9 @@ function ComparePanel({
 
                 <p className="font-body text-xs text-[#ead1de]">
                   {plan.name} · {employees} employees · per month
+                  {billing === "yearly"
+                    ? ` · ${YEARLY_DISCOUNT_PERCENT}% yearly off`
+                    : ""}
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-1">
@@ -510,8 +538,16 @@ export default function TalentPricingCalculator() {
         : monthlyPerEmployee
       : null;
 
+  // Monthly figure used for comparisons (17% off when yearly is selected)
+  const comparableMonthly =
+    monthlyTotal === null
+      ? null
+      : billing === "yearly"
+        ? monthlyTotal * (1 - YEARLY_DISCOUNT_PERCENT / 100)
+        : monthlyTotal;
+
   const bestSavings = (() => {
-    if (monthlyTotal === null) return null;
+    if (comparableMonthly === null) return null;
 
     let best = null;
 
@@ -520,7 +556,7 @@ export default function TalentPricingCalculator() {
 
       const competitorMonthly = competitor.calculate(employees);
 
-      const diff = competitorMonthly - monthlyTotal;
+      const diff = competitorMonthly - comparableMonthly;
 
       if (diff > 0 && (!best || diff > best.diff)) {
         best = {
@@ -663,6 +699,7 @@ export default function TalentPricingCalculator() {
           plan={plan}
           employees={employees}
           monthlyTotal={monthlyTotal}
+          billing={billing}
           competitorId={competitorId}
           onCompetitorSelect={selectCompetitor}
           competitorName={competitorName}

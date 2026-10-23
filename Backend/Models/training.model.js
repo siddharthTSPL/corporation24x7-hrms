@@ -24,6 +24,7 @@ const stageSchema = new mongoose.Schema({
 
 const trainingSchema = new mongoose.Schema({
   organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
+  assignment_group_id: { type: String, default: "", index: true },
   title: { type: String, required: true, trim: true, maxlength: 160 },
   details: { type: String, default: "", maxlength: 4000 },
   category: { type: String, default: "General", trim: true, maxlength: 80 },

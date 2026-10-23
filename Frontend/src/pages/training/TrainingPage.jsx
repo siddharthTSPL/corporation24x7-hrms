@@ -472,7 +472,7 @@ export default function TrainingPage({ superAdminView = false }) {
     estimated_hours: "",
     certificate_validity_months: "",
     skills: "",
-    trainee: "",
+    trainees: [],
     trainer: "",
     stages: [
       {
@@ -508,6 +508,8 @@ export default function TrainingPage({ superAdminView = false }) {
   });
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [traineeSearch, setTraineeSearch] = useState("");
+  const [expandedTrainees, setExpandedTrainees] = useState({});
   const [showCreate, setShowCreate] = useState(false);
   const [showCertificateSetup, setShowCertificateSetup] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -529,7 +531,39 @@ export default function TrainingPage({ superAdminView = false }) {
               .catch(() => ({ data: { report: null } }))
           : Promise.resolve({ data: { report: null } }),
       ]);
-      setTrainings(result.data.trainings || []);
+      const records = result.data.trainings || [];
+      if (admin || superAdminView) {
+        const groups = new Map();
+        records.forEach((record) => {
+          const key = record.assignment_group_id || record._id;
+          const group = groups.get(key) || { ...record, grouped_trainings: [], grouped_trainees: [] };
+          group.grouped_trainings.push(record);
+          group.grouped_trainees.push({
+            id: record.trainee?.id,
+            model: record.trainee?.model,
+            name: record.participant_details?.trainee || "Employee",
+            status: record.status,
+          });
+          groups.set(key, group);
+        });
+        setTrainings([...groups.values()].map((group) => {
+          const statuses = group.grouped_trainings.map((record) => record.status);
+          group.status = statuses.includes("pending_approval")
+            ? "pending_approval"
+            : statuses.includes("in_progress")
+              ? "in_progress"
+              : statuses.every((status) => status === "approved")
+                ? "approved"
+                : statuses.includes("rejected") ? "rejected" : "assigned";
+          group.participant_details = {
+            ...group.participant_details,
+            trainee: group.grouped_trainees[0]?.name || "Employee",
+          };
+          return group;
+        }));
+      } else {
+        setTrainings(records);
+      }
       setEmployees(people.data.employees || []);
       setOrganisation(
         result.data.organisation || templateResult.data.organisation || null,
@@ -567,14 +601,14 @@ export default function TrainingPage({ superAdminView = false }) {
 
   const createAssignment = (event) => {
     event.preventDefault();
-    const trainee = employees.find((p) => personKey(p) === form.trainee);
+    const trainees = employees.filter((p) => form.trainees.includes(personKey(p)));
     const trainer = employees.find((p) => personKey(p) === form.trainer);
-    if (!trainee || !trainer) {
-      toast.error("Select an employee for both trainee and trainer roles.");
+    if (!trainees.length || !trainer) {
+      toast.error("Select at least one trainee and an assigned trainer.");
       return;
     }
-    if (trainee.id === trainer.id && trainee.model === trainer.model) {
-      toast.error("Choose two different employees for trainee and trainer.");
+    if (trainees.some((trainee) => trainee.id === trainer.id && trainee.model === trainer.model)) {
+      toast.error("The assigned trainer cannot also be selected as a trainee.");
       return;
     }
     if (form.due_at && new Date(form.due_at).getTime() < Date.now()) {
@@ -582,7 +616,7 @@ export default function TrainingPage({ superAdminView = false }) {
       return;
     }
     run(async () => {
-      await api.post("/training", {
+      const response = await api.post("/training", {
         title: form.title.trim(),
         details: form.details.trim(),
         category: form.category,
@@ -596,9 +630,11 @@ export default function TrainingPage({ superAdminView = false }) {
           .map((skill) => skill.trim())
           .filter(Boolean),
         stages: form.stages,
-        trainee: { id: trainee.id, model: trainee.model },
+        trainees: trainees.map((trainee) => ({ id: trainee.id, model: trainee.model })),
         trainer: { id: trainer.id, model: trainer.model },
       });
+      return response;
+    }, (response) => {
       setForm({
         title: "",
         details: "",
@@ -608,7 +644,7 @@ export default function TrainingPage({ superAdminView = false }) {
         estimated_hours: "",
         certificate_validity_months: "",
         skills: "",
-        trainee: "",
+        trainees: [],
         trainer: "",
         stages: [
           {
@@ -631,8 +667,11 @@ export default function TrainingPage({ superAdminView = false }) {
           },
         ],
       });
+      setTraineeSearch("");
       setShowCreate(false);
-    }, "Training assigned. The trainer and trainee have been notified.");
+      const count = response.data.trainings?.length || 1;
+      return `Training assigned to ${count} ${count === 1 ? "trainee" : "trainees"}. Trainer and trainees have been notified.`;
+    });
   };
 
   const submitEvidence = (training, stage, event) => {
@@ -804,7 +843,7 @@ export default function TrainingPage({ superAdminView = false }) {
         const term = search.trim().toLowerCase();
         const searchMatch =
           !term ||
-          `${training.title} ${training.details} ${training.participant_details?.trainee} ${training.participant_details?.trainer}`
+          `${training.title} ${training.details} ${training.grouped_trainees?.map((person) => person.name).join(" ")} ${training.participant_details?.trainee} ${training.participant_details?.trainer}`
             .toLowerCase()
             .includes(term);
         return statusMatch && searchMatch;
@@ -1254,6 +1293,8 @@ export default function TrainingPage({ superAdminView = false }) {
                   training.stages?.filter((s) => s.completed_at).length || 0;
                 const currentIsTrainee = training.trainee?.id === currentId;
                 const isTrainer = participantCanManage(training);
+                const groupedTrainees = training.grouped_trainees || [];
+                const traineeListExpanded = Boolean(expandedTrainees[training._id]);
                 const pct = Math.round((completedStages / 3) * 100);
                 return (
                   <article
@@ -1332,6 +1373,17 @@ export default function TrainingPage({ superAdminView = false }) {
                             Trainee:
                           </strong>{" "}
                           {training.participant_details?.trainee || "Employee"}
+                          {groupedTrainees.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTrainees({ ...expandedTrainees, [training._id]: !traineeListExpanded })}
+                              className="ml-1 rounded-full bg-[#FAF0F5] px-2 py-0.5 font-bold text-[#8B1A4A] hover:bg-[#F1DCE5]"
+                              aria-expanded={traineeListExpanded}
+                              aria-label={traineeListExpanded ? "Hide assigned trainees" : `Show ${groupedTrainees.length - 1} more trainees`}
+                            >
+                              {traineeListExpanded ? "−" : `+${groupedTrainees.length - 1}`}
+                            </button>
+                          )}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <ParticipantAvatar name={training.participant_details?.trainer} image={training.participant_details?.trainer_image} />
@@ -1349,6 +1401,15 @@ export default function TrainingPage({ superAdminView = false }) {
                           </span>
                         )}
                       </div>
+                      {traineeListExpanded && groupedTrainees.length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-2 rounded-xl border p-3" style={{ borderColor: BRAND.border, background: "#FCFAFB" }}>
+                          {groupedTrainees.map((trainee) => (
+                            <span key={`${trainee.model}:${trainee.id}`} className="rounded-full border bg-white px-2.5 py-1 text-xs" style={{ borderColor: BRAND.border, color: BRAND.text }}>
+                              {trainee.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       <div
                         className="mt-3 flex flex-wrap items-center gap-2 text-xs"
@@ -2124,7 +2185,7 @@ export default function TrainingPage({ superAdminView = false }) {
         {showCreate && (
           <Modal
             title="Create training assignment"
-            subtitle="Build a guided L1–L3 learning path, then assign a trainee and trainer from your organisation."
+            subtitle="Build one guided learning path and assign multiple trainees to the same trainer."
             onClose={() => setShowCreate(false)}
           >
             <form onSubmit={createAssignment} className="space-y-4">
@@ -2235,7 +2296,7 @@ export default function TrainingPage({ superAdminView = false }) {
                     setForm({ ...form, mandatory: e.target.checked })
                   }
                 />
-                Mandatory training for this employee
+                Mandatory training for selected trainees
               </label>
               <div>
                 <h3 className="text-sm font-bold" style={{ color: BRAND.text }}>
@@ -2364,7 +2425,6 @@ export default function TrainingPage({ superAdminView = false }) {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {[
-                  ["trainee", "Employee to train"],
                   ["trainer", "Assigned trainer"],
                 ].map(([key, label]) => (
                   <Field key={key} label={label}>
@@ -2372,7 +2432,13 @@ export default function TrainingPage({ superAdminView = false }) {
                       required
                       value={form[key]}
                       onChange={(e) =>
-                        setForm({ ...form, [key]: e.target.value })
+                        setForm({
+                          ...form,
+                          [key]: e.target.value,
+                          ...(key === "trainer"
+                            ? { trainees: form.trainees.filter((selected) => selected !== e.target.value) }
+                            : {}),
+                        })
                       }
                       className={input}
                     >
@@ -2388,6 +2454,41 @@ export default function TrainingPage({ superAdminView = false }) {
                     </select>
                   </Field>
                 ))}
+                <Field label="Employees to train" hint={`${form.trainees.length} selected`}>
+                  <div className={`${input} max-h-48 space-y-1 overflow-y-auto p-2`}>
+                    <div className="sticky top-0 flex items-center gap-2 rounded-lg border border-[#E8D5DF] bg-white px-2">
+                      <Search size={14} className="shrink-0 text-[#8B7480]" />
+                      <input
+                        type="search"
+                        value={traineeSearch}
+                        onChange={(e) => setTraineeSearch(e.target.value)}
+                        placeholder="Search by name or employee ID"
+                        className="w-full bg-transparent py-2 text-xs outline-none"
+                      />
+                    </div>
+                    {employees.filter((person) => personKey(person) !== form.trainer && `${person.name} ${person.empid} ${person.model}`.toLowerCase().includes(traineeSearch.trim().toLowerCase())).map((person) => {
+                      const key = personKey(person);
+                      return (
+                        <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[#FAF0F5]">
+                          <input
+                            type="checkbox"
+                            checked={form.trainees.includes(key)}
+                            onChange={(e) => setForm({
+                              ...form,
+                              trainees: e.target.checked
+                                ? [...form.trainees, key]
+                                : form.trainees.filter((selected) => selected !== key),
+                            })}
+                          />
+                          <span>{person.name} <span className="text-xs text-gray-400">- {person.empid} - {person.model}</span></span>
+                        </label>
+                      );
+                    })}
+                    {!employees.some((person) => personKey(person) !== form.trainer && `${person.name} ${person.empid} ${person.model}`.toLowerCase().includes(traineeSearch.trim().toLowerCase())) && (
+                      <p className="px-2 py-1.5 text-xs text-gray-400">No employees found.</p>
+                    )}
+                  </div>
+                </Field>
               </div>
               <div
                 className="flex items-start gap-2 rounded-xl p-3 text-xs leading-5"
@@ -2395,9 +2496,9 @@ export default function TrainingPage({ superAdminView = false }) {
               >
                 <UsersRound size={16} className="mt-0.5 shrink-0" />
                 <p>
-                  Trainer is an active employee from this organisation. The
-                  learner submits evidence for each level; the trainer reviews
-                  and passes it or requests another attempt.
+                  Choose one trainer and multiple trainees. Each trainee gets
+                  their own progress record for this training, reviewed by the
+                  same trainer.
                 </p>
               </div>
               <div

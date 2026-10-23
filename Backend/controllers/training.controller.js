@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { randomUUID } = require("crypto");
 const Training = require("../Models/training.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
@@ -80,6 +81,8 @@ exports.list = async (req, res) => {
     ]);
     return { ...t, participant_details: {
       trainee: trainee ? personLabel(trainee) : "Unavailable",
+      trainee_id: t.trainee.id,
+      trainee_model: t.trainee.model,
       trainee_image: trainee?.profile_image || "",
       trainer: trainer ? personLabel(trainer) : "Unavailable",
       trainer_image: trainer?.profile_image || "",
@@ -133,12 +136,23 @@ exports.report = async (req, res) => {
 
 exports.create = async (req, res) => {
   if (!isAdmin(req)) return respondError(res, 403, "Admin access required");
-  const { title, details = "", trainee, trainer } = req.body;
-  if (!String(title || "").trim() || !trainee?.id || !trainer?.id) return respondError(res, 400, "Title, trainee and trainer are required");
-  if (String(trainee.id) === String(trainer.id) && trainee.model === trainer.model) return respondError(res, 400, "Trainee and trainer must be different employees");
+  const { title, details = "", trainer } = req.body;
+  const trainees = [...new Map(
+    (Array.isArray(req.body.trainees) ? req.body.trainees : [req.body.trainee])
+      .filter((person) => person?.id && person?.model)
+      .map((person) => [`${person.model}:${person.id}`, person]),
+  ).values()];
+  if (!String(title || "").trim() || !trainees.length || !trainer?.id || !trainer?.model)
+    return respondError(res, 400, "Title, at least one trainee and a trainer are required");
+  if (trainees.some((trainee) => String(trainee.id) === String(trainer.id) && trainee.model === trainer.model))
+    return respondError(res, 400, "Trainees and trainer must be different employees");
   const organisation_id = orgId(req);
-  const [traineePerson, trainerPerson] = await Promise.all([getPerson(trainee, organisation_id), getPerson(trainer, organisation_id)]);
-  if (!traineePerson || !trainerPerson) return respondError(res, 400, "Choose active trainee and trainer from your organisation");
+  const [traineePeople, trainerPerson] = await Promise.all([
+    Promise.all(trainees.map((trainee) => getPerson(trainee, organisation_id))),
+    getPerson(trainer, organisation_id),
+  ]);
+  if (traineePeople.some((person) => !person) || !trainerPerson)
+    return respondError(res, 400, "Choose active trainees and a trainer from your organisation");
   const stageDetails = Array.isArray(req.body.stages) ? req.body.stages : [];
   if (stageDetails.length && stageDetails.length !== 3) return respondError(res, 400, "Configure all three learning levels, L1 through L3.");
   if (stageDetails.some((stage) => !String(stage.objective || "").trim())) return respondError(res, 400, "Add a learning objective for each level.");
@@ -164,11 +178,24 @@ exports.create = async (req, res) => {
   const certificate_validity_months = Number(req.body.certificate_validity_months) || 0;
   if (estimated_hours < 0 || estimated_hours > 500) return respondError(res, 400, "Estimated duration must be between 0 and 500 hours.");
   if (certificate_validity_months < 0 || certificate_validity_months > 120) return respondError(res, 400, "Certificate validity must be between 0 and 120 months.");
-  const training = await Training.create({ organisation_id, title: title.trim(), details, trainee, trainer,
-    category: String(req.body.category || "General").trim().slice(0, 80), mandatory: req.body.mandatory === true,
+  const category = String(req.body.category || "General").trim().slice(0, 80);
+  const mandatory = req.body.mandatory === true;
+  const assignment_group_id = trainees.length > 1 ? randomUUID() : "";
+  const trainingRecords = await Training.insertMany(trainees.map((trainee) => ({
+    organisation_id, assignment_group_id, title: title.trim(), details, trainee, trainer, category, mandatory,
     due_at, estimated_hours, certificate_validity_months, skills, stages,
-    audit: [{ action: "assigned", ...actorStamp(req), details: { category: String(req.body.category || "General"), due_at, mandatory: req.body.mandatory === true } }] });
-  await notifyPeople(training, "Training assigned", `${training.title} has been assigned to you.`);
+    audit: [{ action: "assigned", ...actorStamp(req), details: { category, due_at, mandatory } }],
+  })));
+  const training = trainingRecords[0];
+  const traineePerson = traineePeople[0];
+  await createBulkNotifications({
+    recipients: [
+      { recipientModel: trainer.model, recipientId: trainer.id },
+      ...trainees.map((trainee) => ({ recipientModel: trainee.model, recipientId: trainee.id })),
+    ],
+    organisation_id, type: "training", title: "Training assigned",
+    message: `${training.title} has been assigned to you.`, link: "/training",
+  });
   const company = await getCompany(organisation_id);
   const commonRows = [["Trainee", personLabel(traineePerson)], ["Trainer", personLabel(trainerPerson)], ["Programme", "Three learning levels: L1, L2 and L3"], ["Due date", dateTime(due_at)], ["Mandatory", req.body.mandatory === true ? "Yes" : "No"]];
   await Promise.all([
@@ -179,7 +206,12 @@ exports.create = async (req, res) => {
     buildTrainingEmail({ companyName: company?.organisation_name, recipientName: personLabel(person), heading: "A training programme has been assigned", intro, training,
       rows: [["Your role", role], ...commonRows], action: "Your assigned training and future session updates are available in the Training section of your HRMS." }),
   )));
-  res.status(201).json({ success: true, training });
+  await Promise.all(traineePeople.slice(1).map((person, index) => sendBestEffortEmail(person.work_email,
+    `${training.title} Â· Training assignment Â· ${company?.organisation_name || "Your organisation"}`,
+    buildTrainingEmail({ companyName: company?.organisation_name, recipientName: personLabel(person), heading: "A training programme has been assigned", intro: "You have been enrolled in this learning programme.", training: trainingRecords[index + 1],
+      rows: [["Your role", "Trainee"], ["Trainer", personLabel(trainerPerson)], ["Programme", "Three learning levels: L1, L2 and L3"], ["Due date", dateTime(due_at)], ["Mandatory", mandatory ? "Yes" : "No"]], action: "Your assigned training and future session updates are available in the Training section of your HRMS." }),
+  )));
+  res.status(201).json({ success: true, training, trainings: trainingRecords });
 };
 
 exports.updateDetails = async (req, res) => {
