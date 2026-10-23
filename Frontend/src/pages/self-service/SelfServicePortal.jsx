@@ -8,13 +8,13 @@ import {
 import {
   FaCalendarAlt, FaFileInvoiceDollar, FaFolder, FaTicketAlt,
   FaClock, FaPlus, FaArrowRight, FaCheckCircle, FaPercentage,
-  FaChartLine, FaDownload, FaLaptop, FaTimes, FaChevronRight,
+  FaChartLine, FaDownload, FaEye, FaLaptop, FaTimes, FaChevronRight,
 } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
 import { useMyPayslips } from "../../auth/server-state/payroll/payroll.hook";
-import { downloadPayslip, MONTH_NAMES } from "../utils/Payslip";
+import { downloadPayslip, getPayslipLineItems, MONTH_NAMES } from "../utils/Payslip";
 
 const BRAND = "#730042";
 const PALETTE = ["#730042", "#CD166E", "#F5A623", "#2FB4A0", "#4A6FDC", "#9B59B6", "#EB5757", "#27AE60"];
@@ -189,9 +189,15 @@ function AssetDetailModal({ asset, isOrgScope, onClose }) {
 
 // "My Payslip" — available on every plan, including Basic. Shows once
 // payroll has been marked "paid"; nothing to show before that.
-function MyPayslipsCard({ enabled }) {
-  const { data, isLoading, isError } = useMyPayslips(enabled);
+function MyPayslipsCard({ enabled, role }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [year, setYear] = useState("");
+  const [month, setMonth] = useState("");
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
+  const { data, isLoading, isError } = useMyPayslips({ enabled, role, page, pageSize, year, month });
   const payslips = data?.payslips || [];
+  const pagination = data?.pagination || {};
 
   const handleDownload = (payroll) => {
     const snap = payroll.employeeSnapshot || {};
@@ -207,32 +213,118 @@ function MyPayslipsCard({ enabled }) {
     });
   };
 
+  const renderLineItems = (title, items, totalLabel, total) => (
+    <div className="mb-4">
+      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h3>
+      <div className="overflow-hidden rounded-lg border border-gray-100">
+        {items.map((item, index) => (
+          <div key={`${item.label}-${index}`} className="flex justify-between gap-3 border-b border-gray-100 px-3 py-2 text-sm last:border-0">
+            <span className="text-gray-600">{item.label}</span>
+            <span className="font-medium text-gray-700">{fmtCurrency(item.amount)}</span>
+          </div>
+        ))}
+        <div className="flex justify-between gap-3 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">
+          <span>{totalLabel}</span><span>{fmtCurrency(total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <SectionCard title="My Payslip">
       {isLoading ? (
         <p className="text-xs text-gray-400 py-6 text-center">Loading your payslips…</p>
       ) : isError ? (
         <p className="text-xs text-gray-400 py-6 text-center">Couldn't load your payslips right now.</p>
-      ) : payslips.length === 0 ? (
-        <EmptyState text="No paid payslip yet. Once payroll marks a month as Paid, it will appear here for download." />
       ) : (
-        <div className="space-y-2">
-          {payslips.slice(0, 6).map((p) => (
-            <div key={p._id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
+        <>
+        <div className="flex flex-wrap items-end gap-3 mb-3 rounded-xl border border-[#730042]/10 bg-gradient-to-r from-[#730042]/[0.04] to-[#CD166E]/[0.03] p-3">
+          <label className="text-xs font-medium text-gray-600">Year
+            <select value={year} onChange={(e) => { setYear(e.target.value); setPage(1); }} className="block mt-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-700 outline-none focus:border-[#730042]/40 focus:ring-2 focus:ring-[#730042]/10">
+              <option value="">All years</option>
+              {(data?.filters?.years || []).map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-gray-600">Month
+            <select value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} className="block mt-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-700 outline-none focus:border-[#730042]/40 focus:ring-2 focus:ring-[#730042]/10">
+              <option value="">All months</option>
+              {MONTH_NAMES.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-gray-600">Rows
+            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} className="block mt-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-gray-700 outline-none focus:border-[#730042]/40 focus:ring-2 focus:ring-[#730042]/10">
+              {[5, 10, 20].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+        </div>
+        {payslips.length === 0 ? (
+          <EmptyState text={year || month ? "No paid payslips match these filters." : "No paid payslip yet. Once payroll marks a month as Paid, it will appear here for download."} />
+        ) : <div className="space-y-2">
+          {payslips.map((p) => (
+            <div key={p._id} className="group flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2.5 transition-colors hover:border-[#730042]/20 hover:bg-[#730042]/[0.02]">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-700">{MONTH_NAMES[p.month - 1]} {p.year}</p>
-                <p className="text-[11px] text-gray-400">Net Pay: {fmtCurrency(p.netSalary)}</p>
+                <p className="text-sm font-semibold text-gray-700">{MONTH_NAMES[p.month - 1]} {p.year}</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">Net Pay <span className="font-semibold text-[#730042]">{fmtCurrency(p.netSalary)}</span></p>
               </div>
-              <button
-                onClick={() => handleDownload(p)}
-                className="flex items-center gap-1.5 text-xs font-medium text-[#730042] hover:text-[#CD166E] flex-shrink-0"
-              >
-                <FaDownload size={11} /> Download
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button type="button" onClick={() => setSelectedPayslip(p)} className="flex items-center gap-1.5 rounded-lg border border-[#730042]/15 px-2.5 py-1.5 text-xs font-semibold text-[#730042] transition-colors hover:bg-[#730042]/[0.06]">
+                  <FaEye size={11} /> View
+                </button>
+                <button
+                  onClick={() => handleDownload(p)}
+                  className="flex items-center gap-1.5 rounded-lg bg-[#730042]/[0.06] px-2.5 py-1.5 text-xs font-semibold text-[#730042] transition-colors hover:bg-[#730042]/10"
+                >
+                  <FaDownload size={11} /> Download
+                </button>
+              </div>
             </div>
           ))}
+        </div>}
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-xs text-gray-500">
+          <span>{pagination.total ? `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, pagination.total)} of ${pagination.total}` : "No payslips match these filters"}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 transition-colors hover:border-[#730042]/30 hover:text-[#730042] disabled:opacity-40">Previous</button>
+            <span className="rounded-lg bg-[#730042]/[0.06] px-2.5 py-1.5 font-medium text-[#730042]">Page {pagination.totalPages ? Math.min(page, pagination.totalPages) : 0} of {pagination.totalPages || 0}</span>
+            <button type="button" disabled={page >= (pagination.totalPages || 0)} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 transition-colors hover:border-[#730042]/30 hover:text-[#730042] disabled:opacity-40">Next</button>
+          </div>
         </div>
+        </>
       )}
+      {selectedPayslip && (() => {
+        const snapshot = selectedPayslip.employeeSnapshot || {};
+        const { earnings, deductions } = getPayslipLineItems(selectedPayslip);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSelectedPayslip(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Payslip details" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
+                <div>
+                  <p className="text-base font-bold text-gray-800">Payslip</p>
+                  <p className="text-xs text-gray-500">{MONTH_NAMES[selectedPayslip.month - 1]} {selectedPayslip.year}</p>
+                </div>
+                <button type="button" onClick={() => setSelectedPayslip(null)} aria-label="Close payslip" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><FaTimes /></button>
+              </div>
+              <div className="p-5">
+                <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl bg-[#730042]/[0.04] p-4 text-sm sm:grid-cols-2">
+                  <p><span className="text-gray-500">Employee:</span> <span className="font-medium text-gray-800">{snapshot.name || "—"}</span></p>
+                  <p><span className="text-gray-500">Employee ID:</span> <span className="font-medium text-gray-800">{snapshot.employeeId || "—"}</span></p>
+                  <p><span className="text-gray-500">Department:</span> <span className="font-medium text-gray-800">{snapshot.department || "—"}</span></p>
+                  <p><span className="text-gray-500">Designation:</span> <span className="font-medium text-gray-800">{snapshot.designation || "—"}</span></p>
+                  <p><span className="text-gray-500">Paid days:</span> <span className="font-medium text-gray-800">{selectedPayslip.attendance?.paidDays ?? "—"} / {selectedPayslip.attendance?.workingDays ?? "—"}</span></p>
+                  <p><span className="text-gray-500">LOP days:</span> <span className="font-medium text-gray-800">{selectedPayslip.attendance?.lopDays ?? "—"}</span></p>
+                </div>
+                {renderLineItems("Earnings", earnings, "Gross earnings", selectedPayslip.earnings?.totalEarnings)}
+                {renderLineItems("Deductions", deductions, "Total deductions", selectedPayslip.deductions?.totalDeductions)}
+                <div className="flex items-center justify-between rounded-xl bg-[#730042] px-4 py-3 text-white">
+                  <span className="text-sm font-bold">Net Pay</span><span className="text-lg font-bold">{fmtCurrency(selectedPayslip.netSalary)}</span>
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={() => handleDownload(selectedPayslip)} className="flex items-center gap-2 rounded-lg bg-[#730042]/[0.06] px-3 py-2 text-sm font-semibold text-[#730042] hover:bg-[#730042]/10"><FaDownload size={12} /> Download</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </SectionCard>
   );
 }
@@ -339,7 +431,7 @@ export default function SelfServicePortal() {
         </div>
       )}
 
-      {!isOrgScope && can("payroll.can_view_own_payslips") && <MyPayslipsCard enabled={!isOrgScope} />}
+      {(role === "superadmin" || role === "super_admin" || (!isOrgScope && can("payroll.can_view_own_payslips"))) && <MyPayslipsCard enabled role={role} />}
 
       <SectionHeading>Overview</SectionHeading>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

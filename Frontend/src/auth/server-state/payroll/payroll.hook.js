@@ -232,10 +232,11 @@ export const useGetPayslip = (params, enabled) => {
 
 // Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
 // Available on every plan (Basic included).
-export const useMyPayslips = (enabled = true) => {
+export const useMyPayslips = ({ enabled = true, role, page = 1, pageSize = 5, year, month } = {}) => {
+  const params = { page, pageSize, ...(year ? { year } : {}), ...(month ? { month } : {}) };
   return useQuery({
-    queryKey: ["my-payslips"],
-    queryFn: () => getMyPayslips(),
+    queryKey: ["my-payslips", role, params],
+    queryFn: () => getMyPayslips(params, role),
     enabled,
     staleTime: 0,
   });
