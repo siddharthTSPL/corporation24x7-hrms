@@ -241,6 +241,21 @@ const superAdminSchema = new mongoose.Schema(
     },
 
 
+    // External SSO ("Sign in with Microsoft / Zoho"). Separate from
+    // singleSignIn above, which is the one-active-device rule. Microsoft is
+    // bound to the org's Entra tenant ID so another tenant can't claim an
+    // employee's email address.
+    externalSso: {
+      microsoft: {
+        enabled: { type: Boolean, default: false },
+        tenantId: { type: String, default: "", trim: true, lowercase: true },
+      },
+      zoho: {
+        enabled: { type: Boolean, default: false },
+      },
+    },
+
+
     attendanceSettings: {
       autoCheckoutEnabled: { type: Boolean, default: true },
       // Late check-in rule (off by default so existing orgs are unaffected).

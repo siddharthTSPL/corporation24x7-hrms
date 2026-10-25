@@ -777,4 +777,9 @@ module.exports = {
   dismissBirthdayWish,
   generateCompanionLink,
   redeemCompanionLink,
+  // used by the external SSO (Microsoft / Zoho) controller
+  buildLoginToken,
+  findAccountByEmail,
+  cookieOpts,
+  handleLoginGeoCheck,
 };

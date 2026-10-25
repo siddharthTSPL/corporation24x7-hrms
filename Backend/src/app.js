@@ -101,6 +101,7 @@ const planFeatureRouter = require('../routes/planFeature.route');
 const selfServiceRouter = require('../routes/selfService.route');
 const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const singleSignInRouter = require('../routes/SingleSignIn.routes');
+const ssoRouter = require('../routes/Sso.routes');
 const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
 const policyrouter = require('../routes/policy.route');
 const trainingRouter = require('../routes/training.routes');
@@ -109,6 +110,7 @@ const orgTeamRouter = require('../routes/orgteam.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
+app.use('/auth/sso', ssoRouter);
 app.use('/admin', adminrouter);
 app.use('/manager', managerrouter);
 app.use('/user', userrouter);
