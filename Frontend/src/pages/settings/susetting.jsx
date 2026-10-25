@@ -30,6 +30,7 @@ import {
   Search,
 } from "lucide-react";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
+import ExternalSsoSettingsCard from "./ExternalSsoSettingsCard";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -2151,10 +2152,16 @@ export default function SuperAdminSettingsPage() {
             />
           )}
           {tab === "security" && (
-            <SingleSignInSecurityTab
-              onSuccess={showSuccess}
-              onError={showError}
-            />
+            <>
+              <SingleSignInSecurityTab
+                onSuccess={showSuccess}
+                onError={showError}
+              />
+              <ExternalSsoSettingsCard
+                onSuccess={showSuccess}
+                onError={showError}
+              />
+            </>
           )}
           {tab === "avatar" && (
             <AvatarTab

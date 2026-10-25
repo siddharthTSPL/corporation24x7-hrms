@@ -13,6 +13,7 @@ const BlogPage = lazy(() => import("./pages/BlogPage"));
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
+const SsoCallback = lazy(() => import("./pages/auth/Ssocallback"));
 const TalentPricingCalculator = lazy(() => import("./components/marketing/TalentPricingCalculator"));
 const FieldOperations = lazy(() => import("./pages/field-operations/FieldOperations"));
 
@@ -206,6 +207,7 @@ function App() {
               land here; it creates one on THIS browser via the link's
               short-lived token. */}
           <Route path="/companion-login" element={<CompanionLogin />} />
+          <Route path="/sso-callback" element={<SsoCallback />} />
           <Route path="/offer-response/:token" element={<OfferResponse />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.

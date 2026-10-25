@@ -10,6 +10,8 @@ import {
   useUnifiedVerifyForgotPasswordOtp,
   useUnifiedResetPassword,
 } from "../../auth/store/unifiedauth/Unifiedauth.hook";
+import { useSsoProviders } from "../../auth/server-state/sso/sso.hook";
+import { ssoStartUrl } from "../../auth/api/sso/sso.api";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
@@ -50,6 +52,7 @@ function Login() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
+  const { data: ssoProviders } = useSsoProviders();
 
   const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
   const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
@@ -88,6 +91,34 @@ function Login() {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handed over from /sso-callback when another device is already signed in
+  // (single-device approval mode): show the same "waiting for approval" step.
+  useEffect(() => {
+    const challenge = location.state?.ssoChallenge;
+    if (!challenge) return;
+    setApprovalChallenge(challenge);
+    setStep("waiting-approval");
+    navigate(location.pathname, { replace: true, state: {} });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Automatic sign-in: if this browser signed in with Microsoft/Zoho before
+  // (and the person hasn't logged out since), try the provider silently. If
+  // they're still signed in there they land in HRMS with no click; if not,
+  // the provider sends them back here (?sso=none) and the normal form shows.
+  // Tried once per tab session so it can never loop.
+  useEffect(() => {
+    if (authLoading || authData || !ssoProviders?.providers?.length) return;
+    if (location.state?.ssoChallenge || location.state?.notice) return;
+    if (new URLSearchParams(location.search).get("sso") === "none") return;
+    const last = localStorage.getItem("sso_last_provider");
+    if (!last || localStorage.getItem("sso_auto_off") === "1") return;
+    if (sessionStorage.getItem("sso_auto_tried") === "1") return;
+    if (!ssoProviders.providers.some((p) => p.key === last)) return;
+    sessionStorage.setItem("sso_auto_tried", "1");
+    setShowLoader(true);
+    window.location.href = ssoStartUrl(last, { silent: true });
+  }, [authLoading, authData, ssoProviders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}loader.json`)
@@ -394,6 +425,31 @@ function Login() {
                   <span className="text-xs text-gray-400 font-medium">OR</span>
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>
+
+                {ssoProviders?.providers?.length > 0 && (
+                  <div className="flex gap-2 mb-3">
+                    {ssoProviders.providers.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => (window.location.href = ssoStartUrl(p.key))}
+                        className="flex-1 flex items-center justify-center gap-2 border border-gray-300 rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        {p.key === "microsoft" ? (
+                          <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+                            <rect width="10" height="10" fill="#f25022" />
+                            <rect x="11" width="10" height="10" fill="#7fba00" />
+                            <rect y="11" width="10" height="10" fill="#00a4ef" />
+                            <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+                          </svg>
+                        ) : (
+                          <span className="w-4 h-4 rounded-sm bg-[#e42527] text-white text-[10px] font-bold flex items-center justify-center">Z</span>
+                        )}
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <button
                   type="button"
