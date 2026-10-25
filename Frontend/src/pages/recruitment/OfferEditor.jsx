@@ -23,13 +23,57 @@ const Field = ({ label, children, className = "" }) => (
   </div>
 );
 
-const OVERRIDE_KEYS = [
-  { key: "basic", label: "Basic (annual)" },
-  { key: "hra", label: "HRA (annual)" },
-  { key: "conveyance", label: "Conveyance (annual)" },
-  { key: "lta", label: "LTA (annual)" },
-  { key: "variable", label: "Variable pay (annual)" },
+const TYPE_OPTIONS = [
+  { value: "earning", label: "Earning" },
+  { value: "variable", label: "Variable pay" },
+  { value: "employer", label: "Employer contribution" },
+  { value: "deduction", label: "Deduction" },
 ];
+
+const METHOD_OPTIONS = [
+  { value: "FIXED_ANNUAL", label: "Fixed yearly amount" },
+  { value: "FIXED_MONTHLY", label: "Fixed monthly amount" },
+  { value: "PERCENT_OF_CTC", label: "% of CTC" },
+  { value: "PERCENT_OF_COMPONENT", label: "% of another component" },
+  { value: "BALANCE", label: "Balance (auto)" },
+];
+
+const FALLBACK_CONFIG = [
+  { key: "basic", label: "Basic Salary", type: "earning", method: "PERCENT_OF_CTC", value: 40, ref_key: null, enabled: true },
+  { key: "hra", label: "House Rent Allowance (HRA)", type: "earning", method: "PERCENT_OF_COMPONENT", value: 50, ref_key: "basic", enabled: true },
+  { key: "conveyance", label: "Conveyance Allowance", type: "earning", method: "FIXED_MONTHLY", value: 1600, ref_key: null, enabled: true },
+  { key: "special_allowance", label: "Special Allowance", type: "earning", method: "BALANCE", value: 0, ref_key: null, enabled: true },
+];
+
+const configFromLetter = (letter) => {
+  if (letter.ctc?.source === "COMPANY_CONFIG" && Array.isArray(letter.ctc.config) && letter.ctc.config.length) {
+    return letter.ctc.config.map((c) => ({ ...c }));
+  }
+  const comps = (letter.ctc?.components || []).filter((c) => c.key !== "gratuity");
+  if (!comps.length) return FALLBACK_CONFIG.map((c) => ({ ...c }));
+  const rows = comps.map((c) => ({
+    key: c.key,
+    label: c.label,
+    type: c.type,
+    method: c.key === "special_allowance" ? "BALANCE" : "FIXED_ANNUAL",
+    value: c.key === "special_allowance" ? 0 : c.annual,
+    ref_key: null,
+    enabled: true,
+  }));
+  if (!rows.some((r) => r.method === "BALANCE")) rows.push({ key: "special_allowance", label: "Special Allowance", type: "earning", method: "BALANCE", value: 0, ref_key: null, enabled: true });
+  return rows;
+};
+
+const cleanConfig = (list) =>
+  (list || []).map((c) => ({
+    key: c.key,
+    label: String(c.label || "").trim(),
+    type: c.type,
+    method: c.method,
+    value: c.method === "BALANCE" ? 0 : c.value === "" || c.value === null || c.value === undefined ? "" : Number(c.value),
+    ref_key: c.method === "PERCENT_OF_COMPONENT" ? c.ref_key || null : null,
+    enabled: c.enabled !== false,
+  }));
 
 const initForm = (letter, kind) => ({
   designation: letter.designation || "",
@@ -48,13 +92,8 @@ const initForm = (letter, kind) => ({
   accent_color: letter.accent_color || "",
   sections: (letter.sections || []).map((s) => ({ ...s })),
   annual_ctc: kind === "OFFER" ? letter.ctc?.annual_ctc || "" : "",
-  ctc_options: kind === "OFFER" ? { ...(letter.ctc?.options || {}) } : {},
-  ctc_overrides: kind === "OFFER" ? { ...(letter.ctc_overrides || {}) } : {},
-  refresh_salary_config: false,
+  ctc_config: kind === "OFFER" ? configFromLetter(letter) : [],
 });
-
-const cleanOverrides = (o) =>
-  Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== "" && v !== null && v !== undefined && !Number.isNaN(Number(v))).map(([k, v]) => [k, Number(v)]));
 
 const buildPayload = (form, kind) => {
   const payload = {
@@ -76,9 +115,7 @@ const buildPayload = (form, kind) => {
   if (kind === "OFFER") {
     payload.valid_till = form.valid_till || undefined;
     payload.annual_ctc = Number(form.annual_ctc);
-    payload.ctc_options = form.ctc_options;
-    payload.ctc_overrides = cleanOverrides(form.ctc_overrides);
-    payload.refresh_salary_config = form.refresh_salary_config === true;
+    payload.ctc_config = cleanConfig(form.ctc_config);
   }
   return payload;
 };
@@ -97,7 +134,7 @@ const CtcPreview = ({ form, config }) => {
     }
     timer.current = setTimeout(() => {
       previewMut.mutate(
-        { annual_ctc: Number(form.annual_ctc), options: form.ctc_options, overrides: cleanOverrides(form.ctc_overrides), config: config || undefined },
+        { annual_ctc: Number(form.annual_ctc), config: cleanConfig(config) },
         {
           onSuccess: (res) => {
             setResult(res.data);
@@ -111,7 +148,7 @@ const CtcPreview = ({ form, config }) => {
       );
     }, 450);
     return () => clearTimeout(timer.current);
-  }, [form.annual_ctc, form.ctc_options, form.ctc_overrides, config]);
+  }, [form.annual_ctc, config]);
 
   if (err) return <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{err}</div>;
   if (!result) return <div className="text-xs text-gray-400">Enter annual CTC to see the break-up.</div>;
@@ -245,15 +282,31 @@ const OfferEditor = ({ kind = "OFFER", letter, meta, issues: initialIssues, onCl
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const setNested = (group, key) => (e) => setForm((f) => ({ ...f, [group]: { ...f[group], [key]: e.target.value } }));
-  const setOption = (key, value) => setForm((f) => ({ ...f, ctc_options: { ...f.ctc_options, [key]: value } }));
-  const setOverride = (key, value) => setForm((f) => ({ ...f, ctc_overrides: { ...f.ctc_overrides, [key]: value } }));
-
-  const orgConfig = meta?.salary_config;
-  const letterConfig = letter.ctc?.source === "COMPANY_CONFIG" ? letter.ctc.config : null;
-  const usingConfig = isOffer && (form.refresh_salary_config ? !!orgConfig?.is_custom : !!letterConfig);
-  const activeConfig = usingConfig ? (form.refresh_salary_config ? orgConfig.components : letterConfig) : null;
-  const configOutdated = isOffer && !!orgConfig?.is_custom && !form.refresh_salary_config && JSON.stringify(letterConfig || null) !== JSON.stringify(orgConfig.components || null);
-  const configOverrideFields = (activeConfig || []).filter((c) => c.enabled !== false && c.method !== "BALANCE");
+  const patchComponent = (i, patch) =>
+    setForm((f) => ({
+      ...f,
+      ctc_config: f.ctc_config.map((c, idx) => {
+        if (idx !== i) return patch.method === "BALANCE" ? { ...c, method: c.method === "BALANCE" ? "FIXED_ANNUAL" : c.method } : c;
+        const next = { ...c, ...patch };
+        if (patch.method !== undefined) {
+          next.ref_key = patch.method === "PERCENT_OF_COMPONENT" ? c.ref_key || null : null;
+          if (patch.method === "BALANCE") next.value = 0;
+        }
+        if (patch.type !== undefined && patch.type !== "earning" && next.method === "BALANCE") next.method = "FIXED_ANNUAL";
+        return next;
+      }),
+    }));
+  const addComponent = () =>
+    setForm((f) => ({
+      ...f,
+      ctc_config: [...f.ctc_config, { key: `custom_${Date.now().toString(36)}`, label: "", type: "earning", method: "FIXED_MONTHLY", value: 0, ref_key: null, enabled: true }],
+    }));
+  const removeComponent = (i) => setForm((f) => ({ ...f, ctc_config: f.ctc_config.filter((_, idx) => idx !== i) }));
+  const loadCompanyConfig = () => {
+    const comps = meta?.salary_config?.components;
+    if (!comps?.length) return toast.error("No company salary structure found");
+    setForm((f) => ({ ...f, ctc_config: comps.map((c) => ({ ...c })) }));
+  };
 
   const tabs = [
     { key: "details", label: "Details" },
@@ -392,78 +445,56 @@ const OfferEditor = ({ kind = "OFFER", letter, meta, issues: initialIssues, onCl
 
           {tab === "ctc" && isOffer && (
             <div className="space-y-5">
-              {configOutdated && (
-                <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                  <p className="text-xs text-amber-800">{letterConfig ? "Your company salary structure has changed since this offer was prepared." : "Your company has a custom salary structure. This offer still uses the default break-up."}</p>
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, refresh_salary_config: true, ctc_overrides: {} }))} className="text-xs font-semibold text-[#730042] border border-[#eedde8] bg-white px-3 py-1.5 rounded-lg hover:bg-[#730042] hover:text-white transition-colors">Apply company salary structure</button>
-                </div>
-              )}
-              {usingConfig ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Field label="Annual CTC (INR)"><input type="number" min="0" className={inputCls} value={form.annual_ctc} onChange={set("annual_ctc")} /></Field>
-                  </div>
-                  <details className="border border-gray-100 rounded-xl px-4 py-3">
-                    <summary className="text-xs font-bold text-gray-600 cursor-pointer">Manual overrides (optional)</summary>
-                    <p className="text-[11px] text-gray-400 mt-2 mb-3">Leave blank to follow your company salary structure. The balancing component adjusts so the total always matches the CTC.</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {configOverrideFields.map((c) => (
-                        <Field key={c.key} label={`${c.label} (annual)`}>
-                          <input type="number" min="0" className={inputCls} value={form.ctc_overrides[c.key] ?? ""} onChange={(e) => setOverride(c.key, e.target.value)} />
-                        </Field>
-                      ))}
-                    </div>
-                  </details>
-                </>
-              ) : (
-                <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Annual CTC (INR)"><input type="number" min="0" className={inputCls} value={form.annual_ctc} onChange={set("annual_ctc")} /></Field>
-                <Field label="Basic (% of CTC)"><input type="number" min="0" max="100" className={inputCls} value={form.ctc_options.basic_percent ?? ""} onChange={(e) => setOption("basic_percent", e.target.value)} /></Field>
-                <Field label="HRA (% of Basic)"><input type="number" min="0" max="100" className={inputCls} value={form.ctc_options.hra_percent_of_basic ?? ""} onChange={(e) => setOption("hra_percent_of_basic", e.target.value)} /></Field>
-                <Field label="Variable pay (% of CTC)"><input type="number" min="0" max="60" className={inputCls} value={form.ctc_options.variable_percent_of_ctc ?? ""} onChange={(e) => setOption("variable_percent_of_ctc", e.target.value)} /></Field>
-                <Field label="PF calculation">
-                  <select className={inputCls} value={form.ctc_options.pf_mode || "CAPPED"} onChange={(e) => setOption("pf_mode", e.target.value)}>
-                    <option value="CAPPED">Capped at wage ceiling</option>
-                    <option value="ACTUAL">On actual Basic</option>
-                    <option value="NONE">No PF</option>
-                  </select>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <Field label="Annual CTC (INR)" className="w-full sm:w-64">
+                  <input type="number" min="0" className={inputCls} value={form.annual_ctc} onChange={set("annual_ctc")} />
                 </Field>
-                <Field label="Professional tax (monthly)"><input type="number" min="0" className={inputCls} value={form.ctc_options.professional_tax_monthly ?? ""} onChange={(e) => setOption("professional_tax_monthly", e.target.value)} /></Field>
+                <button type="button" onClick={loadCompanyConfig} className="text-xs font-semibold text-[#730042] border border-[#eedde8] bg-white px-3 py-2 rounded-lg hover:bg-[#730042] hover:text-white transition-colors">Load company salary structure</button>
               </div>
 
-              <div className="flex flex-wrap gap-5">
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={form.ctc_options.include_gratuity !== false} onChange={(e) => setOption("include_gratuity", e.target.checked)} />
-                  Include gratuity
-                </label>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={form.ctc_options.include_insurance !== false} onChange={(e) => setOption("include_insurance", e.target.checked)} />
-                  Include group medical insurance
-                </label>
-                {form.ctc_options.include_insurance !== false && (
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    Premium (annual)
-                    <input type="number" min="0" className="w-28 px-2 py-1.5 bg-[#fdf5f9] border border-[#eedde8] rounded-lg text-sm outline-none focus:border-[#730042]" value={form.ctc_options.insurance_annual ?? ""} onChange={(e) => setOption("insurance_annual", e.target.value)} />
-                  </div>
-                )}
-              </div>
-
-              <details className="border border-gray-100 rounded-xl px-4 py-3">
-                <summary className="text-xs font-bold text-gray-600 cursor-pointer">Manual overrides (optional)</summary>
-                <p className="text-[11px] text-gray-400 mt-2 mb-3">Leave blank to calculate automatically. Special Allowance always balances the total to your CTC.</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {OVERRIDE_KEYS.map(({ key, label }) => (
-                    <Field key={key} label={label}>
-                      <input type="number" min="0" className={inputCls} value={form.ctc_overrides[key] ?? ""} onChange={(e) => setOverride(key, e.target.value)} />
-                    </Field>
-                  ))}
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <div className="hidden md:grid grid-cols-[28px_1.4fr_1fr_1.2fr_1fr_1fr_28px] gap-2 bg-[#fdf5f9] px-3 py-2 text-[10px] font-bold text-[#730042] uppercase tracking-wide">
+                  <span />
+                  <span>Component</span>
+                  <span>Type</span>
+                  <span>Calculation</span>
+                  <span>Value</span>
+                  <span>Based on</span>
+                  <span />
                 </div>
-              </details>
-                </>
-              )}
+                {form.ctc_config.map((c, i) => (
+                  <div key={c.key} className={`grid grid-cols-2 md:grid-cols-[28px_1.4fr_1fr_1.2fr_1fr_1fr_28px] gap-2 items-center px-3 py-2 border-t border-gray-50 ${c.enabled === false ? "opacity-50" : ""}`}>
+                    <input type="checkbox" className="w-4 h-4 accent-[#730042]" checked={c.enabled !== false} onChange={(e) => patchComponent(i, { enabled: e.target.checked })} />
+                    <input className={inputCls} placeholder="Component name" value={c.label} onChange={(e) => patchComponent(i, { label: e.target.value })} />
+                    <select className={inputCls} value={c.type} onChange={(e) => patchComponent(i, { type: e.target.value })}>
+                      {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    <select className={inputCls} value={c.method} onChange={(e) => patchComponent(i, { method: e.target.value })}>
+                      {METHOD_OPTIONS.filter((o) => o.value !== "BALANCE" || c.type === "earning").map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    {c.method === "BALANCE" ? (
+                      <div className="text-xs text-gray-400 px-1">Auto</div>
+                    ) : (
+                      <input type="number" min="0" className={inputCls} value={c.value ?? ""} onChange={(e) => patchComponent(i, { value: e.target.value })} />
+                    )}
+                    {c.method === "PERCENT_OF_COMPONENT" ? (
+                      <select className={inputCls} value={c.ref_key || ""} onChange={(e) => patchComponent(i, { ref_key: e.target.value })}>
+                        <option value="">Select</option>
+                        {form.ctc_config.filter((r) => r.key !== c.key && r.type !== "deduction" && r.method !== "BALANCE").map((r) => <option key={r.key} value={r.key}>{r.label || r.key}</option>)}
+                      </select>
+                    ) : (
+                      <div className="text-xs text-gray-400 px-1">-</div>
+                    )}
+                    <button type="button" onClick={() => removeComponent(i)} className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg transition-colors justify-self-end"><FaTrash size={11} /></button>
+                  </div>
+                ))}
+                <div className="px-3 py-2 border-t border-gray-100">
+                  <button type="button" onClick={addComponent} className="flex items-center gap-1.5 text-xs font-semibold text-[#730042] hover:underline"><FaPlus size={10} /> Add component</button>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">Exactly one earning must be set to Balance (for example Special Allowance) so the total always matches the CTC. Uncheck a component to leave it out of this offer.</p>
 
-              <CtcPreview form={form} config={activeConfig} />
+              <CtcPreview form={form} config={form.ctc_config} />
             </div>
           )}
 

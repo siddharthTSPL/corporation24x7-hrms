@@ -21,7 +21,6 @@ const DEFAULT_COMPONENTS = [
   { key: "hra", label: "House Rent Allowance (HRA)", type: "earning", method: "PERCENT_OF_COMPONENT", value: 50, ref_key: "basic", enabled: true },
   { key: "conveyance", label: "Conveyance Allowance", type: "earning", method: "FIXED_MONTHLY", value: 1600, ref_key: null, enabled: true },
   { key: "special_allowance", label: "Special Allowance", type: "earning", method: "BALANCE", value: 0, ref_key: null, enabled: true },
-  { key: "gratuity", label: "Gratuity", type: "employer", method: "PERCENT_OF_COMPONENT", value: 4.81, ref_key: "basic", enabled: true },
   { key: "professional_tax", label: "Professional Tax", type: "deduction", method: "FIXED_MONTHLY", value: 200, ref_key: null, enabled: true },
 ];
 

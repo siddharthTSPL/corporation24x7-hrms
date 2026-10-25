@@ -542,7 +542,7 @@ class LetterWriter {
 
     this.gap(14);
     this.paragraph(
-      "Notes: Figures are in Indian Rupees. Variable pay, if any, is paid subject to company and individual performance. Deductions shown are indicative; actual deductions including income tax (TDS) will be as per applicable law and your investment declarations. Gratuity is payable as per the Payment of Gratuity Act, 1972.",
+      "Notes: Figures are in Indian Rupees. Variable pay, if any, is paid subject to company and individual performance. Deductions shown are indicative; actual deductions including income tax (TDS) will be as per applicable law and your investment declarations." + (comps.some((c) => /gratuity/i.test(c.label)) ? " Gratuity is payable as per the Payment of Gratuity Act, 1972." : ""),
       { size: 8.5, color: this.secondary, font: this.f.italic }
     );
   }

@@ -10,7 +10,7 @@ const DEFAULT_OPTIONS = {
   variable_percent_of_ctc: 0,
   pf_mode: "CAPPED",
   pf_wage_ceiling_monthly: 15000,
-  include_gratuity: true,
+  include_gratuity: false,
   include_insurance: true,
   insurance_annual: 6000,
   professional_tax_monthly: 200,

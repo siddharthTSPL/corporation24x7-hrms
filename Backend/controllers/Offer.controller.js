@@ -11,7 +11,7 @@ const { createNotification } = require("../utils/Notification.utils");
 const { syncRequisitionFillStatus } = require("../utils/recruitment/pipeline.utils");
 const { calculateCtc, formatInr } = require("../utils/recruitment/ctcCalculator.utils");
 const { getOrgComponents, describeConfig } = require("./SalaryStructure.controller");
-const { validateComponents } = require("../utils/recruitment/salaryStructure.utils");
+const { validateComponents, DEFAULT_COMPONENTS } = require("../utils/recruitment/salaryStructure.utils");
 const { listTemplates, TEMPLATES, PLACEHOLDERS, cloneSections } = require("../utils/recruitment/offerTemplates.utils");
 const { buildContext, resolveSections } = require("../utils/recruitment/offerPlaceholders.utils");
 const { generateLetterPdf } = require("../utils/recruitment/offerPdf.utils");
@@ -303,14 +303,17 @@ const applyCommonEdits = (doc, body) => {
 
 const recalcCtc = async (doc, body) => {
   const refresh = body.refresh_salary_config === true;
-  if (body.annual_ctc === undefined && body.ctc_options === undefined && body.ctc_overrides === undefined && !refresh) return false;
+  if (body.annual_ctc === undefined && body.ctc_options === undefined && body.ctc_overrides === undefined && body.ctc_config === undefined && !refresh) return false;
   const annual = body.annual_ctc !== undefined ? Number(body.annual_ctc) : doc.ctc?.annual_ctc;
   const options = body.ctc_options !== undefined ? body.ctc_options : doc.ctc?.options;
   const overrides = body.ctc_overrides !== undefined ? body.ctc_overrides || {} : doc.ctc_overrides || {};
   let config = doc.ctc?.source === "COMPANY_CONFIG" ? doc.ctc.config : null;
-  if (refresh) config = await getOrgComponents(doc.organisation_id);
-  doc.ctc = calculateCtc({ annual_ctc: annual, options, overrides, config });
-  doc.ctc_overrides = overrides;
+  if (refresh) config = (await getOrgComponents(doc.organisation_id)) || DEFAULT_COMPONENTS;
+  if (body.ctc_config !== undefined) config = validateComponents(body.ctc_config);
+  if (!config) config = doc.ctc?.components?.length ? null : DEFAULT_COMPONENTS;
+  const finalOverrides = body.ctc_config !== undefined || refresh ? {} : overrides;
+  doc.ctc = calculateCtc({ annual_ctc: annual, options, overrides: finalOverrides, config });
+  doc.ctc_overrides = finalOverrides;
   doc.markModified("ctc");
   doc.markModified("ctc_overrides");
   return true;
@@ -325,7 +328,7 @@ const previewCtc = async (req, res) => {
   const { annual_ctc, options, overrides, config, use_company_config } = req.body;
   let components = null;
   if (Array.isArray(config) && config.length) components = validateComponents(config);
-  else if (use_company_config) components = await getOrgComponents(req.admin.organisation_id);
+  else if (use_company_config) components = (await getOrgComponents(req.admin.organisation_id)) || DEFAULT_COMPONENTS;
   const ctc = calculateCtc({ annual_ctc, options, overrides, config: components });
   return res.status(200).json({ success: true, data: ctc });
 };
@@ -345,7 +348,7 @@ const generateOffer = async (req, res) => {
   if (!requisition) throw fail(404, "Requisition not found");
 
   const { annual_ctc, joining_date, validity_days, template_key, ctc_options } = req.body;
-  const ctc = calculateCtc({ annual_ctc, options: ctc_options, config: await getOrgComponents(organisationId) });
+  const ctc = calculateCtc({ annual_ctc, options: ctc_options, config: (await getOrgComponents(organisationId)) || DEFAULT_COMPONENTS });
 
   const org = await SuperAdmin.findById(organisationId).select("organisation_name address company_address phone email company_domain").lean();
   if (!org) throw fail(404, "Organisation not found");
