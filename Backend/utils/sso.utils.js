@@ -117,7 +117,7 @@ const zoho = {
       client_id: process.env.ZOHO_SSO_CLIENT_ID,
       response_type: "code",
       redirect_uri: redirectUri("zoho"),
-      scope: "openid email profile",
+      scope: "AaaServer.profile.READ",
       state,
       access_type: "online",
     });
