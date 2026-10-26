@@ -23,6 +23,7 @@
     "date-holidays": "^3.26.11",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "exceljs": "^4.4.0",
     "express-validator": "^7.3.1",
     "geoip-lite": "^1.4.10",
     "geolib": "^3.3.4",
