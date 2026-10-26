@@ -54,7 +54,10 @@ const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup, p
   if (allowedRoles && !allowedRoles.includes(data.role))
     return <AccessDenied />;
 
-  const hasPermissionCheck = permission || permissionGroup?.length;
+  // SuperAdmin owns the organisation and always has every permission. Their permission
+  // store is never hydrated (role stays null), so skip the check instead of denying them.
+  const isSuperAdmin = data.role === "superadmin";
+  const hasPermissionCheck = !isSuperAdmin && (permission || permissionGroup?.length);
 
   if (hasPermissionCheck) {
     const permissionsNotYetLoaded = !permRole && data.role !== "superadmin";

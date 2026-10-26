@@ -86,6 +86,7 @@ const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
 const Payroll = lazy(() => import("./pages/payroll/Payroll"));
+const Reports = lazy(() => import("./pages/reports/Reports"));
 const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/ReimbursementEmployee"));
 const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
 const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
@@ -502,6 +503,9 @@ function App() {
             }
           >
             <Route path="/field-operations" element={<ProtectedRoute permission="navigation.can_view_field_operations"><FieldOperations /></ProtectedRoute>} />
+            {/* Reports & Analytics lives in this shared block so SuperAdmin is matched too. UI gate only - the server authorises every report and export. */}
+            <Route path="/reports" element={<ProtectedRoute permission="reports.can_view_reports"><Reports /></ProtectedRoute>} />
+            <Route path="/reports/:key" element={<ProtectedRoute permission="reports.can_view_reports"><Reports /></ProtectedRoute>} />
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
