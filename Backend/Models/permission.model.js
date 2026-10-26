@@ -96,6 +96,22 @@ const permissionSchema = new mongoose.Schema(
       can_view_own_payslips: { type: Boolean, default: true },
       can_manage_payroll: { type: Boolean, default: false },
     },
+
+    // Reports & Analytics. All default to false (NOT added to the legacy
+    // "allow when missing" lists in Checkpermission). Admin / SuperAdmin
+    // always have access; payroll reports additionally need
+    // payroll.can_manage_payroll. Managers get their own team's data unless
+    // can_view_all_employees is granted.
+    reports: {
+      can_view_reports: { type: Boolean, default: false },
+      can_export_reports: { type: Boolean, default: false },
+      can_view_all_employees: { type: Boolean, default: false },
+      can_view_hr_reports: { type: Boolean, default: false },
+      can_view_attendance_reports: { type: Boolean, default: false },
+      can_view_leave_reports: { type: Boolean, default: false },
+      can_view_timesheet_reports: { type: Boolean, default: false },
+      can_view_expense_reports: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );
