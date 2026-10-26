@@ -179,7 +179,7 @@ const agentDeviceInfo = async (req, res) => {
   const device = await BiometricDevice.findOneAndUpdate(
     { organisation_id, serialNumber: serial },
     { $set: set, $setOnInsert: { organisation_id, serialNumber: serial, name: d.name || `Device ${serial}` } },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
   res.json({ message: "Device registered", deviceId: device._id, serialNumber: device.serialNumber, isActive: device.isActive });
 };
@@ -296,7 +296,7 @@ const updateDevice = async (req, res) => {
   const allowed = ["name", "location", "isActive", "punchMode", "model", "manufacturer"];
   const set = {};
   for (const k of allowed) if (req.body[k] !== undefined) set[k] = req.body[k];
-  const device = await BiometricDevice.findOneAndUpdate({ _id: req.params.id, organisation_id: orgOf(req) }, { $set: set }, { new: true });
+  const device = await BiometricDevice.findOneAndUpdate({ _id: req.params.id, organisation_id: orgOf(req) }, { $set: set }, { returnDocument: "after" });
   if (!device) return res.status(404).json({ message: "Device not found" });
   res.json({ device });
 };
@@ -316,7 +316,7 @@ const downloadAgentConfig = async (req, res) => {
   await BiometricOrgKey.findOneAndUpdate(
     { organisation_id },
     { keyHash: sha256(secret), rotatedAt: new Date() },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: "after" }
   );
   const serverUrl = (process.env.PUBLIC_API_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
   const cfg = {
