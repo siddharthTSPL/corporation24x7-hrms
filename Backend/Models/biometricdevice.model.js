@@ -16,7 +16,7 @@ const biometricDeviceSchema = new mongoose.Schema(
     platform: { type: String, trim: true, default: "" },
     // How the agent reaches it: lan (ZK-protocol over IP / direct cable),
     // usb_drive (pen-drive export file imported by the agent), manual_import (file uploaded from the web UI)
-    connectionType: { type: String, enum: ["lan", "usb_drive", "manual_import", "unknown"], default: "unknown" },
+    connectionType: { type: String, enum: ["lan", "usb_cable", "usb_drive", "manual_import", "unknown"], default: "unknown" },
     ip: { type: String, default: "" },
     port: { type: Number, default: 4370 },
     userCount: { type: Number, default: 0 },

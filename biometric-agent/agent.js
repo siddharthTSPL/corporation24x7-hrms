@@ -3,11 +3,14 @@
  *               devices speaking the ZK protocol (port 4370), reads serial/firmware/users/punches.
  *  - USB drive: when a pen drive that holds an exported attendance file (.dat/.csv/.xls/.xlsx/.txt)
  *               is plugged into the laptop, the file is read and imported automatically.
+ *  - USB cable: if the machine's Windows SDK (zkemkeeper) is installed, the machine is read over the USB cable.
+ *  - USB watcher: plugging in any USB device / pen drive triggers a scan within ~10 seconds.
  *  Everything is pushed to the HRMS server using agent-config.json (downloaded from TorchX Management).
  *
  *  Usage:  node agent.js          (keeps running, syncs every N minutes)
  *          node agent.js --once   (one sync and exit)
  *          node agent.js --scan   (only list devices found, nothing sent)
+ *          node agent.js --usb    (list every USB device connected to this laptop)
  */
 const fs = require("fs");
 const os = require("os");
@@ -238,6 +241,109 @@ async function syncUsbDrives() {
   }
 }
 
+
+// ---------------- USB: detect devices plugged into this laptop ----------------
+const BIOMETRIC_WORDS = /biometric|fingerprint|finger|zk|zkteco|secureye|essl|realtime|mantra|attendance|time\s*clock/i;
+const BIOMETRIC_VIDS = ["1B55"]; // ZKTeco-family USB vendor id
+
+function listUsbDevices() {
+  if (process.platform !== "win32") return [];
+  try {
+    const out = execSync(
+      'powershell -NoProfile -Command "Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -like \'USB\\*\' } | Select-Object FriendlyName,InstanceId,Class,Manufacturer | ConvertTo-Json -Compress"',
+      { encoding: "utf8", timeout: 20000 }
+    ).trim();
+    if (!out) return [];
+    const arr = [].concat(JSON.parse(out));
+    return arr.map((d) => {
+      const vid = (/VID_([0-9A-F]{4})/i.exec(d.InstanceId) || [])[1] || "";
+      const pid = (/PID_([0-9A-F]{4})/i.exec(d.InstanceId) || [])[1] || "";
+      const likely = BIOMETRIC_VIDS.includes(vid.toUpperCase()) || BIOMETRIC_WORDS.test(`${d.FriendlyName} ${d.Manufacturer}`);
+      return { name: d.FriendlyName || "(unnamed)", vid, pid, cls: d.Class || "", manufacturer: d.Manufacturer || "", likely };
+    });
+  } catch { return []; }
+}
+
+// Reading a machine over its USB CABLE needs the maker's Windows SDK ("zkemkeeper"), which is
+// 32-bit COM, so it is called through 32-bit PowerShell. Works only if that SDK is installed
+// (it comes with the machine's own attendance software).
+const PS_USB = `
+$ErrorActionPreference = 'Stop'
+function Out($o) { $o | ConvertTo-Json -Compress -Depth 5; exit }
+try { $zk = New-Object -ComObject zkemkeeper.ZKEM } catch { Out @{ error = 'sdk_missing' } }
+if (-not $zk.Connect_USB(1)) { Out @{ error = 'connect_failed' } }
+$sn=''; [void]$zk.GetSerialNumber(1,[ref]$sn)
+$fw=''; [void]$zk.GetFirmwareVersion(1,[ref]$fw)
+$pc=''; try { [void]$zk.GetProductCode(1,[ref]$pc) } catch {}
+$users=@()
+if ($zk.ReadAllUserID(1)) {
+  $id='';$nm='';$pw='';$pv=0;$en=$false
+  while ($zk.SSR_GetAllUserInfo(1,[ref]$id,[ref]$nm,[ref]$pw,[ref]$pv,[ref]$en)) { $users += @{ userId=$id; name=$nm } }
+}
+$logs=@()
+if ($zk.ReadGeneralLogData(1)) {
+  $id='';$vm=0;$io=0;$y=0;$mo=0;$d=0;$h=0;$mi=0;$s=0;$wc=0
+  while ($zk.SSR_GetGeneralLogData(1,[ref]$id,[ref]$vm,[ref]$io,[ref]$y,[ref]$mo,[ref]$d,[ref]$h,[ref]$mi,[ref]$s,[ref]$wc)) {
+    $logs += @{ userId=$id; time=('{0:D4}-{1:D2}-{2:D2}T{3:D2}:{4:D2}:{5:D2}' -f $y,$mo,$d,$h,$mi,$s); state=$io }
+  }
+}
+$zk.Disconnect()
+Out @{ serial=$sn; firmware=$fw; model=$pc; users=$users; logs=$logs }
+`;
+
+function readUsbCable() {
+  const ps32 = path.join(process.env.SystemRoot || "C:\\Windows", "SysWOW64", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const exe = fs.existsSync(ps32) ? ps32 : "powershell";
+  const tmp = path.join(os.tmpdir(), "torchx-usb-read.ps1");
+  fs.writeFileSync(tmp, PS_USB);
+  try {
+    const out = execSync(`"${exe}" -NoProfile -ExecutionPolicy Bypass -File "${tmp}"`, { encoding: "utf8", timeout: 180000, maxBuffer: 256 * 1024 * 1024 }).trim();
+    return JSON.parse(out.split(/\r?\n/).pop());
+  } catch (e) { return { error: "failed: " + String(e.message).split("\n")[0] }; }
+}
+
+async function syncUsbCable() {
+  if (process.platform !== "win32") return;
+  const r = readUsbCable();
+  if (r.error === "sdk_missing") { log("[USB cable] machine SDK (zkemkeeper) is not installed on this laptop - cannot read over the USB cable. Use LAN or the pen drive."); return; }
+  if (r.error === "connect_failed") { log("[USB cable] no machine answered over USB (not connected, powered off, or not supported)"); return; }
+  if (r.error) { log("[USB cable]", r.error); return; }
+  const serial = String(r.serial || "").trim();
+  if (!serial) { log("[USB cable] machine answered but gave no serial - skipped"); return; }
+  const users = [].concat(r.users || []), logs = [].concat(r.logs || []);
+  log(`[USB cable] serial=${serial} firmware=${r.firmware || "-"} users=${users.length} logs=${logs.length}`);
+  if (ARGS.includes("--scan")) return;
+
+  await api("POST", "/biometric/agent/device-info", {
+    serialNumber: serial, manufacturer: /secureye/i.test(r.model || "") ? "Secureye" : "", model: r.model, firmwareVersion: r.firmware,
+    connectionType: "usb_cable", agentHost: os.hostname(), userCount: users.length, logCount: logs.length,
+  });
+  await api("POST", "/biometric/agent/users", { serialNumber: serial, users: users.map((u) => ({ userId: u.userId, name: u.name })) });
+  const since = state.lastPunch[serial] ? new Date(state.lastPunch[serial]).getTime() - 24 * 3600 * 1000 : 0;
+  const punches = logs.map((l) => ({ userId: l.userId, time: l.time + TZ, state: l.state })).filter((p) => new Date(p.time).getTime() >= since);
+  const n = await pushPunches(serial, punches);
+  const newest = punches.reduce((m, p) => Math.max(m, new Date(p.time).getTime()), 0);
+  if (newest) state.lastPunch[serial] = new Date(newest).toISOString();
+  saveState();
+  log(`[USB cable] pushed ${punches.length} punches (${n} new)`);
+}
+
+// Quick watcher: the moment a USB device / pen drive appears or disappears, run a sync.
+let lastUsbSig = "";
+let busy = false;
+async function usbWatch() {
+  if (busy) return;
+  const devs = listUsbDevices();
+  const sig = devs.map((d) => d.vid + d.pid + d.name).sort().join("|") + "#" + removableRoots().join(",");
+  if (sig === lastUsbSig) return;
+  const first = lastUsbSig === "";
+  lastUsbSig = sig;
+  if (first) return; // the startup cycle already covers what was plugged in at launch
+  log("[USB] change detected - scanning...");
+  devs.filter((d) => d.likely).forEach((d) => log(`[USB] biometric-like device: ${d.name} (VID ${d.vid} PID ${d.pid})`));
+  busy = true; try { await cycle(); } finally { busy = false; }
+}
+
 // ---------------- main loop ----------------
 async function cycle() {
   try {
@@ -247,12 +353,21 @@ async function cycle() {
       for (const ip of ips) { try { await syncLanDevice(ip); } catch (e) { log(`[LAN ${ip}] ${e.message}`); } }
     }
     if (!cfg.usbDrive || cfg.usbDrive.enabled !== false) await syncUsbDrives();
+    if (!cfg.usbCable || cfg.usbCable.enabled !== false) await syncUsbCable();
   } catch (e) { log("sync failed:", e.message); }
 }
 
 (async () => {
   log("TorchX Biometric Agent started on", os.hostname());
+  const usb = listUsbDevices();
+  if (ARGS.includes("--usb")) {
+    console.log(usb.length ? usb : "No USB devices listed (Windows only).");
+    return;
+  }
+  const likely = usb.filter((d) => d.likely);
+  log(`[USB] ${usb.length} USB device(s) connected; ${likely.length} look like a biometric machine` + (likely.length ? ": " + likely.map((d) => d.name).join(", ") : ""));
   await cycle();
   if (ARGS.includes("--once") || ARGS.includes("--scan")) return;
-  setInterval(cycle, Math.max(1, cfg.syncIntervalMinutes || 5) * 60 * 1000);
+  setInterval(() => { if (!busy) { busy = true; cycle().finally(() => { busy = false; }); } }, Math.max(1, cfg.syncIntervalMinutes || 5) * 60 * 1000);
+  setInterval(usbWatch, 10000); // plug something in -> picked up within ~10 seconds
 })();
