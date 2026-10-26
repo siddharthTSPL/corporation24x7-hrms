@@ -109,7 +109,7 @@ const FAQS = [
   },
   {
     q: "Where do the competitor prices in the dropdown come from?",
-    a: "Where possible (greytHR), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, Zoho People, Tankhwa Patra), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
+    a: "Where possible (greytHR, Tankhwa Patra, Pocket HRMS, Zoho People), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, WeekMate), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
   },
 ];
 
@@ -146,15 +146,15 @@ const COMPETITORS = [
     id: "zoho-essential",
     name: "Zoho People Essential",
     description:
-      "Indicative from Zoho's published India pricing: roughly ₹50 per employee/month (annual billing), no bundled headcount tier.",
-    calculate: (count) => 50 * count,
+      "Zoho's published India pricing: ₹48 per employee/month on annual billing (₹60 if billed monthly), no bundled headcount tier.",
+    calculate: (count) => 48 * count,
   },
   {
     id: "zoho-professional",
     name: "Zoho People Professional",
     description:
-      "Indicative from Zoho's published India pricing: roughly ₹120 per employee/month (annual billing).",
-    calculate: (count) => 120 * count,
+      "Zoho's published India pricing: ₹96 per employee/month on annual billing (₹120 if billed monthly).",
+    calculate: (count) => 96 * count,
   },
   {
     id: "pocket-hrms-standard",
@@ -167,8 +167,13 @@ const COMPETITORS = [
     id: "razorpayx-payroll",
     name: "RazorpayX Payroll",
     description:
-      "Indicative from RazorpayX published pricing: roughly ₹100 per user/month. Offers 100% automated direct salary disbursement & tax filings.",
-    calculate: (count) => 100 * count,
+      "RazorpayX current plans (annual billing): Prime ₹2,499/month up to 20 employees; Elite ₹5,499/month for 50 employees, then ₹100 per additional employee/month. Offers automated salary disbursement & tax filings.",
+    calculate: (count) =>
+      count <= 20
+        ? 2499
+        : count <= 50
+          ? 5499
+          : 5499 + (count - 50) * 100,
   },
   {
     id: "weekmate",
@@ -178,11 +183,32 @@ const COMPETITORS = [
     calculate: (count) => 80 * count,
   },
   {
-    id: "tankhwa-patra",
-    name: "Tankhwa Patra",
+    id: "tankhwa-patra-dreamer",
+    name: "Tankhwa Patra — Dreamer",
     description:
-      "Indicative estimate from third-party listings: about ₹885/month for 10 users (≈ ₹88.5 per user/month). Tankhwa Patra doesn't publish exact pricing — confirm with the vendor.",
-    calculate: (count) => Math.round(88.5 * Math.max(count, 10)),
+      "Verified on Tankhwa Patra's official pricing page: ₹600 per user/year (≈ ₹50 per user/month). Attendance, shift, leave, payroll, overtime and PF/ESIC.",
+    calculate: (count) => Math.round((600 / 12) * count),
+  },
+  {
+    id: "tankhwa-patra-performer",
+    name: "Tankhwa Patra — Performer",
+    description:
+      "Verified on Tankhwa Patra's official pricing page: ₹960 per user/year (≈ ₹80 per user/month). Dreamer plus onboarding, visit & expense management.",
+    calculate: (count) => Math.round((960 / 12) * count),
+  },
+  {
+    id: "tankhwa-patra-achiever",
+    name: "Tankhwa Patra — Achiever",
+    description:
+      "Verified on Tankhwa Patra's official pricing page: ₹1,320 per user/year (≈ ₹110 per user/month). Performer plus task, performance & asset management.",
+    calculate: (count) => Math.round((1320 / 12) * count),
+  },
+  {
+    id: "attendo-petpooja",
+    name: "Attendo (Petpooja Payroll)",
+    description:
+      "Flat-fee pricing, no per-user fee: ₹7,000–₹8,750 in Year 1 (calculated here at ₹7,000 ÷ 12 ≈ ₹583/month), then ₹4,000/year renewal from Year 2. Confirm the live number with Petpooja directly.",
+    calculate: () => Math.round(7000 / 12),
   },
 ];
 
@@ -821,7 +847,7 @@ export default function TalentPricingCalculator() {
                     )}
 
                     <ul
-                      className={`space-y-1.5 font-body text-xs text-[#4f3e47] ${
+                      className={`flex-1 space-y-1.5 font-body text-xs text-[#4f3e47] ${
                         inheritedFrom ? "mt-2" : "mt-4"
                       }`}
                     >
