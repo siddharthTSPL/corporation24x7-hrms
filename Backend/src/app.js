@@ -103,7 +103,6 @@ const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const singleSignInRouter = require('../routes/SingleSignIn.routes');
 const ssoRouter = require('../routes/Sso.routes');
 const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
-const biometricRouter = require('../routes/biometric.route');
 const policyrouter = require('../routes/policy.route');
 const trainingRouter = require('../routes/training.routes');
 const overtimeRouter = require('../routes/overtime.routes');
@@ -146,7 +145,6 @@ app.use('/self-service', selfServiceRouter);
 app.use('/field-operations', fieldOperationsRouter);
 app.use('/single-sign-in', singleSignInRouter);
 app.use('/attendance-settings', attendanceSettingsRouter);
-app.use('/biometric', biometricRouter);
 app.use('/admin/analytics', analyticsrouter);
 app.use('/superadmin/analytics', analyticsrouter);
 // TorchX Policy — Policy Management (create/publish/report for

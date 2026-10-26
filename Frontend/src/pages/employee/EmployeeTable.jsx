@@ -290,7 +290,7 @@ const EMP_DEFAULT_PERMISSIONS = {
     can_manage_asset_management: false,
   },
   payroll: { can_view_own_payslips: true, can_manage_payroll: false },
-  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false },
+  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false, can_view_performance_reports: false },
 };
 
 const MGR_DEFAULT_PERMISSIONS = {
@@ -334,7 +334,7 @@ const MGR_DEFAULT_PERMISSIONS = {
     can_manage_asset_management: false,
   },
   payroll: { can_view_own_payslips: true, can_manage_payroll: false },
-  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false },
+  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false, can_view_performance_reports: false },
 };
 
 const ADMIN_PERMISSIONS = {
@@ -378,7 +378,7 @@ const ADMIN_PERMISSIONS = {
     can_manage_asset_management: false,
   },
   payroll: { can_view_own_payslips: true, can_manage_payroll: false },
-  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false },
+  reports: { can_view_reports: false, can_export_reports: false, can_view_all_employees: false, can_view_hr_reports: false, can_view_attendance_reports: false, can_view_leave_reports: false, can_view_timesheet_reports: false, can_view_expense_reports: false, can_view_performance_reports: false },
 };
 
 const EMP_STEPS = [
@@ -1225,6 +1225,7 @@ function PermissionsPanel({ perms, onChange, roleType = "employee", showAdminAcc
         { k: "can_view_leave_reports", label: "Leave reports" },
         { k: "can_view_timesheet_reports", label: "Timesheet reports" },
         { k: "can_view_expense_reports", label: "Expense reports" },
+        { k: "can_view_performance_reports", label: "Performance review reports" },
       ],
     },
     {

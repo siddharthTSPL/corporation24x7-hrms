@@ -10,6 +10,24 @@ const defs = [
   require("./definitions/payrollComponents"),
   require("./definitions/timesheetSummary"),
   require("./definitions/expenseRegister"),
+  // ---- Phase 2 ----
+  require("./definitions/joiningExit"),
+  require("./definitions/attendanceExceptions"),
+  require("./definitions/leaveUtilization"),
+  require("./definitions/payrollStatus"),
+  require("./definitions/recruitmentFunnel"),
+  require("./definitions/offerJoining"),
+  require("./definitions/reviewCompletion"),
+  require("./definitions/timesheetApproval"),
+  require("./definitions/expenseApproval"),
+  // ---- Phase 3: analytics (each carries a `chart` spec rendered from the same rows) ----
+  require("./definitions/workforceTrends"),
+  require("./definitions/payrollCostTrends"),
+  require("./definitions/recruitmentEfficiency"),
+  require("./definitions/ratingDistribution"),
+  require("./definitions/projectBillable"),
+  require("./definitions/expenseTrends"),
+  require("./definitions/managementOverview"),
 ];
 
 const CATEGORIES = [
@@ -19,6 +37,9 @@ const CATEGORIES = [
   { key: "payroll", label: "Payroll" },
   { key: "timesheet", label: "Timesheet" },
   { key: "expense", label: "Expense" },
+  { key: "recruitment", label: "Recruitment" },
+  { key: "performance", label: "Performance" },
+  { key: "management", label: "Management Overview" },
 ];
 
 const map = new Map();

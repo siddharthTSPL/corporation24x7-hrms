@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useReportCatalog } from "../../auth/server-state/reports/reports.hook";
 import ReportRunner from "./ReportRunner";
@@ -6,6 +7,7 @@ import ReportRunner from "./ReportRunner";
 // /reports/:key       -> the generic runner. New reports need NO frontend code.
 export default function Reports() {
   const { key } = useParams();
+  const [q, setQ] = useState("");
   const { data, isLoading, error } = useReportCatalog();
 
   if (isLoading) return <p className="p-6 text-gray-500">Loading reports…</p>;
@@ -30,7 +32,11 @@ export default function Reports() {
       <h1 className="text-2xl font-bold text-gray-800">Reports & Analytics</h1>
       <p className="text-sm text-gray-500">Pick a report, set filters, generate it on screen and export the full result to Excel.</p>
       {categories.length === 0 && <p className="mt-8 text-gray-500">No reports are available for your account.</p>}
-      {categories.map((c) => (
+      {categories.length > 0 && (
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reports…" aria-label="Search reports"
+          className="mt-4 w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#730042] focus:outline-none" />
+      )}
+      {categories.map((c) => ({ ...c, reports: c.reports.filter((r) => !q || `${r.name} ${r.description}`.toLowerCase().includes(q.toLowerCase())) })).filter((c) => c.reports.length).map((c) => (
         <section key={c.key} className="mt-6">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[#730042]">{c.label}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -38,6 +44,7 @@ export default function Reports() {
               <Link key={r.key} to={`/reports/${r.key}`} className="rounded-xl border bg-white p-4 shadow-sm transition hover:border-[#730042] hover:shadow-md">
                 <div className="font-semibold text-gray-800">{r.name}</div>
                 <p className="mt-1 text-sm text-gray-500">{r.description}</p>
+                {r.chart && <span className="mr-1 mt-2 inline-block rounded bg-[#730042]/10 px-2 py-0.5 text-[11px] text-[#730042]">Chart</span>}
                 {r.sensitive && <span className="mt-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-[11px] text-amber-800">Restricted · access is logged</span>}
               </Link>
             ))}

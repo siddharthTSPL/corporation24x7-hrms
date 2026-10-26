@@ -111,6 +111,7 @@ const permissionSchema = new mongoose.Schema(
       can_view_leave_reports: { type: Boolean, default: false },
       can_view_timesheet_reports: { type: Boolean, default: false },
       can_view_expense_reports: { type: Boolean, default: false },
+      can_view_performance_reports: { type: Boolean, default: false },
     },
   },
   { timestamps: true }

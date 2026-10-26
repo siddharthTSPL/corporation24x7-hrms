@@ -139,6 +139,8 @@ async function run({ def, ctx, rawFilters, page = 1, pageSize = 25, search = "",
     summary: entry.summary, // always over ALL matching rows, never just the page
     pagination: { page: current, pageSize: size, totalRows, totalPages, matchedBeforeSearch: entry.rows.length },
     empty: entry.rows.length === 0,
+    chart: def.chart || null,
+    chartRows: def.chart && entry.rows.length <= 500 ? entry.rows : null, // charts always use ALL rows, not the visible page
   };
 }
 

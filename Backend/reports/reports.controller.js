@@ -3,6 +3,7 @@ const { evaluateAccess } = require("./engine/access");
 const { run, exportXlsx } = require("./engine/runner");
 const people = require("./engine/people");
 const TSProject = require("../Models/tsproject.model");
+const Requisition = require("../Models/Hiringrequisition.model");
 const { httpError } = require("./engine/errors");
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -10,7 +11,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const accessFor = (ctx, def) => evaluateAccess({ actorModel: ctx.actor.model, role: ctx.actor.role, perms: ctx.perms }, def);
 const serialize = (def) => ({
   key: def.key, name: def.name, category: def.category, description: def.description,
-  sensitive: !!def.sensitive, filters: def.filters, notes: def.notes || [],
+  sensitive: !!def.sensitive, chart: def.chart || null, filters: def.filters, notes: def.notes || [],
   columns: def.columns.map(({ key, header, type }) => ({ key, header, type })),
 });
 
@@ -43,6 +44,12 @@ const lookups = wrap(async (req, res) => {
       if (ctx.scope !== "org") break;
       const docs = await TSProject.find({ organisation_id: ctx.orgId }).select("name").sort({ name: 1 }).limit(500).lean();
       data = docs.map((d) => ({ value: String(d._id), label: d.name }));
+      break;
+    }
+    case "requisitions": {
+      if (ctx.scope !== "org") break;
+      const docs = await Requisition.find({ organisation_id: ctx.orgId }).select("job_title").sort({ createdAt: -1 }).limit(500).lean();
+      data = docs.map((d) => ({ value: String(d._id), label: d.job_title }));
       break;
     }
     default: throw httpError(404, "Unknown lookup.");

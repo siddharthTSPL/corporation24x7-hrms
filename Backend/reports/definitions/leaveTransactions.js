@@ -67,6 +67,8 @@ module.exports = {
   period: (f) => periodText(fmtDate(parseDateStrict(f.from)), fmtDate(parseDateStrict(f.to))),
   validate(f) { istRange(f.from, f.to, { maxDays: 366 }); },
   normalizeStatus,
+  _sources: SOURCES,
+  _types: LEAVE_TYPES,
   extraSummary() {
     const c = {};
     return {

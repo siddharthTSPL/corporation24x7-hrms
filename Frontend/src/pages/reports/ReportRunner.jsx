@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import ReportFilters from "./ReportFilters";
+import ReportChart from "./ReportChart";
 import { useRunReport, useExportReport } from "../../auth/server-state/reports/reports.hook";
 import { formatCell, isNumericType, formatGeneratedAt } from "./reportFormat";
 
@@ -9,12 +10,18 @@ const monthNow = () => {
   const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" }).format(new Date());
   return p.slice(0, 7);
 };
+const monthOffsetIST = (n) => {
+  const [y, m] = monthNow().split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+};
 const todayIST = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
 const defaultsFor = (report) => {
   const v = {};
   for (const f of report.filters) {
-    if (f.type === "month" && f.required) v[f.key] = monthNow();
+    if (f.type === "month" && f.defaultOffsetMonths !== undefined) v[f.key] = monthOffsetIST(f.defaultOffsetMonths);
+    else if (f.type === "month" && f.required) v[f.key] = monthNow();
     else if (f.key === "asOf") v[f.key] = todayIST();
     else if (f.default !== undefined && typeof f.default !== "function") v[f.key] = f.default;
   }
@@ -30,6 +37,8 @@ export default function ReportRunner({ report }) {
   const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState(null);
+  const [view, setView] = useState("table");
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const run = useRunReport();
   const exp = useExportReport();
   const first = useRef(true);
@@ -50,6 +59,8 @@ export default function ReportRunner({ report }) {
     const missing = report.filters.find((f) => f.required && (values[f.key] === undefined || values[f.key] === ""));
     if (missing) { setError(`${missing.label} is required.`); return; }
     setApplied(values);
+    setView("table");
+    if (window.innerWidth < 768) setFiltersOpen(false);
     setPage(1);
     setSearch("");
     setSort(null);
@@ -87,7 +98,13 @@ export default function ReportRunner({ report }) {
       <p className="text-sm text-gray-500">{report.description}</p>
 
       <section className="mt-4 rounded-xl border bg-white p-4 shadow-sm">
-        <ReportFilters filters={report.filters} values={values} onChange={setValues} />
+        <button type="button" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}
+          className="mb-3 flex w-full items-center justify-between text-sm font-semibold text-gray-700 md:hidden">
+          Filters <span>{filtersOpen ? "−" : "+"}</span>
+        </button>
+        <div className={filtersOpen ? "block" : "hidden md:block"}>
+          <ReportFilters filters={report.filters} values={values} onChange={setValues} />
+        </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button onClick={generate} disabled={run.isPending} className="rounded-lg bg-[#730042] px-5 py-2 text-sm font-semibold text-white hover:bg-[#5a0033] disabled:opacity-60">
             {run.isPending && !result ? "Generating…" : "Generate Report"}
@@ -103,7 +120,20 @@ export default function ReportRunner({ report }) {
         {report.canExport === false && <p className="mt-2 text-xs text-gray-400">You can view this report but do not have permission to export it.</p>}
       </section>
 
-      {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div role="alert" className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <span>{error}</span>
+          {applied && <button onClick={() => fetchPage({}, true)} className="shrink-0 rounded border border-red-300 px-3 py-1 hover:bg-red-100">Retry</button>}
+        </div>
+      )}
+
+      {run.isPending && !result && (
+        <div className="mt-4 animate-pulse space-y-3 rounded-xl border bg-white p-4" aria-busy="true" aria-label="Generating report">
+          <div className="h-4 w-1/3 rounded bg-gray-200" />
+          <div className="grid gap-2 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-14 rounded bg-gray-100" />)}</div>
+          {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-8 rounded bg-gray-100" />)}
+        </div>
+      )}
 
       {result && (
         <section className="mt-4 rounded-xl border bg-white p-4 shadow-sm">
@@ -131,14 +161,24 @@ export default function ReportRunner({ report }) {
             </div>
           ) : (
             <>
+              {result.chart && result.chartRows && (
+                <div className="mb-3 inline-flex rounded-lg border p-0.5 text-sm" role="tablist">
+                  {["table", "chart"].map((v) => (
+                    <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)}
+                      className={`rounded-md px-4 py-1 capitalize ${view === v ? "bg-[#730042] text-white" : "text-gray-600 hover:bg-gray-50"}`}>{v}</button>
+                  ))}
+                </div>
+              )}
+              {view === "chart" && result.chart && result.chartRows && <ReportChart chart={result.chart} rows={result.chartRows} />}
+              <div className={view === "chart" ? "hidden" : "block"}>
               <div className="mb-2 flex flex-wrap items-center gap-3">
                 <input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} placeholder="Search in results…"
                   className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-[#730042] focus:outline-none" />
                 <span className="text-xs text-gray-500">{pg.totalRows.toLocaleString("en-IN")} of {pg.matchedBeforeSearch.toLocaleString("en-IN")} rows</span>
               </div>
-              <div className="overflow-x-auto rounded-lg border">
+              <div className="max-h-[65vh] overflow-auto rounded-lg border">
                 <table className="min-w-full text-sm">
-                  <thead className="bg-[#730042] text-white">
+                  <thead className="sticky top-0 z-10 bg-[#730042] text-white">
                     <tr>
                       {cols.map((c) => (
                         <th key={c.key} onClick={() => toggleSort(c.key)} className={`cursor-pointer whitespace-nowrap px-3 py-2 font-semibold ${isNumericType(c.type) ? "text-right" : "text-left"}`}>
@@ -151,7 +191,7 @@ export default function ReportRunner({ report }) {
                     {result.rows.map((r, i) => (
                       <tr key={i} className="border-t odd:bg-white even:bg-gray-50/60">
                         {cols.map((c) => (
-                          <td key={c.key} className={`whitespace-nowrap px-3 py-2 ${isNumericType(c.type) ? "text-right tabular-nums" : ""}`}>{formatCell(c.type, r[c.key])}</td>
+                          <td key={c.key} className={`whitespace-nowrap px-3 py-2 ${isNumericType(c.type) ? "text-right tabular-nums" : ""} ${c.key === "change" && r[c.key] != null ? (r[c.key] > 0 ? "text-green-700" : r[c.key] < 0 ? "text-red-700" : "") : ""}`}>{formatCell(c.type, r[c.key])}</td>
                         ))}
                       </tr>
                     ))}
@@ -159,7 +199,8 @@ export default function ReportRunner({ report }) {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+              </div>
+              <div className={`mt-3 flex-wrap items-center justify-between gap-2 text-sm ${view === "chart" ? "hidden" : "flex"}`}>
                 <div className="flex items-center gap-2">
                   Rows per page
                   <select value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }} className="rounded border px-2 py-1">

@@ -43,7 +43,7 @@ const SELECT = [
  * Yields arrays of stored payroll docs, one calendar month at a time (so each
  * batch stays small and needs no unindexed server-side sort).
  */
-async function* payrollDocsByMonth(ctx, f) {
+async function* payrollDocsByMonth(ctx, f, opts = {}) {
   const { months } = periodOf(f);
   let ids = null;
   if (ctx.scope === "team") ids = [...(await getTeamIds(ctx))];
@@ -51,16 +51,16 @@ async function* payrollDocsByMonth(ctx, f) {
     await assertEmployeesInScope(ctx, f.employees);
     ids = ids ? f.employees.filter((i) => ids.includes(i)) : f.employees;
   }
-  const statuses = f.includeNonFinal ? ALL_STATUSES : FINAL_STATUSES;
+  const statuses = opts.statuses || (f.includeNonFinal ? ALL_STATUSES : FINAL_STATUSES);
   for (const { year, month } of months) {
     const q = { organisation_id: ctx.orgId, year, month, status: { $in: statuses } }; // tenant filter first, always
     if (f.department) q["employeeSnapshot.department"] = f.department;
     if (f.designation) q["employeeSnapshot.designation"] = f.designation;
     if (ids) q.employee = { $in: ids.map(OID) };
-    const docs = await Payroll.find(q).select(SELECT).lean();
+    const docs = await Payroll.find(q).select(opts.extraSelect ? `${SELECT} ${opts.extraSelect}` : SELECT).lean();
     docs.sort((a, b) => (a.employeeSnapshot?.name || "").localeCompare(b.employeeSnapshot?.name || ""));
     if (docs.length) yield docs;
   }
 }
 
-module.exports = { FINAL_STATUSES, FINAL_LABELS, STATUS_LABEL, PERIOD_FILTERS, periodOf, payrollDocsByMonth, curMonth };
+module.exports = { ALL_STATUSES, FINAL_STATUSES, FINAL_LABELS, STATUS_LABEL, PERIOD_FILTERS, periodOf, payrollDocsByMonth, curMonth };

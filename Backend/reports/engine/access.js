@@ -10,6 +10,9 @@ const CATEGORY_FLAG = {
   timesheet: "can_view_timesheet_reports",
   expense: "can_view_expense_reports",
   payroll: null, // payroll reports are gated by payroll.can_manage_payroll instead
+  recruitment: null, // gated by the existing recruitment.can_view_candidates permission
+  performance: "can_view_performance_reports",
+  management: null, // organisation admins only (handled below)
 };
 
 const ADMIN_ROLES = ["admin", "senior_admin"];
@@ -47,6 +50,7 @@ function evaluateAccess({ actorModel, role, perms }, def) {
     (actorModel === "Admin" && (ADMIN_ROLES.includes(role) || role === "official" || !role));
   if (isOrgAdmin) return { allowed: true, scope: "org", canExport: true, reason: null };
 
+  if (def.category === "management") return { allowed: false, scope: null, canExport: false, reason: "admin_only" };
   const r = perms?.reports || {};
   if (!r.can_view_reports) return { allowed: false, scope: null, canExport: false, reason: "no_reports_permission" };
 
@@ -54,6 +58,10 @@ function evaluateAccess({ actorModel, role, perms }, def) {
   if (def.category === "payroll") {
     if (!perms?.payroll?.can_manage_payroll) {
       return { allowed: false, scope: null, canExport: false, reason: "no_payroll_permission" };
+    }
+  } else if (def.category === "recruitment") {
+    if (!perms?.recruitment?.can_view_candidates) {
+      return { allowed: false, scope: null, canExport: false, reason: "no_recruitment_permission" };
     }
   } else if (!flag || !r[flag]) {
     return { allowed: false, scope: null, canExport: false, reason: "no_category_permission" };
@@ -63,7 +71,7 @@ function evaluateAccess({ actorModel, role, perms }, def) {
   // existing Payroll screen). Everything else: org-wide only if explicitly
   // granted, otherwise managers see their own team and plain employees nothing.
   let scope = null;
-  if (def.category === "payroll" || r.can_view_all_employees) scope = "org";
+  if (def.category === "payroll" || def.category === "recruitment" || r.can_view_all_employees) scope = "org";
   else if (actorModel === "Manager") scope = "team";
   if (!scope) return { allowed: false, scope: null, canExport: false, reason: "no_scope" };
 
@@ -95,6 +103,20 @@ async function attachContext(req, res, next) {
   }
 }
 
+/** Which plan-gated features is this organisation allowed to use? (re-uses the real plan gate, no duplicated rules) */
+async function openFeaturesFor(req, features) {
+  const open = new Set();
+  for (const key of features) {
+    let blocked = false;
+    await new Promise((resolve) => {
+      const stub = { headersSent: false, status() { blocked = true; return { json: () => resolve() }; }, json() { blocked = true; resolve(); } };
+      Promise.resolve(restrictPlanFeature(key)(req, stub, (err) => { if (err) blocked = true; resolve(); })).catch(() => { blocked = true; resolve(); });
+    });
+    if (!blocked) open.add(key);
+  }
+  return open;
+}
+
 /** Per-report gate. mode: "run" | "export". */
 function authorizeReport(registry, auditDenied) {
   return async (req, res, next) => {
@@ -120,6 +142,7 @@ function authorizeReport(registry, auditDenied) {
         });
       }
       ctx.scope = decision.scope;
+      if (def.needsFeatures) ctx.openFeatures = await openFeaturesFor(req, def.needsFeatures);
       req.report = { def };
       next();
     } catch (err) {
