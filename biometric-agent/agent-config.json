@@ -8,8 +8,5 @@
     "port": 4370,
     "knownDevices": []
   },
-  "usbDrive": {
-    "enabled": true,
-    "deviceSerial": ""
-  }
+     "usbDrive": { "enabled": true, "deviceSerial": "2405021163" }
 }
