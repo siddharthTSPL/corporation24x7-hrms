@@ -129,7 +129,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "agent", "face", "field"],
+      enum: ["manual", "agent", "face", "field", "biometric"],
       default: "manual",
     },
     fieldDutySession: {

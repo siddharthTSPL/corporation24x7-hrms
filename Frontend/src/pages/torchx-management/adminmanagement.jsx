@@ -17,6 +17,7 @@ import {
   History,
   Building2,
   LogOut,
+  Fingerprint,
 } from "lucide-react";
 
 import {
@@ -61,6 +62,7 @@ import FieldWorkSettingsCard from "../field-operations/FieldWorkSettingsCard";
 import ApprovalFlowPanel from "./ApprovalFlowPanel";
 import AttendanceSettingsPanel from "./AttendanceSettingsPanel";
 import TeamsPanel from "./TeamsPanel";
+import BiometricDevicesPanel from "./BiometricDevicesPanel";
 
 const DAYS = [
   "monday",
@@ -2227,6 +2229,7 @@ const TABS = [
   { key: "approval_flow", label: "Approval Flow", icon: ShieldCheck },
   { key: "attendance", label: "Attendance", icon: LogOut },
   { key: "teams", label: "Teams", icon: Users },
+  { key: "biometric", label: "Biometric", icon: Fingerprint },
 ];
 
 export default function AdminManagement() {
@@ -2281,6 +2284,7 @@ export default function AdminManagement() {
           {tab === "approval_flow" && <ApprovalFlowPanel notify={notify} />}
           {tab === "attendance" && <AttendanceSettingsPanel notify={notify} />}
           {tab === "teams" && <TeamsPanel notify={notify} />}
+          {tab === "biometric" && <BiometricDevicesPanel notify={notify} />}
         </div>
       </div>
     </div>

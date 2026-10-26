@@ -1,0 +1,9 @@
+{
+  "name": "torchx-biometric-agent",
+  "version": "1.0.0",
+  "description": "Runs on the laptop/PC next to a biometric machine: detects it, reads device info + punches, pushes them to TorchX HRMS.",
+  "main": "agent.js",
+  "scripts": { "start": "node agent.js", "once": "node agent.js --once", "scan": "node agent.js --scan" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "node-zklib": "^1.3.0", "xlsx": "^0.18.5" }
+}

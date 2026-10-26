@@ -1,0 +1,15 @@
+{
+  "serverUrl": "http://localhost:5000",
+  "agentKey": "6a4d34617113a285bf08dd96.3cc08a73f432e7d765c7055aa18bd8d6aef3551a14d8257d",
+  "syncIntervalMinutes": 5,
+  "deviceTimezone": "+05:30",
+  "lan": {
+    "scanSubnet": "auto",
+    "port": 4370,
+    "knownDevices": []
+  },
+  "usbDrive": {
+    "enabled": true,
+    "deviceSerial": ""
+  }
+}
