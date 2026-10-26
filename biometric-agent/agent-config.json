@@ -1,12 +1,22 @@
 {
-  "serverUrl": "http://localhost:5000",
-  "agentKey": "6a4d34617113a285bf08dd96.3cc08a73f432e7d765c7055aa18bd8d6aef3551a14d8257d",
   "syncIntervalMinutes": 5,
   "deviceTimezone": "+05:30",
-  "lan": {
-    "scanSubnet": "auto",
-    "port": 4370,
-    "knownDevices": []
-  },
-     "usbDrive": { "enabled": true, "deviceSerial": "2405021163" }
+  "organisations": [
+    {
+      "name": "Jobdaddy",
+      "serverUrl": "https://torchxsuite.com/api",
+      "agentKey": "6a741f40d572d2efa8e7a814.8f1ff82f8d966591e0c71f5f704529339a8559a0d7194b8a",
+      "lan": {
+        "scanSubnet": "auto",
+        "port": 4370,
+        "knownDevices": []
+      },
+      "usbDrive": {
+        "enabled": true
+      },
+      "usbCable": {
+        "enabled": false
+      }
+    }
+  ]
 }

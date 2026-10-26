@@ -23,6 +23,8 @@ const biometricDeviceSchema = new mongoose.Schema(
     fingerCount: { type: Number, default: 0 },
     logCount: { type: Number, default: 0 },
     logCapacity: { type: Number, default: 0 },
+    // Timezone of the machine's clock, e.g. "+05:30". Empty = agent default. Set per device in HRMS.
+    timezone: { type: String, trim: true, default: "", match: [/^([+-]\d{2}:\d{2})?$/, "timezone must look like +05:30"] },
     deviceTime: Date,
     // Which Attendance direction rule to use when the machine does not say in/out
     punchMode: { type: String, enum: ["first_last", "device_state"], default: "first_last" },

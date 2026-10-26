@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Fingerprint, Plus, Download, Trash2, Loader2, Users, RefreshCw, X, KeyRound, Wand2 } from "lucide-react";
+import { Fingerprint, Plus, Download, Trash2, Loader2, Users, RefreshCw, X, KeyRound, Wand2, Upload } from "lucide-react";
 import {
   useBiometricDevices,
   useBiometricDeviceUsers,
@@ -11,7 +11,9 @@ import {
   useAutoMapBiometricUsers,
   useReprocessBiometric,
 } from "../../auth/server-state/biometric/biometric.hook";
-import { downloadBlob } from "../../auth/api/biometric/biometric.api";
+import { downloadBlob, importBiometricPunches } from "../../auth/api/biometric/biometric.api";
+import { useQueryClient } from "@tanstack/react-query";
+import { parseAttendanceFile } from "./parseAttendanceFile";
 
 const errMsg = (e, fb) => e?.response?.data?.message || e?.message || fb;
 const fmt = (d) => (d ? new Date(d).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—");
@@ -46,6 +48,66 @@ function AddDeviceModal({ onClose, notify }) {
           <button className={btn} onClick={onClose}>Cancel</button>
           <button className={btnPrimary} disabled={!f.serialNumber.trim() || create.isPending} onClick={submit}>
             {create.isPending && <Loader2 className="w-3 h-3 animate-spin" />} Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImportModal({ devices, onClose, notify }) {
+  const qc = useQueryClient();
+  const [serial, setSerial] = useState(devices[0]?.serialNumber || "USB-IMPORT");
+  const [fileName, setFileName] = useState("");
+  const [punches, setPunches] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    setResult(null); setPunches([]); setFileName(file?.name || "");
+    if (!file) return;
+    try {
+      const rows = await parseAttendanceFile(file);
+      setPunches(rows);
+      if (!rows.length) notify("error", "No punches found in this file. Use the attendance export (.dat/.csv/.xls/.xlsx) from the machine.");
+    } catch (err) { notify("error", errMsg(err, "Could not read the file")); }
+  };
+
+  const upload = async () => {
+    setBusy(true);
+    let received = 0, fresh = 0;
+    try {
+      for (let i = 0; i < punches.length; i += 500) {
+        const r = await importBiometricPunches({ serialNumber: serial.trim(), punches: punches.slice(i, i + 500) });
+        received += r.received || 0; fresh += r.newPunches || 0;
+      }
+      setResult({ received, fresh });
+      qc.invalidateQueries({ queryKey: ["biometric"] });
+      notify("success", `Imported: ${fresh} new punches (${received - fresh} already existed)`);
+    } catch (err) { notify("error", errMsg(err, "Import failed")); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-slate-800">Import attendance file</h3>
+          <button onClick={onClose}><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-xs text-slate-400">Export attendance from the machine to a pen drive, then choose that file here (.dat, .csv, .txt, .xls, .xlsx).</p>
+        <label className="text-xs text-slate-500 block">Device serial number
+          <input className={input} list="bio-serials" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="e.g. 2405021163" />
+          <datalist id="bio-serials">{devices.map((d) => <option key={d._id} value={d.serialNumber}>{d.name}</option>)}</datalist>
+        </label>
+        <input type="file" accept=".dat,.csv,.txt,.xls,.xlsx" onChange={pick} className="block w-full text-sm" />
+        {fileName && <p className="text-xs text-slate-500">{fileName}: <b>{punches.length}</b> punches found</p>}
+        {result && <p className="text-xs text-emerald-700">Done: {result.fresh} new, {result.received - result.fresh} duplicates skipped. Map users to Emp IDs, then click Re-process attendance.</p>}
+        <div className="flex justify-end gap-2">
+          <button className={btn} onClick={onClose}>Close</button>
+          <button className={btnPrimary} disabled={!punches.length || !serial.trim() || busy} onClick={upload}>
+            {busy && <Loader2 className="w-3 h-3 animate-spin" />} Import
           </button>
         </div>
       </div>
@@ -176,6 +238,7 @@ export default function BiometricDevicesPanel({ notify }) {
   const update = useUpdateBiometricDevice();
   const remove = useDeleteBiometricDevice();
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [usersFor, setUsersFor] = useState(null);
   const devices = data?.devices || [];
 
@@ -196,6 +259,7 @@ export default function BiometricDevicesPanel({ notify }) {
         </div>
         <div className="flex gap-2 shrink-0">
           <button className={btn} onClick={getAgentConfig}><KeyRound className="w-3 h-3" /> Download agent config</button>
+          <button className={btn} onClick={() => setImporting(true)}><Upload className="w-3 h-3" /> Import file</button>
           <button className={btnPrimary} onClick={() => setAdding(true)}><Plus className="w-3 h-3" /> Add device</button>
         </div>
       </div>
@@ -231,6 +295,7 @@ export default function BiometricDevicesPanel({ notify }) {
       ))}
 
       <PunchLog devices={devices} notify={notify} />
+      {importing && <ImportModal devices={devices} onClose={() => setImporting(false)} notify={notify} />}
       {adding && <AddDeviceModal onClose={() => setAdding(false)} notify={notify} />}
       {usersFor && <UsersModal device={usersFor} onClose={() => setUsersFor(null)} notify={notify} />}
     </div>

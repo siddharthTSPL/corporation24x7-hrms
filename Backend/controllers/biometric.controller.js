@@ -254,7 +254,7 @@ const agentPunches = async (req, res) => {
 // GET /biometric/agent/config  -> what the agent needs to know (device list + known mappings)
 const agentConfig = async (req, res) => {
   const devices = await BiometricDevice.find({ organisation_id: req.agentOrg, isActive: true })
-    .select("serialNumber name ip port connectionType").lean();
+    .select("serialNumber name ip port connectionType timezone").lean();
   res.json({ devices, serverTime: new Date() });
 };
 
@@ -278,12 +278,14 @@ const listDevices = async (req, res) => {
 
 // Pre-register a machine by serial (e.g. 2405021163) before the agent reads it.
 const createDevice = async (req, res) => {
-  const { serialNumber, name, location, model, manufacturer } = req.body || {};
+  const { serialNumber, name, location, model, manufacturer, ip, port, connectionType, timezone } = req.body || {};
   if (!serialNumber || !String(serialNumber).trim()) return res.status(400).json({ message: "serialNumber is required" });
   try {
     const device = await BiometricDevice.create({
       organisation_id: orgOf(req), serialNumber: String(serialNumber).trim(),
       name: name || "", location: location || "", model: model || "", manufacturer: manufacturer || "",
+      ...(ip && { ip: String(ip).trim() }), ...(Number(port) > 0 && { port: Number(port) }),
+      ...(connectionType && { connectionType }), ...(timezone && { timezone: String(timezone).trim() }),
     });
     res.status(201).json({ device });
   } catch (e) {
@@ -293,7 +295,7 @@ const createDevice = async (req, res) => {
 };
 
 const updateDevice = async (req, res) => {
-  const allowed = ["name", "location", "isActive", "punchMode", "model", "manufacturer"];
+  const allowed = ["name", "location", "isActive", "punchMode", "model", "manufacturer", "ip", "port", "connectionType", "timezone"];
   const set = {};
   for (const k of allowed) if (req.body[k] !== undefined) set[k] = req.body[k];
   const device = await BiometricDevice.findOneAndUpdate({ _id: req.params.id, organisation_id: orgOf(req) }, { $set: set }, { returnDocument: "after" });
@@ -319,12 +321,23 @@ const downloadAgentConfig = async (req, res) => {
     { upsert: true, returnDocument: "after" }
   );
   const serverUrl = (process.env.PUBLIC_API_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+  // Multi-organisation format. To serve several organisations from one agent, paste each
+  // organisation's entry into the "organisations" array of one agent-config.json.
+  // Machines (IP, port, connection type, timezone) are NOT written here: the agent reads them
+  // from HRMS (GET /biometric/agent/config), so they are configured per organisation in the UI.
   const cfg = {
-    serverUrl,
-    agentKey: `${organisation_id}.${secret}`,
     syncIntervalMinutes: 5,
-    lan: { scanSubnet: "auto", port: 4370, knownDevices: [] },
-    usbDrive: { enabled: true, fileNames: ["*.dat", "*.csv", "*.xls", "*.xlsx", "*.txt"] },
+    deviceTimezone: "+05:30",
+    organisations: [
+      {
+        name: String(req.query.name || organisation_id),
+        serverUrl,
+        agentKey: `${organisation_id}.${secret}`,
+        lan: { scanSubnet: "auto", port: 4370, knownDevices: [] },
+        usbDrive: { enabled: true },
+        usbCable: { enabled: false },
+      },
+    ],
   };
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Disposition", 'attachment; filename="agent-config.json"');

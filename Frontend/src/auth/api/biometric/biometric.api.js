@@ -14,6 +14,7 @@ export const mapBiometricUser = async ({ id, deviceUserId, empid }) =>
   (await api.put(`biometric/devices/${id}/users/${encodeURIComponent(deviceUserId)}`, { empid })).data;
 export const autoMapBiometricUsers = async (id) => (await api.post(`biometric/devices/${id}/auto-map`)).data;
 export const getBiometricPunches = async (params) => (await api.get("biometric/punches", { params })).data;
+export const importBiometricPunches = async (data) => (await api.post("biometric/import", data)).data;
 export const reprocessBiometric = async (params) => (await api.post("biometric/reprocess", null, { params })).data;
 
 // Downloads (files come back as blobs so the auth cookie is sent)
