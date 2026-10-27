@@ -32,6 +32,9 @@ module.exports = {
     { key: "category", header: "Category", type: "text", width: 16 },
     { key: "currency", header: "Currency", type: "text", width: 10 },
     { key: "amount", header: "Claimed Amount", type: "currency", width: 16 },
+    { key: "approvedAmount", header: "Approved Amount", type: "currency", width: 16 },
+    { key: "reimbursedAmount", header: "Reimbursed Amount", type: "currency", width: 18 },
+    { key: "awaitingAmount", header: "Approved, Not Yet Reimbursed", type: "currency", width: 24 },
     { key: "status", header: "Approval Status", type: "text", width: 16 },
     { key: "approver", header: "Approver", type: "text", width: 24 },
     { key: "decisionDate", header: "Decision Date", type: "date", width: 14 },
@@ -39,7 +42,8 @@ module.exports = {
   ],
   notes: [
     "Draft claims are excluded unless 'Draft' is selected. Deleted claims are never shown.",
-    "Only the claimed amount is stored - there is no separate approved amount, so approved/paid totals use the claimed amount.",
+    "Only the claimed amount is stored - there is no separate approved amount, so Approved Amount equals the claimed amount for Approved and Paid claims.",
+    "Reimbursed Amount counts only claims marked Paid. An Approved claim is not treated as paid; it shows under 'Approved, Not Yet Reimbursed' until payment is recorded.",
     "Totals are shown per currency; amounts in different currencies are never added together.",
   ],
   period: (f) => periodText(fmtDate(parseDateStrict(f.from)), fmtDate(parseDateStrict(f.to))),
@@ -48,16 +52,20 @@ module.exports = {
     const cur = {};
     return {
       add: (r) => {
-        const c = (cur[r.currency] ||= { claimed: 0, approvedPaid: 0, pending: 0, rejected: 0 });
+        const c = (cur[r.currency] ||= { claimed: 0, approved: 0, reimbursed: 0, awaiting: 0, pending: 0, rejected: 0 });
         c.claimed += r.amount;
-        if (r.status === "Approved" || r.status === "Paid") c.approvedPaid += r.amount;
-        else if (r.status === "Pending") c.pending += r.amount;
+        c.approved += r.approvedAmount;
+        c.reimbursed += r.reimbursedAmount;
+        c.awaiting += r.awaitingAmount;
+        if (r.status === "Pending") c.pending += r.amount;
         else if (r.status === "Rejected") c.rejected += r.amount;
       },
       items: () =>
         Object.entries(cur).flatMap(([code, c]) => [
           { label: `Total claimed (${code})`, value: round2(c.claimed), type: "currency" },
-          { label: `Approved + Paid (${code})`, value: round2(c.approvedPaid), type: "currency" },
+          { label: `Approved (${code})`, value: round2(c.approved), type: "currency" },
+          { label: `Reimbursed (${code})`, value: round2(c.reimbursed), type: "currency" },
+          { label: `Approved, not yet reimbursed (${code})`, value: round2(c.awaiting), type: "currency" },
           { label: `Pending (${code})`, value: round2(c.pending), type: "currency" },
           { label: `Rejected (${code})`, value: round2(c.rejected), type: "currency" },
         ]),
@@ -94,6 +102,9 @@ module.exports = {
     const rows = docs.map((d) => {
       const p = byId.get(String(d.submittedBy)) || {};
       const rejected = d.status === "rejected";
+      const amount = round2(d.amountClaimed);
+      const isPaid = d.status === "paid";
+      const isApprovedOnly = d.status === "approved";
       const by = rejected ? d.rejectedBy : d.approvedBy;
       const byModel = rejected ? d.rejectedByModel : d.approvedByModel;
       return {
@@ -102,7 +113,10 @@ module.exports = {
         expenseDate: d.expenseDate,
         category: d.reimbursementType,
         currency: d.currency || "INR",
-        amount: round2(d.amountClaimed),
+        amount,
+        approvedAmount: isPaid || isApprovedOnly ? amount : 0,
+        reimbursedAmount: isPaid ? amount : 0,
+        awaitingAmount: isApprovedOnly ? amount : 0,
         status: STATUS_MAP[d.status] || d.status,
         approver: (by && names.get(`${byModel}:${by}`)) || "",
         decisionDate: (rejected ? d.rejectedAt : d.approvedAt) || null,
