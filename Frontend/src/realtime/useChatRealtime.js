@@ -41,26 +41,26 @@ export default function useChatRealtime(enabled) {
     const detachCalls = callManager.attach(socket);
 
     // --- identity + presence ---
-    const onReady = ({ recipientModel, id }) => chat().setMyKey(`${recipientModel}:${id}`);
     const onPresence = ({ key, online, lastSeenAt, inCall }) => chat().setPresence(key, online, lastSeenAt || null, inCall);
 
-    // "socket:ready" fires once per connection. If this hook mounted AFTER it fired (or the store was
-    // reset) myKey stayed empty and every message looked like it came from the other person. So we
-    // always make sure we know who we are: ask the socket, and fall back to REST.
     const syncIdentity = async () => {
-      if (chat().myKey) return;
+      try {
+        const r = await getMe();
+        if (r?.key) {
+          if (chat().myKey !== r.key) chat().setMyKey(r.key);
+          return;
+        }
+      } catch {
+        void 0;
+      }
       try {
         const r = await emitAck("chat:whoami", {}, 5000);
-        if (r?.key) chat().setMyKey(r.key);
+        if (r?.key && !chat().myKey) chat().setMyKey(r.key);
       } catch {
-        try {
-          const r = await getMe();
-          if (r?.key) chat().setMyKey(r.key);
-        } catch {
-          /* the next connect retries */
-        }
+        void 0;
       }
     };
+    const onReady = () => syncIdentity();
 
     // After a drop/reconnect we may have missed live events: refresh what's on screen.
     let connectedOnce = socket.connected;
@@ -163,7 +163,7 @@ export default function useChatRealtime(enabled) {
     for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.on(ev, refreshMeetings);
     socket.on("meeting:reminder", onMeetingReminder);
     socket.on("call:ended", () => qc.invalidateQueries({ queryKey: CHAT_KEYS.callHistory }));
-    if (socket.connected) syncIdentity(); // already connected before we attached (re-mount)
+    syncIdentity();
 
     return () => {
       readTimers.forEach(clearTimeout);

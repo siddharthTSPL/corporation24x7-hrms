@@ -81,12 +81,20 @@ function MenuButton({ icon: Icon, label, onClick, danger }) {
 
 export default function ChatThread({ conversationId, listConv, onBack, expanded, onToggleExpand, onClose, canExpand, showBack }) {
   const qc = useQueryClient();
-  const myKey = useChatStore((s) => s.myKey);
+  const storeKey = useChatStore((s) => s.myKey);
   const setInfoOpen = useChatUiStore((s) => s.setInfoOpen);
   const { startCall, inCall } = useCall();
 
   const { data: detail, isError: convMissing } = useConversation(conversationId);
   const conv = detail || listConv;
+  const derivedKey =
+    conv?.type === "direct" && conv.otherPerson && conv.participants?.length === 2
+      ? conv.participants.find((p) => p.key !== conv.otherPerson.key)?.key
+      : null;
+  const myKey = derivedKey || storeKey;
+  useEffect(() => {
+    if (derivedKey && derivedKey !== useChatStore.getState().myKey) useChatStore.getState().setMyKey(derivedKey);
+  }, [derivedKey]);
   const isGroup = conv ? conv.type !== "direct" : false;
   const other = conv?.otherPerson;
   const isGroupAdmin = conv?.type === "group" && conv?.myRole === "admin";

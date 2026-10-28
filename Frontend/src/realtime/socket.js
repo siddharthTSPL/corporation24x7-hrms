@@ -1,4 +1,5 @@
 import { io } from "socket.io-client";
+import { useChatStore } from "../auth/store/chat/chatStore";
 
 // Same base the axios clients use: "/talent/api" in production (reverse proxy
 // strips /talent/api before it reaches Node), "http://localhost:5000/" in dev.
@@ -70,6 +71,11 @@ export const getSocket = () => {
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
+  });
+
+  socket.on("socket:ready", ({ recipientModel, id, key }) => {
+    const mine = key || (recipientModel && id ? `${recipientModel}:${id}` : null);
+    if (mine && useChatStore.getState().myKey !== mine) useChatStore.getState().setMyKey(mine);
   });
 
   socket.on("connect", () => {

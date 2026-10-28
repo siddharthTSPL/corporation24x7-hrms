@@ -46,6 +46,20 @@ export { CHAT_KEYS };
 
 // ---------------------------------------------------------------- utilities
 
+const deriveMyKey = (convs = []) => {
+  for (const c of convs) {
+    if (c.type === "direct" && c.otherPerson && c.participants?.length === 2) {
+      const m = c.participants.find((p) => p.key !== c.otherPerson.key);
+      if (m) return m.key;
+    }
+  }
+  return null;
+};
+
+const syncMyKey = (me) => {
+  if (me && useChatStore.getState().myKey !== me) useChatStore.getState().setMyKey(me);
+};
+
 export const useDebouncedValue = (value, delay = 300) => {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -75,7 +89,11 @@ export const useDirectorySearch = (query = "", { department = "", enabled = true
 export const useConversations = (enabled = true) =>
   useQuery({
     queryKey: CHAT_KEYS.conversations,
-    queryFn: () => getConversations({ limit: 100 }),
+    queryFn: async () => {
+      const r = await getConversations({ limit: 100 });
+      syncMyKey(r?.me || deriveMyKey(r?.conversations));
+      return r;
+    },
     enabled,
     staleTime: 15000,
     refetchOnWindowFocus: true,
@@ -175,7 +193,11 @@ export const useChatUnreadCount = (enabled = true) =>
 export const useChatMessages = (conversationId) => {
   const q = useInfiniteQuery({
     queryKey: CHAT_KEYS.messages(conversationId),
-    queryFn: ({ pageParam }) => getMessages({ id: conversationId, before: pageParam, limit: 40 }),
+    queryFn: async ({ pageParam }) => {
+      const r = await getMessages({ id: conversationId, before: pageParam, limit: 40 });
+      syncMyKey(r?.me);
+      return r;
+    },
     initialPageParam: undefined,
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     enabled: !!conversationId,
