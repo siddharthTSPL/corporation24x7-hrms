@@ -2,7 +2,7 @@
 // Generated in-browser with the Web Audio API, so there's no audio file to
 // ship/host — it works instantly and can't 404.
 
-import { getSharedAudioContext } from "./callSound";
+import { getSharedAudioContext } from "./Callsound";
 
 const STORAGE_KEY = "torchx_notif_sound_enabled";
 
