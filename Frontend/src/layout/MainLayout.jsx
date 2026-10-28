@@ -13,6 +13,7 @@ import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 import useRealtimeSync from "../realtime/useRealtimeSync";
+import ChatRoot from "../components/chat/ChatRoot";
 
 // Birthdays are matched on the IST calendar - the same clock the backend
 // birthday cron uses - so the popup, the bell notification and the reminder
@@ -246,6 +247,8 @@ export default function MainLayout() {
   <Outlet />
 </div>
       </div>
+
+      <ChatRoot />
 
       {showWelcome && (
         <WelcomeModal

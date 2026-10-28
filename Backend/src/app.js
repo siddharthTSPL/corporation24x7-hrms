@@ -18,6 +18,7 @@ require('../automatic/Offerlifecycle');
 require('../automatic/Trainingreminders');
 require('../automatic/Featurelaunchnotify');
 require('../automatic/Hourlyleavesync');
+require('../automatic/Meetingreminders');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -103,6 +104,8 @@ const trainingRouter = require('../routes/training.routes');
 const overtimeRouter = require('../routes/overtime.routes');
 const orgTeamRouter = require('../routes/orgteam.routes');
 const reportsRouter = require('../reports/reports.router');
+const chatRouter = require('../routes/chat.routes');
+const meetingRouter = require('../routes/meeting.routes');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -151,6 +154,10 @@ app.use('/overtime', overtimeRouter);
 app.use('/org-teams', orgTeamRouter);
 // Reports & Analytics (see reports/). Auth + permission + tenant scope are enforced inside the router.
 app.use('/reports', reportsRouter);
+// Chat (1:1 + groups), voice/video call history + ICE config, and meeting scheduling.
+// Live messaging and call signalling run over Socket.IO (config/chatSocket.js).
+app.use('/chat', chatRouter);
+app.use('/meetings', meetingRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

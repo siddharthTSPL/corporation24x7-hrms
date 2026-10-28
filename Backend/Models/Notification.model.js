@@ -25,6 +25,8 @@ const NOTIFICATION_TYPES = [
   "birthday",
   "system",
   "general",
+  "chat",
+  "meeting",
 ];
 
 const notificationSchema = new mongoose.Schema(

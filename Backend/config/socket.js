@@ -109,6 +109,14 @@ const initSocket = (httpServer) => {
     if (organisation_id) socket.join(orgRoom(organisation_id));
     console.log(`[socket] connected ${recipientModel}:${id} via ${socket.conn.transport.name} (total: ${io.engine.clientsCount})`);
     socket.emit("socket:ready", { recipientModel, id });
+
+    // chat / presence / calls. Required lazily: chatSocket needs this module's
+    // emit helpers, which only exist once this file has finished loading.
+    try {
+      require("./chatSocket").registerChatSocket(io, socket);
+    } catch (err) {
+      console.error("[socket] chat handlers failed to attach:", err.message);
+    }
   });
 
   console.log("Socket.IO initialised");
