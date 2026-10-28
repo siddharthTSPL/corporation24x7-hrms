@@ -73,7 +73,17 @@ const authenticate = async (socket, next) => {
     if (!rawId) return reject(socket, next, "invalid_token_payload");
 
     const Model = require(cfg.model);
-    const account = await Model.findById(rawId).select("_id organisation_id working_status").lean();
+    let account;
+    try {
+      account = await Model.findById(rawId).select("_id organisation_id working_status").lean();
+    } catch (dbErr) {
+      // Transient DB problem: NOT the user's fault, so mark it retryable. The
+      // client keeps retrying instead of staying dead until a page refresh.
+      console.error("[socket] auth DB lookup failed:", dbErr.message);
+      const e = new Error("server_busy");
+      e.data = { retry: true };
+      return next(e);
+    }
     if (!account) return reject(socket, next, "account_not_found");
     if (account.working_status && account.working_status !== "working") {
       return reject(socket, next, "inactive");
@@ -99,6 +109,17 @@ const initSocket = (httpServer) => {
     transports: ["polling", "websocket"],
     pingInterval: 25000,
     pingTimeout: 20000,
+    // IIS / ARR / nginx buffer or re-compress long-poll responses, which makes
+    // live events show up late ("only after refresh"). Keep payloads untouched.
+    httpCompression: false,
+    perMessageDeflate: false,
+  });
+
+  // Tell every proxy in front of Node: never buffer or cache socket.io traffic.
+  io.engine.on("headers", (headers) => {
+    headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+    headers["X-Accel-Buffering"] = "no"; // nginx
+    headers["Pragma"] = "no-cache";
   });
 
   io.use(authenticate);

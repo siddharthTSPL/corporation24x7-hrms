@@ -14,6 +14,7 @@ import {
 import useCall from "../../realtime/useCall";
 import Avatar from "./Avatar";
 import { formatDuration } from "./chatUtils";
+import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/callSound";
 
 function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false }) {
   const ref = useRef(null);
@@ -253,49 +254,46 @@ function CallScreen() {
   );
 }
 
-function useRingtone(ringing) {
+function useRingtone(ringing, calls) {
+  const [locked, setLocked] = useState(false);
+
   useEffect(() => {
     if (!ringing) return undefined;
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return undefined;
-    let ctx;
-    try {
-      ctx = new Ctx();
-    } catch {
-      return undefined;
-    }
-    const beep = () => {
-      if (ctx.state === "suspended") ctx.resume().catch(() => {});
-      [0, 0.28].forEach((offset) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
-        gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + offset + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.22);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(ctx.currentTime + offset);
-        osc.stop(ctx.currentTime + offset + 0.25);
-      });
-    };
-    beep();
-    const t = setInterval(beep, 2000);
+    setLocked(isAudioLocked());
+    const onUnlock = () => setLocked(false);
+    window.addEventListener("torchx-audio-unlocked", onUnlock);
+
+    const stopRing = startRingtone();
+    const first = calls[0];
+    const closeAlert = showIncomingCallAlert({
+      title: first?.from?.name || first?.conversationName || "Incoming call",
+      body: `${first?.media === "video" ? "Video" : "Voice"} call - tap to answer`,
+    });
     return () => {
-      clearInterval(t);
-      ctx.close().catch(() => {});
+      window.removeEventListener("torchx-audio-unlocked", onUnlock);
+      stopRing();
+      closeAlert();
     };
+    // restart only when ringing starts/stops, not on every store tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ringing]);
+
+  return locked;
 }
 
 function IncomingCalls() {
   const { incoming, inCall, joinCall, declineCall } = useCall();
-  useRingtone(incoming.length > 0 && !inCall);
+  const audioLocked = useRingtone(incoming.length > 0 && !inCall, incoming);
 
   if (!incoming.length) return null;
 
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[95] flex flex-col gap-2 w-[min(360px,calc(100vw-2rem))]">
+      {audioLocked && incoming.length > 0 && !inCall && (
+        <div className="text-center text-[11px] text-amber-200 bg-amber-900/80 rounded-lg px-3 py-1">
+          Click anywhere on the page to enable the ringtone
+        </div>
+      )}
       {incoming.map((c) => {
         const caller = c.from?.name || c.conversationName || "Incoming call";
         const sub =

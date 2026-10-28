@@ -2,16 +2,13 @@
 // Generated in-browser with the Web Audio API, so there's no audio file to
 // ship/host — it works instantly and can't 404.
 
+import { getSharedAudioContext } from "./callSound";
+
 const STORAGE_KEY = "torchx_notif_sound_enabled";
 
-let sharedCtx = null;
-const getAudioContext = () => {
-  if (typeof window === "undefined") return null;
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null;
-  if (!sharedCtx) sharedCtx = new Ctx();
-  return sharedCtx;
-};
+// One shared, user-gesture-unlocked AudioContext (see callSound.js). A context
+// created on its own when a message arrives stays muted in most browsers.
+const getAudioContext = () => getSharedAudioContext();
 
 export const isSoundEnabled = () => {
   if (typeof window === "undefined") return true;
