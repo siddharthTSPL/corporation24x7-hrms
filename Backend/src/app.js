@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const compression = require('compression');
 const allowedOrigins = require('../config/allowedOrigins');
+const realtimeEmit = require('../middleware/realtime/realtimeEmit.middleware');
 
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
@@ -62,6 +63,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Socket.IO: after any successful write, tell the org's connected clients which
+// module changed so their lists refresh live (see middleware/realtime).
+app.use(realtimeEmit);
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');

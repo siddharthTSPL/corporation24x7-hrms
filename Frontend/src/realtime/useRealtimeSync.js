@@ -2,38 +2,57 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { connectSocket, disconnectSocket } from "./socket";
 
-// Which cached lists to refetch when a notification of a given type arrives,
-// so pages (leave requests, WFH, tickets, ...) update without a manual refresh.
-// Keys are React Query key prefixes already used across auth/server-state.
-const LEAVE_KEYS = ["leaveHistory", "AllLeaves", "leaves", "superadmin-leaves", "forwardedLeavesManager", "allManagerLeaves", "myLeavesManager", "employeeStats"];
-const WFH_KEYS = ["adminPendingWFH", "superadmin-pending-wfh", "pendingWFH", "forwardedWFH", "teamWFH", "employee-wfh"];
-const ASSET_KEYS = ["admin-assets", "admin-asset", "superadmin-assets", "superadmin-asset"];
-const TICKET_KEYS = ["tickets", "ticket-stats", "ticket", "employeeTickets", "adminTickets", "managerTickets"];
-const REIMB_KEYS = ["manager-reimbursements", "employee-reimbursements", "admin-my-reimbursements"];
-const DOC_KEYS = ["documents", "personalDocuments", "personal-documents", "manager-documents", "manager-personal-documents", "expenseDocuments", "expense-documents"];
-const TIMESHEET_KEYS = ["tsPendingApprovals", "tsMyTimesheets", "tsOrgAllTimesheets", "tsWeekLog", "tsJobsAssignedToMe", "tsJobsCreatedByMe", "attendance"];
-
-const KEYS_BY_TYPE = {
-  leave_applied: LEAVE_KEYS,
-  leave_approved: LEAVE_KEYS,
-  leave_rejected: LEAVE_KEYS,
-  leave_forwarded: LEAVE_KEYS,
-  wfh_applied: WFH_KEYS,
-  wfh_approved: WFH_KEYS,
-  wfh_rejected: WFH_KEYS,
-  wfh_forwarded: WFH_KEYS,
-  asset_assigned: ASSET_KEYS,
-  asset_returned: ASSET_KEYS,
-  announcement: ["announcements"],
-  ticket: TICKET_KEYS,
-  reimbursement: REIMB_KEYS,
-  document: DOC_KEYS,
-  policy: ["policies", "policy-dashboard"],
-  payroll: ["payrolls"],
-  review: ["allReviews"],
-  timesheet: TIMESHEET_KEYS,
-  overtime: TIMESHEET_KEYS,
+// Module -> which cached React Query lists to refetch. Matched on the FIRST
+// element of the query key, so every role's variant (adminPendingWFH,
+// superadmin-leaves, managerTickets, ...) is covered. Only queries that are
+// currently on screen refetch; the rest are just marked stale.
+const MODULES = {
+  leave: /leave|^employeeStats$|^myTeamOverview$/i,
+  wfh: /wfh/i,
+  timesheet: /^ts[A-Z]/,
+  attendance: /^(attendance|attendanceOverview|employeeAttendanceHistory|myTeamOverview|todayLeaves)$/,
+  reimbursement: /reimbursement/i,
+  ticket: /ticket/i,
+  announcement: /announcement/i,
+  document: /document/i,
+  asset: /asset/i,
+  review: /review/i,
+  training: /training/i,
+  overtime: /overtime/i,
+  payroll: /^(payrolls|payslip|my-payslips|salary-structures|fnf-records|fnf-eligible|payroll-policy)$/,
+  recruitment: /^(all-requisitions|pending-requisitions|my-requisitions|requisition|candidate|candidates|offer-bundle|recruitment-approvers|recruitment-interviewers)$/,
+  policy: /^(policies|policy-dashboard|policy-detail)$/,
+  holiday: /holiday/i,
+  shift: /shift/i,
+  people: /^(employees|managers|admins|employee|manager|admin|employeeStats|usersUnderManager)$/,
 };
+
+// Notification type -> module(s) (a notification can touch more than one list).
+const MODULES_BY_NOTIFICATION = {
+  leave_applied: ["leave"],
+  leave_approved: ["leave", "attendance"],
+  leave_rejected: ["leave"],
+  leave_forwarded: ["leave"],
+  wfh_applied: ["wfh"],
+  wfh_approved: ["wfh", "attendance"],
+  wfh_rejected: ["wfh"],
+  wfh_forwarded: ["wfh"],
+  asset_assigned: ["asset"],
+  asset_returned: ["asset"],
+  announcement: ["announcement"],
+  ticket: ["ticket"],
+  reimbursement: ["reimbursement"],
+  document: ["document"],
+  policy: ["policy"],
+  payroll: ["payroll"],
+  review: ["review"],
+  training: ["training"],
+  timesheet: ["timesheet", "attendance"],
+  overtime: ["overtime", "timesheet"],
+  holiday: ["holiday"],
+};
+
+const DEBOUNCE_MS = 1200;
 
 // Mount once inside the authenticated layout. `enabled` should be true only
 // while a user is logged in; flipping it to false (logout) closes the socket.
@@ -48,21 +67,39 @@ export default function useRealtimeSync(enabled) {
 
     const socket = connectSocket();
     let firstConnect = true;
+    const timers = new Map();
 
     const refreshNotifications = () =>
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
-    const onNew = (notification) => {
-      // Bell badge + dropdown refetch -> the bell's existing logic then plays
-      // the chime and shows the toast for the new item.
-      refreshNotifications();
-      (KEYS_BY_TYPE[notification?.type] || []).forEach((key) =>
-        queryClient.invalidateQueries({ queryKey: [key] })
+    // Many writes in a row (e.g. a bulk approve) -> one refetch per module.
+    const refreshModule = (name) => {
+      const re = MODULES[name];
+      if (!re) return;
+      clearTimeout(timers.get(name));
+      timers.set(
+        name,
+        setTimeout(() => {
+          timers.delete(name);
+          queryClient.invalidateQueries({
+            predicate: (q) => typeof q.queryKey[0] === "string" && re.test(q.queryKey[0]),
+          });
+        }, DEBOUNCE_MS)
       );
     };
 
+    // A notification was created for me: bell + related lists.
+    const onNotification = (notification) => {
+      refreshNotifications();
+      (MODULES_BY_NOTIFICATION[notification?.type] || []).forEach(refreshModule);
+    };
+
+    // Someone in my organisation changed data (leave applied, timesheet
+    // submitted, ticket raised, ...): refresh that module's lists.
+    const onDataChanged = (evt) => refreshModule(evt?.module);
+
     // Read / delete / clear done in another tab or device.
-    const onChanged = () => refreshNotifications();
+    const onNotificationChanged = () => refreshNotifications();
 
     // After a reconnect, catch up on anything missed while offline.
     const onConnect = () => {
@@ -70,16 +107,19 @@ export default function useRealtimeSync(enabled) {
         firstConnect = false;
         return;
       }
-      refreshNotifications();
+      queryClient.invalidateQueries();
     };
 
-    socket.on("notification:new", onNew);
-    socket.on("notification:changed", onChanged);
+    socket.on("notification:new", onNotification);
+    socket.on("notification:changed", onNotificationChanged);
+    socket.on("data:changed", onDataChanged);
     socket.on("connect", onConnect);
 
     return () => {
-      socket.off("notification:new", onNew);
-      socket.off("notification:changed", onChanged);
+      timers.forEach(clearTimeout);
+      socket.off("notification:new", onNotification);
+      socket.off("notification:changed", onNotificationChanged);
+      socket.off("data:changed", onDataChanged);
       socket.off("connect", onConnect);
     };
   }, [enabled, queryClient]);
