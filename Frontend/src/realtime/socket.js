@@ -19,9 +19,22 @@ export const getSocket = () => {
     path,
     withCredentials: true, // sends the same "token" cookie the REST API uses
     autoConnect: false,
-    transports: ["websocket", "polling"],
+    // Default order (long-polling first, then upgrade to WebSocket). This works
+    // through ANY proxy (IIS/ARR, nginx, Cloudflare); if WebSocket is blocked
+    // it simply stays on long-polling instead of failing to connect.
     reconnectionDelayMax: 10000,
   });
+
+  // Visible in the browser console so a broken proxy/cookie is easy to spot.
+  socket.on("connect", () =>
+    console.info("[socket] connected via", socket.io.engine.transport.name, "| id:", socket.id)
+  );
+  socket.on("connect_error", (err) =>
+    console.warn("[socket] connect_error:", err.message, "| url:", origin + path)
+  );
+  socket.on("disconnect", (reason) => console.info("[socket] disconnected:", reason));
+
+  if (typeof window !== "undefined") window.__hrmsSocket = socket; // debugging: __hrmsSocket.connected
   return socket;
 };
 

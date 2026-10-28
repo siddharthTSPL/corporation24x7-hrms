@@ -39,6 +39,13 @@ const readCookie = (header, name) => {
   return null;
 };
 
+// Every rejection is logged with its reason, so "why is nobody connecting?"
+// can be answered from the server log alone.
+const reject = (socket, next, reason) => {
+  console.log(`[socket] rejected (${reason}) from ${socket.handshake.address}`);
+  return next(new Error(reason));
+};
+
 const authenticate = async (socket, next) => {
   try {
     // Browser: the same httpOnly "token" cookie the REST API uses.
@@ -49,11 +56,11 @@ const authenticate = async (socket, next) => {
       const h = socket.handshake.headers.authorization;
       if (h?.startsWith("Bearer ")) token = h.slice(7);
     }
-    if (!token) return next(new Error("unauthorized"));
+    if (!token) return reject(socket, next, "no_token_cookie");
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const cfg = ROLE_CONFIG[decoded.role];
-    if (!cfg) return next(new Error("unknown_role"));
+    if (!cfg) return reject(socket, next, "unknown_role");
 
     const rawId =
       decoded._id ||
@@ -63,13 +70,13 @@ const authenticate = async (socket, next) => {
       decoded.managerid ||
       decoded.superadminid ||
       null;
-    if (!rawId) return next(new Error("invalid_token"));
+    if (!rawId) return reject(socket, next, "invalid_token_payload");
 
     const Model = require(cfg.model);
     const account = await Model.findById(rawId).select("_id organisation_id working_status").lean();
-    if (!account) return next(new Error("unauthorized"));
+    if (!account) return reject(socket, next, "account_not_found");
     if (account.working_status && account.working_status !== "working") {
-      return next(new Error("inactive"));
+      return reject(socket, next, "inactive");
     }
 
     socket.data.recipientModel = cfg.recipientModel;
@@ -78,7 +85,7 @@ const authenticate = async (socket, next) => {
       cfg.recipientModel === "SuperAdmin" ? String(account._id) : account.organisation_id ? String(account.organisation_id) : null;
     return next();
   } catch (err) {
-    return next(new Error("unauthorized"));
+    return reject(socket, next, `jwt_${err.name || "error"}`);
   }
 };
 
@@ -89,7 +96,7 @@ const initSocket = (httpServer) => {
     path: "/socket.io",
     cors: { origin: allowedOrigins, credentials: true },
     // websocket first, long-polling as a fallback (IIS/proxies without WS support).
-    transports: ["websocket", "polling"],
+    transports: ["polling", "websocket"],
     pingInterval: 25000,
     pingTimeout: 20000,
   });
@@ -100,6 +107,7 @@ const initSocket = (httpServer) => {
     const { recipientModel, id, organisation_id } = socket.data;
     socket.join(personRoom(recipientModel, id));
     if (organisation_id) socket.join(orgRoom(organisation_id));
+    console.log(`[socket] connected ${recipientModel}:${id} via ${socket.conn.transport.name} (total: ${io.engine.clientsCount})`);
     socket.emit("socket:ready", { recipientModel, id });
   });
 
