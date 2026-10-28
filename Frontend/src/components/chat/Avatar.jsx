@@ -2,7 +2,8 @@ import { useState } from "react";
 import { FaUsers } from "react-icons/fa";
 import { colorFor, initials } from "./chatUtils";
 
-export default function Avatar({ name = "", photo = "", size = 40, online = null, group = false, seed = "" }) {
+// online === true -> green dot; busy === true (on a call) -> amber dot
+export default function Avatar({ name = "", photo = "", size = 40, online = null, group = false, seed = "", busy = false }) {
   const [failedUrl, setFailedUrl] = useState("");
 
   const dot = Math.max(9, Math.round(size * 0.26));
@@ -27,7 +28,8 @@ export default function Avatar({ name = "", photo = "", size = 40, online = null
       )}
       {online === true && (
         <span
-          className="absolute bottom-0 right-0 rounded-full bg-emerald-500 border-2 border-white"
+          title={busy ? "On a call" : "Online"}
+          className={`absolute bottom-0 right-0 rounded-full border-2 border-white ${busy ? "bg-amber-500" : "bg-emerald-500"}`}
           style={{ width: dot, height: dot }}
         />
       )}

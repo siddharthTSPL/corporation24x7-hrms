@@ -24,7 +24,7 @@ const searchPeople = async (req, res) => {
     limit: parseInt(req.query.limit, 10) || 20,
     department: req.query.department || "",
   });
-  ok(res, { people: people.map((p) => ({ ...p, online: presence.isOnline(p.key) })) });
+  ok(res, { people: people.map((p) => ({ ...p, online: presence.isOnline(p.key), inCall: presence.isInCall(p.key) })) });
 };
 
 // ---------- conversations ----------
@@ -156,6 +156,7 @@ const sendMessage = async (req, res) => {
     text: req.body?.text,
     replyTo: req.body?.replyTo || null,
     clientId: req.body?.clientId || null,
+    sticker: req.body?.sticker || null,
     attachments,
   });
   ok(res, { message, duplicate }, duplicate ? 200 : 201);
@@ -165,8 +166,53 @@ const editMessage = async (req, res) => {
   ok(res, { message: await chat.editMessage(actorOf(req), req.params.messageId, req.body?.text) });
 };
 
+// DELETE /chat/messages/:id            -> delete for everyone
+// DELETE /chat/messages/:id?scope=me   -> delete only for me
 const deleteMessage = async (req, res) => {
-  ok(res, await chat.deleteMessage(actorOf(req), req.params.messageId));
+  const scope = req.query.scope === "me" ? "me" : "everyone";
+  ok(res, await chat.deleteMessage(actorOf(req), req.params.messageId, scope));
+};
+
+// POST /chat/messages/:id/react  { emoji }
+const reactToMessage = async (req, res) => {
+  ok(res, { message: await chat.toggleReaction(actorOf(req), req.params.messageId, req.body?.emoji) });
+};
+
+// POST /chat/messages/:id/forward  { conversationIds: [] }
+const forwardMessage = async (req, res) => {
+  ok(res, { messages: await chat.forwardMessage(actorOf(req), req.params.messageId, req.body?.conversationIds) });
+};
+
+// ---------- per-person chat settings ----------
+
+// PATCH /chat/conversations/:id/wallpaper  { wallpaper }   ("" = default)
+const setWallpaper = async (req, res) => {
+  ok(res, { wallpaper: await chat.setWallpaper(actorOf(req), req.params.id, req.body?.wallpaper) });
+};
+
+// POST /chat/conversations/:id/wallpaper/upload   (multipart, field "image")
+const uploadWallpaper = async (req, res) => {
+  const actor = actorOf(req);
+  await chat.loadConversation(actor, req.params.id);
+  const file = req.file;
+  if (!file || !String(file.mimetype).startsWith("image/")) throw httpError("Please choose an image.");
+  const [att] = await uploadAttachments([file], actor, `${req.params.id}/wallpaper`);
+  ok(res, { wallpaper: await chat.setWallpaper(actor, req.params.id, att.url) });
+};
+
+const setPinned = async (req, res) => {
+  await chat.setPinnedChat(actorOf(req), req.params.id, !!req.body?.pinned);
+  ok(res, { pinned: !!req.body?.pinned });
+};
+
+const clearChat = async (req, res) => {
+  await chat.clearChat(actorOf(req), req.params.id);
+  ok(res, { message: "Chat cleared." });
+};
+
+const whoAmI = async (req, res) => {
+  const actor = actorOf(req);
+  ok(res, { key: actor.key, model: actor.model, id: actor.id });
 };
 
 // GET /chat/search?q=invoice&conversationId=<optional>
@@ -188,6 +234,7 @@ const searchMessages = async (req, res) => {
     conversation: { $in: convIds },
     type: { $in: ["text", "file"] },
     deletedAt: null,
+    deletedFor: { $ne: actor.key },
     text: new RegExp(escapeRegex(term), "i"),
   })
     .sort({ _id: -1 })
@@ -286,6 +333,13 @@ module.exports = {
   sendMessage,
   editMessage,
   deleteMessage,
+  reactToMessage,
+  forwardMessage,
+  setWallpaper,
+  uploadWallpaper,
+  setPinned,
+  clearChat,
+  whoAmI,
   searchMessages,
   unreadCount,
   getPresence,

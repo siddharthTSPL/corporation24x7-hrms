@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { connectSocket } from "./socket";
-import { emitQuiet } from "./chatSocket";
+import { emitAck, emitQuiet } from "./chatSocket";
+import { getMe } from "../auth/api/chat/chat.api";
 import { callManager } from "./webrtc/callManager";
 import { useChatStore } from "../auth/store/chat/chatStore";
 import { useCallStore } from "../auth/store/call/callStore";
@@ -10,13 +11,16 @@ import {
   CHAT_KEYS,
   upsertMessage,
   markMessageDeleted,
+  removeMessage,
+  addDelivered,
   patchConversation,
   bumpConversationToTop,
   removeConversation,
 } from "../auth/server-state/chat/chatCache";
 import { MEETING_KEYS } from "../auth/server-state/meeting/meeting.hook";
 
-const preview = (m) => (m.text ? m.text : m.type === "file" ? m.attachments?.[0]?.name || "Attachment" : "");
+const preview = (m) =>
+  m.type === "sticker" ? "Sticker" : m.text ? m.text : m.type === "file" ? m.attachments?.[0]?.name || "Attachment" : "";
 
 // Mount ONCE inside the authenticated layout, next to useRealtimeSync:
 //     useChatRealtime(Boolean(auth?.role));
@@ -38,7 +42,33 @@ export default function useChatRealtime(enabled) {
 
     // --- identity + presence ---
     const onReady = ({ recipientModel, id }) => chat().setMyKey(`${recipientModel}:${id}`);
-    const onPresence = ({ key, online, lastSeenAt }) => chat().setPresence(key, online, lastSeenAt || null);
+    const onPresence = ({ key, online, lastSeenAt, inCall }) => chat().setPresence(key, online, lastSeenAt || null, inCall);
+
+    // "socket:ready" fires once per connection. If this hook mounted AFTER it fired (or the store was
+    // reset) myKey stayed empty and every message looked like it came from the other person. So we
+    // always make sure we know who we are: ask the socket, and fall back to REST.
+    const syncIdentity = async () => {
+      if (chat().myKey) return;
+      try {
+        const r = await emitAck("chat:whoami", {}, 5000);
+        if (r?.key) chat().setMyKey(r.key);
+      } catch {
+        try {
+          const r = await getMe();
+          if (r?.key) chat().setMyKey(r.key);
+        } catch {
+          /* the next connect retries */
+        }
+      }
+    };
+
+    // After a drop/reconnect we may have missed live events: refresh what's on screen.
+    let connectedOnce = socket.connected;
+    const onConnect = () => {
+      syncIdentity();
+      if (connectedOnce) qc.invalidateQueries({ queryKey: CHAT_KEYS.all });
+      connectedOnce = true;
+    };
 
     // --- messages ---
     const readTimers = new Map();
@@ -81,7 +111,13 @@ export default function useChatRealtime(enabled) {
     };
 
     const onMessageUpdated = ({ conversationId, message }) => upsertMessage(qc, conversationId, message);
-    const onMessageDeleted = ({ conversationId, messageId }) => markMessageDeleted(qc, conversationId, messageId);
+    const onMessageDeleted = ({ conversationId, messageId, forMe }) =>
+      forMe ? removeMessage(qc, conversationId, messageId) : markMessageDeleted(qc, conversationId, messageId);
+
+    const onDelivered = ({ conversationId, by, messageIds }) => addDelivered(qc, conversationId, messageIds || [], by);
+
+    // someone tried to call me while I was on another call
+    const onMissedBusy = ({ from }) => toast(`${from?.name || "Someone"} tried to call you while you were on another call.`, { icon: "📞", duration: 6000 });
 
     // someone read the chat: update "seen" ticks; if it was me (other tab) clear my badge
     const onRead = ({ conversationId, by, at }) => {
@@ -119,11 +155,15 @@ export default function useChatRealtime(enabled) {
     socket.on("chat:message:updated", onMessageUpdated);
     socket.on("chat:message:deleted", onMessageDeleted);
     socket.on("chat:read", onRead);
+    socket.on("chat:delivered", onDelivered);
+    socket.on("call:missed-busy", onMissedBusy);
+    socket.on("connect", onConnect);
     socket.on("chat:typing", onTyping);
     socket.on("chat:conversation:updated", onConversationUpdated);
     for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.on(ev, refreshMeetings);
     socket.on("meeting:reminder", onMeetingReminder);
     socket.on("call:ended", () => qc.invalidateQueries({ queryKey: CHAT_KEYS.callHistory }));
+    if (socket.connected) syncIdentity(); // already connected before we attached (re-mount)
 
     return () => {
       readTimers.forEach(clearTimeout);
@@ -135,6 +175,9 @@ export default function useChatRealtime(enabled) {
       socket.off("chat:message:updated", onMessageUpdated);
       socket.off("chat:message:deleted", onMessageDeleted);
       socket.off("chat:read", onRead);
+      socket.off("chat:delivered", onDelivered);
+      socket.off("call:missed-busy", onMissedBusy);
+      socket.off("connect", onConnect);
       socket.off("chat:typing", onTyping);
       socket.off("chat:conversation:updated", onConversationUpdated);
       for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.off(ev, refreshMeetings);

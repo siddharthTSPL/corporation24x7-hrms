@@ -10,6 +10,7 @@ import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import { playNotificationSound, isSoundEnabled } from "../notifications/Notificationsound";
 import Avatar from "./Avatar";
+import { previewOf } from "./chatUtils";
 import ChatPanel from "./ChatPanel";
 import CallOverlay from "./CallOverlay";
 
@@ -34,7 +35,7 @@ function useMessageToasts(enabled) {
       if (isSoundEnabled()) playNotificationSound();
 
       const title = conv && conv.type !== "direct" ? `${message.sender?.name || "Someone"} · ${conv.name}` : message.sender?.name || conv?.name || "New message";
-      const body = message.text || message.attachments?.[0]?.name || "Sent an attachment";
+      const body = previewOf(message) || "Sent an attachment";
 
       toast.custom(
         (t) => (

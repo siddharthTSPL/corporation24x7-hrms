@@ -245,7 +245,8 @@ const startCall = async ({ conversationId, media = "video" }) => {
   } catch (err) {
     stopStream(stream);
     busy = false;
-    store().setError(err.message);
+    // "X is on another call" is shown as a normal toast by the chat header, not as a call error
+    if (err.code !== "USER_BUSY" && err.code !== "SELF_BUSY") store().setError(err.message);
     throw err;
   }
 };
@@ -406,6 +407,11 @@ const attach = (sock) => {
   let lostConnection = false;
 
   const onIncoming = (c) => {
+    // already on a call: tell the caller we're busy instead of ringing on top of it
+    if (store().active || busy) {
+      emitQuiet("call:decline", { roomKey: c.roomKey, reason: "busy" });
+      return;
+    }
     store().addIncoming({ ...c, expiresAt: Date.now() + (c.ringSeconds || 45) * 1000 });
     clearTimeout(ringTimers.get(c.roomKey));
     ringTimers.set(c.roomKey, setTimeout(() => store().removeIncoming(c.roomKey), (c.ringSeconds || 45) * 1000));

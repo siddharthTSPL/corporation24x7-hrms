@@ -129,7 +129,7 @@ const initSocket = (httpServer) => {
     socket.join(personRoom(recipientModel, id));
     if (organisation_id) socket.join(orgRoom(organisation_id));
     console.log(`[socket] connected ${recipientModel}:${id} via ${socket.conn.transport.name} (total: ${io.engine.clientsCount})`);
-    socket.emit("socket:ready", { recipientModel, id });
+    socket.emit("socket:ready", { recipientModel, id, key: `${recipientModel}:${id}` });
 
     // chat / presence / calls. Required lazily: chatSocket needs this module's
     // emit helpers, which only exist once this file has finished loading.

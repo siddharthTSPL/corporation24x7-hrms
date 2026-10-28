@@ -7,7 +7,7 @@ import {
   previewRingtone,
   desktopAlertPermission,
   requestDesktopAlertPermission,
-} from "../notifications/callSound";
+} from "../notifications/Callsound";
 import { isSoundEnabled, setSoundEnabled, playNotificationSound } from "../notifications/Notificationsound";
 
 const Row = ({ label, children }) => (

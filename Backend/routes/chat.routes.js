@@ -12,6 +12,7 @@ chatRouter.use(anyRoleAuth);
 // people
 chatRouter.get("/directory", asyncHandler(c.searchPeople));
 chatRouter.get("/presence", asyncHandler(c.getPresence));
+chatRouter.get("/me", asyncHandler(c.whoAmI));
 
 // conversations
 chatRouter.get("/conversations", asyncHandler(c.listConversations));
@@ -25,12 +26,18 @@ chatRouter.patch("/conversations/:id/members/:key/role", asyncHandler(c.setMembe
 chatRouter.post("/conversations/:id/leave", asyncHandler(c.leaveGroup));
 chatRouter.patch("/conversations/:id/mute", asyncHandler(c.setMuted));
 chatRouter.post("/conversations/:id/read", asyncHandler(c.markRead));
+chatRouter.patch("/conversations/:id/pin", asyncHandler(c.setPinned));
+chatRouter.post("/conversations/:id/clear", asyncHandler(c.clearChat));
+chatRouter.patch("/conversations/:id/wallpaper", asyncHandler(c.setWallpaper));
+chatRouter.post("/conversations/:id/wallpaper/upload", chatUpload.single("image"), asyncHandler(c.uploadWallpaper));
 
 // messages
 chatRouter.get("/conversations/:id/messages", asyncHandler(c.getMessages));
 chatRouter.post("/conversations/:id/messages", chatUpload.array("attachments", 5), asyncHandler(c.sendMessage));
 chatRouter.patch("/messages/:messageId", asyncHandler(c.editMessage));
 chatRouter.delete("/messages/:messageId", asyncHandler(c.deleteMessage));
+chatRouter.post("/messages/:messageId/react", asyncHandler(c.reactToMessage));
+chatRouter.post("/messages/:messageId/forward", asyncHandler(c.forwardMessage));
 chatRouter.get("/search", asyncHandler(c.searchMessages));
 chatRouter.get("/unread-count", asyncHandler(c.unreadCount));
 

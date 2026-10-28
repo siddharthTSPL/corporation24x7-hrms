@@ -1,12 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaReply, FaPen } from "react-icons/fa";
+import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaReply, FaPen, FaRegSmile, FaMicrophone, FaTrash, FaLock } from "react-icons/fa";
 import { useTypingEmitter } from "../../auth/server-state/chat/chat.hook";
+import EmojiStickerPicker from "./EmojiStickerPicker";
 import { ACCEPT_ATTR, ALLOWED_MIME, MAX_FILES, MAX_FILE_BYTES, formatSize } from "./chatUtils";
 
-export default function Composer({ conversationId, replyTo, editing, initialText = "", onCancelContext, onSend }) {
+const MAX_VOICE_SECONDS = 5 * 60;
+const VOICE_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
+const VOICE_EXT = { "audio/webm": "webm", "audio/mp4": "m4a", "audio/ogg": "ogg" };
+
+const fmtSecs = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+
+export default function Composer({ conversationId, replyTo, editing, initialText = "", disabledReason = "", onCancelContext, onSend }) {
   const [text, setText] = useState(initialText);
   const [files, setFiles] = useState([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const recRef = useRef({ mr: null, stream: null, chunks: [], timer: null, cancelled: false });
   const areaRef = useRef(null);
   const fileRef = useRef(null);
   const { onType, stopTyping } = useTypingEmitter(conversationId);
@@ -58,6 +69,98 @@ export default function Composer({ conversationId, replyTo, editing, initialText
     setFiles(next);
   };
 
+  // ---- voice notes ----
+  const stopTracks = () => {
+    const r = recRef.current;
+    clearInterval(r.timer);
+    r.timer = null;
+    r.stream?.getTracks().forEach((t) => t.stop());
+    r.stream = null;
+  };
+
+  const startRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Voice messages aren't supported in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = VOICE_TYPES.find((t) => MediaRecorder.isTypeSupported?.(t));
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const r = recRef.current;
+      r.mr = mr;
+      r.stream = stream;
+      r.chunks = [];
+      r.cancelled = false;
+      mr.ondataavailable = (e) => e.data.size && r.chunks.push(e.data);
+      mr.onstop = () => {
+        stopTracks();
+        setRecording(false);
+        if (r.cancelled || !r.chunks.length) return;
+        const base = (mr.mimeType || mime || "audio/webm").split(";")[0];
+        const type = VOICE_EXT[base] ? base : "audio/webm";
+        const file = new File(r.chunks, `voice-message.${VOICE_EXT[type]}`, { type });
+        if (file.size > MAX_FILE_BYTES) toast.error("That voice message is too long.");
+        else onSend({ text: "", files: [file] });
+      };
+      mr.start();
+      setSecs(0);
+      setRecording(true);
+      setPickerOpen(false);
+      r.timer = setInterval(() => {
+        setSecs((n) => {
+          if (n + 1 >= MAX_VOICE_SECONDS) mr.state === "recording" && mr.stop();
+          return n + 1;
+        });
+      }, 1000);
+    } catch {
+      toast.error("Couldn't access the microphone. Please allow it in your browser.");
+    }
+  };
+
+  const finishRecording = (cancel) => {
+    const r = recRef.current;
+    r.cancelled = cancel;
+    if (r.mr && r.mr.state === "recording") r.mr.stop();
+    else {
+      stopTracks();
+      setRecording(false);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      const r = recRef.current;
+      r.cancelled = true;
+      if (r.mr && r.mr.state === "recording") r.mr.stop();
+      stopTracks();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const insertEmoji = (emoji) => {
+    const el = areaRef.current;
+    const start = el ? el.selectionStart : text.length;
+    const end = el ? el.selectionEnd : text.length;
+    const next = (text.slice(0, start) + emoji + text.slice(end)).slice(0, 5000);
+    setText(next);
+    onType();
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = start + emoji.length;
+      el.setSelectionRange(pos, pos);
+      resize();
+    });
+  };
+
+  const sendSticker = (id) => {
+    if (editing) return;
+    setPickerOpen(false);
+    onSend({ text: "", files: [], sticker: id });
+  };
+
   const submit = () => {
     const t = text.trim();
     if (editing) {
@@ -69,6 +172,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
     }
     setText("");
     setFiles([]);
+    setPickerOpen(false);
     stopTyping();
     requestAnimationFrame(resize);
   };
@@ -90,6 +194,32 @@ export default function Composer({ conversationId, replyTo, editing, initialText
   };
 
   const canSend = editing ? !!text.trim() : !!text.trim() || files.length > 0;
+
+  if (disabledReason) {
+    return (
+      <div className="border-t border-gray-100 bg-white px-4 py-3.5 flex items-center justify-center gap-2 text-xs text-gray-500">
+        <FaLock className="text-[11px]" /> {disabledReason}
+      </div>
+    );
+  }
+
+  if (recording) {
+    return (
+      <div className="border-t border-gray-100 bg-white flex items-center gap-3 px-4 py-3">
+        <button type="button" onClick={() => finishRecording(true)} title="Cancel" className="w-9 h-9 rounded-full text-red-500 hover:bg-red-50 flex items-center justify-center">
+          <FaTrash />
+        </button>
+        <div className="flex-1 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmtSecs(secs)}</span>
+          <span className="text-xs text-gray-400">Recording…</span>
+        </div>
+        <button type="button" onClick={() => finishRecording(false)} title="Send voice message" className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center hover:bg-[#5c0035]">
+          <FaPaperPlane className="text-sm" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t border-gray-100 bg-white">
@@ -162,6 +292,15 @@ export default function Composer({ conversationId, replyTo, editing, initialText
           </>
         )}
 
+        <button
+          type="button"
+          onClick={() => setPickerOpen((v) => !v)}
+          title="Emoji & stickers"
+          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${pickerOpen ? "bg-[#F6E8EF] text-[#730042]" : "text-gray-500 hover:bg-gray-100"}`}
+        >
+          <FaRegSmile className="text-lg" />
+        </button>
+
         <textarea
           ref={areaRef}
           rows={1}
@@ -179,16 +318,29 @@ export default function Composer({ conversationId, replyTo, editing, initialText
           className="flex-1 resize-none rounded-2xl bg-gray-100 px-4 py-2.5 text-sm leading-snug focus:outline-none focus:ring-2 focus:ring-[#730042]/40 max-h-[120px]"
         />
 
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!canSend}
-          title="Send"
-          className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#5c0035] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          <FaPaperPlane className="text-sm" />
-        </button>
+        {canSend || editing ? (
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!canSend}
+            title="Send"
+            className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#5c0035] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <FaPaperPlane className="text-sm" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={startRecording}
+            title="Record a voice message"
+            className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#5c0035] transition-colors"
+          >
+            <FaMicrophone className="text-sm" />
+          </button>
+        )}
       </div>
+
+      {pickerOpen && <EmojiStickerPicker onEmoji={insertEmoji} onSticker={sendSticker} onClose={() => setPickerOpen(false)} />}
     </div>
   );
 }

@@ -100,6 +100,21 @@ const removePeer = (room, socketId) => {
 
 const isModerator = (room, key) => room.hostKeys.has(key);
 
+// Rooms this person is connected to right now (any of their tabs/devices counts).
+const roomsWithPerson = (key) => {
+  const out = [];
+  for (const room of rooms.values()) {
+    if (room.ending) continue;
+    for (const p of room.peers.values()) {
+      if (p.key === key) { out.push(room); break; }
+    }
+  }
+  return out;
+};
+
+// "Busy on a call" - true while the person is inside any call / meeting.
+const isInCall = (key) => roomsWithPerson(key).length > 0;
+
 // Calls someone could still pick up right now (for people who connect late).
 const ringingFor = (key) => {
   const out = [];
@@ -146,6 +161,8 @@ module.exports = {
   publicPeer,
   distinctPeople,
   isModerator,
+  roomsWithPerson,
+  isInCall,
   ringingFor,
   activeFor,
   summary,

@@ -13,6 +13,12 @@ import {
   FaExpandAlt,
   FaCompressAlt,
   FaChevronUp,
+  FaChevronDown,
+  FaSearch,
+  FaImage,
+  FaThumbtack,
+  FaEraser,
+  FaSignOutAlt,
 } from "react-icons/fa";
 import {
   useConversation,
@@ -20,10 +26,15 @@ import {
   useSendMessage,
   useEditMessage,
   useDeleteMessage,
+  useReactToMessage,
   useMarkConversationRead,
   useMuteConversation,
+  usePinConversation,
+  useClearChat,
+  useLeaveGroupChat,
   useTypingNames,
   useIsOnline,
+  useIsInCall,
   useLastSeen,
 } from "../../auth/server-state/chat/chat.hook";
 import { CHAT_KEYS, newClientId } from "../../auth/server-state/chat/chatCache";
@@ -33,7 +44,12 @@ import useCall from "../../realtime/useCall";
 import Avatar from "./Avatar";
 import MessageBubble from "./MessageBubble";
 import Composer from "./Composer";
-import { formatDayLabel, formatLastSeen, isSameDay } from "./chatUtils";
+import WallpaperSheet from "./WallpaperSheet";
+import ForwardSheet from "./ForwardSheet";
+import DeleteDialog from "./DeleteDialog";
+import ChatSearchBar from "./ChatSearchBar";
+import { wallpaperStyle } from "./emojiData";
+import { copyToClipboard, deliveryStatus, formatDayLabel, formatLastSeen, isSameDay, previewOf } from "./chatUtils";
 
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
@@ -51,6 +67,18 @@ function Skeleton() {
   );
 }
 
+function MenuButton({ icon: Icon, label, onClick, danger }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
+    >
+      <Icon className={danger ? "text-red-400" : "text-gray-400"} /> {label}
+    </button>
+  );
+}
+
 export default function ChatThread({ conversationId, listConv, onBack, expanded, onToggleExpand, onClose, canExpand, showBack }) {
   const qc = useQueryClient();
   const myKey = useChatStore((s) => s.myKey);
@@ -61,21 +89,33 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const conv = detail || listConv;
   const isGroup = conv ? conv.type !== "direct" : false;
   const other = conv?.otherPerson;
+  const isGroupAdmin = conv?.type === "group" && conv?.myRole === "admin";
 
   const { messages, isLoading, hasOlder, isLoadingOlder, loadOlder } = useChatMessages(conversationId);
   const { send } = useSendMessage();
   const editMessage = useEditMessage();
   const deleteMessage = useDeleteMessage();
+  const react = useReactToMessage();
   const muteMutation = useMuteConversation();
+  const pinMutation = usePinConversation();
+  const clearChat = useClearChat();
+  const leaveGroup = useLeaveGroupChat();
   const { mutate: markRead } = useMarkConversationRead();
 
   const typingNames = useTypingNames(conversationId);
   const online = useIsOnline(!isGroup ? other?.key : null, !!other?.online);
+  const otherInCall = useIsInCall(!isGroup ? other?.key : null, !!other?.inCall);
   const lastSeen = useLastSeen(!isGroup ? other?.key : null);
 
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sheet, setSheet] = useState(null); // null | "wallpaper" | "forward"
+  const [forwardMsg, setForwardMsg] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [atBottom, setAtBottom] = useState(true);
 
   const scrollRef = useRef(null);
   const stickRef = useRef(true);
@@ -83,6 +123,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const lastIdRef = useRef(null);
   const pendingRef = useRef(new Map());
   const menuRef = useRef(null);
+  const olderRef = useRef({ hasOlder: false, loadOlder: null });
+  olderRef.current = { hasOlder, loadOlder };
 
   useEffect(() => {
     if (conversationId) markRead(conversationId);
@@ -128,8 +170,17 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const onScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stickRef.current = near;
+    setAtBottom((prev) => (prev === near ? prev : near));
     if (el.scrollTop < 60) fetchOlder();
+  };
+
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   };
 
   const items = useMemo(() => {
@@ -163,12 +214,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
   const others = useMemo(() => (conv?.participants || []).filter((p) => p.key !== myKey), [conv, myKey]);
 
-  const isSeen = (m) =>
-    others.length > 0 &&
-    others.every((p) => p.lastReadAt && new Date(p.lastReadAt) >= new Date(m.createdAt));
-
-  const handleSend = ({ text, files }) => {
+  const handleSend = ({ text, files = [], sticker }) => {
     if (editing) {
+      if (sticker) return;
       editMessage.mutate(
         { messageId: editing.id, text },
         { onError: (err) => toast.error(err.message || "Couldn't edit the message.") },
@@ -177,7 +225,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
       return;
     }
     const clientId = newClientId();
-    const payload = { conversationId, text, files, replyTo: replyTo?.id };
+    const payload = { conversationId, text, files, sticker, replyTo: replyTo?.id };
     pendingRef.current.set(clientId, payload);
     setReplyTo(null);
     stickRef.current = true;
@@ -206,18 +254,19 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     );
   };
 
-  const handleDelete = (m) => {
-    if (!window.confirm("Delete this message for everyone?")) return;
-    deleteMessage.mutate(m.id, { onError: (err) => toast.error(err.message || "Couldn't delete the message.") });
+  const runDelete = (scope) => {
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (!target) return;
+    deleteMessage.mutate(
+      { messageId: target.id, scope },
+      { onError: (err) => toast.error(err.message || "Couldn't delete the message.") },
+    );
   };
 
   const handleReply = (m) => {
     setEditing(null);
-    setReplyTo({
-      id: m.id,
-      name: m.sender?.name || "",
-      text: m.text || m.attachments?.[0]?.name || "Attachment",
-    });
+    setReplyTo({ id: m.id, name: m.sender?.name || "", text: previewOf(m) });
   };
 
   const handleEdit = (m) => {
@@ -225,32 +274,87 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     setEditing({ id: m.id, text: m.text });
   };
 
-  const jumpTo = (id) => {
-    const el = scrollRef.current?.querySelector(`[data-mid="${id}"]`);
-    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  const handleCopy = async (m) => {
+    if (await copyToClipboard(m.text)) toast.success("Copied");
+    else toast.error("Couldn't copy the message.");
+  };
+
+  const handleReact = (m, emoji) =>
+    react.mutate({ conversationId, messageId: m.id, emoji }, { onError: (err) => toast.error(err.message || "Couldn't react.") });
+
+  const flash = (el) => {
+    el.classList.add("ring-2", "ring-[#730042]/50");
+    setTimeout(() => el.classList.remove("ring-2", "ring-[#730042]/50"), 1400);
+  };
+
+  // Scrolls to a message; if it's older than what's loaded, keeps loading older pages (up to 6).
+  const jumpTo = async (id) => {
+    const find = () => scrollRef.current?.querySelector(`[data-mid="${id}"]`);
+    for (let i = 0; i < 6; i += 1) {
+      const el = find();
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        flash(el);
+        return;
+      }
+      if (!olderRef.current.hasOlder) break;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await olderRef.current.loadOlder();
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 80));
+      } catch {
+        break;
+      }
+    }
+    toast.error("Couldn't find that message in the loaded history.");
   };
 
   const call = (media) => {
     Promise.resolve(startCall({ conversationId, media })).catch((err) => toast.error(err?.message || "Couldn't start the call."));
   };
 
+  const handleExitGroup = async () => {
+    setMenuOpen(false);
+    if (!window.confirm("Exit this group? You won't get new messages from it.")) return;
+    try {
+      await leaveGroup.mutateAsync(conversationId);
+      toast.success("You left the group.");
+      onBack();
+    } catch (err) {
+      toast.error(err.message || "Couldn't leave the group.");
+    }
+  };
+
+  const handleClear = () => {
+    setMenuOpen(false);
+    if (!window.confirm("Clear all messages in this chat? This only clears them for you.")) return;
+    clearChat.mutate(conversationId, { onError: (err) => toast.error(err.message || "Couldn't clear the chat.") });
+  };
+
+  const typing = typingNames.length > 0;
+  const callsBlocked = inCall || (!isGroup && otherInCall);
+  const callTitle = (label) => (inCall ? "You're already in a call" : !isGroup && otherInCall ? `${conv?.name || "This person"} is on another call` : label);
+
   const subtitle = (() => {
-    if (typingNames.length) {
+    if (typing) {
       return typingNames.length === 1 || !isGroup
         ? `${isGroup ? typingNames[0] : "typing"}${isGroup ? " is typing…" : "…"}`
         : `${typingNames.join(", ")} are typing…`;
     }
     if (!conv) return "";
     if (isGroup) return `${conv.participants.length} members`;
+    if (otherInCall) return "On another call";
     if (online) return "Online";
     if (lastSeen) return `Last seen ${formatLastSeen(lastSeen)}`;
     return other?.designation || "Offline";
   })();
 
-  const typing = typingNames.length > 0;
+  const composerLock =
+    conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#F7F9FB]">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#F7F9FB]">
       <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-100">
         {showBack && (
           <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -268,12 +372,15 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             photo={conv?.photo || ""}
             size={38}
             online={!isGroup ? online : null}
+            busy={!isGroup && otherInCall}
             group={isGroup}
             seed={other?.key || conversationId}
           />
           <div className="min-w-0">
             <p className="text-sm font-bold text-gray-900 truncate">{conv?.name || "…"}</p>
-            <p className={`text-[11px] truncate ${typing ? "text-[#730042] font-medium" : online && !isGroup ? "text-emerald-600" : "text-gray-500"}`}>
+            <p
+              className={`text-[11px] truncate ${typing ? "text-[#730042] font-medium" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600" : "text-gray-500"}`}
+            >
               {subtitle}
             </p>
           </div>
@@ -282,18 +389,18 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             type="button"
-            disabled={inCall}
+            disabled={callsBlocked}
             onClick={() => call("audio")}
-            title={inCall ? "You're already in a call" : "Voice call"}
+            title={callTitle("Voice call")}
             className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
           >
             <FaPhoneAlt className="text-sm" />
           </button>
           <button
             type="button"
-            disabled={inCall}
+            disabled={callsBlocked}
             onClick={() => call("video")}
-            title={inCall ? "You're already in a call" : "Video call"}
+            title={callTitle("Video call")}
             className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
           >
             <FaVideo className="text-sm" />
@@ -308,30 +415,51 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
               <FaEllipsisV className="text-sm" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+              <div className="absolute right-0 top-9 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
                 {isGroup && (
-                  <button
-                    type="button"
+                  <MenuButton
+                    icon={FaInfoCircle}
+                    label="Group info"
                     onClick={() => {
                       setMenuOpen(false);
                       setInfoOpen(true);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <FaInfoCircle className="text-gray-400" /> Group info
-                  </button>
+                  />
                 )}
-                <button
-                  type="button"
+                <MenuButton
+                  icon={FaSearch}
+                  label="Search in chat"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSearchOpen(true);
+                  }}
+                />
+                <MenuButton
+                  icon={FaImage}
+                  label="Chat background"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSheet("wallpaper");
+                  }}
+                />
+                <MenuButton
+                  icon={FaThumbtack}
+                  label={conv?.pinned ? "Unpin chat" : "Pin chat"}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    pinMutation.mutate({ id: conversationId, pinned: !conv?.pinned }, { onError: (e) => toast.error(e.message || "Couldn't pin the chat.") });
+                  }}
+                />
+                <MenuButton
+                  icon={conv?.muted ? FaBell : FaBellSlash}
+                  label={conv?.muted ? "Unmute notifications" : "Mute notifications"}
                   onClick={() => {
                     setMenuOpen(false);
                     muteMutation.mutate({ id: conversationId, muted: !conv?.muted });
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  {conv?.muted ? <FaBell className="text-gray-400" /> : <FaBellSlash className="text-gray-400" />}
-                  {conv?.muted ? "Unmute notifications" : "Mute notifications"}
-                </button>
+                />
+                <MenuButton icon={FaEraser} label="Clear chat" onClick={handleClear} />
+                {conv?.type === "group" && <MenuButton icon={FaSignOutAlt} label="Exit group" onClick={handleExitGroup} danger />}
               </div>
             )}
           </div>
@@ -352,59 +480,105 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
         </div>
       </div>
 
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
-        {isLoading ? (
-          <Skeleton />
-        ) : (
-          <>
-            {hasOlder && (
-              <div className="flex justify-center mb-2">
-                <button
-                  type="button"
-                  onClick={fetchOlder}
-                  disabled={isLoadingOlder}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#730042] bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <FaChevronUp className="text-[9px]" />
-                  {isLoadingOlder ? "Loading…" : "Load earlier messages"}
-                </button>
-              </div>
-            )}
+      {searchOpen && (
+        <ChatSearchBar
+          conversationId={conversationId}
+          query={searchQuery}
+          setQuery={setSearchQuery}
+          onClose={() => {
+            setSearchOpen(false);
+            setSearchQuery("");
+          }}
+          onPick={(m) => {
+            setSearchOpen(false);
+            setSearchQuery("");
+            jumpTo(m.id);
+          }}
+        />
+      )}
 
-            {!messages.length && (
-              <div className="h-full flex flex-col items-center justify-center text-center text-gray-400 py-16">
-                <Avatar name={conv?.name || ""} photo={conv?.photo || ""} size={64} group={isGroup} seed={other?.key || conversationId} />
-                <p className="text-sm font-semibold text-gray-700 mt-3">{conv?.name}</p>
-                <p className="text-xs mt-1">No messages yet. Say hello!</p>
-              </div>
-            )}
-
-            {items.map((it) =>
-              it.kind === "day" ? (
-                <div key={it.key} className="flex justify-center my-3">
-                  <span className="text-[11px] font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-0.5">
-                    {it.label}
-                  </span>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollRef}
+          data-chat-scroll
+          onScroll={onScroll}
+          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          style={wallpaperStyle(conv?.wallpaper)}
+        >
+          {isLoading ? (
+            <Skeleton />
+          ) : (
+            <>
+              {hasOlder && (
+                <div className="flex justify-center mb-2">
+                  <button
+                    type="button"
+                    onClick={fetchOlder}
+                    disabled={isLoadingOlder}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#730042] bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    <FaChevronUp className="text-[9px]" />
+                    {isLoadingOlder ? "Loading…" : "Load earlier messages"}
+                  </button>
                 </div>
-              ) : (
-                <MessageBubble
-                  key={it.key}
-                  m={it.m}
-                  mine={!!it.m.senderKey && it.m.senderKey === myKey}
-                  isGroup={isGroup}
-                  first={it.first}
-                  last={it.last}
-                  seen={it.m.senderKey === myKey && isSeen(it.m)}
-                  onReply={handleReply}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onRetry={handleRetry}
-                  onDiscard={handleDiscard}
-                  onJump={jumpTo}
-                />
-              ),
-            )}
-          </>
+              )}
+
+              {!messages.length && (
+                <div className="h-full flex flex-col items-center justify-center text-center py-16">
+                  <div className="bg-white/90 rounded-2xl px-6 py-5 flex flex-col items-center border border-gray-100">
+                    <Avatar name={conv?.name || ""} photo={conv?.photo || ""} size={64} group={isGroup} seed={other?.key || conversationId} />
+                    <p className="text-sm font-semibold text-gray-700 mt-3">{conv?.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">No messages yet. Say hello! 👋</p>
+                  </div>
+                </div>
+              )}
+
+              {items.map((it) =>
+                it.kind === "day" ? (
+                  <div key={it.key} className="flex justify-center my-3">
+                    <span className="text-[11px] font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-0.5">
+                      {it.label}
+                    </span>
+                  </div>
+                ) : (
+                  <MessageBubble
+                    key={it.key}
+                    m={it.m}
+                    mine={!!it.m.senderKey && it.m.senderKey === myKey}
+                    myKey={myKey}
+                    isGroup={isGroup}
+                    first={it.first}
+                    last={it.last}
+                    status={it.m.senderKey === myKey ? deliveryStatus(it.m, others) : undefined}
+                    canDeleteForAll={isGroupAdmin}
+                    onReply={handleReply}
+                    onEdit={handleEdit}
+                    onDelete={setDeleteTarget}
+                    onForward={(m) => {
+                      setForwardMsg(m);
+                      setSheet("forward");
+                    }}
+                    onReact={handleReact}
+                    onCopy={handleCopy}
+                    onRetry={handleRetry}
+                    onDiscard={handleDiscard}
+                    onJump={jumpTo}
+                  />
+                ),
+              )}
+            </>
+          )}
+        </div>
+
+        {!atBottom && !isLoading && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            title="Jump to latest"
+            className="absolute bottom-3 right-4 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-md text-gray-600 hover:bg-gray-50 flex items-center justify-center z-10"
+          >
+            <FaChevronDown className="text-sm" />
+          </button>
         )}
       </div>
 
@@ -424,12 +598,40 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
         conversationId={conversationId}
         replyTo={replyTo}
         editing={editing}
+        disabledReason={composerLock}
         onCancelContext={() => {
           setReplyTo(null);
           setEditing(null);
         }}
         onSend={handleSend}
       />
+
+      {deleteTarget && (
+        <DeleteDialog
+          canDeleteForAll={!deleteTarget.deleted && (deleteTarget.senderKey === myKey || isGroupAdmin)}
+          onDeleteForMe={() => runDelete("me")}
+          onDeleteForAll={() => runDelete("everyone")}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {sheet === "wallpaper" && (
+        <div className="absolute inset-0 z-30 bg-white">
+          <WallpaperSheet conversationId={conversationId} current={conv?.wallpaper || ""} onClose={() => setSheet(null)} />
+        </div>
+      )}
+
+      {sheet === "forward" && forwardMsg && (
+        <div className="absolute inset-0 z-30 bg-white">
+          <ForwardSheet
+            message={forwardMsg}
+            onClose={() => {
+              setSheet(null);
+              setForwardMsg(null);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

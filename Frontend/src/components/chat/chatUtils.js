@@ -106,3 +106,77 @@ export const ALLOWED_MIME = [
 export const ACCEPT_ATTR = ALLOWED_MIME.join(",");
 
 export const personOf = (m) => ({ model: m.model, id: m.id });
+
+// ---------------------------------------------------------------- message helpers
+
+// "👍", "😂😂", "🙏 ❤️" -> bigger emoji without a bubble (max 3, nothing else in the text)
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u;
+export const isEmojiOnly = (text = "") => {
+  const t = String(text).trim();
+  return !!t && t.length <= 24 && EMOJI_ONLY.test(t);
+};
+
+// Turns plain text into [{ text } | { url }] so links are clickable.
+const URL_RE = /(https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)])/gi;
+export const splitLinks = (text = "") =>
+  String(text)
+    .split(URL_RE)
+    .filter((p) => p !== "")
+    .map((p) => (/^https?:\/\//i.test(p) ? { url: p } : { text: p }));
+
+// Tick state of one of MY messages: sending | failed | sent | delivered | seen
+export const deliveryStatus = (m, others) => {
+  if (m.failed) return "failed";
+  if (m.pending) return "sending";
+  if (!others.length) return "sent";
+  const created = new Date(m.createdAt);
+  if (others.every((p) => p.lastReadAt && new Date(p.lastReadAt) >= created)) return "seen";
+  const delivered = m.deliveredTo || [];
+  if (others.every((p) => delivered.includes(p.key) || (p.lastReadAt && new Date(p.lastReadAt) >= created))) return "delivered";
+  return "sent";
+};
+
+// [{ emoji, count, mine, keys }] sorted by popularity
+export const groupReactions = (reactions = [], myKey) => {
+  const map = new Map();
+  for (const r of reactions) {
+    const row = map.get(r.emoji) || { emoji: r.emoji, count: 0, mine: false, keys: [] };
+    row.count += 1;
+    row.keys.push(r.key);
+    if (r.key === myKey) row.mine = true;
+    map.set(r.emoji, row);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+};
+
+export const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+};
+
+export const previewOf = (m) => {
+  if (!m) return "";
+  if (m.deleted) return "Message deleted";
+  if (m.type === "sticker") return "Sticker";
+  if (m.text) return m.text;
+  const a = m.attachments?.[0];
+  if (a?.mime?.startsWith("audio/")) return "Voice message";
+  if (a?.mime?.startsWith("image/")) return "Photo";
+  return a?.name || "Attachment";
+};

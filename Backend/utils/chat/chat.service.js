@@ -4,6 +4,7 @@ const ChatMessage = require("../../Models/chatmessage.model");
 const imagekit = require("../imagekit.utils");
 const { emitToRecipient } = require("../../config/socket");
 const presence = require("./presence");
+const callRooms = require("./callRooms");
 const { httpError, personKey, parseKey, resolvePeople, requirePeople } = require("./people.utils");
 
 const MAX_TEXT = 5000;
@@ -66,6 +67,7 @@ const serializeConversation = (conv, actor, people) => {
     joinedAt: p.joinedAt,
     lastReadAt: p.lastReadAt,
     online: presence.isOnline(p.key),
+    inCall: presence.isOnline(p.key) && callRooms.isInCall(p.key),
   }));
   const me = o.participants.find((p) => p.key === actor.key);
 
@@ -90,6 +92,9 @@ const serializeConversation = (conv, actor, people) => {
     myRole: me ? me.role : null,
     unread: me ? me.unread : 0,
     muted: me ? !!me.muted : false,
+    pinned: me ? !!me.pinned : false,
+    wallpaper: me ? me.wallpaper || "" : "",
+    settings: { onlyAdminsCanSend: !!(o.settings && o.settings.onlyAdminsCanSend) },
     lastMessage: o.lastMessage && o.lastMessage.at
       ? {
           id: o.lastMessage.message ? String(o.lastMessage.message) : null,
@@ -118,6 +123,7 @@ const serializeOneConversation = async (conv, actor) => {
 
 const snippet = (m) => {
   if (m.deletedAt) return "";
+  if (m.type === "sticker") return "Sticker";
   if (m.type === "file" && !m.text) return m.attachments?.length > 1 ? `${m.attachments.length} attachments` : m.attachments?.[0]?.name || "Attachment";
   return String(m.text || "").slice(0, 140);
 };
@@ -161,6 +167,9 @@ const hydrateMessages = async (organisation_id, messages) => {
       clientId: m.clientId || null,
       editedAt: m.editedAt || null,
       deleted: !!m.deletedAt,
+      reactions: m.deletedAt ? [] : (m.reactions || []).map((r) => ({ key: r.key, emoji: r.emoji })),
+      deliveredTo: m.deliveredTo || [],
+      forwarded: !!m.forwarded,
       createdAt: m.createdAt,
     };
   });
@@ -232,11 +241,22 @@ const createGroup = async (actor, { name, description = "", members = [], photo 
 
 const sanitizeText = (text) => String(text == null ? "" : text).replace(/\u0000/g, "").trim();
 
-const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null } = {}) => {
+const STICKER_ID = /^[\w:.\-]{1,64}$/;
+
+const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false } = {}) => {
   const conv = await loadConversation(actor, conversationId);
-  const body = sanitizeText(text);
+
+  // announcement-style groups: only admins may post
+  if (conv.type === "group" && conv.settings && conv.settings.onlyAdminsCanSend) {
+    const me = conv.participants.find((p) => p.key === actor.key);
+    if (!me || me.role !== "admin") throw httpError("Only admins can send messages in this group.", 403);
+  }
+
+  const stickerId = sticker ? String(sticker).trim() : "";
+  if (stickerId && !STICKER_ID.test(stickerId)) throw httpError("Invalid sticker.");
+  const body = stickerId ? "" : sanitizeText(text);
   if (body.length > MAX_TEXT) throw httpError(`Message is too long (max ${MAX_TEXT} characters).`);
-  if (!body && !attachments.length) throw httpError("Message cannot be empty.");
+  if (!body && !attachments.length && !stickerId) throw httpError("Message cannot be empty.");
 
   if (replyTo) {
     assertObjectId(replyTo, "reply id");
@@ -249,13 +269,16 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
     msg = await ChatMessage.create({
       organisation_id: actor.organisation_id,
       conversation: conv._id,
-      type: attachments.length ? "file" : "text",
+      type: stickerId ? "sticker" : attachments.length ? "file" : "text",
       sender: actor.id,
       senderModel: actor.model,
       senderKey: actor.key,
-      text: body,
-      attachments,
+      text: stickerId || body,
+      attachments: stickerId ? [] : attachments,
       replyTo: replyTo || undefined,
+      forwarded: !!forwarded,
+      // anyone who is online right now has the message on their device => "delivered"
+      deliveredTo: conv.participantKeys.filter((k) => k !== actor.key && presence.isOnline(k)),
       clientId: clientId ? String(clientId).slice(0, 64) : undefined,
     });
   } catch (err) {
@@ -314,7 +337,9 @@ const postSystemMessage = async (conv, actor, meta, text, { type = "system" } = 
 const getMessages = async (actor, conversationId, { before = null, limit = 40 } = {}) => {
   const conv = await loadConversation(actor, conversationId);
   const lim = Math.min(Math.max(parseInt(limit, 10) || 40, 1), 100);
-  const q = { conversation: conv._id };
+  const me = conv.participants.find((p) => p.key === actor.key);
+  const q = { conversation: conv._id, deletedFor: { $ne: actor.key } };
+  if (me && me.clearedAt) q.createdAt = { $gt: me.clearedAt }; // "clear chat" hides older messages for me only
   if (before) {
     assertObjectId(before, "cursor");
     q._id = { $lt: before };
@@ -364,12 +389,21 @@ const editMessage = async (actor, messageId, text) => {
   return hydrated;
 };
 
-const deleteMessage = async (actor, messageId) => {
+// scope "everyone" (default): the message turns into "This message was deleted" for all.
+// scope "me": it just disappears from my own view.
+const deleteMessage = async (actor, messageId, scope = "everyone") => {
   assertObjectId(messageId, "message id");
   const msg = await ChatMessage.findOne({ _id: messageId, organisation_id: actor.organisation_id });
-  if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
+  if (!msg) throw httpError("Message not found.", 404);
   const conv = await loadConversation(actor, msg.conversation);
 
+  if (scope === "me") {
+    await ChatMessage.updateOne({ _id: msg._id }, { $addToSet: { deletedFor: actor.key } });
+    emitToKeys([actor.key], "chat:message:deleted", { conversationId: String(conv._id), messageId: String(msg._id), forMe: true });
+    return { conversationId: String(conv._id), messageId: String(msg._id), forMe: true };
+  }
+
+  if (msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
   const me = conv.participants.find((p) => p.key === actor.key);
   const isGroupAdmin = conv.type === "group" && me && me.role === "admin";
   if (msg.senderKey !== actor.key && !isGroupAdmin) throw httpError("You can only delete your own messages.", 403);
@@ -378,16 +412,136 @@ const deleteMessage = async (actor, messageId) => {
   msg.deletedAt = new Date();
   msg.text = "";
   msg.attachments = [];
+  msg.reactions = [];
   await msg.save();
 
-  // best effort - never fail the delete because storage cleanup failed
-  for (const f of files) if (f.fileId) imagekit.deleteFile(f.fileId).catch(() => {});
+  // best effort - never fail the delete because storage cleanup failed.
+  // A forwarded copy may still point at the same file, so only remove it when nobody else uses it.
+  for (const f of files) {
+    if (!f.fileId) continue;
+    ChatMessage.exists({ _id: { $ne: msg._id }, "attachments.fileId": f.fileId })
+      .then((used) => (used ? null : imagekit.deleteFile(f.fileId)))
+      .catch(() => {});
+  }
 
   if (conv.lastMessage?.message && String(conv.lastMessage.message) === String(msg._id)) {
     await Conversation.updateOne({ _id: conv._id }, { $set: { "lastMessage.text": "", "lastMessage.type": "text" } });
   }
   emitToKeys(conv.participantKeys, "chat:message:deleted", { conversationId: String(conv._id), messageId: String(msg._id) });
   return { conversationId: String(conv._id), messageId: String(msg._id) };
+};
+
+// ---------- reactions, forwarding, delivery ----------
+
+// Same emoji again removes my reaction; a different emoji replaces it.
+const toggleReaction = async (actor, messageId, emoji) => {
+  assertObjectId(messageId, "message id");
+  const e = String(emoji || "").trim();
+  if (!e || e.length > 16) throw httpError("Invalid reaction.");
+  const msg = await ChatMessage.findOne({ _id: messageId, organisation_id: actor.organisation_id });
+  if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
+  const conv = await loadConversation(actor, msg.conversation);
+
+  const had = (msg.reactions || []).find((r) => r.key === actor.key);
+  await ChatMessage.updateOne({ _id: msg._id }, { $pull: { reactions: { key: actor.key } } });
+  if (!had || had.emoji !== e) {
+    await ChatMessage.updateOne({ _id: msg._id }, { $push: { reactions: { key: actor.key, emoji: e, at: new Date() } } });
+  }
+  const fresh = await ChatMessage.findById(msg._id);
+  const [hydrated] = await hydrateMessages(actor.organisation_id, [fresh]);
+  emitToKeys(conv.participantKeys, "chat:message:updated", { conversationId: String(conv._id), message: hydrated });
+  return hydrated;
+};
+
+const MAX_FORWARD_TARGETS = 5;
+
+const forwardMessage = async (actor, messageId, conversationIds = []) => {
+  assertObjectId(messageId, "message id");
+  const targets = [...new Set((Array.isArray(conversationIds) ? conversationIds : []).map(String))].slice(0, MAX_FORWARD_TARGETS);
+  if (!targets.length) throw httpError("Choose at least one chat to forward to.");
+
+  const msg = await ChatMessage.findOne({ _id: messageId, organisation_id: actor.organisation_id });
+  if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
+  await loadConversation(actor, msg.conversation); // I must be able to see the original
+
+  const sent = [];
+  for (const id of targets) {
+    const { message } = await sendMessage(actor, id, {
+      text: msg.text,
+      sticker: msg.type === "sticker" ? msg.text : null,
+      attachments: (msg.attachments || []).map((a) => ({ url: a.url, fileId: a.fileId, name: a.name, mime: a.mime, size: a.size })),
+      forwarded: true,
+    });
+    sent.push(message);
+  }
+  return sent;
+};
+
+// When someone comes online, everything sent to them while they were away becomes "delivered".
+const markDeliveredForActor = async (actor) => {
+  const convs = await Conversation.find({ organisation_id: actor.organisation_id, participantKeys: actor.key }).select("_id").limit(500).lean();
+  if (!convs.length) return;
+  const pending = await ChatMessage.find({
+    conversation: { $in: convs.map((c) => c._id) },
+    senderKey: { $nin: ["", actor.key] },
+    deliveredTo: { $ne: actor.key },
+    type: { $in: ["text", "file", "sticker"] },
+    deletedAt: null,
+    createdAt: { $gt: new Date(Date.now() - 30 * 86400000) },
+  }).select("_id conversation senderKey").limit(1000).lean();
+  if (!pending.length) return;
+
+  await ChatMessage.updateMany({ _id: { $in: pending.map((p) => p._id) } }, { $addToSet: { deliveredTo: actor.key } });
+
+  const byConv = new Map();
+  for (const p of pending) {
+    const row = byConv.get(String(p.conversation)) || { senders: new Set(), ids: [] };
+    row.senders.add(p.senderKey);
+    row.ids.push(String(p._id));
+    byConv.set(String(p.conversation), row);
+  }
+  for (const [conversationId, row] of byConv) {
+    emitToKeys([...row.senders], "chat:delivered", { conversationId, by: actor.key, messageIds: row.ids });
+  }
+};
+
+// ---------- per-person chat settings ----------
+
+const WALLPAPER_OK = /^(preset:[a-z0-9_-]{1,30}|color:#[0-9a-fA-F]{6}|https:\/\/\S{1,480})$/;
+
+const setWallpaper = async (actor, conversationId, wallpaper) => {
+  const conv = await loadConversation(actor, conversationId);
+  const w = String(wallpaper || "").trim();
+  if (w && !WALLPAPER_OK.test(w)) throw httpError("Invalid wallpaper.");
+  await Conversation.updateOne({ _id: conv._id, "participants.key": actor.key }, { $set: { "participants.$.wallpaper": w } });
+  emitToKeys([actor.key], "chat:conversation:updated", { conversationId: String(conv._id) });
+  return w;
+};
+
+const MAX_PINNED_CHATS = 5;
+
+const setPinnedChat = async (actor, conversationId, pinned) => {
+  const conv = await loadConversation(actor, conversationId);
+  if (pinned) {
+    const count = await Conversation.countDocuments({
+      organisation_id: actor.organisation_id,
+      participants: { $elemMatch: { key: actor.key, pinned: true } },
+    });
+    const already = conv.participants.find((p) => p.key === actor.key)?.pinned;
+    if (!already && count >= MAX_PINNED_CHATS) throw httpError(`You can pin up to ${MAX_PINNED_CHATS} chats.`);
+  }
+  await Conversation.updateOne({ _id: conv._id, "participants.key": actor.key }, { $set: { "participants.$.pinned": !!pinned } });
+  emitToKeys([actor.key], "chat:conversation:updated", { conversationId: String(conv._id) });
+};
+
+// "Clear chat" - hides the current history for me only.
+const clearChat = async (actor, conversationId) => {
+  const conv = await loadConversation(actor, conversationId);
+  await Conversation.updateOne(
+    { _id: conv._id, "participants.key": actor.key },
+    { $set: { "participants.$.clearedAt": new Date(), "participants.$.unread": 0 } }
+  );
+  emitToKeys([actor.key], "chat:conversation:updated", { conversationId: String(conv._id), cleared: true });
 };
 
 // ---------- group / membership management ----------
@@ -406,7 +560,7 @@ const syncKeys = (conv) => {
 
 const nameOf = (people, key) => people.get(key)?.name || "Someone";
 
-const updateGroup = async (actor, conversationId, { name, description, photo }) => {
+const updateGroup = async (actor, conversationId, { name, description, photo, settings }) => {
   const conv = await loadConversation(actor, conversationId);
   requireGroupAdmin(conv, actor);
   const changes = [];
@@ -418,7 +572,21 @@ const updateGroup = async (actor, conversationId, { name, description, photo }) 
   }
   if (description !== undefined) conv.description = String(description).trim().slice(0, 300);
   if (photo !== undefined) conv.photo = String(photo || "");
+  let onlyAdminsChanged = null;
+  if (settings && typeof settings.onlyAdminsCanSend === "boolean" && settings.onlyAdminsCanSend !== !!(conv.settings && conv.settings.onlyAdminsCanSend)) {
+    conv.set("settings.onlyAdminsCanSend", settings.onlyAdminsCanSend);
+    onlyAdminsChanged = settings.onlyAdminsCanSend;
+  }
   await conv.save();
+  if (onlyAdminsChanged !== null) {
+    const who = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
+    await postSystemMessage(
+      conv,
+      actor,
+      { event: "settings" },
+      `${nameOf(who, actor.key)} ${onlyAdminsChanged ? "allowed only admins to send messages" : "allowed everyone to send messages"}`
+    );
+  }
   if (changes.includes("name")) {
     const people = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
     await postSystemMessage(conv, actor, { event: "renamed" }, `${nameOf(people, actor.key)} renamed the group to "${conv.name}"`);
@@ -548,6 +716,12 @@ module.exports = {
   markRead,
   editMessage,
   deleteMessage,
+  toggleReaction,
+  forwardMessage,
+  markDeliveredForActor,
+  setWallpaper,
+  setPinnedChat,
+  clearChat,
   updateGroup,
   addMembers,
   removeMember,

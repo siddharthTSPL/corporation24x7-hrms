@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { FaSearch, FaPlus, FaTimes, FaExpandAlt, FaCompressAlt, FaBellSlash, FaRegCommentDots, FaCog } from "react-icons/fa";
-import { useConversations, useChatSearch, useIsOnline } from "../../auth/server-state/chat/chat.hook";
+import { FaSearch, FaPlus, FaTimes, FaExpandAlt, FaCompressAlt, FaBellSlash, FaRegCommentDots, FaCog, FaThumbtack } from "react-icons/fa";
+import { useConversations, useChatSearch, useIsOnline, useIsInCall } from "../../auth/server-state/chat/chat.hook";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import Avatar from "./Avatar";
 import { formatListTime } from "./chatUtils";
-import RealtimeStatus from "./Realtimestatus ";
+import RealtimeStatus from "./RealtimeStatus";
 import CallSoundSettings from "./CallSoundSettings";
 
 const TABS = [
@@ -16,6 +16,7 @@ const TABS = [
 function Row({ conv, active, myKey, onClick }) {
   const other = conv.otherPerson;
   const online = useIsOnline(conv.type === "direct" ? other?.key : null, !!other?.online);
+  const onCall = useIsInCall(conv.type === "direct" ? other?.key : null, !!other?.inCall);
   const lm = conv.lastMessage;
 
   let prefix = "";
@@ -35,6 +36,7 @@ function Row({ conv, active, myKey, onClick }) {
         photo={conv.photo}
         size={44}
         online={conv.type === "direct" ? online : null}
+        busy={conv.type === "direct" && onCall}
         group={conv.type !== "direct"}
         seed={conv.otherPerson?.key || conv.id}
       />
@@ -49,9 +51,10 @@ function Row({ conv, active, myKey, onClick }) {
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className={`text-xs truncate ${conv.unread ? "text-gray-800 font-medium" : "text-gray-500"}`}>
-            {lm ? `${prefix}${lm.text || "Message deleted"}` : "No messages yet"}
+            {onCall && conv.type === "direct" ? "On another call" : lm ? `${prefix}${lm.type === "sticker" ? "Sticker" : lm.text || "Message deleted"}` : "No messages yet"}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {conv.pinned && <FaThumbtack className="text-[10px] text-gray-400 -rotate-45" />}
             {conv.muted && <FaBellSlash className="text-[10px] text-gray-400" />}
             {conv.unread > 0 && (
               <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#730042] text-white text-[10px] font-bold flex items-center justify-center">
@@ -91,17 +94,20 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
 
   const q = query.trim().toLowerCase();
 
+  // pinned chats first; the sort is stable, so everything else stays newest-first
   const filtered = useMemo(
     () =>
-      conversations.filter((c) => {
-        if (tab === "direct" && c.type !== "direct") return false;
-        if (tab === "group" && c.type === "direct") return false;
-        if (!q) return true;
-        return (
-          (c.name || "").toLowerCase().includes(q) ||
-          c.participants?.some((p) => (p.name || "").toLowerCase().includes(q))
-        );
-      }),
+      conversations
+        .filter((c) => {
+          if (tab === "direct" && c.type !== "direct") return false;
+          if (tab === "group" && c.type === "direct") return false;
+          if (!q) return true;
+          return (
+            (c.name || "").toLowerCase().includes(q) ||
+            c.participants?.some((p) => (p.name || "").toLowerCase().includes(q))
+          );
+        })
+        .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)),
     [conversations, tab, q],
   );
 

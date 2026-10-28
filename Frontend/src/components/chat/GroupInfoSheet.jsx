@@ -101,7 +101,7 @@ export default function GroupInfoSheet({ conversation, onClose }) {
   };
 
   const handleLeave = async () => {
-    if (!window.confirm("Leave this group?")) return;
+    if (!window.confirm("Exit this group? You won't get new messages from it.")) return;
     try {
       await leave.mutateAsync(conv.id);
       backToList();
@@ -206,6 +206,25 @@ export default function GroupInfoSheet({ conversation, onClose }) {
             )}
           </div>
 
+          {isAdmin && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-800">Only admins can send messages</p>
+                <p className="text-xs text-gray-500">Good for announcements. Everyone can still read and react.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!conv.settings?.onlyAdminsCanSend}
+                disabled={update.isPending}
+                onClick={() => update.mutate({ id: conv.id, settings: { onlyAdminsCanSend: !conv.settings?.onlyAdminsCanSend } }, { onError: fail })}
+                className={`relative w-10 h-6 rounded-full flex-shrink-0 transition-colors disabled:opacity-60 ${conv.settings?.onlyAdminsCanSend ? "bg-[#730042]" : "bg-gray-300"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${conv.settings?.onlyAdminsCanSend ? "left-[18px]" : "left-0.5"}`} />
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-4 pt-4 pb-1">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
               {conv.participants.length} members
@@ -249,7 +268,7 @@ export default function GroupInfoSheet({ conversation, onClose }) {
                 disabled={leave.isPending}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-red-500 hover:bg-red-50 disabled:opacity-60"
               >
-                <FaSignOutAlt /> Leave group
+                <FaSignOutAlt /> Exit group
               </button>
             )}
           </div>

@@ -17,6 +17,10 @@ const participantSchema = new mongoose.Schema(
     lastReadAt: { type: Date, default: Date.now },
     unread: { type: Number, default: 0, min: 0 },
     muted: { type: Boolean, default: false },
+    // per-person chat settings (every person sees their own wallpaper / pin)
+    wallpaper: { type: String, default: "" }, // preset id ("preset:sunset"), "color:#hex" or an image url
+    pinned: { type: Boolean, default: false },
+    clearedAt: { type: Date, default: null }, // "clear chat": older messages are hidden for this person only
   },
   { _id: false }
 );
@@ -29,6 +33,11 @@ const conversationSchema = new mongoose.Schema(
     name: { type: String, trim: true, maxlength: 80, default: "" },
     description: { type: String, trim: true, maxlength: 300, default: "" },
     photo: { type: String, default: "" },
+
+    // group rules (admins change them)
+    settings: {
+      onlyAdminsCanSend: { type: Boolean, default: false }, // announcement-style group
+    },
 
     participants: { type: [participantSchema], default: [] },
     participantKeys: { type: [String], default: [], index: true }, // mirror of participants[].key for fast "my chats" queries

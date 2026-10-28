@@ -18,8 +18,8 @@ const chatMessageSchema = new mongoose.Schema(
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
     conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", required: true },
 
-    // text | file | system (joined/left/renamed...) | call (call started/ended/missed summary)
-    type: { type: String, enum: ["text", "file", "system", "call"], default: "text" },
+    // text | file | sticker | system (joined/left/renamed...) | call (call started/ended/missed summary)
+    type: { type: String, enum: ["text", "file", "sticker", "system", "call"], default: "text" },
 
     sender: { type: mongoose.Schema.Types.ObjectId, refPath: "senderModel", default: undefined },
     senderModel: { type: String, enum: PERSON_MODELS, default: undefined },
@@ -31,6 +31,17 @@ const chatMessageSchema = new mongoose.Schema(
 
     // system / call payload, e.g. { event: "member_added", targets: [...] } or { callType, duration, status }
     meta: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    // one emoji per person per message (tap the same emoji again to remove it)
+    reactions: {
+      type: [{ key: { type: String, required: true }, emoji: { type: String, required: true, maxlength: 16 }, at: { type: Date, default: Date.now }, _id: false }],
+      default: [],
+    },
+    // keys of people whose device has received the message (grey double tick)
+    deliveredTo: { type: [String], default: [] },
+    // "delete for me": the message disappears only for these people
+    deletedFor: { type: [String], default: [] },
+    forwarded: { type: Boolean, default: false },
 
     clientId: { type: String, default: undefined }, // lets the sender de-dupe its optimistic message
     editedAt: { type: Date, default: null },

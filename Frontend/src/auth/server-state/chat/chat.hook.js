@@ -17,6 +17,12 @@ import {
   sendMessageRest,
   editMessage,
   deleteMessage,
+  reactToMessage,
+  forwardMessage,
+  setWallpaper,
+  uploadWallpaper,
+  setPinnedChat,
+  clearChat,
   searchMessages,
   getChatUnreadCount,
   getIceServers,
@@ -30,6 +36,7 @@ import {
   flattenMessages,
   upsertMessage,
   patchMessage,
+  removeMessage,
   patchConversation,
   removeConversation,
   newClientId,
@@ -186,7 +193,7 @@ export const useChatMessages = (conversationId) => {
 };
 
 /**
- * send({ conversationId, text, replyTo?, files? })
+ * send({ conversationId, text, replyTo?, files?, sticker? })
  * - plain text goes over the socket (fastest), falling back to REST if offline
  * - files always go over REST (multipart)
  * - the message shows instantly as { pending: true } and is replaced when the server confirms;
@@ -196,28 +203,30 @@ export const useChatMessages = (conversationId) => {
 export const useSendMessage = () => {
   const qc = useQueryClient();
   const mutation = useMutation({
-    mutationFn: async ({ conversationId, text, replyTo, files = [], clientId, onUploadProgress }) => {
+    mutationFn: async ({ conversationId, text, replyTo, files = [], clientId, sticker, onUploadProgress }) => {
       if (!files.length) {
         try {
-          const res = await emitAck("chat:send", { conversationId, text, replyTo, clientId });
+          const res = await emitAck("chat:send", { conversationId, text, replyTo, clientId, sticker });
           return res.message;
         } catch (err) {
           if (err.code !== "OFFLINE" && err.code !== "TIMEOUT") throw err;
         }
       }
-      const res = await sendMessageRest({ id: conversationId, text, replyTo, clientId, files, onUploadProgress });
+      const res = await sendMessageRest({ id: conversationId, text, replyTo, clientId, sticker, files, onUploadProgress });
       return res.message;
     },
-    onMutate: ({ conversationId, text, replyTo, files = [], clientId }) => {
+    onMutate: ({ conversationId, text, replyTo, files = [], clientId, sticker }) => {
       const myKey = useChatStore.getState().myKey;
       upsertMessage(qc, conversationId, {
         id: clientId,
         clientId,
         conversationId,
-        type: files.length ? "file" : "text",
+        type: sticker ? "sticker" : files.length ? "file" : "text",
         senderKey: myKey || "",
         sender: null,
-        text: text || "",
+        text: sticker || text || "",
+        reactions: [],
+        deliveredTo: [],
         attachments: files.map((f) => ({ name: f.name, size: f.size, mime: f.type, url: null, uploading: true })),
         replyTo: replyTo ? { id: replyTo } : null,
         meta: {},
@@ -244,12 +253,97 @@ export const useEditMessage = () => {
   });
 };
 
+// mutate({ messageId, scope: "everyone" | "me" })
 export const useDeleteMessage = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: deleteMessage, // (messageId)
-    onSuccess: ({ conversationId, messageId }) =>
-      patchMessage(qc, conversationId, messageId, { deleted: true, text: "", attachments: [] }),
+    mutationFn: deleteMessage,
+    onSuccess: ({ conversationId, messageId, forMe }) => {
+      if (forMe) removeMessage(qc, conversationId, messageId);
+      else patchMessage(qc, conversationId, messageId, { deleted: true, text: "", attachments: [], reactions: [] });
+    },
+  });
+};
+
+// mutate({ messageId, emoji }) - same emoji again removes my reaction. Updates instantly, rolls back on error.
+export const useReactToMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reactToMessage,
+    onMutate: ({ conversationId, messageId, emoji }) => {
+      const myKey = useChatStore.getState().myKey;
+      const snapshot = qc.getQueryData(CHAT_KEYS.messages(conversationId));
+      const mapPagesLocal = (fn) =>
+        qc.setQueryData(CHAT_KEYS.messages(conversationId), (old) =>
+          old ? { ...old, pages: old.pages.map((p) => ({ ...p, messages: p.messages.map(fn) })) } : old,
+        );
+      mapPagesLocal((m) => {
+        if (m.id !== messageId) return m;
+        const mine = (m.reactions || []).find((r) => r.key === myKey);
+        const rest = (m.reactions || []).filter((r) => r.key !== myKey);
+        return { ...m, reactions: mine && mine.emoji === emoji ? rest : [...rest, { key: myKey, emoji }] };
+      });
+      return { snapshot, conversationId };
+    },
+    onError: (_e, _v, ctx) => ctx && qc.setQueryData(CHAT_KEYS.messages(ctx.conversationId), ctx.snapshot),
+    onSuccess: ({ message }) => upsertMessage(qc, message.conversationId, message),
+  });
+};
+
+// mutateAsync({ messageId, conversationIds: [] })
+export const useForwardMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: forwardMessage,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+// ---- per-person chat settings ----
+export const useSetWallpaper = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setWallpaper, // { id, wallpaper }  ("" resets)
+    onMutate: ({ id, wallpaper }) => {
+      patchConversation(qc, id, (c) => ({ ...c, wallpaper }));
+      qc.setQueryData(CHAT_KEYS.conversation(id), (old) => (old ? { ...old, conversation: { ...old.conversation, wallpaper } } : old));
+    },
+    onError: (_e, { id }) => {
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversation(id) });
+    },
+  });
+};
+
+export const useUploadWallpaper = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: uploadWallpaper, // { id, file }
+    onSuccess: ({ wallpaper }, { id }) => {
+      patchConversation(qc, id, (c) => ({ ...c, wallpaper }));
+      qc.setQueryData(CHAT_KEYS.conversation(id), (old) => (old ? { ...old, conversation: { ...old.conversation, wallpaper } } : old));
+    },
+  });
+};
+
+export const usePinConversation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setPinnedChat, // { id, pinned }
+    onMutate: ({ id, pinned }) => patchConversation(qc, id, (c) => ({ ...c, pinned })),
+    onError: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+export const useClearChat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: clearChat, // (conversationId)
+    onSuccess: (_r, id) => {
+      qc.removeQueries({ queryKey: CHAT_KEYS.messages(id) });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.messages(id) });
+      patchConversation(qc, id, (c) => ({ ...c, unread: 0 }));
+    },
   });
 };
 
@@ -312,6 +406,10 @@ export const useTypingNames = (conversationId) => {
 // Live online state for a person key; falls back to what the API last said.
 export const useIsOnline = (key, fallback = false) =>
   useChatStore((s) => (key && s.presence[key] ? s.presence[key].online : fallback));
+
+// true while that person is inside a call ("busy on call")
+export const useIsInCall = (key, fallback = false) =>
+  useChatStore((s) => (key && s.presence[key] ? !!s.presence[key].inCall : fallback));
 
 export const useLastSeen = (key) => useChatStore((s) => (key ? s.presence[key]?.lastSeenAt || null : null));
 

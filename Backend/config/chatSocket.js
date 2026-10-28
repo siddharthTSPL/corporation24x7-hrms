@@ -55,8 +55,10 @@ const registerChatSocket = (io, socket) => {
 
   // ----- presence -----
   if (presence.add(actor.key, socket.id)) {
-    emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true });
+    emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true, inCall: presence.isInCall(actor.key) });
   }
+  // everything people sent me while I was away is now "delivered" (grey double tick for them)
+  chat.markDeliveredForActor(actor).catch((err) => console.error("[socket] mark delivered failed:", err.message));
   // calls that started while this person was offline / reconnecting
   for (const room of rooms.ringingFor(actor.key)) {
     socket.emit("call:incoming", {
@@ -67,15 +69,18 @@ const registerChatSocket = (io, socket) => {
     });
   }
 
+  // Who am I? (lets the client rebuild its identity even if it missed "socket:ready")
+  on("chat:whoami", async () => ({ key: actor.key, model: actor.model, id: actor.id }));
+
   on("presence:query", async ({ keys }) => {
     const list = Array.isArray(keys) ? keys.filter((k) => typeof k === "string").slice(0, 200) : [];
     return { presence: presence.snapshot(list) };
   });
 
   // ----- chat -----
-  on("chat:send", async ({ conversationId, text, replyTo, clientId }) => {
+  on("chat:send", async ({ conversationId, text, replyTo, clientId, sticker }) => {
     if (!allow(socket, "send", 20, 10000)) throw Object.assign(new Error("You're sending messages too fast."), { statusCode: 429 });
-    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId });
+    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId, sticker });
     return { message };
   });
 
@@ -205,7 +210,7 @@ const registerChatSocket = (io, socket) => {
       }
     }
     if (presence.remove(actor.key, socket.id)) {
-      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, lastSeenAt: presence.lastSeenAt(actor.key) });
+      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, inCall: false, lastSeenAt: presence.lastSeenAt(actor.key) });
     }
   });
 };

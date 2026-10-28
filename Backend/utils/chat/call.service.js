@@ -2,11 +2,12 @@ const Conversation = require("../../Models/conversation.model");
 const CallSession = require("../../Models/callsession.model");
 const Meeting = require("../../Models/meeting.model");
 const { createBulkNotifications } = require("../Notification.utils");
-const { getIO } = require("../../config/socket");
+const { getIO, emitToOrganisation } = require("../../config/socket");
+const presence = require("./presence");
 const chat = require("./chat.service");
 const rooms = require("./callRooms");
 const { getIceServers } = require("./ice.utils");
-const { httpError, parseKey } = require("./people.utils");
+const { httpError, parseKey, resolvePeople } = require("./people.utils");
 
 const RING_SECONDS = 45;
 const MEETING_EARLY_JOIN_MIN = 10; // attendees can enter this long before start
@@ -21,6 +22,17 @@ const fmtDuration = (sec) => {
   const m = Math.floor(sec / 60);
   if (m < 60) return `${m} min`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
+};
+
+// Tells the whole organisation that someone is now (not) on a call, so every
+// chat list / header can show the "On a call" badge.
+const broadcastCallState = (key, organisation_id) => {
+  emitToOrganisation(organisation_id, "presence:update", {
+    key,
+    online: presence.isOnline(key),
+    inCall: rooms.isInCall(key),
+    lastSeenAt: presence.isOnline(key) ? null : presence.lastSeenAt(key),
+  });
 };
 
 const actorFromKey = (key) => {
@@ -52,6 +64,34 @@ const authorizeMeeting = async (actor, meetingId, { roomRunning }) => {
 
 // ---------- start / join ----------
 
+// Nobody can pick up: leave a "missed call" line in the chat + a bell notification
+// for the people who were busy, so they can call back.
+const handleAllBusy = async (conv, actor, person, media, busyKeys) => {
+  try {
+    const label = media === "audio" ? "voice" : "video";
+    await chat.postSystemMessage(
+      conv,
+      actor,
+      { event: "call", media, status: "missed", durationSec: 0, kind: conv.type, reason: "busy" },
+      `Missed ${label} call (busy on another call)`,
+      { type: "call" }
+    );
+    for (const k of busyKeys) chat.emitToKeys([k], "call:missed-busy", { conversationId: String(conv._id), from: { key: person.key, name: person.name }, media });
+    await createBulkNotifications({
+      recipients: busyKeys.map((k) => { const p = parseKey(k); return { recipientModel: p.model, recipientId: p.id }; }),
+      organisation_id: actor.organisation_id,
+      type: "chat",
+      title: "Missed call",
+      message: `${person.name || "Someone"} tried to call you while you were on another call.`,
+      link: `/chat?conversation=${conv._id}`,
+      priority: "medium",
+      meta: { conversationId: String(conv._id), reason: "busy" },
+    });
+  } catch (err) {
+    console.error("[call] busy bookkeeping failed:", err.message);
+  }
+};
+
 const startConversationCall = async (actor, person, { conversationId, media }) => {
   const conv = await chat.loadConversation(actor, conversationId);
   if (conv.type === "meeting") throw httpError("Join meeting calls from the meeting itself.");
@@ -59,8 +99,25 @@ const startConversationCall = async (actor, person, { conversationId, media }) =
   const existing = rooms.get(roomKey);
   if (existing) return { room: existing, existing: true };
 
+  // I can't start a call while I'm already inside another one
+  if (rooms.isInCall(actor.key)) throw withCode("You are already on another call.", "SELF_BUSY");
+
   const m = media === "audio" ? "audio" : "video";
   const invited = conv.participantKeys.filter((k) => k !== actor.key);
+
+  // Zoho-style "busy on call": people who are inside another call are not rung.
+  const busyKeys = invited.filter((k) => rooms.isInCall(k));
+  const ringKeys = invited.filter((k) => !busyKeys.includes(k));
+  if (!ringKeys.length) {
+    await handleAllBusy(conv, actor, person, m, busyKeys);
+    const who = await resolvePeople(actor.organisation_id, busyKeys.slice(0, 1).map(parseKey));
+    const first = who.get(busyKeys[0]);
+    const label = conv.type === "direct" ? (first ? first.name : "This person") : "Everyone";
+    throw withCode(`${label} ${conv.type === "direct" ? "is" : "are"} on another call. Try again in a few minutes.`, "USER_BUSY", 409, { busyKeys });
+  }
+  for (const k of busyKeys) {
+    chat.emitToKeys([k], "call:missed-busy", { conversationId: String(conv._id), from: { key: person.key, name: person.name }, media: m });
+  }
   const admins = conv.participants.filter((p) => p.role === "admin").map((p) => p.key);
   const hostKeys = conv.type === "direct" ? conv.participantKeys : [...new Set([actor.key, ...admins])];
 
@@ -91,7 +148,7 @@ const startConversationCall = async (actor, person, { conversationId, media }) =
   });
   room.initiatorName = person.name;
 
-  chat.emitToKeys(invited, "call:incoming", {
+  chat.emitToKeys(ringKeys, "call:incoming", {
     callId: room.callId,
     roomKey,
     kind: conv.type,
@@ -182,6 +239,10 @@ const joinRoom = async (socket, actor, person, roomKey, { audio = true, video } 
   }
   if (room.ending) throw withCode("This call has ended.", "CALL_ENDED", 410);
 
+  // one call at a time (a second tab of the SAME call is fine)
+  const other = rooms.roomsWithPerson(actor.key).find((r) => r.roomKey !== room.roomKey);
+  if (other) throw withCode("You are already on another call.", "ALREADY_IN_CALL");
+
   const wantVideo = video === undefined ? room.media === "video" : !!video;
   const alreadyIn = room.peers.has(socket.id);
   const { peer, firstForPerson, distinctCount } = alreadyIn
@@ -216,6 +277,7 @@ const joinRoom = async (socket, actor, person, roomKey, { audio = true, video } 
       chat.emitToKeys([actor.key], "call:dismissed", { roomKey, callId: room.callId, reason: "answered_elsewhere", bySocketId: socket.id });
     }
     socket.to(roomOf(roomKey)).emit("call:peer-joined", { roomKey, peer: rooms.publicPeer(socket.id, peer) });
+    if (firstForPerson) broadcastCallState(actor.key, actor.organisation_id);
   }
 
   return {
@@ -257,6 +319,7 @@ const leaveRoom = async (socket, roomKey, reason = "hangup") => {
   if (r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: socket.id, key: r.peer.key, sharing: false });
   if (r.personGone) {
     CallSession.updateOne({ _id: room.callId, "participants.key": r.peer.key }, { $set: { "participants.$.leftAt": new Date() } }).catch(() => {});
+    broadcastCallState(r.peer.key, room.organisation_id);
   }
 
   if (r.empty) return finalizeRoom(room, room.status === "ringing" ? "cancelled" : "all_left");
@@ -307,6 +370,7 @@ const kickPeer = async (socket, actor, roomKey, targetSocketId) => {
   detachSocket(targetSocketId, roomKey);
   io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: targetSocketId, key: target.key, reason: "removed" });
   if (r && r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: targetSocketId, key: target.key, sharing: false });
+  if (r && r.personGone) broadcastCallState(target.key, room.organisation_id);
   if (r && r.empty) await finalizeRoom(room, "all_left");
 };
 
@@ -327,9 +391,12 @@ const finalizeRoom = async (room, reason) => {
   io.to(roomOf(room.roomKey)).emit("call:ended", payload);
   // anyone still being rung (or with the incoming screen open) stops ringing
   chat.emitToKeys([...room.invitedKeys], "call:dismissed", { roomKey: room.roomKey, callId: room.callId, reason });
+  const inRoomKeys = new Set([...room.peers.values()].map((p) => p.key));
   for (const sid of room.peers.keys()) detachSocket(sid, room.roomKey);
   room.peers.clear();
   rooms.remove(room.roomKey);
+  // everyone who was still inside is free again
+  for (const k of inRoomKeys) broadcastCallState(k, room.organisation_id);
 
   try {
     await CallSession.updateOne(

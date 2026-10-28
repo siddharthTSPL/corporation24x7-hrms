@@ -1,6 +1,8 @@
 // In-memory presence: which people have at least one live socket.
 // (Single Node process. If you ever run several instances, swap this and
 // callRooms.js for the socket.io Redis adapter + a shared store.)
+const rooms = require("./callRooms");
+
 const sockets = new Map(); // key -> Set(socketId)
 const lastSeen = new Map(); // key -> Date
 
@@ -26,6 +28,8 @@ const remove = (key, socketId) => {
 
 const isOnline = (key) => (sockets.get(key)?.size || 0) > 0;
 const lastSeenAt = (key) => lastSeen.get(key) || null;
-const snapshot = (keys) => keys.map((key) => ({ key, online: isOnline(key), lastSeenAt: isOnline(key) ? null : lastSeenAt(key) }));
+const isInCall = (key) => isOnline(key) && rooms.isInCall(key);
+const snapshot = (keys) =>
+  keys.map((key) => ({ key, online: isOnline(key), inCall: isInCall(key), lastSeenAt: isOnline(key) ? null : lastSeenAt(key) }));
 
-module.exports = { add, remove, isOnline, lastSeenAt, snapshot };
+module.exports = { add, remove, isOnline, isInCall, lastSeenAt, snapshot };
