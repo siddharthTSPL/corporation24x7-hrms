@@ -14,7 +14,7 @@ import {
 import useCall from "../../realtime/useCall";
 import Avatar from "./Avatar";
 import { formatDuration } from "./chatUtils";
-import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
+import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/callSound";
 
 function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false }) {
   const ref = useRef(null);

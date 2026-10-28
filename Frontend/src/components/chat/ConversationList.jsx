@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import { FaSearch, FaPlus, FaTimes, FaExpandAlt, FaCompressAlt, FaBellSlash, FaRegCommentDots } from "react-icons/fa";
+import { FaSearch, FaPlus, FaTimes, FaExpandAlt, FaCompressAlt, FaBellSlash, FaRegCommentDots, FaCog } from "react-icons/fa";
 import { useConversations, useChatSearch, useIsOnline } from "../../auth/server-state/chat/chat.hook";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import Avatar from "./Avatar";
 import { formatListTime } from "./chatUtils";
+import RealtimeStatus from "./Realtimestatus ";
+import CallSoundSettings from "./CallSoundSettings";
 
 const TABS = [
   { id: "all", label: "All" },
@@ -82,6 +84,7 @@ function Skeleton() {
 export default function ConversationList({ selectedId, onSelect, onNew, expanded, onToggleExpand, onClose, canExpand }) {
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
+  const [soundOpen, setSoundOpen] = useState(false);
   const myKey = useChatStore((s) => s.myKey);
   const { data: conversations = [], isLoading } = useConversations(true);
   const { data: results = [], isFetching: searching } = useChatSearch(query);
@@ -108,8 +111,19 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
   return (
     <div className="flex flex-col h-full min-h-0 bg-white">
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+          <RealtimeStatus />
+        </div>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setSoundOpen(true)}
+            title="Call & sound settings"
+            className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center"
+          >
+            <FaCog className="text-xs" />
+          </button>
           <button
             type="button"
             onClick={onNew}
@@ -138,6 +152,8 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
           </button>
         </div>
       </div>
+
+      {soundOpen && <CallSoundSettings onClose={() => setSoundOpen(false)} />}
 
       <div className="px-4 pb-2">
         <div className="relative">
