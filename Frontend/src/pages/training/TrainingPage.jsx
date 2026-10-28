@@ -24,6 +24,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
+import useRealtimeRefresh from "../../realtime/useRealtimeRefresh";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/",
@@ -585,6 +586,10 @@ export default function TrainingPage({ superAdminView = false }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Socket.IO: reload live when any training changes (assigned, stage submitted,
+  // approved/rejected, scheduled) - no manual refresh needed.
+  useRealtimeRefresh(["training"], load);
 
   const run = async (action, message) => {
     setBusy(true);
