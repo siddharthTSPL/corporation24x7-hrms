@@ -8,7 +8,8 @@ import {
   clearReadNotifications,
 } from "../../api/notification/notification.api";
 
-const UNREAD_POLL_MS = 30000;
+// Live updates come over Socket.IO (see src/realtime); polling is just a fallback.
+const UNREAD_POLL_MS = 60000;
 
 export const useUnreadNotificationCount = (enabled = true) => {
   return useQuery({

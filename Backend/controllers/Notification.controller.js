@@ -1,5 +1,10 @@
 const NotificationModel = require("../Models/Notification.model");
 const FeatureLaunchModel = require("../Models/featureLaunch.model");
+const { emitToRecipient } = require("../config/socket");
+
+// Tells the person's OTHER open tabs/devices to refresh their bell.
+const syncOtherTabs = (actor, action, id = null) =>
+  emitToRecipient(actor.recipientModel, actor.id, "notification:changed", { action, id });
 
 const getMyNotifications = async (req, res) => {
   const { recipientModel, id } = { recipientModel: req.actor.recipientModel, id: req.actor.id };
@@ -77,6 +82,7 @@ const markAsRead = async (req, res) => {
     return res.status(404).json({ success: false, message: "Notification not found" });
   }
 
+  syncOtherTabs(req.actor, "read", req.params.id);
   return res.status(200).json({ success: true, data: notification });
 };
 
@@ -88,6 +94,7 @@ const markAllAsRead = async (req, res) => {
     { isRead: true, readAt: new Date() }
   );
 
+  syncOtherTabs(req.actor, "read-all");
   return res.status(200).json({ success: true, message: "All notifications marked as read" });
 };
 
@@ -104,6 +111,7 @@ const deleteNotification = async (req, res) => {
     return res.status(404).json({ success: false, message: "Notification not found" });
   }
 
+  syncOtherTabs(req.actor, "delete", req.params.id);
   return res.status(200).json({ success: true, message: "Notification deleted" });
 };
 
@@ -116,6 +124,7 @@ const clearReadNotifications = async (req, res) => {
     isRead: true,
   });
 
+  syncOtherTabs(req.actor, "clear-read");
   return res.status(200).json({ success: true, message: "Read notifications cleared", deletedCount: result.deletedCount });
 };
 

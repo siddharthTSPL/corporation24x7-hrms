@@ -115,6 +115,50 @@ notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 
 
 notificationSchema.statics.TYPES = NOTIFICATION_TYPES;
 
+// ---- Real-time push (Socket.IO) -------------------------------------------
+// Every notification in the app is created through this model (Model.create /
+// insertMany via utils/Notification.utils.js), so hooking here pushes ALL of
+// them live without touching any individual controller.
+const toPayload = (doc) => {
+  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  return {
+    _id: o._id,
+    recipient: o.recipient,
+    recipientModel: o.recipientModel,
+    type: o.type,
+    title: o.title,
+    message: o.message,
+    link: o.link,
+    priority: o.priority,
+    isRead: o.isRead,
+    meta: o.meta,
+    createdAt: o.createdAt,
+  };
+};
+
+const pushLive = (doc) => {
+  try {
+    // required lazily: config/socket.js loads account models for auth.
+    const { emitToRecipient } = require("../config/socket");
+    emitToRecipient(doc.recipientModel, doc.recipient, "notification:new", toPayload(doc));
+  } catch (err) {
+    console.error("[notification] live push failed:", err.message);
+  }
+};
+
+notificationSchema.pre("save", function () {
+  this.$locals.wasNew = this.isNew;
+});
+
+notificationSchema.post("save", function (doc) {
+  if (doc.$locals && doc.$locals.wasNew) pushLive(doc);
+});
+
+notificationSchema.post("insertMany", function (docs) {
+  if (Array.isArray(docs)) docs.forEach(pushLive);
+});
+
+
 const NotificationModel =
   mongoose.models.Notification || mongoose.model("Notification", notificationSchema);
 

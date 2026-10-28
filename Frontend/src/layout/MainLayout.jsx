@@ -12,6 +12,7 @@ import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner
 import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
+import useRealtimeSync from "../realtime/useRealtimeSync";
 
 // Birthdays are matched on the IST calendar - the same clock the backend
 // birthday cron uses - so the popup, the bell notification and the reminder
@@ -60,6 +61,9 @@ export default function MainLayout() {
   const { mutate: dismissBirthday, isPending: isDismissingBirthday } = useDismissBirthdayWish();
 
   usePermissionsSync();
+
+  // Socket.IO: live notifications + auto-refresh of request lists (no page reload).
+  useRealtimeSync(Boolean(auth?.role));
 
   // TorchX Policy — Access Gate. While any mandatory policy assigned to
   // this person is unacknowledged, render ONLY PolicyGateScreen below —

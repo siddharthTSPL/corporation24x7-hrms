@@ -3,6 +3,7 @@ const cookieparser = require('cookie-parser');
 const morgan = require('morgan');
 const cors = require('cors');
 const compression = require('compression');
+const allowedOrigins = require('../config/allowedOrigins');
 
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
@@ -54,18 +55,7 @@ app.use(cookieparser());
 app.use(compression());
 
 const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://torchx-talent.techtorch.solutions",
-    "http://torchx-talent.techtorch.solutions",
-    "https://www.torchx-talent.techtorch.solutions",
-    "http://talent.techtorch.solutions",
-    "https://talent.techtorch.solutions",
-    "https://corporation24x7-hrms.onrender.com",
-    "https://torchxsuite.com/talent",
-    "http://torchxsuite.com/talent/",
-  ],
+  origin: allowedOrigins,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

@@ -31,7 +31,9 @@ function normalize(doc, model) {
     model,
     roleKey: cfg.roleKey,
     roleLabel: cfg.label,
-    uid: doc.uid || doc.empid || "",
+    // Reports show the Employee ID (empid). The row key stays "uid" so the UI/export
+    // column bindings do not change; uid is only a fallback for legacy records.
+    uid: doc.empid || doc.uid || "",
     name: [doc.f_name, doc.l_name].filter(Boolean).join(" ").trim(),
     department: doc.department || "",
     designation: doc.designation || "",
@@ -174,10 +176,10 @@ async function searchPeople(ctx, { q = "", limit = 15, roleKeys } = {}) {
       if (idFilter) query._id = { $in: idFilter };
       if (term) {
         const rx = new RegExp(esc(term), "i");
-        query.$or = [{ f_name: rx }, { l_name: rx }, { uid: rx }];
+        query.$or = [{ f_name: rx }, { l_name: rx }, { empid: rx }, { uid: rx }];
       }
-      const docs = await cfg.Model.find(query).select("uid f_name l_name").limit(limit).lean();
-      for (const d of docs) rows.push({ value: String(d._id), label: `${[d.f_name, d.l_name].filter(Boolean).join(" ")} (${d.uid || "-"})` });
+      const docs = await cfg.Model.find(query).select("empid uid f_name l_name").limit(limit).lean();
+      for (const d of docs) rows.push({ value: String(d._id), label: `${[d.f_name, d.l_name].filter(Boolean).join(" ")} (${d.empid || d.uid || "-"})` });
     })
   );
   return rows.sort((a, b) => a.label.localeCompare(b.label)).slice(0, limit);

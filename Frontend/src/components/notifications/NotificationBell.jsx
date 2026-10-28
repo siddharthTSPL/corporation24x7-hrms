@@ -15,7 +15,7 @@ import NotificationItem from "./NotificationItem";
 import FeatureNotificationModal from "./FeatureNotificationModal";
 import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
 
-const LIVE_POLL_MS = 20000;
+const LIVE_POLL_MS = 60000; // fallback only; Socket.IO pushes new items instantly
 
 function BellSkeleton() {
   return (
