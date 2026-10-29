@@ -148,17 +148,23 @@ const startConversationCall = async (actor, person, { conversationId, media }) =
   });
   room.initiatorName = person.name;
 
-  chat.emitToKeys(ringKeys, "call:incoming", {
-    callId: room.callId,
-    roomKey,
-    kind: conv.type,
-    media: m,
-    conversationId: String(conv._id),
-    conversationName: conv.type === "group" ? conv.name : person.name,
-    from: { key: person.key, id: person.id, model: person.model, name: person.name, photo: person.photo || "" },
-    ringSeconds: RING_SECONDS,
-    startedAt: new Date(room.createdAt),
-  });
+  // Ring ONLY the invited people, one emit per person, each tagged with `to` so the
+  // client can double-check the call is really meant for the logged-in account.
+  console.log(`[call] ${conv.type} call in ${conv._id} by ${actor.key} -> ringing ${ringKeys.length} (${ringKeys.join(", ")})`);
+  for (const k of ringKeys) {
+    chat.emitToKeys([k], "call:incoming", {
+      callId: room.callId,
+      roomKey,
+      kind: conv.type,
+      media: m,
+      to: k,
+      conversationId: String(conv._id),
+      conversationName: conv.type === "group" ? conv.name : person.name,
+      from: { key: person.key, id: person.id, model: person.model, name: person.name, photo: person.photo || "" },
+      ringSeconds: RING_SECONDS,
+      startedAt: new Date(room.createdAt),
+    });
+  }
   room.ringTimer = setTimeout(() => {
     const r = rooms.get(roomKey);
     if (r && r.status === "ringing") finalizeRoom(r, "timeout").catch((e) => console.error("[call] timeout finalize failed:", e.message));
@@ -223,7 +229,12 @@ const assertCanJoinExisting = async (room, actor) => {
   if (room.kind === "meeting") {
     await authorizeMeeting(actor, room.meetingId, { roomRunning: true });
   } else {
+    // must be a member of the chat the call belongs to...
     await chat.loadConversation(actor, room.conversationId);
+    // ...and for a 1:1 call, must be the caller or the person who was called
+    if (room.kind === "direct" && !room.invitedKeys.has(actor.key) && room.initiatorKey !== actor.key && !room.hostKeys.has(actor.key)) {
+      throw withCode("This call is not for you.", "NOT_INVITED", 403);
+    }
   }
 };
 

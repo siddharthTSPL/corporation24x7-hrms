@@ -362,8 +362,9 @@ function useEmployeeDirectory() {
       ? [{
           _id: owner._id,
           name: `${owner.f_name || ""} ${owner.l_name || ""}`.trim() || "Super Admin",
-          uid: "OWNER",
-          empid: "OWNER",
+          uid: owner.empid || "OWNER",
+          empid: owner.empid || "OWNER",
+          designation: owner.designation || "",
           model: "SuperAdmin",
         }]
       : [];

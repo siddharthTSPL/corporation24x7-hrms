@@ -6,6 +6,7 @@
 // Mesh is comfortable up to ~6-8 people; bigger all-hands need an SFU.
 import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
+import { useChatStore } from "../../auth/store/chat/chatStore";
 
 const store = () => useCallStore.getState();
 const MESH_WARN_AT = 8;
@@ -407,6 +408,9 @@ const attach = (sock) => {
   let lostConnection = false;
 
   const onIncoming = (c) => {
+    // the server tags every ring with the person it is for: never ring for someone else's call
+    const me = useChatStore.getState().myKey;
+    if (c.to && me && c.to !== me) return;
     // already on a call: tell the caller we're busy instead of ringing on top of it
     if (store().active || busy) {
       emitQuiet("call:decline", { roomKey: c.roomKey, reason: "busy" });

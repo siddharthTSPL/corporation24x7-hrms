@@ -62,7 +62,7 @@ const registerChatSocket = (io, socket) => {
   // calls that started while this person was offline / reconnecting
   for (const room of rooms.ringingFor(actor.key)) {
     socket.emit("call:incoming", {
-      callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media,
+      callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media, to: actor.key,
       conversationId: room.conversationId, conversationName: room.title || room.initiatorName || "",
       from: { key: room.initiatorKey, name: room.initiatorName || "" }, ringSeconds: calls.RING_SECONDS,
       startedAt: new Date(room.createdAt),

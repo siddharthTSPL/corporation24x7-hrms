@@ -75,13 +75,13 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
+    const person = await Model.findById(employeeId).select("f_name l_name empid designation organisation_name bank_name account_number").lean();
     if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
-      employeeId: "OWNER",
+      employeeId: person.empid || "OWNER",
       department: "Management",
-      designation: "Super Admin",
+      designation: person.designation || "",
       bankName: person.bank_name || "",
       accountNumber: person.account_number || "",
     };
@@ -109,6 +109,33 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
 
+// Payrolls generated earlier saved the SuperAdmin's employee id as the literal
+// "OWNER". Show the SuperAdmin's real empid (profile > Employee ID) instead.
+// Same for the designation: older payrolls stored the literal "Super Admin" - show the
+// owner's real designation (profile > Designation) instead.
+const fixOwnerEmpId = async (payrolls) => {
+  const stale = payrolls.filter(
+    (p) =>
+      p.employeeModel === "SuperAdmin" &&
+      (!p.employeeSnapshot?.employeeId ||
+        p.employeeSnapshot.employeeId === "OWNER" ||
+        !p.employeeSnapshot?.designation ||
+        p.employeeSnapshot.designation === "Super Admin")
+  );
+  if (!stale.length) return;
+  const ids = [...new Set(stale.map((p) => String(p.employee)))];
+  const owners = await SuperAdmin.find({ _id: { $in: ids } }).select("empid designation").lean();
+  const byId = new Map(owners.map((o) => [String(o._id), o]));
+  for (const p of stale) {
+    const o = byId.get(String(p.employee));
+    if (!o) continue;
+    const snap = { ...p.employeeSnapshot };
+    if ((!snap.employeeId || snap.employeeId === "OWNER") && o.empid) snap.employeeId = o.empid;
+    if (!snap.designation || snap.designation === "Super Admin") snap.designation = o.designation || "";
+    p.employeeSnapshot = snap;
+  }
+};
+
 // Basic org-owner (SuperAdmin) identity — Admin needs this to see "Super Admin"
 // as a selectable person for CTC/payroll, same as SuperAdmin already can for
 // themself. organisation_id === the SuperAdmin's own _id (see
@@ -116,7 +143,7 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 const getOrgOwner = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
 
-  const owner = await SuperAdmin.findById(organisation_id).select("f_name l_name organisation_name").lean();
+  const owner = await SuperAdmin.findById(organisation_id).select("f_name l_name empid designation organisation_name").lean();
   if (!owner) return res.status(404).json({ success: false, message: "Organisation owner not found" });
 
   res.status(200).json({
@@ -125,6 +152,8 @@ const getOrgOwner = async (req, res) => {
       _id: owner._id,
       f_name: owner.f_name || "",
       l_name: owner.l_name || "",
+      empid: owner.empid || "",
+      designation: owner.designation || "",
       organisation_name: owner.organisation_name || "",
     },
   });
@@ -1111,6 +1140,8 @@ const listPayrolls = async (req, res) => {
     }
   }
 
+  await fixOwnerEmpId(payrolls);
+
   res.status(200).json({ success: true, count: payrolls.length, payrolls });
 };
 
@@ -1136,6 +1167,8 @@ const getPayslip = async (req, res) => {
     const { bankName, accountNumber } = await getEmployeeSnapshot(payslip.employeeModel, payslip.employee);
     payslip.employeeSnapshot = { ...payslip.employeeSnapshot, bankName, accountNumber };
   }
+
+  await fixOwnerEmpId([payslip]);
 
   res.status(200).json({ success: true, payslip });
 };
@@ -1200,6 +1233,8 @@ const getMyPayslips = async (req, res, next) => {
         }
       }
     }
+
+    await fixOwnerEmpId(payslips);
 
     res.status(200).json({
       success: true,
