@@ -43,10 +43,26 @@ export default function useChatRealtime(enabled) {
     // --- identity + presence ---
     const onPresence = ({ key, online, lastSeenAt, inCall }) => chat().setPresence(key, online, lastSeenAt || null, inCall);
 
+    // Identity the SOCKET was authenticated as (from the cookie at handshake time).
+    let socketKey = null;
+    let driftReconnects = 0;
+
     const syncIdentity = async () => {
       try {
         const r = await getMe();
         if (r?.key) {
+          // The auth cookie is shared by every tab of this browser. If another
+          // account logged in elsewhere, this tab's socket still belongs to the
+          // OLD account (chat/calls get routed to the wrong person). Re-handshake
+          // so the socket uses the cookie that REST is using right now.
+          if (socketKey && r.key !== socketKey && driftReconnects < 2) {
+            driftReconnects += 1;
+            console.warn("[socket] identity drift:", socketKey, "->", r.key, "- reconnecting");
+            socketKey = null;
+            socket.disconnect();
+            socket.connect();
+            return;
+          }
           if (chat().myKey !== r.key) chat().setMyKey(r.key);
           return;
         }
@@ -60,7 +76,15 @@ export default function useChatRealtime(enabled) {
         void 0;
       }
     };
-    const onReady = () => syncIdentity();
+    const onReady = ({ key } = {}) => {
+      socketKey = key || null;
+      syncIdentity();
+    };
+    const recheckIdentity = () => {
+      if (document.visibilityState === "visible" && socket.connected) syncIdentity();
+    };
+    window.addEventListener("focus", recheckIdentity);
+    document.addEventListener("visibilitychange", recheckIdentity);
 
     // After a drop/reconnect we may have missed live events: refresh what's on screen.
     let connectedOnce = socket.connected;
@@ -169,6 +193,8 @@ export default function useChatRealtime(enabled) {
       readTimers.forEach(clearTimeout);
       clearTimeout(unreadTimer);
       detachCalls();
+      window.removeEventListener("focus", recheckIdentity);
+      document.removeEventListener("visibilitychange", recheckIdentity);
       socket.off("socket:ready", onReady);
       socket.off("presence:update", onPresence);
       socket.off("chat:message", onMessage);
