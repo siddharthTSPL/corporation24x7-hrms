@@ -4,7 +4,7 @@
 // Negotiation uses the "perfect negotiation" pattern, so camera on/off in an audio
 // call and screen share can renegotiate at any time without glare.
 // Mesh is comfortable up to ~6-8 people; bigger all-hands need an SFU.
-import { emitAck, emitQuiet } from "../chatSocket";
+import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
 
 const store = () => useCallStore.getState();
@@ -238,7 +238,7 @@ const startCall = async ({ conversationId, media = "video" }) => {
   try {
     const m = await getLocalMedia(media === "video");
     stream = m.stream;
-    const ack = await emitAck("call:start", { conversationId, media });
+    const ack = await emitAckRetry("call:start", { conversationId, media });
     setupRoom(ack, stream, m.cameraBlocked);
     busy = false;
     return ack;
@@ -262,7 +262,7 @@ const joinCall = async ({ roomKey, media = "video" }) => {
     const m = await getLocalMedia(media === "video");
     stream = m.stream;
     const hasVideo = stream.getVideoTracks().length > 0;
-    const ack = await emitAck("call:join", { roomKey, audio: true, video: hasVideo });
+    const ack = await emitAckRetry("call:join", { roomKey, audio: true, video: hasVideo });
     store().removeIncoming(roomKey);
     store().setWaiting(null);
     setupRoom(ack, stream, m.cameraBlocked);
@@ -490,7 +490,7 @@ const attach = (sock) => {
     try {
       [...pcs.keys()].forEach(closePeer);
       store().patchActive({ peers: {} });
-      const ack = await emitAck("call:join", { roomKey: a.roomKey, audio: a.audio, video: a.video });
+      const ack = await emitAckRetry("call:join", { roomKey: a.roomKey, audio: a.audio, video: a.video });
       ice = ack.iceServers || ice;
       mySocketId = ack.you.socketId;
       store().patchActive({ mySocketId, status: "connecting", presenterSocketId: ack.presenterSocketId || null });
