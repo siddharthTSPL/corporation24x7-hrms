@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { useChatStore } from "../auth/store/chat/chatStore";
+import { getTabToken } from "../lib/Tabsession";
 
 // Same base the axios clients use: "/talent/api" in production (reverse proxy
 // strips /talent/api before it reaches Node), "http://localhost:5000/" in dev.
@@ -63,6 +64,8 @@ export const getSocket = () => {
   socket = io(origin, {
     path,
     withCredentials: true, // sends the same "token" cookie the REST API uses
+    // This tab's own login token (re-read on every (re)connect). Falls back to the cookie when absent.
+    auth: (cb) => cb({ token: getTabToken() || undefined }),
     autoConnect: false,
     // Default order (long-polling first, then upgrade to WebSocket). Works
     // through ANY proxy (IIS/ARR, nginx, Cloudflare); if WebSocket is blocked

@@ -50,8 +50,10 @@ const authenticate = async (socket, next) => {
   try {
     // Browser: the same httpOnly "token" cookie the REST API uses.
     // Fallback: explicit token (e.g. mobile app) via socket.handshake.auth.token.
-    let token = readCookie(socket.handshake.headers.cookie, "token");
-    if (!token && socket.handshake.auth?.token) token = socket.handshake.auth.token;
+    // The tab's own token (socket.handshake.auth.token) wins over the shared cookie,
+    // so two accounts in one browser each get their own socket identity.
+    let token = socket.handshake.auth?.token || null;
+    if (!token) token = readCookie(socket.handshake.headers.cookie, "token");
     if (!token) {
       const h = socket.handshake.headers.authorization;
       if (h?.startsWith("Bearer ")) token = h.slice(7);
