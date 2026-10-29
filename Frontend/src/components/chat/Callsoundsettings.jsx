@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { FaTimes, FaPlay, FaUpload, FaTrash } from "react-icons/fa";
+import { useEffect, useRef, useState } from "react";
+import { FaArrowLeft, FaPlay, FaStop, FaUpload, FaTrash } from "react-icons/fa";
 import {
   RINGTONES,
   getCallSoundSettings,
@@ -34,9 +34,47 @@ export default function CallSoundSettings({ onClose }) {
   const [s, setS] = useState(getCallSoundSettings);
   const [msgSound, setMsgSound] = useState(isSoundEnabled);
   const [perm, setPerm] = useState(desktopAlertPermission);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewMessage, setPreviewMessage] = useState("");
   const fileRef = useRef(null);
+  const previewStopRef = useRef(null);
 
-  const patch = (p) => setS(setCallSoundSettings(p));
+  const stopPreview = () => {
+    previewStopRef.current?.();
+    previewStopRef.current = null;
+    setPreviewing(false);
+  };
+
+  useEffect(() => () => previewStopRef.current?.(), []);
+
+  const patch = (p) => {
+    stopPreview();
+    setPreviewMessage("");
+    setS(setCallSoundSettings(p));
+  };
+
+  const testRingtone = () => {
+    if (previewing) {
+      stopPreview();
+      setPreviewMessage("Test stopped");
+      return;
+    }
+    setPreviewMessage("");
+    const stop = previewRingtone(s.ringtone, s.volume, s, {
+      onStopped: () => {
+        previewStopRef.current = null;
+        setPreviewing(false);
+      },
+      onError: (err) => {
+        previewStopRef.current = null;
+        setPreviewing(false);
+        setPreviewMessage(err?.message || "Could not play the test ringtone.");
+      },
+    });
+    if (!stop) return;
+    previewStopRef.current = stop;
+    setPreviewing(true);
+  };
 
   const uploadRingtone = (file) => {
     if (!file) return;
@@ -57,14 +95,14 @@ export default function CallSoundSettings({ onClose }) {
   const removeRingtone = () => patch({ ringtone: "classic", customRingtone: null });
 
   return (
-    <div className="fixed inset-0 z-[96] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-base font-bold text-gray-900">Call & sound settings</h3>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
-            <FaTimes className="text-sm" />
-          </button>
-        </div>
+    <div className="flex flex-col h-full min-h-0 bg-white">
+      <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-100 shrink-0">
+        <button type="button" onClick={onClose} title="Back to chat" className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center">
+          <FaArrowLeft className="text-sm" />
+        </button>
+        <h3 className="text-base font-bold text-gray-900">Call & sound settings</h3>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
 
         <Row label="Ring on incoming calls"><Toggle on={s.ringEnabled} onChange={(v) => patch({ ringEnabled: v })} /></Row>
 
@@ -72,7 +110,7 @@ export default function CallSoundSettings({ onClose }) {
           <div className="flex items-center gap-2">
             <select
               value={s.ringtone}
-              onChange={(e) => { patch({ ringtone: e.target.value }); previewRingtone(e.target.value, s.volume); }}
+              onChange={(e) => patch({ ringtone: e.target.value })}
               className="text-sm border border-gray-200 rounded-lg px-2 py-1"
             >
               {RINGTONES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
@@ -80,14 +118,16 @@ export default function CallSoundSettings({ onClose }) {
             </select>
             <button
               type="button"
-              title="Test ringtone"
-              onClick={() => previewRingtone(s.ringtone, s.volume)}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+              title={previewing ? "Stop ringtone test" : "Test ringtone"}
+              onClick={testRingtone}
+              className={`w-8 h-8 rounded-full flex items-center justify-center ${previewing ? "bg-[#730042] text-white" : "bg-gray-100 hover:bg-gray-200"}`}
             >
-              <FaPlay className="text-[10px]" />
+              {previewing ? <FaStop className="text-[10px]" /> : <FaPlay className="text-[10px]" />}
             </button>
           </div>
         </Row>
+        {previewMessage && <p role="status" className={`text-xs pb-2 ${previewMessage.includes("Could not") || previewMessage.includes("ringing") ? "text-amber-700" : "text-gray-500"}`}>{previewMessage}</p>}
+        {previewing && <p role="status" className="text-xs pb-2 text-[#730042]">Playing test ringtone… Click again to stop.</p>}
 
         <Row label="Your ringtone">
           <div className="flex items-center gap-2">
@@ -117,7 +157,6 @@ export default function CallSoundSettings({ onClose }) {
           <input
             type="range" min="10" max="100" value={s.volume}
             onChange={(e) => patch({ volume: Number(e.target.value) })}
-            onMouseUp={() => previewRingtone(s.ringtone, s.volume)}
             className="w-32 accent-[#730042]"
           />
         </Row>

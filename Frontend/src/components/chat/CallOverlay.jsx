@@ -42,11 +42,11 @@ function MediaView({ stream, muted = false, mirror = false, hidden = false, cont
   );
 }
 
-function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting }) {
+function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting, avatarSize = 72 }) {
   return (
     <div className="relative w-full h-full min-h-0 rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center">
       <MediaView stream={stream} muted={muted} mirror={mirror} hidden={!videoOn} />
-      {!videoOn && <Avatar name={name} photo={photo} size={72} seed={seed} />}
+      {!videoOn && <Avatar name={name} photo={photo} size={avatarSize} seed={seed} />}
       <div className="absolute left-2 bottom-2 flex items-center gap-1.5 bg-black/55 text-white text-xs rounded-full px-2.5 py-1 max-w-[80%]">
         {!audioOn && <FaMicrophoneSlash className="text-[10px] text-red-300 flex-shrink-0" />}
         <span className="truncate">{label || name}</span>
@@ -108,12 +108,23 @@ function CallScreen() {
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
 
+  useEffect(() => {
+    if (active?.callId) setMinimized(false);
+  }, [active?.callId]);
+
   if (!active) return null;
 
   const statusText =
     active.status === "connected" ? formatDuration(elapsed) : active.status === "ringing" ? "Ringing…" : "Connecting…";
-  const title = active.title || (active.kind === "meeting" ? "Meeting" : "Call");
+  const directTarget = conversation?.type === "direct" ? conversation.otherPerson : null;
+  const title = active.kind === "direct"
+    ? directTarget?.name || active.title || conversation?.name || "Call"
+    : active.title || conversation?.name || (active.kind === "meeting" ? "Meeting" : "Call");
   const presenter = peers.find((p) => p.screenStream);
+  const self = conversation?.participants?.find((p) => p.key === myKey);
+  const waitingTarget = active.kind === "direct" && peers.length === 0
+    ? directTarget || { key: "call-target", name: title, photo: conversation?.photo || "" }
+    : null;
   const joinedKeys = new Set([myKey, ...peers.map((p) => p.key)].filter(Boolean));
   const candidateSource = conversation?.type === "direct" ? directoryPeople : conversation?.participants || [];
   const candidates = candidateSource
@@ -164,24 +175,56 @@ function CallScreen() {
   );
 
   if (minimized) {
+    const miniParticipants = active.kind === "direct"
+      ? peers.length ? peers.slice(0, 1) : [{ ...waitingTarget, socketId: waitingTarget.key }]
+      : peers.slice(0, 3);
+    const participantCount = active.kind === "direct" ? 1 : peers.length + 1;
+    const connected = active.status === "connected";
     return (
-      <div className="fixed bottom-4 right-4 z-[90] w-72 rounded-2xl bg-gray-900 text-white shadow-2xl border border-white/10 overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2.5">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{title}</p>
-            <p className="text-[11px] text-emerald-300">{statusText}</p>
+      <div className="fixed bottom-4 right-4 z-[90] w-[min(360px,calc(100vw-2rem))] rounded-2xl bg-slate-950 text-white shadow-[0_18px_55px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-[#730042] via-fuchsia-500 to-emerald-400" />
+        <div className="px-4 pt-3.5 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0">
+              {active.media === "video" ? <FaVideo /> : <FaPhoneAlt />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold truncate">{title}</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-300">
+                <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-400" : "bg-amber-400 animate-pulse"}`} />
+                <span className={connected ? "text-emerald-300" : "text-amber-200"}>{statusText}</span>
+              </p>
+            </div>
+            <button type="button" onClick={() => setMinimized(false)} title="Open call" className="w-9 h-9 rounded-full text-gray-300 hover:bg-white/10 hover:text-white flex items-center justify-center">
+              <FaExpandAlt className="text-xs" />
+            </button>
           </div>
-          <button type="button" onClick={() => setMinimized(false)} title="Expand" className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center">
-            <FaExpandAlt className="text-xs" />
-          </button>
         </div>
-        <div className="flex items-center justify-center gap-2 pb-3">
-          <CtrlButton onClick={toggleAudio} active={active.audio} title="Mute">
-            {active.audio ? <FaMicrophone /> : <FaMicrophoneSlash />}
-          </CtrlButton>
-          <CtrlButton onClick={run(leave)} danger title="Leave call">
+        <div className="flex items-center gap-3 px-4 py-3 border-y border-white/10 bg-white/[0.03]">
+          <div className="flex items-center pl-1">
+            {active.kind !== "direct" && <Avatar name="You" size={30} seed="you" />}
+            {miniParticipants.map((p) => (
+              <div key={p.socketId} className={`${active.kind === "direct" ? "" : "-ml-2.5"} rounded-full ring-2 ring-slate-950`}>
+                <Avatar name={p.name || "Participant"} photo={p.photo} size={30} seed={p.key || p.socketId} />
+              </div>
+            ))}
+            {participantCount > 4 && <span className="-ml-2.5 w-[30px] h-[30px] rounded-full ring-2 ring-slate-950 bg-slate-700 text-[9px] flex items-center justify-center">+{participantCount - 4}</span>}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-gray-200">{participantCount} {participantCount === 1 ? "person" : "people"}</p>
+            <p className="text-[10px] text-gray-400 truncate">{active.kind === "direct" ? peers.length ? `With ${peers[0].name || waitingTarget.name}` : `${active.status === "ringing" ? "Calling" : "Connecting to"} ${waitingTarget.name}` : peers.length ? peers.map((p) => p.name || "Participant").join(", ") : connected ? "You are the only one here" : "Waiting for someone to join"}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-3 px-4 py-3.5">
+          <button type="button" onClick={toggleAudio} title={active.audio ? "Mute microphone" : "Unmute microphone"} className={`h-10 min-w-20 px-3 rounded-full flex items-center justify-center gap-2 text-xs font-semibold ${active.audio ? "bg-white/10 hover:bg-white/15 text-white" : "bg-amber-300 text-gray-900 hover:bg-amber-200"}`}>
+            {active.audio ? <FaMicrophone /> : <FaMicrophoneSlash />}<span>{active.audio ? "Mute" : "Muted"}</span>
+          </button>
+          <button type="button" onClick={run(toggleVideo)} title={active.video ? "Turn camera off" : "Turn camera on"} className={`h-10 min-w-20 px-3 rounded-full flex items-center justify-center gap-2 text-xs font-semibold ${active.video ? "bg-white/10 hover:bg-white/15 text-white" : "bg-white/10 hover:bg-white/15 text-gray-300"}`}>
+            {active.video ? <FaVideo /> : <FaVideoSlash />}<span>{active.video ? "Camera" : "Video off"}</span>
+          </button>
+          <button type="button" onClick={run(leave)} title="Leave call" className="h-10 w-12 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center">
             <FaPhoneSlash />
-          </CtrlButton>
+          </button>
         </div>
         <div className="absolute w-0 h-0 overflow-hidden">
           {peers.map((p) => (
@@ -192,20 +235,31 @@ function CallScreen() {
     );
   }
 
-  const tiles = [
-    {
-      id: "me",
-      name: "You",
-      photo: "",
-      seed: "me",
-      stream: active.localStream,
-      muted: true,
-      audioOn: active.audio,
-      videoOn: active.video && !!active.localStream,
-      mirror: true,
-      label: isPresenting ? "You (presenting)" : "You",
-    },
-    ...peers.map((p) => ({
+  const selfTile = {
+    id: "me",
+    name: "You",
+    photo: self?.photo || "",
+    seed: "me",
+    stream: active.localStream,
+    muted: true,
+    audioOn: active.audio,
+    videoOn: active.video && !!active.localStream,
+    mirror: true,
+    label: isPresenting ? "You (presenting)" : "You",
+  };
+  const callingTile = waitingTarget ? {
+      id: "calling-target",
+      name: waitingTarget.name || "Calling…",
+      photo: waitingTarget.photo || "",
+      seed: waitingTarget.key || "calling-target",
+      stream: null,
+      muted: false,
+      audioOn: false,
+      videoOn: false,
+      mirror: false,
+      label: `${active.status === "ringing" ? "Calling" : active.status === "connected" ? "With" : "Connecting to"} ${waitingTarget.name || "person"}`,
+    } : null;
+  const peerTiles = peers.map((p) => ({
       id: p.socketId,
       name: p.name || "Participant",
       photo: p.photo || "",
@@ -216,8 +270,10 @@ function CallScreen() {
       videoOn: !!p.video && !!p.stream,
       mirror: false,
       reconnecting: p.connectionState === "disconnected" || p.connectionState === "failed",
-    })),
-  ];
+    }));
+  const tiles = active.kind === "direct"
+    ? (peerTiles.length ? peerTiles : [callingTile || selfTile])
+    : [selfTile, ...peerTiles];
 
   return (
     <div className="fixed inset-0 z-[90] bg-gray-950 text-white flex flex-col">
@@ -259,7 +315,7 @@ function CallScreen() {
         ) : (
           <div className={`grid ${gridCols(tiles.length)} auto-rows-fr gap-2 flex-1 min-h-0`}>
             {tiles.map((t) => (
-              <Tile key={t.id} {...t} />
+              <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 144 : 72} />
             ))}
           </div>
         )}

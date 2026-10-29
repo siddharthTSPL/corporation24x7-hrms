@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { FaSearch, FaUsers, FaTimes, FaExpandAlt, FaCompressAlt, FaBellSlash, FaRegCommentDots, FaCog, FaThumbtack, FaPhoneAlt, FaVideo, FaPhone, FaPhoneSlash, FaPhoneVolume } from "react-icons/fa";
 import { useConversations, useChatSearch, useIsOnline, useIsInCall, useCallHistory } from "../../auth/server-state/chat/chat.hook";
 import { useChatStore } from "../../auth/store/chat/chatStore";
+import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import Avatar from "./Avatar";
 import { formatDuration, formatListTime } from "./chatUtils";
 import RealtimeStatus from "./RealtimeStatus";
-import CallSoundSettings from "./CallSoundSettings";
 import useCall from "../../realtime/useCall";
 import toast from "react-hot-toast";
 
@@ -90,7 +90,7 @@ function Row({ conv, active, myKey, onClick }) {
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <p className={`text-xs truncate ${conv.unread ? "text-gray-800 font-medium" : "text-gray-500"}`}>
-            {onCall && conv.type === "direct" ? "On another call" : lm ? `${prefix}${lm.type === "sticker" ? "Sticker" : lm.text || "Message deleted"}` : "No messages yet"}
+            {conv.type === "direct" && other?.onLeave ? "On leave" : onCall && conv.type === "direct" ? "On another call" : lm ? `${prefix}${lm.type === "sticker" ? "Sticker" : lm.text || "Message deleted"}` : "No messages yet"}
           </p>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {conv.pinned && <FaThumbtack className="text-[10px] text-gray-400 -rotate-45" />}
@@ -126,8 +126,8 @@ function Skeleton() {
 export default function ConversationList({ selectedId, onSelect, onNew, expanded, onToggleExpand, onClose, canExpand }) {
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
-  const [soundOpen, setSoundOpen] = useState(false);
   const myKey = useChatStore((s) => s.myKey);
+  const setSoundSettingsOpen = useChatUiStore((s) => s.setSoundSettingsOpen);
   const { data: conversations = [], isLoading } = useConversations(true);
   const { data: results = [], isFetching: searching } = useChatSearch(query);
   const { data: calls = [], isLoading: callsLoading, isError: callsError } = useCallHistory(tab === "calls");
@@ -174,7 +174,7 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setSoundOpen(true)}
+            onClick={() => setSoundSettingsOpen(true)}
             title="Call & sound settings"
             className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center"
           >
@@ -208,8 +208,6 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
           </button>
         </div>
       </div>
-
-      {soundOpen && <CallSoundSettings onClose={() => setSoundOpen(false)} />}
 
       <div className="px-4 pb-2">
         <div className="relative">

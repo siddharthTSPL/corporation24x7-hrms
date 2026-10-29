@@ -42,7 +42,6 @@ import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import useCall from "../../realtime/useCall";
 import Avatar from "./Avatar";
-import PersonInfoSheet from "./PersonInfoSheet";
 import MessageBubble from "./MessageBubble";
 import Composer from "./Composer";
 import WallpaperSheet from "./WallpaperSheet";
@@ -129,7 +128,6 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const [forwardMsg, setForwardMsg] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
-  const [personInfoOpen, setPersonInfoOpen] = useState(false);
 
   const scrollRef = useRef(null);
   const stickRef = useRef(true);
@@ -364,6 +362,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     }
     if (!conv) return "";
     if (isGroup) return `${conv.participants.length} members`;
+    if (other?.onLeave) return "On leave";
     if (otherInCall) return "On another call";
     if (online) return "Online";
     if (lastSeen) return `Last seen ${formatLastSeen(lastSeen)}`;
@@ -384,7 +383,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
         <button
           type="button"
-          onClick={() => (isGroup ? setInfoOpen(true) : other && setPersonInfoOpen(true))}
+          onClick={() => (isGroup || other) && setInfoOpen(true)}
           className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer"
           title={isGroup ? "Group info" : "Contact information"}
         >
@@ -653,7 +652,6 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           />
         </div>
       )}
-      {personInfoOpen && <PersonInfoSheet person={other} onClose={() => setPersonInfoOpen(false)} />}
     </div>
   );
 }

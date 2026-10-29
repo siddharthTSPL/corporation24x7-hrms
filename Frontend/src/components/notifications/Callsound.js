@@ -113,6 +113,26 @@ const tone = (c, { freq, start, dur, type = "sine", gain = 0.3 }, master) => {
   g.connect(master);
   osc.start(t0);
   osc.stop(t0 + dur + 0.03);
+  return osc;
+};
+
+let activePlayback = null;
+
+const stopActivePlayback = () => {
+  const current = activePlayback;
+  activePlayback = null;
+  current?.stop();
+};
+
+const ownPlayback = (kind, stop) => {
+  stopActivePlayback();
+  const playback = { kind, stop };
+  activePlayback = playback;
+  return () => {
+    if (activePlayback !== playback) return;
+    activePlayback = null;
+    stop();
+  };
 };
 
 // each pattern = one ring cycle; `cycleMs` is how often it repeats
@@ -147,25 +167,35 @@ const PATTERNS = {
 
 const playCycle = (name, volume) => {
   const c = getSharedAudioContext();
-  if (!c) return;
+  if (!c) return () => {};
   if (c.state === "suspended") c.resume().catch(() => {});
   const p = PATTERNS[name] || PATTERNS.classic;
   const master = c.createGain();
   master.gain.value = Math.min(Math.max(volume, 0), 100) / 100;
   master.connect(c.destination);
-  p.notes.forEach((n) => tone(c, n, master));
-  setTimeout(() => {
+  const sources = p.notes.map((n) => tone(c, n, master)).filter(Boolean);
+  let stopped = false;
+  const timer = setTimeout(() => {
     try { master.disconnect(); } catch { /* ignore */ }
-  }, 2500);
+  }, 1800);
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    clearTimeout(timer);
+    sources.forEach((source) => { try { source.stop(); } catch { /* already ended */ } });
+    try { master.disconnect(); } catch { /* already disconnected */ }
+  };
 };
 
-const playCustomRingtone = (customRingtone, volume, { loop = false } = {}) => {
+const playCustomRingtone = (customRingtone, volume, { loop = false, onEnded, onError } = {}) => {
   if (!customRingtone?.dataUrl || typeof Audio === "undefined") return () => {};
   const audio = new Audio(customRingtone.dataUrl);
   audio.volume = Math.min(Math.max(volume, 0), 100) / 100;
   audio.loop = loop;
-  audio.play().catch(() => {});
+  audio.addEventListener("ended", onEnded, { once: true });
+  audio.play().catch((err) => onError?.(err));
   return () => {
+    audio.removeEventListener("ended", onEnded);
     audio.pause();
     audio.currentTime = 0;
   };
@@ -174,6 +204,7 @@ const playCustomRingtone = (customRingtone, volume, { loop = false } = {}) => {
 // Starts ringing until the returned stop() is called. Respects the saved settings.
 export const startRingtone = () => {
   const s = getCallSoundSettings();
+  stopActivePlayback();
   if (!s.ringEnabled) return () => {};
   if (s.ringtone === "custom" && s.customRingtone?.dataUrl) {
     const stopAudio = playCustomRingtone(s.customRingtone, s.volume, { loop: true });
@@ -183,16 +214,20 @@ export const startRingtone = () => {
       buzz();
       vib = setInterval(buzz, 3000);
     }
-    return () => {
+    return ownPlayback("ring", () => {
       stopAudio();
       if (vib) {
         clearInterval(vib);
         navigator.vibrate?.(0);
       }
-    };
+    });
   }
   const p = PATTERNS[s.ringtone] || PATTERNS.classic;
-  const run = () => playCycle(s.ringtone, s.volume);
+  let stopCycle = null;
+  const run = () => {
+    stopCycle?.();
+    stopCycle = playCycle(s.ringtone, s.volume);
+  };
   run();
   const timer = setInterval(run, p.cycleMs);
   let vib = null;
@@ -201,24 +236,53 @@ export const startRingtone = () => {
     buzz();
     vib = setInterval(buzz, p.cycleMs);
   }
-  return () => {
+  return ownPlayback("ring", () => {
     clearInterval(timer);
+    stopCycle?.();
     if (vib) {
       clearInterval(vib);
       navigator.vibrate?.(0);
     }
-  };
+  });
 };
 
-// "Test" button in settings: plays one cycle with the given (unsaved) values.
-export const previewRingtone = (name, volume) => {
-  unlock();
-  if (name === "custom") {
-    const s = getCallSoundSettings();
-    playCustomRingtone(s.customRingtone, volume);
-    return;
+// "Test" button in settings: loop one controlled preview until its owner stops it.
+export const previewRingtone = (name, volume, settings = getCallSoundSettings(), callbacks = {}) => {
+  if (activePlayback?.kind === "ring") {
+    callbacks.onError?.(new Error("An incoming call is ringing right now."));
+    return null;
   }
-  playCycle(name, volume);
+  stopActivePlayback();
+  unlock();
+  let cycleTimer = null;
+  let stopSound;
+  if (name === "custom") {
+    stopSound = playCustomRingtone(settings.customRingtone, volume, {
+      loop: true,
+      onError: (err) => {
+        stopPlayback();
+        callbacks.onError?.(err);
+      },
+    });
+  } else {
+    const pattern = PATTERNS[name] || PATTERNS.classic;
+    let stopCycle = null;
+    const runCycle = () => {
+      stopCycle?.();
+      stopCycle = playCycle(name, volume);
+    };
+    runCycle();
+    cycleTimer = setInterval(runCycle, pattern.cycleMs);
+    stopSound = () => {
+      clearInterval(cycleTimer);
+      stopCycle?.();
+    };
+  }
+  const stopPlayback = ownPlayback("preview", () => {
+    stopSound?.();
+    callbacks.onStopped?.();
+  });
+  return stopPlayback;
 };
 
 // ---------------------------------------------------------------- desktop alerts

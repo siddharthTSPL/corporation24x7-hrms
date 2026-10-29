@@ -48,12 +48,22 @@ export const formatDayLabel = (d) => {
 export const formatLastSeen = (d) => {
   if (!d) return "";
   const date = new Date(d);
-  const now = new Date();
-  if (isSameDay(date, now)) return `today at ${formatClock(date)}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (isSameDay(date, yesterday)) return `yesterday at ${formatClock(date)}`;
-  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const time = date.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  });
+  const istDayKey = (value) => {
+    const shifted = new Date(value.getTime() + 330 * 60 * 1000);
+    return `${shifted.getUTCFullYear()}-${shifted.getUTCMonth()}-${shifted.getUTCDate()}`;
+  };
+  const today = new Date();
+  if (istDayKey(date) === istDayKey(today)) return `today at ${time}`;
+  const yesterday = new Date(today.getTime() - 86400000);
+  if (istDayKey(date) === istDayKey(yesterday)) return `yesterday at ${time}`;
+  const day = date.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+  return `${day} at ${time}`;
 };
 
 export const formatSize = (bytes = 0) => {
