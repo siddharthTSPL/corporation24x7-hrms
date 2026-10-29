@@ -266,6 +266,17 @@ const buildReport = async (actor, m) => {
       joinedLateMin: lateMin,
     };
   });
+  // outsiders invited by email + PIN
+  for (const g of m.guests || []) {
+    const key = `Guest:${g.guestId}`;
+    const rec = byKey.get(key);
+    const lateMin = rec && meetingStart ? Math.max(0, Math.round((rec.firstJoinedAt - meetingStart) / 60000)) : null;
+    rows.push({
+      key, name: g.name || g.email, email: g.email, isGuest: true, rsvp: "guest", isHost: false, isCoHost: false,
+      attended: !!rec, firstJoinedAt: rec ? rec.firstJoinedAt : null, lastLeftAt: rec ? rec.lastLeftAt : null,
+      durationSec: rec ? rec.durationSec : 0, joinedLateMin: lateMin,
+    });
+  }
   const attended = rows.filter((r) => r.attended).length;
   const first = sessions[0];
   const last = sessions[sessions.length - 1];
@@ -296,7 +307,7 @@ const meetingReport = async (req, res) => {
     const lines = report.participants.map((r) => [
       r.name,
       r.rsvp,
-      r.isHost ? "Host" : r.isCoHost ? "Co-host" : "Attendee",
+      r.isHost ? "Host" : r.isCoHost ? "Co-host" : r.isGuest ? "Guest" : "Attendee",
       r.attended ? "Yes" : "No",
       r.firstJoinedAt ? new Date(r.firstJoinedAt).toISOString() : "",
       r.lastLeftAt ? new Date(r.lastLeftAt).toISOString() : "",

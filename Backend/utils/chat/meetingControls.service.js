@@ -117,7 +117,10 @@ const gateEntry = (room, socket, actor, person) => {
   const alreadyPresent = rooms.distinctPeople(room).has(actor.key);
   if (alreadyPresent || room.admittedKeys.has(actor.key)) return null;
   if (room.locked) throw withCode("This meeting is locked by the host.", "ROOM_LOCKED", 403);
-  if (!room.settings.lobby) return null;
+  // Outsiders (invited by email + PIN) ALWAYS wait for the host to admit them,
+  // even when the meeting's lobby setting is off.
+  const isGuest = actor.model === "Guest";
+  if (!room.settings.lobby && !isGuest) return null;
 
   const existing = [...room.lobby.values()].find((w) => w.key === actor.key && w.socketId === socket.id);
   if (!existing) {
@@ -128,6 +131,8 @@ const gateEntry = (room, socket, actor, person) => {
       model: person.model,
       name: person.name,
       photo: person.photo || "",
+      isGuest,
+      email: isGuest ? person.email || "" : undefined,
       requestedAt: new Date(),
     });
     socket.data.lobbyRooms = socket.data.lobbyRooms || new Set();
@@ -312,6 +317,7 @@ const liveState = (room, { forModerator = false } = {}) => ({
 
 module.exports = {
   REACTIONS,
+  emitLobby,
   normalizeSettings,
   plainSettings,
   requireRoom,

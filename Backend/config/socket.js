@@ -46,8 +46,36 @@ const reject = (socket, next, reason) => {
   return next(new Error(reason));
 };
 
+// Outsiders invited to a meeting by email + PIN. They send the short-lived guest token
+// (from POST /meetings/guest/join) as socket.handshake.auth.guestToken. It is checked
+// against the DB on every connect, so revoking a guest cuts them off at the next reconnect.
+const authenticateGuest = async (socket, next, guestToken) => {
+  const guests = require("../utils/chat/guest.service");
+  const payload = guests.verifyGuestToken(guestToken);
+  if (!payload) return reject(socket, next, "guest_token_invalid");
+  let ctx;
+  try {
+    ctx = await guests.loadGuestContext(payload.mid, payload.gid);
+  } catch (dbErr) {
+    console.error("[socket] guest DB lookup failed:", dbErr.message);
+    const e = new Error("server_busy");
+    e.data = { retry: true };
+    return next(e);
+  }
+  if (!ctx) return reject(socket, next, "guest_not_allowed");
+  socket.data.recipientModel = "Guest";
+  socket.data.id = String(payload.gid);
+  socket.data.organisation_id = String(ctx.meeting.organisation_id);
+  socket.data.isGuest = true;
+  socket.data.guestMeetingId = String(ctx.meeting._id);
+  socket.data.guestName = ctx.guest.name || payload.name || ctx.guest.email.split("@")[0];
+  socket.data.guestEmail = ctx.guest.email;
+  return next();
+};
+
 const authenticate = async (socket, next) => {
   try {
+    if (socket.handshake.auth?.guestToken) return await authenticateGuest(socket, next, socket.handshake.auth.guestToken);
     // Browser: the same httpOnly "token" cookie the REST API uses.
     // Fallback: explicit token (e.g. mobile app) via socket.handshake.auth.token.
     // The tab's own token (socket.handshake.auth.token) wins over the shared cookie,
@@ -128,10 +156,12 @@ const initSocket = (httpServer) => {
 
   io.on("connection", (socket) => {
     const { recipientModel, id, organisation_id } = socket.data;
+    const isGuest = !!socket.data.isGuest;
     socket.join(personRoom(recipientModel, id));
-    if (organisation_id) socket.join(orgRoom(organisation_id));
+    // outsiders never join the organisation room (presence / org-wide broadcasts)
+    if (organisation_id && !isGuest) socket.join(orgRoom(organisation_id));
     console.log(`[socket] connected ${recipientModel}:${id} via ${socket.conn.transport.name} (total: ${io.engine.clientsCount})`);
-    socket.emit("socket:ready", { recipientModel, id, key: `${recipientModel}:${id}` });
+    socket.emit("socket:ready", { recipientModel, id, key: `${recipientModel}:${id}`, ...(isGuest ? { guest: true, meetingId: socket.data.guestMeetingId } : {}) });
 
     // chat / presence / calls. Required lazily: chatSocket needs this module's
     // emit helpers, which only exist once this file has finished loading.

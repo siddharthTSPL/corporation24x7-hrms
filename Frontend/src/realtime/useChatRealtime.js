@@ -18,6 +18,8 @@ import {
   removeConversation,
 } from "../auth/server-state/chat/chatCache";
 import { MEETING_KEYS } from "../auth/server-state/meeting/meeting.hook";
+import { MEETING_SPACE_KEYS, MEETING_SPACE_EVENTS, patchAnnouncementSeen } from "../auth/server-state/meeting/meetingSpace.hook";
+import { RECEIPT_KEYS } from "../auth/server-state/chat/chatReceipt.hook";
 
 const preview = (m) =>
   m.type === "sticker" ? "Sticker" : m.text ? m.text : m.type === "file" ? m.attachments?.[0]?.name || "Attachment" : "";
@@ -154,6 +156,7 @@ export default function useChatRealtime(enabled) {
         old ? { ...old, conversation: { ...old.conversation, participants: old.conversation.participants.map((p) => (p.key === by ? { ...p, lastReadAt: at } : p)) } } : old,
       );
       if (by === chat().myKey) refreshUnread();
+      qc.invalidateQueries({ queryKey: RECEIPT_KEYS.all });
     };
 
     const onTyping = ({ conversationId, key, name, isTyping }) => chat().setTyping(conversationId, key, name, isTyping);
@@ -170,6 +173,8 @@ export default function useChatRealtime(enabled) {
 
     // --- meetings (bell notifications already arrive via notification:new) ---
     const refreshMeetings = () => qc.invalidateQueries({ queryKey: MEETING_KEYS.all });
+    const refreshMeetingSpace = () => qc.invalidateQueries({ queryKey: MEETING_SPACE_KEYS.all });
+    const onAnnouncementSeen = ({ meetingId, announcementId, seenCount }) => patchAnnouncementSeen(qc, meetingId, announcementId, seenCount);
     const onMeetingReminder = ({ title, minutes }) =>
       toast(`"${title}" starts in ${minutes} minute${minutes === 1 ? "" : "s"}`, { icon: "📅", duration: 8000 });
 
@@ -186,6 +191,9 @@ export default function useChatRealtime(enabled) {
     socket.on("chat:conversation:updated", onConversationUpdated);
     for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.on(ev, refreshMeetings);
     socket.on("meeting:reminder", onMeetingReminder);
+    for (const ev of MEETING_SPACE_EVENTS) socket.on(ev, refreshMeetingSpace);
+    socket.on("meeting:announcement:seen", onAnnouncementSeen);
+    socket.on("meeting:interest", refreshMeetings);
     socket.on("call:ended", () => qc.invalidateQueries({ queryKey: CHAT_KEYS.callHistory }));
     syncIdentity();
 
@@ -208,6 +216,9 @@ export default function useChatRealtime(enabled) {
       socket.off("chat:conversation:updated", onConversationUpdated);
       for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.off(ev, refreshMeetings);
       socket.off("meeting:reminder", onMeetingReminder);
+      for (const ev of MEETING_SPACE_EVENTS) socket.off(ev, refreshMeetingSpace);
+      socket.off("meeting:announcement:seen", onAnnouncementSeen);
+      socket.off("meeting:interest", refreshMeetings);
     };
   }, [enabled, qc]);
 }

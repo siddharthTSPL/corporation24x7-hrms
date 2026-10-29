@@ -27,7 +27,7 @@ const runMeetingJobs = async () => {
     for (const { _id } of due) {
       const m = await Meeting.findOneAndUpdate({ _id, reminderSentAt: null, status: "scheduled" }, { $set: { reminderSentAt: now } }, { new: true }).lean();
       if (!m) continue;
-      const keys = m.attendees.filter((a) => a.rsvp !== "declined").map((a) => a.key);
+      const keys = [...new Set([...m.attendees.filter((a) => a.rsvp !== "declined").map((a) => a.key), ...(m.interestedKeys || [])])];
       const mins = Math.max(1, Math.round((m.startTime - now) / 60000));
       await createBulkNotifications({
         recipients: keys.map((k) => { const p = parseKey(k); return { recipientModel: p.model, recipientId: p.id }; }),

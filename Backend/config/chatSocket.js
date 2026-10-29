@@ -24,13 +24,29 @@ const allow = (socket, bucket, max, windowMs) => {
   return rec.n <= max;
 };
 
+// Outsiders (meeting guests) only get the in-meeting subset: no chat, no org presence,
+// no inviting, no host controls. Everything else is refused before the handler runs.
+const GUEST_EVENTS = new Set([
+  "chat:whoami", "call:join", "call:leave", "call:signal", "call:media-state",
+  "call:screen-share:start", "call:screen-share:stop",
+  "call:hand:raise", "call:hand:lower", "call:reaction",
+  "meeting:state", "meeting:lobby-leave",
+]);
+
 const registerChatSocket = (io, socket) => {
+  const isGuest = !!socket.data.isGuest;
   const actor = chat.toActor({ id: socket.data.id, recipientModel: socket.data.recipientModel, organisation_id: socket.data.organisation_id });
   socket.data.callRooms = new Set();
 
   // Lazily resolved once per socket (name/photo shown to other people in calls).
   let personPromise = null;
   const getPerson = () => {
+    if (isGuest) {
+      return Promise.resolve({
+        key: actor.key, id: actor.id, model: "Guest", name: socket.data.guestName || "Guest",
+        photo: "", role: "Guest", email: socket.data.guestEmail || "", isGuest: true,
+      });
+    }
     if (!personPromise) {
       personPromise = resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]).then(
         (m) => m.get(actor.key) || { key: actor.key, id: actor.id, model: actor.model, name: "Unknown", photo: "" }
@@ -44,6 +60,7 @@ const registerChatSocket = (io, socket) => {
     socket.on(event, async (payload, ack) => {
       if (typeof payload === "function") { ack = payload; payload = {}; }
       const reply = typeof ack === "function" ? ack : () => {};
+      if (isGuest && !GUEST_EVENTS.has(event)) return reply({ ok: false, error: "Not available for guests.", code: "GUEST_FORBIDDEN" });
       try {
         const data = await handler(payload || {});
         reply({ ok: true, ...(data || {}) });
@@ -55,13 +72,13 @@ const registerChatSocket = (io, socket) => {
   };
 
   // ----- presence -----
-  if (presence.add(actor.key, socket.id)) {
+  if (!isGuest && presence.add(actor.key, socket.id)) {
     emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true, inCall: presence.isInCall(actor.key) });
   }
   // everything people sent me while I was away is now "delivered" (grey double tick for them)
-  chat.markDeliveredForActor(actor).catch((err) => console.error("[socket] mark delivered failed:", err.message));
+  if (!isGuest) chat.markDeliveredForActor(actor).catch((err) => console.error("[socket] mark delivered failed:", err.message));
   // calls that started while this person was offline / reconnecting
-  for (const room of rooms.ringingFor(actor.key)) {
+  for (const room of isGuest ? [] : rooms.ringingFor(actor.key)) {
     socket.emit("call:incoming", {
       callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media, to: actor.key,
       conversationId: room.conversationId, conversationName: room.title || room.initiatorName || "",
@@ -118,6 +135,8 @@ const registerChatSocket = (io, socket) => {
 
   on("call:join", async ({ roomKey, audio, video }) => {
     if (!roomKey) throw Object.assign(new Error("roomKey is required."), { statusCode: 400 });
+    // a guest token is good for exactly one meeting
+    if (isGuest && String(roomKey) !== `meeting:${socket.data.guestMeetingId}`) throw Object.assign(new Error("This invitation is for a different meeting."), { statusCode: 403, code: "GUEST_WRONG_MEETING" });
     return calls.joinRoom(socket, actor, await getPerson(), String(roomKey), { audio: audio !== false, video });
   });
 
@@ -259,7 +278,7 @@ const registerChatSocket = (io, socket) => {
         console.error("[socket] leave-on-disconnect failed:", err.message);
       }
     }
-    if (presence.remove(actor.key, socket.id)) {
+    if (!isGuest && presence.remove(actor.key, socket.id)) {
       emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, inCall: false, lastSeenAt: presence.lastSeenAt(actor.key) });
     }
   });
