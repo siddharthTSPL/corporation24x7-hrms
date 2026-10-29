@@ -56,6 +56,16 @@ const meetingSchema = new mongoose.Schema(
     roomKey: { type: String, required: true }, // meeting:<id>
     allowJoinBeforeHost: { type: Boolean, default: false },
 
+    settings: {
+      lobby: { type: Boolean, default: false },
+      muteOnEntry: { type: Boolean, default: false },
+      allowUnmute: { type: Boolean, default: true },
+      chatEnabled: { type: Boolean, default: true },
+      reactionsEnabled: { type: Boolean, default: true },
+      handRaiseEnabled: { type: Boolean, default: true },
+      screenShare: { type: String, enum: ["everyone", "host"], default: "everyone" },
+    },
+
     reminderMinutes: { type: Number, default: 10, min: 0, max: 1440 },
     reminderSentAt: { type: Date, default: null },
 

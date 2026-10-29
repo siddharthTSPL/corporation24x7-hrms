@@ -10,6 +10,7 @@ const chat = require("../utils/chat/chat.service");
 const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
 const { getIceServers } = require("../utils/chat/ice.utils");
+const controls = require("../utils/chat/meetingControls.service");
 const { httpError, parseKey, personKey, requirePeople, resolvePeople, listAllPeople, shapePerson } = require("../utils/chat/people.utils");
 
 const MAX_ATTENDEES = 500;
@@ -228,6 +229,7 @@ const shapeMeeting = (m, actor, people, { detail = false } = {}) => {
     conversationId: o.conversation ? String(o.conversation) : null,
     roomKey: o.roomKey,
     allowJoinBeforeHost: o.allowJoinBeforeHost,
+    settings: controls.plainSettings(o.settings),
     reminderMinutes: o.reminderMinutes,
     opensAt,
     live: room ? { participants: [...rooms.distinctPeople(room)].length } : null,
@@ -326,6 +328,7 @@ const createMeeting = async (req, res) => {
       conversation: conv._id,
       roomKey: rooms.meetingRoomKey(_id),
       allowJoinBeforeHost: !!b.allowJoinBeforeHost,
+      settings: controls.normalizeSettings(b.settings),
       reminderMinutes: Math.min(Math.max(parseInt(b.reminderMinutes, 10) || 10, 0), 1440),
     };
   });
@@ -369,6 +372,41 @@ const listMeetings = async (req, res) => {
   ok(res, { meetings: rows.map((m) => shapeMeeting(m, actor, people)) });
 };
 
+const dayKey = (date, tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+
+const calendar = async (req, res) => {
+  const actor = actorOf(req);
+  const tz = validTz(req.query.tz || DEFAULT_TZ);
+  let from;
+  let to;
+  if (req.query.month && /^\d{4}-\d{2}$/.test(String(req.query.month))) {
+    const [y, mo] = String(req.query.month).split("-").map(Number);
+    from = new Date(Date.UTC(y, mo - 1, 1) - 14 * 3600 * 1000);
+    to = new Date(Date.UTC(y, mo, 1) + 14 * 3600 * 1000);
+  } else {
+    from = req.query.from ? parseDate(req.query.from, "from") : new Date(Date.now() - 24 * 3600 * 1000);
+    to = req.query.to ? parseDate(req.query.to, "to") : new Date(Date.now() + 35 * 24 * 3600 * 1000);
+  }
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 300, 1), 500);
+
+  const q = { organisation_id: actor.organisation_id, attendeeKeys: actor.key, startTime: { $lt: to }, endTime: { $gt: from }, status: { $ne: "cancelled" } };
+  if (req.query.hosting === "true") q.hostKey = actor.key;
+  const rows = await Meeting.find(q).sort({ startTime: 1 }).limit(limit);
+  const people = await peopleFor(actor.organisation_id, rows);
+
+  const days = {};
+  const meetings = rows.map((row) => {
+    const shaped = shapeMeeting(row, actor, people);
+    const startDay = dayKey(row.startTime, tz);
+    const endDay = dayKey(new Date(row.endTime.getTime() - 1), tz);
+    const keys = startDay === endDay ? [startDay] : [startDay, endDay];
+    for (const k of keys) (days[k] = days[k] || []).push(shaped.id);
+    return shaped;
+  });
+  const counts = Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.length]));
+  ok(res, { timezone: tz, from, to, meetings, days, counts, liveNow: meetings.filter((x) => x.status === "live").map((x) => x.id) });
+};
+
 const getMeeting = async (req, res) => {
   const actor = actorOf(req);
   const m = await loadMeeting(actor, req.params.id);
@@ -397,6 +435,7 @@ const updateMeeting = async (req, res) => {
   if (b.media !== undefined) m.media = b.media === "audio" ? "audio" : "video";
   if (b.timezone !== undefined) m.timezone = validTz(b.timezone);
   if (b.allowJoinBeforeHost !== undefined) m.allowJoinBeforeHost = !!b.allowJoinBeforeHost;
+  if (b.settings !== undefined) m.settings = controls.normalizeSettings(b.settings, controls.plainSettings(m.settings));
   if (b.reminderMinutes !== undefined) m.reminderMinutes = Math.min(Math.max(parseInt(b.reminderMinutes, 10) || 0, 0), 1440);
 
   if (b.startTime !== undefined || b.endTime !== undefined || b.durationMin !== undefined) {
@@ -606,4 +645,5 @@ module.exports = {
   joinInfo,
   downloadIcs,
   availability,
+  calendar,
 };

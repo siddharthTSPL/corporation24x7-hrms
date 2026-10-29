@@ -8,6 +8,7 @@
 const chat = require("../utils/chat/chat.service");
 const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
+const controls = require("../utils/chat/meetingControls.service");
 const presence = require("../utils/chat/presence");
 const { resolvePeople, personKey } = require("../utils/chat/people.utils");
 const { emitToOrganisation } = require("./socket");
@@ -172,6 +173,7 @@ const registerChatSocket = (io, socket) => {
     const room = rooms.get(String(roomKey));
     const peer = room && room.peers.get(socket.id);
     if (!peer) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
+    controls.assertCanShare(room, actor.key);
     if (room.presenterSocketId && room.presenterSocketId !== socket.id) {
       const cur = room.peers.get(room.presenterSocketId);
       throw Object.assign(new Error(`${cur ? cur.name : "Someone"} is already sharing their screen.`), { statusCode: 409, code: "SHARE_IN_USE" });
@@ -205,8 +207,51 @@ const registerChatSocket = (io, socket) => {
     io.to(socketId).emit("call:mute-request", { roomKey: room.roomKey, by: actor.key });
   });
 
+  // ----- meeting: hands, reactions, lobby, host controls -----
+  const meetingRoom = (roomKey) => controls.requireMeetingRoom(roomKey);
+  const anyRoom = (roomKey) => controls.requireRoom(roomKey);
+
+  on("call:hand:raise", async ({ roomKey }) => controls.raiseHand(anyRoom(roomKey), socket, actor));
+
+  on("call:hand:lower", async ({ roomKey, key }) => controls.lowerHand(anyRoom(roomKey), socket, actor, key));
+
+  on("call:hand:lower-all", async ({ roomKey }) => controls.lowerAllHands(anyRoom(roomKey), socket, actor));
+
+  on("call:reaction", async ({ roomKey, emoji }) => {
+    if (!allow(socket, "reaction", 12, 10000)) throw Object.assign(new Error("You're reacting too fast."), { statusCode: 429 });
+    controls.sendReaction(anyRoom(roomKey), socket, actor, String(emoji || ""));
+  });
+
+  on("meeting:state", async ({ roomKey }) => {
+    const room = meetingRoom(roomKey);
+    if (!room.peers.has(socket.id)) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
+    return { state: controls.liveState(room, { forModerator: rooms.isModerator(room, actor.key) }) };
+  });
+
+  on("meeting:lobby-leave", async ({ roomKey }) => {
+    controls.leaveLobby(rooms.get(String(roomKey)), socket);
+  });
+
+  on("meeting:lobby-admit", async ({ roomKey, socketId, all }) => controls.admit(meetingRoom(roomKey), socket, actor, { socketId: socketId ? String(socketId) : null, all: !!all }));
+
+  on("meeting:lobby-deny", async ({ roomKey, socketId, all, block }) => controls.deny(meetingRoom(roomKey), socket, actor, { socketId: socketId ? String(socketId) : null, all: !!all, block: !!block }));
+
+  on("meeting:lock", async ({ roomKey, locked }) => controls.setLocked(meetingRoom(roomKey), socket, actor, locked !== false));
+
+  on("meeting:settings", async ({ roomKey, settings }) => {
+    const next = await controls.updateSettingsFromSocket(meetingRoom(roomKey), socket, actor, settings);
+    return { settings: next };
+  });
+
+  on("meeting:set-cohost", async ({ roomKey, key, cohost }) => controls.setCoHost(meetingRoom(roomKey), socket, actor, key, cohost !== false));
+
+  on("call:mute-all", async ({ roomKey }) => controls.muteAll(anyRoom(roomKey), socket, actor));
+
+  on("call:screen-share:force-stop", async ({ roomKey }) => controls.stopShareByHost(anyRoom(roomKey), socket, actor));
+
   // ----- disconnect: leave every call, flip presence -----
   socket.on("disconnect", async () => {
+    controls.leaveAllLobbies(socket);
     for (const roomKey of [...(socket.data.callRooms || [])]) {
       try {
         await calls.leaveRoom(socket, roomKey, "disconnected");
