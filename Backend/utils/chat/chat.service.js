@@ -6,6 +6,10 @@ const { emitToRecipient } = require("../../config/socket");
 const presence = require("./presence");
 const callRooms = require("./callRooms");
 const { httpError, personKey, parseKey, resolvePeople, requirePeople } = require("./people.utils");
+const Leave = require("../../Models/leave.model");
+const ManagerLeave = require("../../Models/maleave.model");
+const AdminLeave = require("../../Models/adleave.model");
+const { startOfISTDay, endOfISTDay } = require("../Istdate.utils");
 
 const MAX_TEXT = 5000;
 
@@ -113,7 +117,45 @@ const serializeConversation = (conv, actor, people) => {
 const loadPeopleForConversations = async (organisation_id, convs) => {
   const refs = [];
   for (const c of convs) for (const p of c.participants) refs.push({ model: p.memberModel, id: p.member });
-  return resolvePeople(organisation_id, refs);
+  const people = await resolvePeople(organisation_id, refs, { includeProfile: true });
+  if (!people.size) return people;
+
+  const idsByModel = { User: [], Manager: [], Admin: [] };
+  for (const person of people.values()) {
+    if (idsByModel[person.model]) idsByModel[person.model].push(person.id);
+  }
+  const startDate = startOfISTDay();
+  const endDate = endOfISTDay();
+  const approved = {
+    User: ["approved_manager", "approved_reporting_manager", "approved_admin"],
+    Manager: ["approved_reporting_manager", "approved_admin"],
+    Admin: ["approved_superadmin", "approved_reporting_manager"],
+  };
+  const leaveQueries = [
+    idsByModel.User.length ? Leave.find({
+      organisation_id, employee: { $in: idsByModel.User }, status: { $in: approved.User }, startDate: { $lte: endDate }, endDate: { $gte: startDate },
+    }).select("employee").lean() : Promise.resolve([]),
+    idsByModel.Manager.length ? ManagerLeave.find({
+      organisation_id, manager: { $in: idsByModel.Manager }, status: { $in: approved.Manager }, startDate: { $lte: endDate }, endDate: { $gte: startDate },
+    }).select("manager").lean() : Promise.resolve([]),
+    idsByModel.Admin.length ? AdminLeave.find({
+      organisation_id, admin: { $in: idsByModel.Admin }, status: { $in: approved.Admin }, startDate: { $lte: endDate }, endDate: { $gte: startDate },
+    }).select("admin").lean() : Promise.resolve([]),
+  ];
+  const [userLeaves = [], managerLeaves = [], adminLeaves = []] = await Promise.all(leaveQueries);
+  for (const leave of userLeaves) {
+    const person = people.get(personKey("User", leave.employee));
+    if (person) person.onLeave = true;
+  }
+  for (const leave of managerLeaves) {
+    const person = people.get(personKey("Manager", leave.manager));
+    if (person) person.onLeave = true;
+  }
+  for (const leave of adminLeaves) {
+    const person = people.get(personKey("Admin", leave.admin));
+    if (person) person.onLeave = true;
+  }
+  return people;
 };
 
 const serializeOneConversation = async (conv, actor) => {

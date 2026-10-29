@@ -8,6 +8,8 @@ import ConversationList from "./ConversationList";
 import ChatThread from "./ChatThread";
 import NewChatSheet from "./NewChatSheet";
 import GroupInfoSheet from "./GroupInfoSheet";
+import PersonInfoSheet from "./PersonInfoSheet";
+import CallSoundSettings from "./Callsoundsettings";
 
 const useMediaQuery = (query) => {
   const [matches, setMatches] = useState(() => (typeof window === "undefined" ? false : window.matchMedia(query).matches));
@@ -27,12 +29,14 @@ export default function ChatPanel() {
   const selectedId = useChatUiStore((s) => s.selectedId);
   const newChatOpen = useChatUiStore((s) => s.newChatOpen);
   const infoOpen = useChatUiStore((s) => s.infoOpen);
+  const soundSettingsOpen = useChatUiStore((s) => s.soundSettingsOpen);
   const closePanel = useChatUiStore((s) => s.closePanel);
   const toggleExpanded = useChatUiStore((s) => s.toggleExpanded);
   const openConversation = useChatUiStore((s) => s.openConversation);
   const backToList = useChatUiStore((s) => s.backToList);
   const setNewChatOpen = useChatUiStore((s) => s.setNewChatOpen);
   const setInfoOpen = useChatUiStore((s) => s.setInfoOpen);
+  const setSoundSettingsOpen = useChatUiStore((s) => s.setSoundSettingsOpen);
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -54,12 +58,13 @@ export default function ChatPanel() {
       const tag = (e.target?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea") return;
       if (infoOpen) setInfoOpen(false);
+      else if (soundSettingsOpen) setSoundSettingsOpen(false);
       else if (newChatOpen) setNewChatOpen(false);
       else closePanel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, infoOpen, newChatOpen, closePanel, setInfoOpen, setNewChatOpen]);
+  }, [open, infoOpen, soundSettingsOpen, newChatOpen, closePanel, setInfoOpen, setSoundSettingsOpen, setNewChatOpen]);
 
   const showList = twoPane || !selectedId;
   const showThread = twoPane || !!selectedId;
@@ -138,9 +143,19 @@ export default function ChatPanel() {
             </div>
           )}
 
-          {infoOpen && infoConv && infoConv.type !== "direct" && (
+          {infoOpen && infoConv && (
             <div className={`absolute top-0 bottom-0 right-0 z-30 bg-white ${twoPane ? "w-[420px] border-l border-gray-200 shadow-xl" : "left-0"}`}>
-              <GroupInfoSheet conversation={infoConv} onClose={() => setInfoOpen(false)} />
+              {infoConv.type !== "direct" ? (
+                <GroupInfoSheet conversation={infoConv} onClose={() => setInfoOpen(false)} />
+              ) : (
+                <PersonInfoSheet person={infoConv.otherPerson} onClose={() => setInfoOpen(false)} />
+              )}
+            </div>
+          )}
+
+          {soundSettingsOpen && (
+            <div className={`absolute top-0 bottom-0 right-0 z-30 bg-white ${twoPane ? "w-[420px] border-l border-gray-200 shadow-xl" : "left-0"}`}>
+              <CallSoundSettings onClose={() => setSoundSettingsOpen(false)} />
             </div>
           )}
         </motion.div>

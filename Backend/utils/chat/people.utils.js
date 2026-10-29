@@ -22,8 +22,9 @@ const parseKey = (key) => {
 const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const PROJECTION = "f_name l_name uid designation department work_email email profile_image working_status";
+const PROFILE_PROJECTION = `${PROJECTION} personal_contact phone date_of_joining Under_manager reporting_manager reporting_manager_model`;
 
-const shapePerson = (doc, model) => ({
+const shapePerson = (doc, model, profile = {}) => ({
   key: personKey(model, doc._id),
   id: String(doc._id),
   model,
@@ -34,6 +35,11 @@ const shapePerson = (doc, model) => ({
   email: doc.work_email || doc.email || "",
   photo: doc.profile_image || "",
   role: ROLE_LABEL[model],
+  ...(profile.include && {
+    phone: doc.personal_contact || doc.phone || "",
+    joinedAt: doc.date_of_joining || null,
+    reportingManager: profile.reportingManager || "",
+  }),
 });
 
 // The org filter differs for SuperAdmin (the org itself) vs everyone else.
@@ -45,7 +51,7 @@ const isActive = (doc) => !doc.working_status || doc.working_status === "working
 // Accepts [{model, id}] (or [{model, _id}]) and returns Map<key, shapedPerson>.
 // Anyone who isn't in this organisation, or isn't "working", is silently absent
 // from the result - callers decide whether that is an error (see requirePeople).
-const resolvePeople = async (organisation_id, refs) => {
+const resolvePeople = async (organisation_id, refs, { includeProfile = false } = {}) => {
   const byModel = {};
   for (const r of refs || []) {
     const model = r && r.model;
@@ -53,16 +59,48 @@ const resolvePeople = async (organisation_id, refs) => {
     if (!MODELS[model] || !mongoose.isValidObjectId(id)) continue;
     (byModel[model] = byModel[model] || new Set()).add(id);
   }
-  const out = new Map();
-  await Promise.all(
+  const documents = (await Promise.all(
     Object.entries(byModel).map(async ([model, ids]) => {
       const docs = await MODELS[model]
         .find({ _id: { $in: [...ids] }, ...orgFilter(model, organisation_id) })
-        .select(PROJECTION)
+        .select(includeProfile ? PROFILE_PROJECTION : PROJECTION)
         .lean();
-      for (const d of docs) if (isActive(d)) out.set(personKey(model, d._id), shapePerson(d, model));
+      return docs.filter(isActive).map((doc) => ({ model, doc }));
     })
-  );
+  )).flat();
+
+  // Resolve the reporting line from the same organisation before exposing the
+  // manager's name in the profile card.
+  const managerNames = new Map();
+  if (includeProfile) {
+    const managerRefs = new Map();
+    for (const { model, doc } of documents) {
+      const managerModel = model === "User" ? "Manager" : doc.reporting_manager_model;
+      const managerId = model === "User" ? doc.Under_manager : doc.reporting_manager;
+      if (!MODELS[managerModel] || !managerId) continue;
+      const key = personKey(managerModel, managerId);
+      managerRefs.set(key, { model: managerModel, id: String(managerId) });
+    }
+    const refsByModel = {};
+    for (const [key, ref] of managerRefs) (refsByModel[ref.model] ||= new Set()).add(ref.id);
+    await Promise.all(Object.entries(refsByModel).map(async ([model, ids]) => {
+      const managers = await MODELS[model]
+        .find({ _id: { $in: [...ids] }, ...orgFilter(model, organisation_id) })
+        .select("f_name l_name")
+        .lean();
+      for (const manager of managers) {
+        managerNames.set(personKey(model, manager._id), `${manager.f_name || ""} ${manager.l_name || ""}`.trim());
+      }
+    }));
+  }
+
+  const out = new Map();
+  for (const { model, doc } of documents) {
+    const managerModel = model === "User" ? "Manager" : doc.reporting_manager_model;
+    const managerId = model === "User" ? doc.Under_manager : doc.reporting_manager;
+    const reportingManager = includeProfile && managerId ? managerNames.get(personKey(managerModel, managerId)) || "" : "";
+    out.set(personKey(model, doc._id), shapePerson(doc, model, { include: includeProfile, reportingManager }));
+  }
   return out;
 };
 

@@ -25,7 +25,7 @@ function Member({ p, isMe, canManage, busy, onToggleRole, onRemove }) {
           {p.name}
           {isMe && <span className="text-gray-400 font-normal"> (You)</span>}
         </p>
-        <p className="text-xs text-gray-500 truncate">{p.designation || p.department || ""}</p>
+        <p className={`text-xs truncate ${p.onLeave ? "text-amber-700 font-medium" : "text-gray-500"}`}>{p.onLeave ? "On leave" : p.designation || p.department || ""}</p>
       </div>
       {p.role === "admin" && (
         <span className="text-[10px] font-semibold text-[#730042] bg-[#F6E8EF] rounded-full px-2 py-0.5">Admin</span>
