@@ -105,6 +105,7 @@ const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
 const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
+const MeetingsPage = lazy(() => import("./pages/meetings/MeetingsPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -511,6 +512,7 @@ function App() {
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
             <Route path="/overtime"       element={<Overtime />} />
+            <Route path="/meetings"       element={<MeetingsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

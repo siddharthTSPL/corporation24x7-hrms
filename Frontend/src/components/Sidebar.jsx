@@ -31,6 +31,7 @@ import {
   FaUserCheck,      // NEW: Face Attendance icon
   FaRegFolderOpen,  // NEW: Team Documents icon
   FaBookOpen,       // NEW: My Policies icon
+  FaVideo,          // Meetings icon
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -50,6 +51,7 @@ import {
 } from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
+  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
 
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
@@ -75,6 +77,7 @@ const superAdminMenu = [
 ];
 
 const adminMenu = [
+  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
   
@@ -108,6 +111,7 @@ const adminMenu = [
 ];
 
 const managerMenu = [
+  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
  
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
   
@@ -133,6 +137,7 @@ const managerMenu = [
 ];
 
 const employeeMenu = [
+  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates.", permissionGroup: ["navigation.can_view_dashboard"] },
  
@@ -173,6 +178,7 @@ const SIDEBAR_ORDER = [
   "recruitment",
   "leave",
   "field operations",
+  "meetings",
   "timesheet",
   "overtime",
   "reimbursement",
