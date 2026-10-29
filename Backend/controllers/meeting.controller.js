@@ -10,6 +10,8 @@ const chat = require("../utils/chat/chat.service");
 const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
 const { getIceServers } = require("../utils/chat/ice.utils");
+const controls = require("../utils/chat/meetingControls.service");
+const guestSvc = require("../utils/chat/guest.service");
 const { httpError, parseKey, personKey, requirePeople, resolvePeople, listAllPeople, shapePerson } = require("../utils/chat/people.utils");
 
 const MAX_ATTENDEES = 500;
@@ -228,14 +230,20 @@ const shapeMeeting = (m, actor, people, { detail = false } = {}) => {
     conversationId: o.conversation ? String(o.conversation) : null,
     roomKey: o.roomKey,
     allowJoinBeforeHost: o.allowJoinBeforeHost,
+    settings: controls.plainSettings(o.settings),
     reminderMinutes: o.reminderMinutes,
     opensAt,
     live: room ? { participants: [...rooms.distinctPeople(room)].length } : null,
     startedAt: o.startedAt,
     endedAt: o.endedAt,
     cancelReason: o.cancelReason || "",
+    guestCount: (o.guests || []).filter((g) => !g.revoked).length,
+    visibility: o.visibility || "invite_only",
+    capacity: o.capacity || 0,
+    interestedCount: (o.interestedKeys || []).length,
   };
   if (detail) {
+    if (isModerator(o, actor)) base.guests = (o.guests || []).map(guestSvc.publicGuest);
     base.coHosts = o.coHostKeys.map(person);
     base.attendees = o.attendees.map((a) => ({ ...person(a.key), rsvp: a.rsvp, respondedAt: a.respondedAt, isHost: a.key === o.hostKey }));
   }
@@ -282,7 +290,9 @@ const createMeeting = async (req, res) => {
   const { people, audience } = await resolveAttendees(actor, { attendees: b.attendees, audience: b.audience });
   const [host] = [...(await requirePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }])).values()];
   people.set(host.key, host);
-  if (people.size < 2) throw httpError("Invite at least one other person.");
+  // outsiders: people without an account, invited by email (they get a PIN by mail)
+  const guestPlan = await guestSvc.prepareGuests(actor, b.guests);
+  if (people.size + guestPlan.entries.length < 2) throw httpError("Invite at least one other person.");
   if (people.size > MAX_ATTENDEES) throw httpError(`A meeting can have at most ${MAX_ATTENDEES} attendees.`);
 
   let coHostKeys = [];
@@ -320,12 +330,16 @@ const createMeeting = async (req, res) => {
       host: actor.id, hostModel: actor.model, hostKey: host.key, coHostKeys,
       startTime: o.start, endTime: o.end, timezone: tz, media,
       attendees, attendeeKeys: attendeeList.map((p) => p.key),
+      guests: guestPlan.entries.map((e) => e.doc), // same guestId + PIN for every session of a series
       audience,
       recurrence: { freq: b.recurrence?.freq && occ.length > 1 ? b.recurrence.freq : "none", interval: Math.min(Math.max(parseInt(b.recurrence?.interval, 10) || 1, 1), 12), until: occ.length > 1 ? occ[occ.length - 1].start : null },
       seriesId,
       conversation: conv._id,
       roomKey: rooms.meetingRoomKey(_id),
       allowJoinBeforeHost: !!b.allowJoinBeforeHost,
+      visibility: b.visibility === "organisation" ? "organisation" : "invite_only",
+      capacity: Math.min(Math.max(parseInt(b.capacity, 10) || 0, 0), 5000),
+      settings: controls.normalizeSettings(b.settings),
       reminderMinutes: Math.min(Math.max(parseInt(b.reminderMinutes, 10) || 10, 0), 1440),
     };
   });
@@ -342,6 +356,7 @@ const createMeeting = async (req, res) => {
     priority: "high",
   });
   if (b.sendEmail !== false) emailAttendees(first, host, invitees, "REQUEST", attendeeList);
+  if (guestPlan.entries.length && b.sendEmail !== false) guestSvc.emailGuests(created, host, guestPlan.entries.map((e) => ({ guest: e.doc, pin: e.pin })));
 
   const people2 = new Map(attendeeList.map((p) => [p.key, p]));
   const resolvedConflicts = conflicts.filter((c) => c.key !== host.key || true).map((c) => ({ ...c, name: people2.get(c.key)?.name || "" }));
@@ -349,6 +364,7 @@ const createMeeting = async (req, res) => {
     meeting: shapeMeeting(first, actor, people2, { detail: false }),
     occurrences: created.length,
     conflicts: resolvedConflicts,
+    guests: { invited: guestPlan.entries.map((e) => e.doc.email), skipped: guestPlan.skipped },
   }, 201);
 };
 
@@ -367,6 +383,41 @@ const listMeetings = async (req, res) => {
   const rows = await Meeting.find(q).sort({ startTime: 1 }).limit(limit);
   const people = await peopleFor(actor.organisation_id, rows);
   ok(res, { meetings: rows.map((m) => shapeMeeting(m, actor, people)) });
+};
+
+const dayKey = (date, tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+
+const calendar = async (req, res) => {
+  const actor = actorOf(req);
+  const tz = validTz(req.query.tz || DEFAULT_TZ);
+  let from;
+  let to;
+  if (req.query.month && /^\d{4}-\d{2}$/.test(String(req.query.month))) {
+    const [y, mo] = String(req.query.month).split("-").map(Number);
+    from = new Date(Date.UTC(y, mo - 1, 1) - 14 * 3600 * 1000);
+    to = new Date(Date.UTC(y, mo, 1) + 14 * 3600 * 1000);
+  } else {
+    from = req.query.from ? parseDate(req.query.from, "from") : new Date(Date.now() - 24 * 3600 * 1000);
+    to = req.query.to ? parseDate(req.query.to, "to") : new Date(Date.now() + 35 * 24 * 3600 * 1000);
+  }
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 300, 1), 500);
+
+  const q = { organisation_id: actor.organisation_id, attendeeKeys: actor.key, startTime: { $lt: to }, endTime: { $gt: from }, status: { $ne: "cancelled" } };
+  if (req.query.hosting === "true") q.hostKey = actor.key;
+  const rows = await Meeting.find(q).sort({ startTime: 1 }).limit(limit);
+  const people = await peopleFor(actor.organisation_id, rows);
+
+  const days = {};
+  const meetings = rows.map((row) => {
+    const shaped = shapeMeeting(row, actor, people);
+    const startDay = dayKey(row.startTime, tz);
+    const endDay = dayKey(new Date(row.endTime.getTime() - 1), tz);
+    const keys = startDay === endDay ? [startDay] : [startDay, endDay];
+    for (const k of keys) (days[k] = days[k] || []).push(shaped.id);
+    return shaped;
+  });
+  const counts = Object.fromEntries(Object.entries(days).map(([k, v]) => [k, v.length]));
+  ok(res, { timezone: tz, from, to, meetings, days, counts, liveNow: meetings.filter((x) => x.status === "live").map((x) => x.id) });
 };
 
 const getMeeting = async (req, res) => {
@@ -397,6 +448,7 @@ const updateMeeting = async (req, res) => {
   if (b.media !== undefined) m.media = b.media === "audio" ? "audio" : "video";
   if (b.timezone !== undefined) m.timezone = validTz(b.timezone);
   if (b.allowJoinBeforeHost !== undefined) m.allowJoinBeforeHost = !!b.allowJoinBeforeHost;
+  if (b.settings !== undefined) m.settings = controls.normalizeSettings(b.settings, controls.plainSettings(m.settings));
   if (b.reminderMinutes !== undefined) m.reminderMinutes = Math.min(Math.max(parseInt(b.reminderMinutes, 10) || 0, 0), 1440);
 
   if (b.startTime !== undefined || b.endTime !== undefined || b.durationMin !== undefined) {
@@ -477,6 +529,7 @@ const updateMeeting = async (req, res) => {
       priority: timeChanged ? "high" : "medium",
     });
     if (b.sendEmail !== false) emailAttendees(m, host, existingKeys.map((k) => everyone.get(k)).filter(Boolean), "UPDATE", [...everyone.values()]);
+    if (b.sendEmail !== false) guestSvc.notifyGuestsOfChange(m, actor, "REQUEST", true).catch(() => {});
   }
 
   ok(res, { meeting: await shapeOne(m, actor, true) });
@@ -527,6 +580,7 @@ const cancelMeeting = async (req, res) => {
     priority: "high",
   });
   if (req.body?.sendEmail !== false) emailAttendees(m, host, others.map((k) => everyone.get(k)).filter(Boolean), "CANCEL", [...everyone.values()]);
+  if (req.body?.sendEmail !== false) for (const t of targets) guestSvc.notifyGuestsOfChange(t, actor, "CANCEL").catch(() => {});
   ok(res, { cancelled: targets.length });
 };
 
@@ -596,6 +650,7 @@ const availability = async (req, res) => {
 };
 
 module.exports = {
+  helpers: { notify, emailAttendees, shapeMeeting, peopleFor, joinUrl, fmtWhen, escapeHtml, validTz, isModerator, loadMeeting },
   createMeeting,
   listMeetings,
   getMeeting,
@@ -606,4 +661,5 @@ module.exports = {
   joinInfo,
   downloadIcs,
   availability,
+  calendar,
 };

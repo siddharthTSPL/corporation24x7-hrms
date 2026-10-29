@@ -5,6 +5,7 @@ const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const anyRoleAuth = require("../middleware/auth/Anyrole.middleware");
 const chatUpload = require("../middleware/upload/Chatattachments.middleware");
 const c = require("../controllers/chat.controller");
+const r = require("../controllers/chatReceipt.controller");
 
 // Every role (employee / manager / admin / super admin) uses the same endpoints.
 chatRouter.use(anyRoleAuth);
@@ -38,6 +39,8 @@ chatRouter.patch("/messages/:messageId", asyncHandler(c.editMessage));
 chatRouter.delete("/messages/:messageId", asyncHandler(c.deleteMessage));
 chatRouter.post("/messages/:messageId/react", asyncHandler(c.reactToMessage));
 chatRouter.post("/messages/:messageId/forward", asyncHandler(c.forwardMessage));
+chatRouter.get("/messages/:messageId/receipts", asyncHandler(r.messageReceipts));
+chatRouter.post("/conversations/:id/receipts", asyncHandler(r.conversationReceipts));
 chatRouter.get("/search", asyncHandler(c.searchMessages));
 chatRouter.get("/unread-count", asyncHandler(c.unreadCount));
 

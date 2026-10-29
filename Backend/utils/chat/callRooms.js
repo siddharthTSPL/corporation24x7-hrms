@@ -12,7 +12,7 @@ const socketRoomName = (roomKey) => `call:${roomKey}`;
 
 const get = (roomKey) => rooms.get(roomKey) || null;
 
-const create = ({ roomKey, callId, kind, media, organisation_id, conversationId = null, meetingId = null, initiatorKey, hostKeys = [], invitedKeys = [], title = "" }) => {
+const create = ({ roomKey, callId, kind, media, organisation_id, conversationId = null, meetingId = null, initiatorKey, ownerKey = null, hostKeys = [], invitedKeys = [], title = "", settings = null }) => {
   const room = {
     roomKey,
     callId: String(callId),
@@ -24,6 +24,22 @@ const create = ({ roomKey, callId, kind, media, organisation_id, conversationId 
     meetingId: meetingId ? String(meetingId) : null,
     title,
     initiatorKey,
+    ownerKey: ownerKey || initiatorKey,
+    settings: {
+      lobby: false,
+      muteOnEntry: false,
+      allowUnmute: true,
+      chatEnabled: true,
+      reactionsEnabled: true,
+      handRaiseEnabled: true,
+      screenShare: "everyone",
+      ...(settings || {}),
+    },
+    locked: false,
+    hands: new Map(),
+    lobby: new Map(),
+    admittedKeys: new Set(),
+    blockedKeys: new Set(),
     hostKeys: new Set(hostKeys),
     invitedKeys: new Set(invitedKeys),
     declinedKeys: new Set(),
@@ -56,6 +72,7 @@ const publicPeer = (socketId, p) => ({
   audio: p.audio,
   video: p.video,
   screen: p.screen,
+  handRaisedAt: p.handRaisedAt || null,
   joinedAt: p.joinedAt,
 });
 
@@ -76,6 +93,7 @@ const addPeer = (room, socketId, person, { audio = true, video = false } = {}) =
     audio: !!audio,
     video: !!video,
     screen: false,
+    handRaisedAt: room.hands.get(person.key) || null,
     joinedAt: new Date(),
   };
   room.peers.set(socketId, peer);
@@ -100,6 +118,22 @@ const removePeer = (room, socketId) => {
 };
 
 const isModerator = (room, key) => room.hostKeys.has(key);
+
+const byConversation = (conversationId) => {
+  const id = String(conversationId);
+  for (const room of rooms.values()) {
+    if (!room.ending && room.conversationId === id) return room;
+  }
+  return null;
+};
+
+const moderatorSocketIds = (room) =>
+  [...room.peers.entries()].filter(([, p]) => room.hostKeys.has(p.key)).map(([sid]) => sid);
+
+const handQueue = (room) =>
+  [...room.hands.entries()].sort((a, b) => a[1] - b[1]).map(([key, at], i) => ({ key, raisedAt: new Date(at), order: i + 1 }));
+
+const lobbyList = (room) => [...room.lobby.values()];
 
 // Rooms this person is connected to right now (any of their tabs/devices counts).
 const roomsWithPerson = (key) => {
@@ -147,6 +181,8 @@ const summary = (room) => ({
   startedAt: new Date(room.createdAt),
   participants: [...distinctPeople(room)],
   presenterSocketId: room.presenterSocketId,
+  locked: room.locked,
+  settings: room.settings,
 });
 
 module.exports = {
@@ -162,6 +198,10 @@ module.exports = {
   publicPeer,
   distinctPeople,
   isModerator,
+  byConversation,
+  moderatorSocketIds,
+  handQueue,
+  lobbyList,
   roomsWithPerson,
   isInCall,
   ringingFor,

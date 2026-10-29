@@ -8,6 +8,7 @@ const chat = require("./chat.service");
 const rooms = require("./callRooms");
 const { getIceServers } = require("./ice.utils");
 const { httpError, parseKey, resolvePeople } = require("./people.utils");
+const controls = require("./meetingControls.service");
 
 const RING_SECONDS = 45;
 const MEETING_EARLY_JOIN_MIN = 10; // attendees can enter this long before start
@@ -27,6 +28,7 @@ const fmtDuration = (sec) => {
 // Tells the whole organisation that someone is now (not) on a call, so every
 // chat list / header can show the "On a call" badge.
 const broadcastCallState = (key, organisation_id) => {
+  if (String(key).startsWith("Guest:")) return; // outsiders are invisible to the org's presence list
   emitToOrganisation(organisation_id, "presence:update", {
     key,
     online: presence.isOnline(key),
@@ -45,7 +47,10 @@ const actorFromKey = (key) => {
 // Throws a coded error the client can act on (WAITING_FOR_HOST, TOO_EARLY, ...).
 const authorizeMeeting = async (actor, meetingId, { roomRunning }) => {
   if (!require("mongoose").isValidObjectId(meetingId)) throw httpError("Meeting not found.", 404);
-  const meeting = await Meeting.findOne({ _id: meetingId, organisation_id: actor.organisation_id, attendeeKeys: actor.key });
+  const isGuest = actor.model === "Guest";
+  const meeting = isGuest
+    ? await Meeting.findOne({ _id: meetingId, organisation_id: actor.organisation_id, guests: { $elemMatch: { guestId: actor.id, revoked: false } } })
+    : await Meeting.findOne({ _id: meetingId, organisation_id: actor.organisation_id, attendeeKeys: actor.key });
   if (!meeting) throw httpError("Meeting not found.", 404);
   if (meeting.status === "cancelled") throw withCode("This meeting was cancelled.", "MEETING_CANCELLED", 410);
   if (meeting.status === "ended") throw withCode("This meeting has ended.", "MEETING_ENDED", 410);
@@ -56,7 +61,8 @@ const authorizeMeeting = async (actor, meetingId, { roomRunning }) => {
   const closesAt = meeting.endTime.getTime() + MEETING_LATE_GRACE_MIN * 60000;
   if (now > closesAt) throw withCode("This meeting is over.", "MEETING_ENDED", 410);
   if (now < opensAt && !roomRunning) throw withCode("This meeting hasn't opened yet.", "TOO_EARLY", 425, { startsAt: meeting.startTime });
-  if (!roomRunning && !moderator && !meeting.allowJoinBeforeHost) {
+  // outsiders can never open the room - the host / a co-host has to start it first
+  if (!roomRunning && !moderator && (isGuest || !meeting.allowJoinBeforeHost || (meeting.settings && meeting.settings.lobby))) {
     throw withCode("Waiting for the host to start the meeting.", "WAITING_FOR_HOST", 409, { startsAt: meeting.startTime });
   }
   return { meeting, moderator };
@@ -204,8 +210,9 @@ const openMeetingRoom = async (actor, meetingId) => {
   });
   const room = rooms.get(roomKey) || rooms.create({
     roomKey, callId: session._id, kind: "meeting", media: meeting.media, organisation_id: actor.organisation_id,
-    conversationId: meeting.conversation, meetingId: meeting._id, initiatorKey: actor.key,
+    conversationId: meeting.conversation, meetingId: meeting._id, initiatorKey: actor.key, ownerKey: meeting.hostKey,
     hostKeys: [meeting.hostKey, ...meeting.coHostKeys], invitedKeys: meeting.attendeeKeys, title: meeting.title,
+    settings: controls.plainSettings(meeting.settings),
   });
   room.status = "active";
   room.answeredAt = Date.now();
@@ -217,7 +224,8 @@ const openMeetingRoom = async (actor, meetingId) => {
   }
   // tell attendees (live) and ping them (bell) that the room is open
   const others = meeting.attendeeKeys.filter((k) => k !== actor.key);
-  chat.emitToKeys(others, "meeting:started", { meetingId: String(meeting._id), roomKey, title: meeting.title, media: meeting.media, startedBy: actor.key });
+  const guestKeys = (meeting.guests || []).filter((g) => !g.revoked).map((g) => `Guest:${g.guestId}`);
+  chat.emitToKeys([...others, ...guestKeys], "meeting:started", { meetingId: String(meeting._id), roomKey, title: meeting.title, media: meeting.media, startedBy: actor.key });
   createBulkNotifications({
     recipients: others.map((k) => { const p = parseKey(k); return { recipientModel: p.model, recipientId: p.id }; }),
     organisation_id: actor.organisation_id,
@@ -259,15 +267,19 @@ const joinRoom = async (socket, actor, person, roomKey, { audio = true, video } 
   }
   if (room.ending) throw withCode("This call has ended.", "CALL_ENDED", 410);
 
+  const gate = controls.gateEntry(room, socket, actor, person);
+  if (gate) return gate;
+
   // one call at a time (a second tab of the SAME call is fine)
   const other = rooms.roomsWithPerson(actor.key).find((r) => r.roomKey !== room.roomKey);
   if (other) throw withCode("You are already on another call.", "ALREADY_IN_CALL");
 
   const wantVideo = video === undefined ? room.media === "video" : !!video;
   const alreadyIn = room.peers.has(socket.id);
+  const mutedOnEntry = !alreadyIn && room.kind === "meeting" && room.settings.muteOnEntry && !rooms.isModerator(room, actor.key);
   const { peer, firstForPerson, distinctCount } = alreadyIn
     ? { peer: room.peers.get(socket.id), firstForPerson: false, distinctCount: rooms.distinctPeople(room).size }
-    : rooms.addPeer(room, socket.id, person, { audio, video: wantVideo });
+    : rooms.addPeer(room, socket.id, person, { audio: mutedOnEntry ? false : audio, video: wantVideo });
 
   socket.join(roomOf(roomKey));
   socket.data.callRooms = socket.data.callRooms || new Set();
@@ -311,8 +323,14 @@ const joinRoom = async (socket, actor, person, roomKey, { audio = true, video } 
     meetingId: room.meetingId,
     you: { socketId: socket.id, key: actor.key },
     hostKeys: [...room.hostKeys],
+    ownerKey: room.ownerKey,
     peers: rooms.peerList(room, socket.id), // the newcomer sends an offer to each of these
     presenterSocketId: room.presenterSocketId,
+    settings: room.settings,
+    locked: room.locked,
+    hands: rooms.handQueue(room),
+    waiting: rooms.isModerator(room, actor.key) ? rooms.lobbyList(room) : undefined,
+    mutedOnEntry,
     iceServers: getIceServers(actor.key),
   };
 };
@@ -392,6 +410,7 @@ const leaveRoom = async (socket, roomKey, reason = "hangup") => {
   io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: socket.id, key: r.peer.key, reason });
   if (r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: socket.id, key: r.peer.key, sharing: false });
   if (r.personGone) {
+    controls.onPersonGone(room, r.peer.key);
     CallSession.updateOne({ _id: room.callId, "participants.key": r.peer.key }, { $set: { "participants.$.leftAt": new Date() } }).catch(() => {});
     broadcastCallState(r.peer.key, room.organisation_id);
   }
@@ -437,15 +456,57 @@ const kickPeer = async (socket, actor, roomKey, targetSocketId) => {
   assertModerator(room, socket, actor);
   const target = room.peers.get(targetSocketId);
   if (!target) throw httpError("That participant is not in the call.", 404);
-  if (rooms.isModerator(room, target.key) && room.initiatorKey === target.key) throw httpError("You cannot remove the host.", 403);
+  if (target.key === room.ownerKey || (rooms.isModerator(room, target.key) && room.initiatorKey === target.key)) throw httpError("You cannot remove the host.", 403);
 
-  io.to(targetSocketId).emit("call:kicked", { roomKey, by: actor.key });
-  const r = rooms.removePeer(room, targetSocketId);
-  detachSocket(targetSocketId, roomKey);
-  io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: targetSocketId, key: target.key, reason: "removed" });
-  if (r && r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: targetSocketId, key: target.key, sharing: false });
-  if (r && r.personGone) broadcastCallState(target.key, room.organisation_id);
-  if (r && r.empty) await finalizeRoom(room, "all_left");
+  const sockets = [...room.peers.entries()].filter(([, p]) => p.key === target.key).map(([sid]) => sid);
+  let lastResult = null;
+  for (const sid of sockets) {
+    io.to(sid).emit("call:kicked", { roomKey, by: actor.key });
+    const r = rooms.removePeer(room, sid);
+    detachSocket(sid, roomKey);
+    io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: sid, key: target.key, reason: "removed" });
+    if (r && r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: sid, key: target.key, sharing: false });
+    lastResult = r || lastResult;
+  }
+  if (room.kind === "meeting") controls.onKicked(room, target.key);
+  else controls.onPersonGone(room, target.key);
+  if (lastResult && lastResult.personGone) {
+    CallSession.updateOne({ _id: room.callId, "participants.key": target.key }, { $set: { "participants.$.leftAt": new Date() } }).catch(() => {});
+    broadcastCallState(target.key, room.organisation_id);
+  }
+  if (lastResult && lastResult.empty) await finalizeRoom(room, "all_left");
+};
+
+// Removes a person (all their tabs) from a running room AND from its lobby, and blocks
+// them from coming back in. Used when a guest's invite is revoked mid-meeting.
+const ejectKey = async (roomKey, key, byKey) => {
+  const io = getIO();
+  const room = rooms.get(roomKey);
+  if (!room || room.ending) return;
+  for (const w of rooms.lobbyList(room)) {
+    if (w.key !== key) continue;
+    room.lobby.delete(w.socketId);
+    const s = io.sockets.sockets.get(w.socketId);
+    if (s && s.data.lobbyRooms) s.data.lobbyRooms.delete(room.roomKey);
+    io.to(w.socketId).emit("meeting:denied", { roomKey, meetingId: room.meetingId, by: byKey });
+  }
+  controls.emitLobby(room);
+  const sockets = [...room.peers.entries()].filter(([, p]) => p.key === key).map(([sid]) => sid);
+  let last = null;
+  for (const sid of sockets) {
+    io.to(sid).emit("call:kicked", { roomKey, by: byKey });
+    const r = rooms.removePeer(room, sid);
+    detachSocket(sid, roomKey);
+    io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: sid, key, reason: "removed" });
+    if (r && r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: sid, key, sharing: false });
+    last = r || last;
+  }
+  controls.onKicked(room, key);
+  if (last && last.personGone) {
+    CallSession.updateOne({ _id: room.callId, "participants.key": key }, { $set: { "participants.$.leftAt": new Date() } }).catch(() => {});
+    broadcastCallState(key, room.organisation_id);
+  }
+  if (last && last.empty) await finalizeRoom(room, "all_left");
 };
 
 // Tears the whole room down, writes history, posts the summary line in the chat.
@@ -465,6 +526,8 @@ const finalizeRoom = async (room, reason) => {
   io.to(roomOf(room.roomKey)).emit("call:ended", payload);
   // anyone still being rung (or with the incoming screen open) stops ringing
   chat.emitToKeys([...room.invitedKeys], "call:dismissed", { roomKey: room.roomKey, callId: room.callId, reason });
+  controls.dismissLobby(room);
+  room.hands.clear();
   const inRoomKeys = new Set([...room.peers.values()].map((p) => p.key));
   for (const sid of room.peers.keys()) detachSocket(sid, room.roomKey);
   room.peers.clear();
@@ -548,6 +611,7 @@ module.exports = {
   declineCall,
   endForAll,
   kickPeer,
+  ejectKey,
   finalizeRoom,
   forceEndMeetingRoom,
   closeStaleSessions,

@@ -19,6 +19,7 @@ require('../automatic/Trainingreminders');
 require('../automatic/Featurelaunchnotify');
 require('../automatic/Hourlyleavesync');
 require('../automatic/Meetingreminders');
+require('../automatic/Meetingactionreminders');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)

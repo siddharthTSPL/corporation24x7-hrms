@@ -288,6 +288,11 @@ const STICKER_ID = /^[\w:.\-]{1,64}$/;
 const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false } = {}) => {
   const conv = await loadConversation(actor, conversationId);
 
+  const liveRoom = callRooms.byConversation(conv._id);
+  if (liveRoom && liveRoom.kind === "meeting" && liveRoom.settings && liveRoom.settings.chatEnabled === false && !callRooms.isModerator(liveRoom, actor.key)) {
+    throw Object.assign(httpError("Chat is turned off by the host.", 403), { code: "CHAT_DISABLED" });
+  }
+
   // announcement-style groups: only admins may post
   if (conv.type === "group" && conv.settings && conv.settings.onlyAdminsCanSend) {
     const me = conv.participants.find((p) => p.key === actor.key);
