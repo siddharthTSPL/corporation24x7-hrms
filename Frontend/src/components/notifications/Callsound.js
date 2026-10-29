@@ -5,8 +5,17 @@
 // (muted). Here ONE shared context is created and unlocked on the person's
 // first click / key press / tap anywhere in the app, so by the time a call
 // arrives it is allowed to make sound.
+import { useChatStore } from "../../auth/store/chat/chatStore";
 
 const KEY = "torchx_call_sound_settings";
+const settingsKey = () => {
+  try {
+    const accountKey = useChatStore.getState().myKey;
+    return accountKey ? `${KEY}:${accountKey}` : KEY;
+  } catch {
+    return KEY;
+  }
+};
 
 export const RINGTONES = [
   { id: "classic", label: "Classic phone" },
@@ -24,7 +33,15 @@ const DEFAULTS = {
 
 export const getCallSoundSettings = () => {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const key = settingsKey();
+    let raw = window.localStorage.getItem(key);
+    if (!raw && key !== KEY) {
+      raw = window.localStorage.getItem(KEY);
+      if (raw) {
+        window.localStorage.setItem(key, raw);
+        window.localStorage.removeItem(KEY);
+      }
+    }
     return { ...DEFAULTS, ...(raw ? JSON.parse(raw) : {}) };
   } catch {
     return { ...DEFAULTS };
@@ -34,7 +51,7 @@ export const getCallSoundSettings = () => {
 export const setCallSoundSettings = (patch) => {
   const next = { ...getCallSoundSettings(), ...patch };
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    window.localStorage.setItem(settingsKey(), JSON.stringify(next));
   } catch {
     /* private mode etc. */
   }
@@ -142,10 +159,38 @@ const playCycle = (name, volume) => {
   }, 2500);
 };
 
+const playCustomRingtone = (customRingtone, volume, { loop = false } = {}) => {
+  if (!customRingtone?.dataUrl || typeof Audio === "undefined") return () => {};
+  const audio = new Audio(customRingtone.dataUrl);
+  audio.volume = Math.min(Math.max(volume, 0), 100) / 100;
+  audio.loop = loop;
+  audio.play().catch(() => {});
+  return () => {
+    audio.pause();
+    audio.currentTime = 0;
+  };
+};
+
 // Starts ringing until the returned stop() is called. Respects the saved settings.
 export const startRingtone = () => {
   const s = getCallSoundSettings();
   if (!s.ringEnabled) return () => {};
+  if (s.ringtone === "custom" && s.customRingtone?.dataUrl) {
+    const stopAudio = playCustomRingtone(s.customRingtone, s.volume, { loop: true });
+    let vib = null;
+    if (s.vibrate && typeof navigator !== "undefined" && navigator.vibrate) {
+      const buzz = () => navigator.vibrate([400, 200, 400]);
+      buzz();
+      vib = setInterval(buzz, 3000);
+    }
+    return () => {
+      stopAudio();
+      if (vib) {
+        clearInterval(vib);
+        navigator.vibrate?.(0);
+      }
+    };
+  }
   const p = PATTERNS[s.ringtone] || PATTERNS.classic;
   const run = () => playCycle(s.ringtone, s.volume);
   run();
@@ -168,6 +213,11 @@ export const startRingtone = () => {
 // "Test" button in settings: plays one cycle with the given (unsaved) values.
 export const previewRingtone = (name, volume) => {
   unlock();
+  if (name === "custom") {
+    const s = getCallSoundSettings();
+    playCustomRingtone(s.customRingtone, volume);
+    return;
+  }
   playCycle(name, volume);
 };
 

@@ -10,8 +10,12 @@ import {
   FaDesktop,
   FaCompressAlt,
   FaExpandAlt,
+  FaUserPlus,
+  FaSearch,
+  FaCheck,
 } from "react-icons/fa";
 import useCall from "../../realtime/useCall";
+import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
 import Avatar from "./Avatar";
 import { formatDuration } from "./chatUtils";
 import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
@@ -95,8 +99,13 @@ function gridCols(n) {
 }
 
 function CallScreen() {
-  const { active, peers, isHost, isPresenting, toggleAudio, toggleVideo, startScreenShare, stopScreenShare, leave, endForAll } = useCall();
+  const { active, peers, myKey, isHost, isPresenting, toggleAudio, toggleVideo, startScreenShare, stopScreenShare, leave, endForAll, invitePeople } = useCall();
   const [minimized, setMinimized] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState([]);
+  const { data: conversation } = useConversation(active?.conversationId);
+  const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
 
   if (!active) return null;
@@ -105,6 +114,25 @@ function CallScreen() {
     active.status === "connected" ? formatDuration(elapsed) : active.status === "ringing" ? "Ringing…" : "Connecting…";
   const title = active.title || (active.kind === "meeting" ? "Meeting" : "Call");
   const presenter = peers.find((p) => p.screenStream);
+  const joinedKeys = new Set([myKey, ...peers.map((p) => p.key)].filter(Boolean));
+  const candidateSource = conversation?.type === "direct" ? directoryPeople : conversation?.participants || [];
+  const candidates = candidateSource
+    .filter((p) => !joinedKeys.has(p.key))
+    .filter((p) => conversation?.type === "direct" || active.kind === "group")
+    .filter((p) => `${p.name} ${p.designation || ""} ${p.department || ""}`.toLowerCase().includes(inviteQuery.toLowerCase().trim()));
+
+  const inviteSelected = async () => {
+    try {
+      const result = await invitePeople(selectedKeys);
+      if (result.invited?.length) toast.success(`Calling ${result.invited.map((p) => p.name).join(", ")}.`);
+      if (result.busy?.length) toast(`${result.busy.map((p) => p.name).join(", ")} ${result.busy.length === 1 ? "is" : "are"} already on a call.`);
+      if (!result.invited?.length && !result.busy?.length) toast("No one new to invite.");
+      setSelectedKeys([]);
+      setInviteOpen(false);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't invite people.");
+    }
+  };
 
   const run = (fn) => () => Promise.resolve(fn()).catch((err) => toast.error(err?.message || "Something went wrong."));
 
@@ -200,6 +228,11 @@ function CallScreen() {
         </div>
         <div className="flex items-center gap-2">
           {active.mutedByHost && <span className="text-[11px] bg-amber-500/20 text-amber-300 rounded-full px-2.5 py-1">Muted by host</span>}
+          {active.kind !== "meeting" && (
+            <button type="button" onClick={() => setInviteOpen(true)} title="Invite people" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
+              <FaUserPlus className="text-sm" />
+            </button>
+          )}
           <button type="button" onClick={() => setMinimized(true)} title="Minimise" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
             <FaCompressAlt className="text-xs" />
           </button>
@@ -236,6 +269,42 @@ function CallScreen() {
 
       {isPresenting && (
         <div className="text-center text-xs text-amber-300 pb-1">You're sharing your screen</div>
+      )}
+
+      {inviteOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4" onClick={() => setInviteOpen(false)}>
+          <section className="w-full max-w-sm max-h-[80vh] bg-white text-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="font-bold text-sm">{conversation?.type === "direct" ? "Invite people" : "Invite group members"}</p>
+              <div className="relative mt-3">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                <input value={inviteQuery} onChange={(e) => setInviteQuery(e.target.value)} placeholder="Search members" className="w-full pl-8 pr-3 py-2 rounded-full bg-gray-100 text-sm outline-none focus:ring-2 focus:ring-[#730042]/30" />
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {candidates.map((p) => {
+                const selected = selectedKeys.includes(p.key);
+                return (
+                  <button key={p.key} type="button" onClick={() => setSelectedKeys((prev) => selected ? prev.filter((key) => key !== p.key) : [...prev, p.key])} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50">
+                    <Avatar name={p.name} photo={p.photo} size={38} seed={p.key} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold truncate">{p.name}</span>
+                      <span className="block text-xs text-gray-500 truncate">{p.designation || p.department || "Group member"}</span>
+                    </span>
+                    <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${selected ? "bg-[#730042] border-[#730042] text-white" : "border-gray-300"}`}>
+                      {selected && <FaCheck className="text-[9px]" />}
+                    </span>
+                  </button>
+                );
+              })}
+              {!candidates.length && <p className="text-center text-xs text-gray-400 py-8">No available members found.</p>}
+            </div>
+            <div className="flex justify-end gap-2 p-3 border-t border-gray-100">
+              <button type="button" onClick={() => setInviteOpen(false)} className="px-3 py-2 text-xs font-semibold text-gray-600 rounded-full hover:bg-gray-100">Cancel</button>
+              <button type="button" onClick={inviteSelected} disabled={!selectedKeys.length} className="px-4 py-2 text-xs font-semibold text-white bg-[#730042] rounded-full disabled:opacity-50">Call selected ({selectedKeys.length})</button>
+            </div>
+          </section>
+        </div>
       )}
 
       <div className="flex items-center justify-center gap-3 pb-6 pt-1">
@@ -304,7 +373,7 @@ function IncomingCalls() {
               : `${c.media === "video" ? "Video" : "Voice"} call`;
         return (
           <div key={c.roomKey} className="bg-gray-900 text-white rounded-2xl shadow-2xl border border-white/10 p-4 flex items-center gap-3">
-            <Avatar name={caller} photo="" size={48} seed={c.from?.key || c.roomKey} />
+            <Avatar name={caller} photo={c.from?.photo || ""} size={48} seed={c.from?.key || c.roomKey} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{caller}</p>
               <p className="text-xs text-gray-400 truncate">{inCall ? `${sub} · you're in another call` : sub}</p>
@@ -338,6 +407,35 @@ function IncomingCalls() {
   );
 }
 
+function RejoinCalls() {
+  const { active, incoming, inCall, joinCall } = useCall();
+  const { data: calls = [] } = useActiveCalls(!inCall);
+  if (inCall || active) return null;
+  const ringingKeys = new Set(incoming.map((call) => call.roomKey));
+  const available = calls.filter((call) => call.kind === "group" && call.status === "active" && !ringingKeys.has(call.roomKey));
+  if (!available.length) return null;
+
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[94] flex flex-col gap-2 w-[min(420px,calc(100vw-2rem))]">
+      {available.slice(0, 3).map((call) => (
+        <div key={call.roomKey} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white shadow-xl border border-emerald-100">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{call.title || "Group call"}</p>
+            <p className="text-xs text-gray-500">{call.participants?.length || 0} people in the call</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => Promise.resolve(joinCall({ roomKey: call.roomKey, media: call.media })).catch((err) => toast.error(err?.message || "Couldn't rejoin the call."))}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex-shrink-0"
+          >
+            <FaPhoneAlt className="text-[10px]" /> Rejoin
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function CallOverlay() {
   const { lastEnded, clearLastEnded, error, clearError, inCall } = useCall();
 
@@ -357,6 +455,7 @@ export default function CallOverlay() {
   return (
     <>
       <IncomingCalls />
+      <RejoinCalls />
       <CallScreen />
     </>
   );

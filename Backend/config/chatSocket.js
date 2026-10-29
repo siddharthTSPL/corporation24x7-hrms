@@ -64,7 +64,7 @@ const registerChatSocket = (io, socket) => {
     socket.emit("call:incoming", {
       callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media, to: actor.key,
       conversationId: room.conversationId, conversationName: room.title || room.initiatorName || "",
-      from: { key: room.initiatorKey, name: room.initiatorName || "" }, ringSeconds: calls.RING_SECONDS,
+      from: { key: room.initiatorKey, name: room.initiatorName || "", photo: room.initiatorPhoto || "" }, ringSeconds: calls.RING_SECONDS,
       startedAt: new Date(room.createdAt),
     });
   }
@@ -118,6 +118,11 @@ const registerChatSocket = (io, socket) => {
   on("call:join", async ({ roomKey, audio, video }) => {
     if (!roomKey) throw Object.assign(new Error("roomKey is required."), { statusCode: 400 });
     return calls.joinRoom(socket, actor, await getPerson(), String(roomKey), { audio: audio !== false, video });
+  });
+
+  on("call:invite", async ({ roomKey, keys }) => {
+    if (!allow(socket, "callInvite", 10, 10000)) throw Object.assign(new Error("You're inviting people too quickly."), { statusCode: 429 });
+    return calls.inviteToGroupCall(socket, actor, await getPerson(), String(roomKey || ""), keys);
   });
 
   on("call:decline", async ({ roomKey, reason }) => {

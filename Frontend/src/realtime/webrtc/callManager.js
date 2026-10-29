@@ -399,6 +399,7 @@ const startScreenShare = async () => {
 
 const kick = (socketId) => emitAck("call:kick", { roomKey: store().active?.roomKey, socketId });
 const requestMute = (socketId) => emitAck("call:mute-request", { roomKey: store().active?.roomKey, socketId });
+const invitePeople = (keys) => emitAck("call:invite", { roomKey: store().active?.roomKey, keys });
 
 // ------------------------------------------------------------------ socket wiring
 
@@ -474,6 +475,9 @@ const attach = (sock) => {
     store().patchActive({ audio: false, mutedByHost: true });
     emitQuiet("call:media-state", { roomKey, audio: false });
   };
+  const onCallUpdated = ({ roomKey, kind, title }) => {
+    if (store().active?.roomKey === roomKey) store().patchActive({ kind, title: title || store().active.title });
+  };
   // host opened a meeting I was waiting for -> go in
   const onMeetingStarted = ({ meetingId }) => {
     const w = store().waiting;
@@ -520,6 +524,7 @@ const attach = (sock) => {
     "call:ended": onEnded,
     "call:kicked": onKicked,
     "call:mute-request": onMuteRequest,
+    "call:updated": onCallUpdated,
     "meeting:started": onMeetingStarted,
     disconnect: onDisconnect,
     connect: onConnect,
@@ -550,4 +555,5 @@ export const callManager = {
   stopScreenShare,
   kick,
   requestMute,
+  invitePeople,
 };

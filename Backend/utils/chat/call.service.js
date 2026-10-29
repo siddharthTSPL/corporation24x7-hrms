@@ -105,9 +105,16 @@ const startConversationCall = async (actor, person, { conversationId, media }) =
   const m = media === "audio" ? "audio" : "video";
   const invited = conv.participantKeys.filter((k) => k !== actor.key);
 
-  // Zoho-style "busy on call": people who are inside another call are not rung.
-  const busyKeys = invited.filter((k) => rooms.isInCall(k));
-  const ringKeys = invited.filter((k) => !busyKeys.includes(k));
+  // Only ring people with a live Socket.IO connection. Offline recipients cannot
+  // receive the incoming-call event, so don't create a call room for them.
+  const onlineKeys = invited.filter((k) => presence.isOnline(k));
+  if (!onlineKeys.length) {
+    throw withCode("Nobody in this conversation is online to take the call.", "NO_ONLINE_RECIPIENTS", 409);
+  }
+
+  // Zoho-style "busy on call": online people who are inside another call are not rung.
+  const busyKeys = onlineKeys.filter((k) => rooms.isInCall(k));
+  const ringKeys = onlineKeys.filter((k) => !busyKeys.includes(k));
   if (!ringKeys.length) {
     await handleAllBusy(conv, actor, person, m, busyKeys);
     const who = await resolvePeople(actor.organisation_id, busyKeys.slice(0, 1).map(parseKey));
@@ -147,6 +154,7 @@ const startConversationCall = async (actor, person, { conversationId, media }) =
     title: conv.type === "group" ? conv.name : "",
   });
   room.initiatorName = person.name;
+  room.initiatorPhoto = person.photo || "";
 
   // Ring ONLY the invited people, one emit per person, each tagged with `to` so the
   // client can double-check the call is really meant for the logged-in account.
@@ -229,6 +237,7 @@ const assertCanJoinExisting = async (room, actor) => {
   if (room.kind === "meeting") {
     await authorizeMeeting(actor, room.meetingId, { roomRunning: true });
   } else {
+    if (room.directConversationConverted && room.invitedKeys.has(actor.key)) return;
     // must be a member of the chat the call belongs to...
     await chat.loadConversation(actor, room.conversationId);
     // ...and for a 1:1 call, must be the caller or the person who was called
@@ -306,6 +315,60 @@ const joinRoom = async (socket, actor, person, roomKey, { audio = true, video } 
     presenterSocketId: room.presenterSocketId,
     iceServers: getIceServers(actor.key),
   };
+};
+
+// Ring additional members of an existing group call. Group membership is the
+// invitation boundary; direct calls and scheduled meetings use their own flows.
+const inviteToGroupCall = async (socket, actor, person, roomKey, keys = []) => {
+  const room = rooms.get(String(roomKey));
+  if (!room || room.ending || room.status !== "active") throw withCode("This call is no longer active.", "CALL_ENDED", 404);
+  if (!["group", "direct"].includes(room.kind) || !room.conversationId) throw httpError("People can't be added to this call.", 400);
+  if (!room.peers.has(socket.id)) throw httpError("You are not in this call.", 403);
+
+  const conv = await chat.loadConversation(actor, room.conversationId);
+  const currentKeys = rooms.distinctPeople(room);
+  const requested = [...new Set((Array.isArray(keys) ? keys : []).filter((key) => typeof key === "string"))].slice(0, 30);
+  const memberKeys = new Set(conv.participantKeys);
+  const people = await resolvePeople(actor.organisation_id, requested.filter((key) => key !== actor.key && !currentKeys.has(key)).map(parseKey));
+  const eligible = requested.filter((key) => {
+    if (key === actor.key || currentKeys.has(key) || !people.has(key)) return false;
+    return conv.type === "direct" || memberKeys.has(key);
+  });
+  const invited = [];
+  const busy = [];
+
+  for (const key of eligible) {
+    const target = people.get(key);
+    if (!target) continue;
+    if (rooms.isInCall(key)) {
+      busy.push({ key, name: target.name });
+      continue;
+    }
+    if (conv.type === "direct" && !room.directConversationConverted) {
+      room.kind = "group";
+      room.title = "Group call";
+      room.directConversationConverted = true;
+      CallSession.updateOne({ _id: room.callId }, { $set: { kind: "group" } }).catch(() => {});
+      getIO()?.to(roomOf(room.roomKey)).emit("call:updated", { roomKey: room.roomKey, kind: room.kind, title: room.title });
+    }
+    room.invitedKeys.add(key);
+    room.declinedKeys.delete(key);
+    CallSession.updateOne({ _id: room.callId }, { $addToSet: { invitedKeys: key } }).catch(() => {});
+    chat.emitToKeys([key], "call:incoming", {
+      callId: room.callId,
+      roomKey: room.roomKey,
+      kind: room.kind,
+      media: room.media,
+      to: key,
+      conversationId: room.conversationId,
+      conversationName: room.title,
+      from: { key: person.key, id: person.id, model: person.model, name: person.name, photo: person.photo || "" },
+      ringSeconds: RING_SECONDS,
+      startedAt: new Date(room.createdAt),
+    });
+    invited.push({ key, name: target.name });
+  }
+  return { invited, busy };
 };
 
 // ---------- leave / decline / end / kick ----------
@@ -480,6 +543,7 @@ module.exports = {
   authorizeMeeting,
   startConversationCall,
   joinRoom,
+  inviteToGroupCall,
   leaveRoom,
   declineCall,
   endForAll,

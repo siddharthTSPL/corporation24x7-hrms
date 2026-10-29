@@ -36,6 +36,7 @@ export default function useCall() {
     lastEnded,
     error,
     isHost: !!(active && myKey && active.hostKeys.includes(myKey)),
+    myKey,
     isPresenting: !!(active && active.presenterSocketId && active.presenterSocketId === active.mySocketId),
 
     // actions
@@ -52,6 +53,7 @@ export default function useCall() {
     stopScreenShare: callManager.stopScreenShare,
     kick: callManager.kick,
     requestMute: callManager.requestMute,
+    invitePeople: callManager.invitePeople,
     clearLastEnded: () => setLastEnded(null),
     clearError,
   };

@@ -20,6 +20,7 @@ const create = ({ roomKey, callId, kind, media, organisation_id, conversationId 
     media,
     organisation_id: String(organisation_id),
     conversationId: conversationId ? String(conversationId) : null,
+    directConversationConverted: false,
     meetingId: meetingId ? String(meetingId) : null,
     title,
     initiatorKey,

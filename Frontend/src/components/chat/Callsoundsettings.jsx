@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FaTimes, FaPlay } from "react-icons/fa";
+import { useRef, useState } from "react";
+import { FaTimes, FaPlay, FaUpload, FaTrash } from "react-icons/fa";
 import {
   RINGTONES,
   getCallSoundSettings,
@@ -34,8 +34,27 @@ export default function CallSoundSettings({ onClose }) {
   const [s, setS] = useState(getCallSoundSettings);
   const [msgSound, setMsgSound] = useState(isSoundEnabled);
   const [perm, setPerm] = useState(desktopAlertPermission);
+  const fileRef = useRef(null);
 
   const patch = (p) => setS(setCallSoundSettings(p));
+
+  const uploadRingtone = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("audio/")) {
+      fileRef.current.value = "";
+      return window.alert("Please select an audio file.");
+    }
+    if (file.size > 1024 * 1024) {
+      fileRef.current.value = "";
+      return window.alert("Choose an audio file smaller than 1 MB.");
+    }
+    const reader = new FileReader();
+    reader.onload = () => patch({ ringtone: "custom", customRingtone: { name: file.name, dataUrl: reader.result } });
+    reader.onerror = () => window.alert("Couldn't read that audio file.");
+    reader.readAsDataURL(file);
+  };
+
+  const removeRingtone = () => patch({ ringtone: "classic", customRingtone: null });
 
   return (
     <div className="fixed inset-0 z-[96] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -57,6 +76,7 @@ export default function CallSoundSettings({ onClose }) {
               className="text-sm border border-gray-200 rounded-lg px-2 py-1"
             >
               {RINGTONES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+              {s.customRingtone?.dataUrl && <option value="custom">{s.customRingtone.name || "My ringtone"}</option>}
             </select>
             <button
               type="button"
@@ -66,6 +86,30 @@ export default function CallSoundSettings({ onClose }) {
             >
               <FaPlay className="text-[10px]" />
             </button>
+          </div>
+        </Row>
+
+        <Row label="Your ringtone">
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={(e) => uploadRingtone(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200"
+            >
+              <FaUpload /> {s.customRingtone ? "Change" : "Upload"}
+            </button>
+            {s.customRingtone && (
+              <button type="button" onClick={removeRingtone} title="Remove uploaded ringtone" className="w-7 h-7 rounded-full text-red-500 hover:bg-red-50 flex items-center justify-center">
+                <FaTrash className="text-[10px]" />
+              </button>
+            )}
           </div>
         </Row>
 

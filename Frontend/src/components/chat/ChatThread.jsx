@@ -42,6 +42,7 @@ import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import useCall from "../../realtime/useCall";
 import Avatar from "./Avatar";
+import PersonInfoSheet from "./PersonInfoSheet";
 import MessageBubble from "./MessageBubble";
 import Composer from "./Composer";
 import WallpaperSheet from "./WallpaperSheet";
@@ -82,6 +83,7 @@ function MenuButton({ icon: Icon, label, onClick, danger }) {
 export default function ChatThread({ conversationId, listConv, onBack, expanded, onToggleExpand, onClose, canExpand, showBack }) {
   const qc = useQueryClient();
   const storeKey = useChatStore((s) => s.myKey);
+  const presenceMap = useChatStore((s) => s.presence);
   const setInfoOpen = useChatUiStore((s) => s.setInfoOpen);
   const { startCall, inCall } = useCall();
 
@@ -114,6 +116,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const online = useIsOnline(!isGroup ? other?.key : null, !!other?.online);
   const otherInCall = useIsInCall(!isGroup ? other?.key : null, !!other?.inCall);
   const lastSeen = useLastSeen(!isGroup ? other?.key : null);
+  const onlineGroupRecipients = isGroup && (conv?.participants || []).some((p) =>
+    p.key !== storeKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
+  );
 
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -124,6 +129,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const [forwardMsg, setForwardMsg] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [atBottom, setAtBottom] = useState(true);
+  const [personInfoOpen, setPersonInfoOpen] = useState(false);
 
   const scrollRef = useRef(null);
   const stickRef = useRef(true);
@@ -341,8 +347,14 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   };
 
   const typing = typingNames.length > 0;
-  const callsBlocked = inCall || (!isGroup && otherInCall);
-  const callTitle = (label) => (inCall ? "You're already in a call" : !isGroup && otherInCall ? `${conv?.name || "This person"} is on another call` : label);
+  const callsBlocked = inCall || (isGroup ? !onlineGroupRecipients : otherInCall || !online);
+  const callTitle = (label) => (
+    inCall ? "You're already in a call"
+      : !isGroup && otherInCall ? `${conv?.name || "This person"} is on another call`
+        : !isGroup && !online ? `${conv?.name || "This person"} is offline`
+          : isGroup && !onlineGroupRecipients ? "Nobody else in this group is online"
+          : label
+  );
 
   const subtitle = (() => {
     if (typing) {
@@ -372,8 +384,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
         <button
           type="button"
-          onClick={() => isGroup && setInfoOpen(true)}
-          className={`flex items-center gap-2.5 min-w-0 flex-1 text-left ${isGroup ? "cursor-pointer" : "cursor-default"}`}
+          onClick={() => (isGroup ? setInfoOpen(true) : other && setPersonInfoOpen(true))}
+          className="flex items-center gap-2.5 min-w-0 flex-1 text-left cursor-pointer"
+          title={isGroup ? "Group info" : "Contact information"}
         >
           <Avatar
             name={conv?.name || ""}
@@ -640,6 +653,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           />
         </div>
       )}
+      {personInfoOpen && <PersonInfoSheet person={other} onClose={() => setPersonInfoOpen(false)} />}
     </div>
   );
 }

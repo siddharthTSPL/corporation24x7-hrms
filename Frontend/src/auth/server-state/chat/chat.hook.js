@@ -446,6 +446,7 @@ export const useActiveCalls = (enabled = true) =>
     queryFn: getActiveCalls,
     enabled,
     staleTime: 5000,
+    refetchInterval: enabled ? 5000 : false,
     select: (d) => d.calls,
   });
 
