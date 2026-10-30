@@ -37,7 +37,7 @@ import {
   useIsInCall,
   useLastSeen,
 } from "../../auth/server-state/chat/chat.hook";
-import { CHAT_KEYS, newClientId } from "../../auth/server-state/chat/chatCache";
+import { CHAT_KEYS, newClientId, isMineMessage } from "../../auth/server-state/chat/chatCache";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import useCall from "../../realtime/useCall";
@@ -116,7 +116,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const otherInCall = useIsInCall(!isGroup ? other?.key : null, !!other?.inCall);
   const lastSeen = useLastSeen(!isGroup ? other?.key : null);
   const onlineGroupRecipients = isGroup && (conv?.participants || []).some((p) =>
-    p.key !== storeKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
+    p.key !== myKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
   );
 
   const [replyTo, setReplyTo] = useState(null);
@@ -165,7 +165,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     }
     const last = messages[messages.length - 1];
     const lastId = last ? last.clientId || last.id : null;
-    const sentByMe = last && last.senderKey === myKey && lastId !== lastIdRef.current;
+    const sentByMe = last && isMineMessage(last, myKey) && lastId !== lastIdRef.current;
     if (stickRef.current || sentByMe) el.scrollTop = el.scrollHeight;
     lastIdRef.current = lastId;
   }, [messages, myKey]);
@@ -564,12 +564,12 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
                   <MessageBubble
                     key={it.key}
                     m={it.m}
-                    mine={!!it.m.senderKey && it.m.senderKey === myKey}
+                    mine={isMineMessage(it.m, myKey)}
                     myKey={myKey}
                     isGroup={isGroup}
                     first={it.first}
                     last={it.last}
-                    status={it.m.senderKey === myKey ? deliveryStatus(it.m, others) : undefined}
+                    status={isMineMessage(it.m, myKey) ? deliveryStatus(it.m, others) : undefined}
                     canDeleteForAll={isGroupAdmin}
                     onReply={handleReply}
                     onEdit={handleEdit}
@@ -628,7 +628,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
       {deleteTarget && (
         <DeleteDialog
-          canDeleteForAll={!deleteTarget.deleted && (deleteTarget.senderKey === myKey || isGroupAdmin)}
+          canDeleteForAll={!deleteTarget.deleted && (isMineMessage(deleteTarget, myKey) || isGroupAdmin)}
           onDeleteForMe={() => runDelete("me")}
           onDeleteForAll={() => runDelete("everyone")}
           onCancel={() => setDeleteTarget(null)}

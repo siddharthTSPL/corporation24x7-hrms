@@ -40,6 +40,7 @@ import {
   patchConversation,
   removeConversation,
   newClientId,
+  registerSent,
 } from "./chatCache";
 
 export { CHAT_KEYS };
@@ -238,7 +239,11 @@ export const useSendMessage = () => {
       return res.message;
     },
     onMutate: ({ conversationId, text, replyTo, files = [], clientId, sticker }) => {
-      const myKey = useChatStore.getState().myKey;
+      registerSent(clientId);
+      const cachedConv =
+        qc.getQueryData(CHAT_KEYS.conversation(conversationId))?.conversation ||
+        qc.getQueryData(CHAT_KEYS.conversations)?.conversations?.find((c) => c.id === conversationId);
+      const myKey = useChatStore.getState().myKey || deriveMyKey(cachedConv ? [cachedConv] : []);
       upsertMessage(qc, conversationId, {
         id: clientId,
         clientId,

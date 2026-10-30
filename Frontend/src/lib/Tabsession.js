@@ -48,19 +48,43 @@ const nativeGet = Storage.prototype.getItem;
 const nativeSet = Storage.prototype.setItem;
 const nativeRemove = Storage.prototype.removeItem;
 
+const isRoleOnLocal = (store, key) => {
+  try {
+    return key === ROLE_KEY && store === window.localStorage;
+  } catch {
+    return false;
+  }
+};
+
 Storage.prototype.getItem = function (key) {
-  if (this === window.localStorage && key === ROLE_KEY) {
-    const mine = nativeGet.call(window.sessionStorage, ROLE_KEY);
-    if (mine !== null) return mine;
+  if (isRoleOnLocal(this, key)) {
+    try {
+      const mine = nativeGet.call(window.sessionStorage, ROLE_KEY);
+      if (mine !== null) return mine;
+    } catch {
+      void 0;
+    }
   }
   return nativeGet.call(this, key);
 };
 Storage.prototype.setItem = function (key, value) {
-  if (this === window.localStorage && key === ROLE_KEY) nativeSet.call(window.sessionStorage, ROLE_KEY, value);
+  if (isRoleOnLocal(this, key)) {
+    try {
+      nativeSet.call(window.sessionStorage, ROLE_KEY, value);
+    } catch {
+      void 0;
+    }
+  }
   return nativeSet.call(this, key, value);
 };
 Storage.prototype.removeItem = function (key) {
-  if (this === window.localStorage && key === ROLE_KEY) nativeRemove.call(window.sessionStorage, ROLE_KEY);
+  if (isRoleOnLocal(this, key)) {
+    try {
+      nativeRemove.call(window.sessionStorage, ROLE_KEY);
+    } catch {
+      void 0;
+    }
+  }
   return nativeRemove.call(this, key);
 };
 
@@ -94,7 +118,7 @@ XMLHttpRequest.prototype.open = function (method, url, ...rest) {
 
 XMLHttpRequest.prototype.send = function (body) {
   const url = this.__tabUrl || "";
-  if (isApiUrl(url)) {
+  if (isApiUrl(url) && !/\/socket\.io\//.test(url)) {
     const token = getTabToken();
     if (token) {
       try {

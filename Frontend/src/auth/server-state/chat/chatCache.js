@@ -89,5 +89,19 @@ export const removeConversation = (qc, conversationId) => {
   qc.removeQueries({ queryKey: CHAT_KEYS.messages(conversationId) });
 };
 
+const sentClientIds = new Set();
+
+export const registerSent = (clientId) => {
+  if (clientId) sentClientIds.add(clientId);
+  return clientId;
+};
+
+export const isMineMessage = (m, myKey) => {
+  if (!m) return false;
+  if (m.pending || m.failed) return true;
+  if (m.clientId && sentClientIds.has(m.clientId)) return true;
+  return !!m.senderKey && !!myKey && m.senderKey === myKey;
+};
+
 export const newClientId = () =>
-  `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  registerSent(`c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`);
