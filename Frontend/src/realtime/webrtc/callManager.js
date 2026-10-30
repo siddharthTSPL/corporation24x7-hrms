@@ -128,11 +128,25 @@ const createPeer = (socketId, { initiator }) => {
   pc.onicecandidate = (e) => e.candidate && sendSignal(socketId, { candidate: e.candidate });
 
   pc.ontrack = (e) => {
-    const stream = e.streams[0] || new MediaStream([e.track]);
-    const peer = store().active?.peers[socketId] || {};
+    const active = store().active;
+    const peer = active?.peers[socketId] || {};
+    const remoteStream = e.streams[0] || null;
+    const isScreen = remoteStream
+      ? entry.remoteScreenStreamId === remoteStream.id || (!!entry.remoteCameraStreamId && entry.remoteCameraStreamId !== remoteStream.id)
+      : (!!peer.screen || active?.presenterSocketId === socketId);
+    if (remoteStream && !isScreen && !entry.remoteCameraStreamId) entry.remoteCameraStreamId = remoteStream.id;
+    if (remoteStream && isScreen) entry.remoteScreenStreamId = remoteStream.id;
+    let stream = remoteStream;
+    if (!stream) {
+      const streamKey = isScreen ? "remoteScreenStream" : "remoteMediaStream";
+      stream = entry[streamKey] || (entry[streamKey] = new MediaStream());
+      if (!stream.getTracks().some((track) => track.id === e.track.id)) stream.addTrack(e.track);
+    }
     // first stream = camera/mic; a different second stream = their screen share
-    if (!peer.stream || peer.stream.id === stream.id) {
+    if (!isScreen && (!peer.stream || peer.stream.id === stream.id)) {
       store().patchPeer(socketId, { stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
+    } else if (isScreen) {
+      store().patchPeer(socketId, { screenStream: stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
     } else {
       store().patchPeer(socketId, { screenStream: stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
     }
@@ -487,6 +501,12 @@ const attach = (sock) => {
     if (sharing) store().patchActive({ presenterSocketId: socketId });
     else if (a.presenterSocketId === socketId) store().patchActive({ presenterSocketId: null });
   };
+  const onReaction = (reaction) => {
+    if (store().active?.roomKey !== reaction.roomKey) return;
+    store().addReaction(reaction);
+    const id = store().active?.reactions?.at(-1)?.id;
+    setTimeout(() => store().removeReaction(id), 3200);
+  };
   const onAnswered = ({ roomKey }) => {
     if (store().active?.roomKey === roomKey) {
       if (store().active.status === "ringing") armConnectTimer();
@@ -557,6 +577,7 @@ const attach = (sock) => {
     "call:signal": onSignal,
     "call:media-state": onMediaState,
     "call:screen-share": onScreenShare,
+    "call:reaction": onReaction,
     "call:answered": onAnswered,
     "call:ended": onEnded,
     "call:kicked": onKicked,
