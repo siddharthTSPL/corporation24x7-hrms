@@ -10,9 +10,13 @@ import { useChatStore } from "../../auth/store/chat/chatStore";
 
 const store = () => useCallStore.getState();
 const MESH_WARN_AT = 8;
+const FALLBACK_ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
+const CONNECT_TIMEOUT_MS = 30000;
+const normalizeIce = (list) => (Array.isArray(list) && list.length ? list : FALLBACK_ICE);
 
 let socket = null;
-let ice = [];
+let connectTimer = null;
+let ice = FALLBACK_ICE;
 let mySocketId = null;
 let busy = false; // start/join in flight
 const pcs = new Map(); // socketId -> peer entry
@@ -25,9 +29,12 @@ const friendlyMediaError = (err, wantVideo) => {
   const name = err?.name;
   if (name === "NotAllowedError" || name === "SecurityError")
     return new Error(`Allow microphone${wantVideo ? " and camera" : ""} access in your browser to join the call.`);
-  if (name === "NotFoundError" || name === "OverconstrainedError")
+  if (name === "NotFoundError" || name === "DevicesNotFoundError")
     return new Error("No microphone found. Plug one in and try again.");
-  if (name === "NotReadableError") return new Error("Your microphone or camera is being used by another app.");
+  if (name === "OverconstrainedError")
+    return new Error("Your camera or microphone doesn't support the requested settings.");
+  if (name === "NotReadableError" || name === "TrackStartError")
+    return new Error("Your microphone or camera is being used by another app.");
   return new Error(err?.message || "Could not access your microphone.");
 };
 
@@ -39,7 +46,7 @@ const getLocalMedia = async (wantVideo) => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio,
-      video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
+      video: wantVideo ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
     });
     return { stream, cameraBlocked: false };
   } catch (err) {
@@ -57,6 +64,24 @@ const getLocalMedia = async (wantVideo) => {
 };
 
 const stopStream = (s) => s && s.getTracks().forEach((t) => t.stop());
+
+const clearConnectTimer = () => {
+  clearTimeout(connectTimer);
+  connectTimer = null;
+};
+
+const armConnectTimer = () => {
+  clearConnectTimer();
+  connectTimer = setTimeout(() => {
+    connectTimer = null;
+    const a = store().active;
+    if (!a || a.status === "connected" || a.status === "ringing") return;
+    const roomKey = a.roomKey;
+    cleanup();
+    store().setError("Couldn't connect the call. Your network may be blocking it. Try again, or switch between Wi-Fi and mobile data.");
+    emitAck("call:leave", { roomKey }, 3000).catch(() => {});
+  }, CONNECT_TIMEOUT_MS);
+};
 
 // ------------------------------------------------------------------ peers
 
@@ -134,7 +159,10 @@ const createPeer = (socketId, { initiator }) => {
 
   pc.onconnectionstatechange = () => {
     store().patchPeer(socketId, { connectionState: pc.connectionState });
-    if (pc.connectionState === "connected") store().patchActive({ status: "connected" });
+    if (pc.connectionState === "connected") {
+      clearConnectTimer();
+      store().patchActive({ status: "connected" });
+    }
     if (pc.connectionState === "failed") {
       try { pc.restartIce(); } catch { /* ignore */ }
     }
@@ -191,7 +219,7 @@ const handleSignal = async (from, data) => {
 // ------------------------------------------------------------------ room lifecycle
 
 const setupRoom = (ack, stream, cameraBlocked) => {
-  ice = ack.iceServers || [];
+  ice = normalizeIce(ack.iceServers);
   mySocketId = ack.you.socketId;
   local.stream = stream;
 
@@ -222,12 +250,14 @@ const setupRoom = (ack, stream, cameraBlocked) => {
     store().patchPeer(p.socketId, { ...p, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
     createPeer(p.socketId, { initiator: true });
   }
+  if (ack.peers.length) armConnectTimer();
   if (ack.peers.length + 1 > MESH_WARN_AT) {
     store().setError(`This call has ${ack.peers.length + 1} people. Video quality may drop on slower devices.`);
   }
 };
 
-const cleanup = () => {
+function cleanup() {
+  clearConnectTimer();
   [...pcs.keys()].forEach(closePeer);
   stopStream(local.stream);
   stopStream(local.screenStream);
@@ -236,7 +266,7 @@ const cleanup = () => {
   mySocketId = null;
   busy = false;
   store().setActive(null);
-};
+}
 
 const ensureIdle = () => {
   if (store().active || busy) throw new Error("You're already in a call.");
@@ -444,7 +474,10 @@ const attach = (sock) => {
     if (!a || a.roomKey !== roomKey) return;
     store().patchPeer(peer.socketId, { ...peer, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
     createPeer(peer.socketId, { initiator: false }); // they will send us an offer
-    if (a.status === "ringing") store().patchActive({ status: "connecting" }); // someone picked up
+    if (a.status === "ringing") {
+      store().patchActive({ status: "connecting" });
+      armConnectTimer();
+    }
     if (Object.keys(store().active.peers).length + 1 > MESH_WARN_AT) {
       store().setError(`This call has ${Object.keys(store().active.peers).length + 1} people. Video quality may drop on slower devices.`);
     }
@@ -475,7 +508,10 @@ const attach = (sock) => {
     setTimeout(() => store().removeReaction(id), 3200);
   };
   const onAnswered = ({ roomKey }) => {
-    if (store().active?.roomKey === roomKey) store().patchActive({ status: "connecting" });
+    if (store().active?.roomKey === roomKey) {
+      if (store().active.status === "ringing") armConnectTimer();
+      store().patchActive({ status: "connecting" });
+    }
   };
   const onEnded = ({ roomKey, reason, status, durationSec }) => {
     onDismissed({ roomKey });
@@ -519,9 +555,10 @@ const attach = (sock) => {
       [...pcs.keys()].forEach(closePeer);
       store().patchActive({ peers: {} });
       const ack = await emitAckRetry("call:join", { roomKey: a.roomKey, audio: a.audio, video: a.video });
-      ice = ack.iceServers || ice;
+      ice = ack.iceServers?.length ? ack.iceServers : ice;
       mySocketId = ack.you.socketId;
       store().patchActive({ mySocketId, status: "connecting", presenterSocketId: ack.presenterSocketId || null });
+      armConnectTimer();
       for (const p of ack.peers) {
         store().patchPeer(p.socketId, { ...p, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
         createPeer(p.socketId, { initiator: true });

@@ -9,6 +9,7 @@ import { useChatStore } from "../auth/store/chat/chatStore";
 import { useCallStore } from "../auth/store/call/callStore";
 import {
   CHAT_KEYS,
+  isMineMessage,
   upsertMessage,
   markMessageDeleted,
   removeMessage,
@@ -35,6 +36,7 @@ export default function useChatRealtime(enabled) {
     if (!enabled) {
       useChatStore.getState().reset();
       useCallStore.getState().reset();
+      qc.removeQueries({ queryKey: CHAT_KEYS.all });
       return undefined;
     }
 
@@ -45,41 +47,52 @@ export default function useChatRealtime(enabled) {
     // --- identity + presence ---
     const onPresence = ({ key, online, lastSeenAt, inCall }) => chat().setPresence(key, online, lastSeenAt || null, inCall);
 
-    // Identity the SOCKET was authenticated as (from the cookie at handshake time).
-    let socketKey = null;
     let driftReconnects = 0;
+    let syncing = false;
+    let syncAgain = false;
 
     const syncIdentity = async () => {
+      if (syncing) {
+        syncAgain = true;
+        return;
+      }
+      syncing = true;
       try {
-        const r = await getMe();
-        if (r?.key) {
-          // The auth cookie is shared by every tab of this browser. If another
-          // account logged in elsewhere, this tab's socket still belongs to the
-          // OLD account (chat/calls get routed to the wrong person). Re-handshake
-          // so the socket uses the cookie that REST is using right now.
-          if (socketKey && r.key !== socketKey && driftReconnects < 2) {
+        let restKey = null;
+        let socketKey = null;
+        try {
+          restKey = (await getMe())?.key || null;
+        } catch {
+          void 0;
+        }
+        if (socket.connected) {
+          try {
+            socketKey = (await emitAck("chat:whoami", {}, 5000, 0))?.key || null;
+          } catch {
+            void 0;
+          }
+        }
+        if (restKey && chat().myKey !== restKey) chat().setMyKey(restKey);
+        if (!restKey && socketKey && !chat().myKey) chat().setMyKey(socketKey);
+        if (restKey && socketKey) {
+          if (restKey !== socketKey && driftReconnects < 3) {
             driftReconnects += 1;
-            console.warn("[socket] identity drift:", socketKey, "->", r.key, "- reconnecting");
-            socketKey = null;
+            console.warn("[socket] identity drift:", socketKey, "->", restKey, "- reconnecting");
             socket.disconnect();
             socket.connect();
-            return;
+          } else if (restKey === socketKey) {
+            driftReconnects = 0;
           }
-          if (chat().myKey !== r.key) chat().setMyKey(r.key);
-          return;
         }
-      } catch {
-        void 0;
-      }
-      try {
-        const r = await emitAck("chat:whoami", {}, 5000);
-        if (r?.key && !chat().myKey) chat().setMyKey(r.key);
-      } catch {
-        void 0;
+      } finally {
+        syncing = false;
+        if (syncAgain) {
+          syncAgain = false;
+          syncIdentity();
+        }
       }
     };
-    const onReady = ({ key } = {}) => {
-      socketKey = key || null;
+    const onReady = () => {
       syncIdentity();
     };
     const recheckIdentity = () => {
@@ -111,7 +124,7 @@ export default function useChatRealtime(enabled) {
     const onMessage = ({ conversationId, message }) => {
       upsertMessage(qc, conversationId, message);
       const { myKey, activeConversationId } = chat();
-      const mine = !!message.senderKey && message.senderKey === myKey;
+      const mine = isMineMessage(message, myKey);
       const viewing = activeConversationId === conversationId && document.visibilityState === "visible";
       const isLine = message.type === "system" || message.type === "call";
 

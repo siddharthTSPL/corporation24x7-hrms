@@ -117,10 +117,15 @@ function CallScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteQuery, setInviteQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
-  const [reactionOpen, setReactionOpen] = useState(false);
   const { data: conversation } = useConversation(active?.conversationId);
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
+  const sendReaction = (emoji) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setReactions((items) => [...items.slice(-7), { id, emoji }]);
+    setEmojiOpen(false);
+    window.setTimeout(() => setReactions((items) => items.filter((item) => item.id !== id)), 2600);
+  };
 
   useEffect(() => {
     if (active?.callId) setMinimized(false);
@@ -370,6 +375,14 @@ function CallScreen() {
 
       {hiddenAudio}
 
+      {reactions.length > 0 && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-28 z-[95] flex justify-center gap-3 overflow-hidden" aria-live="polite">
+          {reactions.map((reaction, index) => (
+            <span key={reaction.id} className="call-reaction" style={{ animationDelay: `${index * 35}ms` }}>{reaction.emoji}</span>
+          ))}
+        </div>
+      )}
+
       {isPresenting && (
         <div className="text-center text-xs text-amber-300 pb-1">You're sharing your screen</div>
       )}
@@ -410,19 +423,7 @@ function CallScreen() {
         </div>
       )}
 
-      <div className="relative flex items-center justify-center gap-3 pb-6 pt-1">
-        {reactionOpen && (
-          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw-1.5rem)] gap-0.5 overflow-x-auto rounded-full border border-white/10 bg-slate-900/95 p-1.5 shadow-2xl">
-            {quickReactions.map((emoji) => (
-              <button key={emoji} type="button" onClick={() => sendReaction(emoji)} aria-label={`Send ${emoji} reaction`} className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full hover:bg-white/15 text-2xl transition-transform hover:scale-110">
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-        <CtrlButton onClick={() => setReactionOpen((open) => !open)} active={reactionOpen} title="Send a reaction">
-          <FaSmile />
-        </CtrlButton>
+      <div className="flex items-center justify-center gap-3 pb-6 pt-1">
         {controls}
         {isHost && active.kind !== "direct" && (
           <button

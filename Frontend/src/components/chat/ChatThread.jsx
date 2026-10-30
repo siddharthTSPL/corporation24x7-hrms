@@ -37,7 +37,7 @@ import {
   useIsInCall,
   useLastSeen,
 } from "../../auth/server-state/chat/chat.hook";
-import { CHAT_KEYS, newClientId } from "../../auth/server-state/chat/chatCache";
+import { CHAT_KEYS, newClientId, isMineMessage } from "../../auth/server-state/chat/chatCache";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import useCall from "../../realtime/useCall";
@@ -116,7 +116,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const otherInCall = useIsInCall(!isGroup ? other?.key : null, !!other?.inCall);
   const lastSeen = useLastSeen(!isGroup ? other?.key : null);
   const onlineGroupRecipients = isGroup && (conv?.participants || []).some((p) =>
-    p.key !== storeKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
+    p.key !== myKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
   );
 
   const [replyTo, setReplyTo] = useState(null);
@@ -165,7 +165,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     }
     const last = messages[messages.length - 1];
     const lastId = last ? last.clientId || last.id : null;
-    const sentByMe = last && last.senderKey === myKey && lastId !== lastIdRef.current;
+    const sentByMe = last && isMineMessage(last, myKey) && lastId !== lastIdRef.current;
     if (stickRef.current || sentByMe) el.scrollTop = el.scrollHeight;
     lastIdRef.current = lastId;
   }, [messages, myKey]);
@@ -373,8 +373,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#F7F9FB]">
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-100">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#F8F7FA]">
+      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-3 border-b border-[#eee8ef] shadow-[0_2px_12px_rgba(36,10,28,0.035)]">
         {showBack && (
           <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
             <FaArrowLeft className="text-sm" />
@@ -397,9 +397,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             seed={other?.key || conversationId}
           />
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{conv?.name || "…"}</p>
+            <p className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
             <p
-              className={`text-[11px] truncate ${typing ? "text-[#730042] font-medium" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600" : "text-gray-500"}`}
+              className={`text-[11px] mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
             >
               {subtitle}
             </p>
@@ -517,7 +517,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
         />
       )}
 
-      <div className="relative flex-1 min-h-0">
+      <div className="chat-message-list relative flex-1 min-h-0">
         <div
           ref={scrollRef}
           data-chat-scroll
@@ -564,12 +564,12 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
                   <MessageBubble
                     key={it.key}
                     m={it.m}
-                    mine={!!it.m.senderKey && it.m.senderKey === myKey}
+                    mine={isMineMessage(it.m, myKey)}
                     myKey={myKey}
                     isGroup={isGroup}
                     first={it.first}
                     last={it.last}
-                    status={it.m.senderKey === myKey ? deliveryStatus(it.m, others) : undefined}
+                    status={isMineMessage(it.m, myKey) ? deliveryStatus(it.m, others) : undefined}
                     canDeleteForAll={isGroupAdmin}
                     onReply={handleReply}
                     onEdit={handleEdit}
@@ -628,7 +628,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
       {deleteTarget && (
         <DeleteDialog
-          canDeleteForAll={!deleteTarget.deleted && (deleteTarget.senderKey === myKey || isGroupAdmin)}
+          canDeleteForAll={!deleteTarget.deleted && (isMineMessage(deleteTarget, myKey) || isGroupAdmin)}
           onDeleteForMe={() => runDelete("me")}
           onDeleteForAll={() => runDelete("everyone")}
           onCancel={() => setDeleteTarget(null)}

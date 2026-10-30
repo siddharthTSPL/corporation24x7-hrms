@@ -5,7 +5,7 @@ import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import useChatRealtime from "../../realtime/useChatRealtime";
 import { getSocket } from "../../realtime/socket";
 import { useConversations } from "../../auth/server-state/chat/chat.hook";
-import { CHAT_KEYS } from "../../auth/server-state/chat/chatCache";
+import { CHAT_KEYS, isMineMessage } from "../../auth/server-state/chat/chatCache";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import { useChatUiStore } from "../../auth/store/chat/chatUiStore";
 import { playNotificationSound, isSoundEnabled } from "../notifications/Notificationsound";
@@ -23,7 +23,7 @@ function useMessageToasts(enabled) {
 
     const onMessage = ({ conversationId, message }) => {
       const { myKey, activeConversationId } = useChatStore.getState();
-      if (!message.senderKey || message.senderKey === myKey) return;
+      if (!message.senderKey || isMineMessage(message, myKey)) return;
       if (message.type === "system" || message.type === "call") return;
 
       const viewing = activeConversationId === conversationId && document.visibilityState === "visible";

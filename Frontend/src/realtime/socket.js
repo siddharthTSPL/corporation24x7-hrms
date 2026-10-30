@@ -78,7 +78,7 @@ export const getSocket = () => {
 
   socket.on("socket:ready", ({ recipientModel, id, key }) => {
     const mine = key || (recipientModel && id ? `${recipientModel}:${id}` : null);
-    if (mine && useChatStore.getState().myKey !== mine) useChatStore.getState().setMyKey(mine);
+    if (mine && !useChatStore.getState().myKey) useChatStore.getState().setMyKey(mine);
   });
 
   socket.on("connect", () => {
