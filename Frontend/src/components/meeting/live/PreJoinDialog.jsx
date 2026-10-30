@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaBan, FaTint } from "react-icons/fa";
-import { MediaView } from "../RoomMedia";
-import { PRESET_BACKGROUNDS, readSavedEffect, writeSavedEffect } from "../effectPresets";
-import { createEffectProcessor, loadEffectImage } from "../../../../realtime/webrtc/videoEffects";
-import { audioConstraints, videoConstraints, getMediaPrefs, setMediaPrefs } from "../../../../realtime/webrtc/mediaPrefs";
-import { useUpdateMeetingPreferences } from "../../../../auth/server-state/meeting/meeting.hook";
+import { MediaView } from "../room/RoomMedia";
+import { PRESET_BACKGROUNDS, readSavedEffect, writeSavedEffect } from "../room/effectPresets";
+import { createEffectProcessor, loadEffectImage } from "../../../realtime/webrtc/videoEffects";
+import { audioConstraints, videoConstraints, getMediaPrefs, setMediaPrefs } from "../../../realtime/webrtc/mediaPrefs";
+import { useUpdateMeetingPreferences } from "../../../auth/server-state/meeting/meeting.hook";
 import useAudioActivity from "./useAudioActivity";
 import { DeviceSelect, useDevices } from "./DeviceFields";
 

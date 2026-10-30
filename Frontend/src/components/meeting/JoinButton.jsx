@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Video, Mic, Loader2 } from "lucide-react";
 import useCall from "../../realtime/useCall";
 import { useMeetingJoinInfo } from "../../auth/server-state/meeting/meeting.hook";
-import PreJoinDialog from "./room/live/PreJoinDialog";
+import PreJoinDialog from "./live/PreJoinDialog";
 import { Btn, Chip } from "./ui";
 import { fmtTime, startOfDay, useNow, errMsg } from "./meetingUtils";
 
