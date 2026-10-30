@@ -4,6 +4,8 @@
 .chat-scroll::-webkit-scrollbar-track { background: transparent; }
 .chat-scroll::-webkit-scrollbar-thumb { background: rgba(84, 101, 111, 0.2); border-radius: 999px; }
 .chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(84, 101, 111, 0.38); }
+.chat-thread-scroll { scrollbar-width: none; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+.chat-thread-scroll::-webkit-scrollbar { display: none; }
 .chat-hide-scroll { scrollbar-width: none; }
 .chat-hide-scroll::-webkit-scrollbar { display: none; }
 

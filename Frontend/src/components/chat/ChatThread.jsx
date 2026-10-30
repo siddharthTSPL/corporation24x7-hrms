@@ -522,7 +522,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           ref={scrollRef}
           data-chat-scroll
           onScroll={onScroll}
-          className="absolute inset-0 overflow-y-auto px-3 py-2"
+          className="chat-thread-scroll chat-hide-scroll absolute inset-0 overflow-y-auto overscroll-contain px-3 py-2"
           style={wallpaperStyle(conv?.wallpaper)}
         >
           {isLoading ? (
@@ -595,7 +595,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             type="button"
             onClick={scrollToBottom}
             title="Jump to latest"
-            className="absolute bottom-3 right-4 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-md text-gray-600 hover:bg-gray-50 flex items-center justify-center z-10"
+            className="absolute bottom-3 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#d9e1e5] bg-white/95 text-[#54656f] shadow-[0_3px_12px_rgba(17,27,33,.14)] transition-all hover:-translate-y-0.5 hover:border-[#00a884] hover:text-[#008f72] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a884]/40"
           >
             <FaChevronDown className="text-sm" />
           </button>
