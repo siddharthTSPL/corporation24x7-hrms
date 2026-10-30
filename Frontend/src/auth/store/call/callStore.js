@@ -17,6 +17,7 @@ const initial = {
   waiting: null, // { meetingId, roomKey, code, startsAt } - waiting for host / early
   lastEnded: null, // { roomKey, reason, status, durationSec } - lets the UI show "Call ended"
   error: null,
+  reactionSequence: 0,
 };
 
 export const useCallStore = create((set) => ({
@@ -30,6 +31,17 @@ export const useCallStore = create((set) => ({
 
   setActive: (active) => set({ active }),
   patchActive: (patch) => set((s) => (s.active ? { active: { ...s.active, ...patch } } : s)),
+  addReaction: (reaction) => set((s) => {
+    if (!s.active) return s;
+    const reactionSequence = s.reactionSequence + 1;
+    return {
+      reactionSequence,
+      active: { ...s.active, reactions: [...(s.active.reactions || []), { ...reaction, id: reactionSequence }] },
+    };
+  }),
+  removeReaction: (id) => set((s) => s.active
+    ? { active: { ...s.active, reactions: (s.active.reactions || []).filter((reaction) => reaction.id !== id) } }
+    : s),
   patchPeer: (socketId, patch) =>
     set((s) => {
       if (!s.active) return s;

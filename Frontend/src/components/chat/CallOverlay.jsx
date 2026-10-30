@@ -13,14 +13,16 @@ import {
   FaUserPlus,
   FaSearch,
   FaCheck,
+  FaSmile,
 } from "react-icons/fa";
 import useCall from "../../realtime/useCall";
+import { emitAck } from "../../realtime/chatSocket";
 import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
 import Avatar from "./Avatar";
 import { formatDuration } from "./chatUtils";
 import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
 
-function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false }) {
+function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false, refreshKey = 0 }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -28,8 +30,19 @@ function MediaView({ stream, muted = false, mirror = false, hidden = false, cont
     if (!el) return;
     const next = stream || null;
     if (el.srcObject !== next) el.srcObject = next;
-    if (next) el.play().catch(() => {});
-  }, [stream]);
+    const play = () => { if (next) el.play().catch(() => {}); };
+    el.addEventListener("loadedmetadata", play);
+    el.addEventListener("canplay", play);
+    next?.addEventListener("addtrack", play);
+    next?.getTracks().forEach((track) => track.addEventListener("unmute", play));
+    play();
+    return () => {
+      el.removeEventListener("loadedmetadata", play);
+      el.removeEventListener("canplay", play);
+      next?.removeEventListener("addtrack", play);
+      next?.getTracks().forEach((track) => track.removeEventListener("unmute", play));
+    };
+  }, [stream, refreshKey]);
 
   return (
     <video
@@ -42,10 +55,10 @@ function MediaView({ stream, muted = false, mirror = false, hidden = false, cont
   );
 }
 
-function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting, avatarSize = 72 }) {
+function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting, avatarSize = 72, tracksVersion = 0 }) {
   return (
     <div className="relative w-full h-full min-h-0 rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center">
-      <MediaView stream={stream} muted={muted} mirror={mirror} hidden={!videoOn} />
+      <MediaView stream={stream} muted={muted} mirror={mirror} hidden={!videoOn} refreshKey={tracksVersion} />
       {!videoOn && <Avatar name={name} photo={photo} size={avatarSize} seed={seed} />}
       <div className="absolute left-2 bottom-2 flex items-center gap-1.5 bg-black/55 text-white text-xs rounded-full px-2.5 py-1 max-w-[80%]">
         {!audioOn && <FaMicrophoneSlash className="text-[10px] text-red-300 flex-shrink-0" />}
@@ -104,6 +117,7 @@ function CallScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteQuery, setInviteQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [reactionOpen, setReactionOpen] = useState(false);
   const { data: conversation } = useConversation(active?.conversationId);
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
@@ -173,6 +187,16 @@ function CallScreen() {
       {presenter && <MediaView stream={presenter.screenStream} muted />}
     </div>
   );
+
+  const quickReactions = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎"];
+  const sendReaction = async (emoji) => {
+    try {
+      await emitAck("call:reaction", { roomKey: active.roomKey, emoji }, 5000);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't send reaction.");
+    }
+    setReactionOpen(false);
+  };
 
   if (minimized) {
     const miniParticipants = active.kind === "direct"
@@ -270,6 +294,7 @@ function CallScreen() {
       videoOn: !!p.video && !!p.stream,
       mirror: false,
       reconnecting: p.connectionState === "disconnected" || p.connectionState === "failed",
+      tracksVersion: p.tracksVersion || 0,
     }));
   const tiles = active.kind === "direct"
     ? (peerTiles.length ? peerTiles : [callingTile || selfTile])
@@ -295,7 +320,7 @@ function CallScreen() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 px-3 pb-3 flex flex-col md:flex-row gap-2">
+      <div className="relative flex-1 min-h-0 px-3 pb-3 flex flex-col md:flex-row gap-2">
         {presenter ? (
           <>
             <div className="flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden bg-black relative">
@@ -312,10 +337,32 @@ function CallScreen() {
               ))}
             </div>
           </>
+        ) : active.kind === "direct" && active.media === "video" ? (
+          <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-gray-900">
+            <Tile {...(peerTiles[0] || callingTile || selfTile)} avatarSize={144} />
+            <div className="absolute bottom-3 right-3 z-10 w-28 sm:w-36 aspect-[3/4] overflow-hidden rounded-xl border-2 border-white/80 shadow-2xl bg-gray-800">
+              <Tile {...selfTile} avatarSize={56} />
+            </div>
+          </div>
         ) : (
           <div className={`grid ${gridCols(tiles.length)} auto-rows-fr gap-2 flex-1 min-h-0`}>
             {tiles.map((t) => (
               <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 144 : 72} />
+            ))}
+          </div>
+        )}
+        {!!active.reactions?.length && (
+          <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-live="polite">
+            <style>{"@keyframes callReactionFloat { 0% { transform: translateY(24px) scale(.7); opacity: 0; } 12% { opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-190px) scale(1.2); opacity: 0; } }"}</style>
+            {active.reactions.map((reaction) => (
+              <span
+                key={reaction.id}
+                className="absolute bottom-5 text-4xl sm:text-5xl drop-shadow-lg"
+                style={{ left: `${18 + ((reaction.id * 37) % 65)}%`, animation: "callReactionFloat 3.2s ease-out forwards" }}
+                title={reaction.name || "Participant"}
+              >
+                {reaction.emoji}
+              </span>
             ))}
           </div>
         )}
@@ -363,7 +410,19 @@ function CallScreen() {
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3 pb-6 pt-1">
+      <div className="relative flex items-center justify-center gap-3 pb-6 pt-1">
+        {reactionOpen && (
+          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw-1.5rem)] gap-0.5 overflow-x-auto rounded-full border border-white/10 bg-slate-900/95 p-1.5 shadow-2xl">
+            {quickReactions.map((emoji) => (
+              <button key={emoji} type="button" onClick={() => sendReaction(emoji)} aria-label={`Send ${emoji} reaction`} className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full hover:bg-white/15 text-2xl transition-transform hover:scale-110">
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        <CtrlButton onClick={() => setReactionOpen((open) => !open)} active={reactionOpen} title="Send a reaction">
+          <FaSmile />
+        </CtrlButton>
         {controls}
         {isHost && active.kind !== "direct" && (
           <button
