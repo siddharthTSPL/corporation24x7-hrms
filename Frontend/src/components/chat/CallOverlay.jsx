@@ -194,14 +194,14 @@ function CallScreen() {
   );
 
   const quickReactions = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎"];
-  const sendReaction = async (emoji) => {
-    try {
-      await emitAck("call:reaction", { roomKey: active.roomKey, emoji }, 5000);
-    } catch (err) {
-      toast.error(err?.message || "Couldn't send reaction.");
-    }
-    setReactionOpen(false);
-  };
+  // const sendReaction = async (emoji) => {
+  //   try {
+  //     await emitAck("call:reaction", { roomKey: active.roomKey, emoji }, 5000);
+  //   } catch (err) {
+  //     toast.error(err?.message || "Couldn't send reaction.");
+  //   }
+  //   setReactionOpen(false);
+  // };
 
   if (minimized) {
     const miniParticipants = active.kind === "direct"
