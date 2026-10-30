@@ -373,8 +373,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#F8F7FA]">
-      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-3 border-b border-[#eee8ef] shadow-[0_2px_12px_rgba(36,10,28,0.035)]">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#efeae2]">
+      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-2 border-b border-[#e9edef]">
         {showBack && (
           <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
             <FaArrowLeft className="text-sm" />
@@ -522,7 +522,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           ref={scrollRef}
           data-chat-scroll
           onScroll={onScroll}
-          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          className="absolute inset-0 overflow-y-auto px-3 py-2"
           style={wallpaperStyle(conv?.wallpaper)}
         >
           {isLoading ? (
@@ -555,8 +555,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
               {items.map((it) =>
                 it.kind === "day" ? (
-                  <div key={it.key} className="flex justify-center my-3">
-                    <span className="text-[11px] font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-0.5">
+                  <div key={it.key} className="flex justify-center my-2">
+                    <span className="text-[11px] font-medium text-[#54656f] bg-[#e9edef] rounded-full px-3 py-0.5 shadow-[0_1px_1px_rgba(0,0,0,.04)]">
                       {it.label}
                     </span>
                   </div>

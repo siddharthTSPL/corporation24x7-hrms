@@ -8,6 +8,8 @@ import {
   FaTrash,
   FaFileAlt,
   FaPhoneAlt,
+  FaVideo,
+  FaPhoneSlash,
   FaExclamationCircle,
   FaBan,
   FaRegSmile,
@@ -71,7 +73,7 @@ function Ticks({ status, tone }) {
 
 function Linkified({ text, mine }) {
   return (
-    <p className="whitespace-pre-wrap leading-snug">
+    <span className="whitespace-pre-wrap leading-snug">
       {splitLinks(text).map((part, i) =>
         part.url ? (
           <a
@@ -79,7 +81,7 @@ function Linkified({ text, mine }) {
             href={part.url}
             target="_blank"
             rel="noopener noreferrer"
-            className={`underline break-all ${mine ? "text-sky-200" : "text-sky-700"}`}
+            className={`underline break-all ${mine ? "text-emerald-800" : "text-sky-700"}`}
           >
             {part.url}
           </a>
@@ -87,7 +89,7 @@ function Linkified({ text, mine }) {
           <span key={i}>{part.text}</span>
         ),
       )}
-    </p>
+    </span>
   );
 }
 
@@ -154,11 +156,18 @@ export default function MessageBubble({
   }, [panel]);
 
   if (m.type === "system" || m.type === "call") {
+    const callText = String(m.text || "");
+    const isCallEvent = m.type === "call" || m.meta?.event === "call";
+    const missed = ["missed", "declined"].includes(String(m.meta?.status || "").toLowerCase()) || /missed|declined|no answer/i.test(callText);
+    const videoCall = m.meta?.media === "video" || /video/i.test(callText);
     return (
-      <div data-mid={m.id} className="flex justify-center my-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-500 bg-white/90 border border-gray-200 rounded-full px-3 py-1 max-w-[85%] text-center">
-          {m.type === "call" && <FaPhoneAlt className="text-[9px] flex-shrink-0" />}
+      <div data-mid={m.id} className="flex justify-center my-1.5">
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-700 bg-white/90 border border-gray-100 rounded-xl px-2.5 py-1 max-w-[85%] text-center shadow-[0_1px_2px_rgba(0,0,0,.08)]">
+          {isCallEvent && missed && <FaPhoneSlash title="Missed call" className="text-[11px] text-red-500 flex-shrink-0" />}
+          {isCallEvent && videoCall && <FaVideo title="Video call" className={`text-[11px] flex-shrink-0 ${missed ? "text-red-500" : "text-[#54656f]"}`} />}
+          {isCallEvent && !missed && !videoCall && <FaPhoneAlt title="Voice call" className="text-[10px] text-[#54656f] flex-shrink-0" />}
           <span>{m.text}</span>
+          {m.createdAt && <span className="text-[9px] text-gray-400 whitespace-nowrap">{formatClock(m.createdAt)}</span>}
         </span>
       </div>
     );
@@ -173,6 +182,7 @@ export default function MessageBubble({
   const isSticker = m.type === "sticker" && !deleted;
   const bigEmoji = !deleted && m.type === "text" && !m.attachments?.length && !m.replyTo && isEmojiOnly(m.text);
   const bare = isSticker || bigEmoji; // no coloured bubble around it
+  const inlineFooter = !deleted && !bare && m.type === "text" && !m.attachments?.length && !m.replyTo && !m.forwarded;
   const reactions = groupReactions(m.reactions, myKey);
 
   const radius = mine
@@ -184,11 +194,11 @@ export default function MessageBubble({
     : bare
       ? "bg-transparent text-gray-900"
       : mine
-        ? `bg-[#730042] text-white ${m.failed ? "opacity-70" : ""}`
-        : "bg-white border border-gray-200 text-gray-900";
+        ? `bg-[#d9fdd3] text-[#111b21] ${m.failed ? "opacity-70" : ""}`
+        : "bg-white text-[#111b21]";
 
-  const footerTone = mine && !deleted && !bare ? "text-white/70" : "text-gray-400";
-  const tickTone = bare ? "dark" : "light";
+  const footerTone = "text-[#667781]";
+  const tickTone = "dark";
   const pick = (fn) => () => {
     setPanel(null);
     fn(m);
@@ -198,7 +208,7 @@ export default function MessageBubble({
   return (
     <div
       data-mid={m.id}
-      className={`group flex items-end gap-2 transition-shadow rounded-xl ${mine ? "justify-end" : "justify-start"} ${first ? "mt-2" : "mt-0.5"} ${reactions.length ? "mb-3" : ""}`}
+      className={`group flex items-end gap-2 transition-shadow rounded-xl ${mine ? "justify-end" : "justify-start"} ${first ? "mt-1" : "mt-0.5"} ${reactions.length ? "mb-3" : ""}`}
     >
       {showAvatar && (
         <div className="w-7 flex-shrink-0">
@@ -221,7 +231,7 @@ export default function MessageBubble({
             setPanel("more");
           }}
         >
-          <div className={`${bare ? "px-1 py-0.5" : "px-3.5 py-2.5"} chat-message-bubble ${mine && !bare && !deleted ? "chat-message-bubble-mine" : !mine && !bare && !deleted ? "chat-message-bubble-theirs" : ""} text-[13px] leading-[1.55] break-words ${radius} ${bubbleTone}`}>
+          <div className={`${bare ? "px-1 py-0.5" : "px-3 py-1.5"} chat-message-bubble ${mine && !bare && !deleted ? "chat-message-bubble-mine" : !mine && !bare && !deleted ? "chat-message-bubble-theirs" : ""} text-[13px] leading-[1.35] break-words ${radius} ${bubbleTone}`}>
             {deleted ? (
               <span className="inline-flex items-center gap-1.5 text-xs">
                 <FaBan className="text-[10px]" /> This message was deleted
@@ -263,7 +273,7 @@ export default function MessageBubble({
               </>
             )}
 
-            <div className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${footerTone}`}>
+            <div className={`${inlineFooter ? "inline-flex align-baseline ml-2" : "flex justify-end mt-0.5"} items-center gap-1 text-[9px] leading-none ${footerTone}`}>
               {m.editedAt && !deleted && <span>edited</span>}
               <span>{formatClock(m.createdAt)}</span>
               {mine && !deleted && <Ticks status={status} tone={tickTone} />}

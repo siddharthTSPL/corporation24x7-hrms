@@ -174,21 +174,21 @@ export const WALLPAPER_PRESETS = [
   { id: "midnight", name: "Midnight", css: "linear-gradient(160deg,#243B55 0%,#141E30 100%)" },
 ];
 
-export const WALLPAPER_COLORS = ["#F7F9FB", "#FFF8E1", "#E8F5E9", "#E3F2FD", "#FCE4EC", "#EDE7F6", "#FFE0B2", "#D7CCC8", "#CFD8DC", "#263238"];
+export const WALLPAPER_COLORS = ["#efeae2", "#FFF8E1", "#E8F5E9", "#E3F2FD", "#FCE4EC", "#EDE7F6", "#FFE0B2", "#D7CCC8", "#CFD8DC", "#263238"];
 
 const DARK_PRESETS = new Set(["night", "midnight"]);
 
 export const wallpaperStyle = (w) => {
-  if (!w) return { background: "#F7F9FB" };
+  if (!w) return { backgroundColor: "transparent" };
   if (w.startsWith("preset:")) {
     const p = WALLPAPER_PRESETS.find((x) => x.id === w.slice(7));
-    return { background: p ? p.css : "#F7F9FB" };
+    return { background: p ? p.css : "transparent" };
   }
   if (w.startsWith("color:")) return { background: w.slice(6) };
   if (/^https:\/\//.test(w)) {
-    return { backgroundImage: `url(${JSON.stringify(w)})`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: "#F7F9FB" };
+    return { backgroundImage: `url(${JSON.stringify(w)})`, backgroundSize: "cover", backgroundPosition: "center", backgroundColor: "#efeae2" };
   }
-  return { background: "#F7F9FB" };
+  return { backgroundColor: "transparent" };
 };
 
 // true when the wallpaper is dark enough that the small date/typing chips need a light background

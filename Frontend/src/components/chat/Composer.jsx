@@ -205,7 +205,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
 
   if (recording) {
     return (
-      <div className="border-t border-gray-100 bg-white flex items-center gap-3 px-4 py-3">
+      <div className="border-t border-[#e9edef] bg-[#f0f2f5] flex items-center gap-3 px-4 py-3">
         <button type="button" onClick={() => finishRecording(true)} title="Cancel" className="w-9 h-9 rounded-full text-red-500 hover:bg-red-50 flex items-center justify-center">
           <FaTrash />
         </button>
@@ -214,7 +214,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
           <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmtSecs(secs)}</span>
           <span className="text-xs text-gray-400">Recording…</span>
         </div>
-        <button type="button" onClick={() => finishRecording(false)} title="Send voice message" className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center hover:bg-[#5c0035]">
+        <button type="button" onClick={() => finishRecording(false)} title="Send voice message" className="w-9 h-9 rounded-full bg-[#00a884] text-white flex items-center justify-center hover:bg-[#008f72]">
           <FaPaperPlane className="text-sm" />
         </button>
       </div>
@@ -222,7 +222,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
   }
 
   return (
-    <div className="border-t border-gray-100 bg-white">
+    <div className="border-t border-[#e9edef] bg-[#f0f2f5]">
       {(replyTo || editing) && (
         <div className="flex items-center gap-2 px-4 pt-2.5">
           <div className="flex-1 min-w-0 flex items-center gap-2 pl-2.5 border-l-2 border-[#730042] bg-gray-50 rounded-r-lg py-1.5 pr-2">
@@ -267,36 +267,37 @@ export default function Composer({ conversationId, replyTo, editing, initialText
         </div>
       )}
 
-      <div className="flex items-end gap-2 px-3 py-3">
-        {!editing && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept={ACCEPT_ATTR}
-              className="hidden"
-              onChange={(e) => {
-                addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              title="Attach files"
-              className="w-9 h-9 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center flex-shrink-0"
-            >
-              <FaPaperclip />
-            </button>
-          </>
-        )}
+      <div className="flex items-end gap-2 px-3 py-2.5">
+        <div className="flex min-w-0 flex-1 items-end gap-0.5 rounded-full bg-white px-1.5 py-1 shadow-sm">
+          {!editing && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept={ACCEPT_ATTR}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                title="Attach files"
+                className="w-9 h-9 rounded-full text-[#54656f] hover:bg-gray-100 flex items-center justify-center flex-shrink-0"
+              >
+                <FaPaperclip />
+              </button>
+            </>
+          )}
 
         <button
           type="button"
           onClick={() => setPickerOpen((v) => !v)}
           title="Emoji & stickers"
-          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${pickerOpen ? "bg-[#F6E8EF] text-[#730042]" : "text-gray-500 hover:bg-gray-100"}`}
+          className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${pickerOpen ? "bg-emerald-50 text-[#00a884]" : "text-[#54656f] hover:bg-gray-100"}`}
         >
           <FaRegSmile className="text-lg" />
         </button>
@@ -315,16 +316,17 @@ export default function Composer({ conversationId, replyTo, editing, initialText
           onBlur={stopTyping}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
-          className="flex-1 resize-none rounded-2xl bg-gray-100 px-4 py-2.5 text-sm leading-snug focus:outline-none focus:ring-2 focus:ring-[#730042]/40 max-h-[120px]"
+          className="flex-1 min-w-0 resize-none rounded-2xl bg-white px-2 py-2 text-sm leading-snug text-[#111b21] placeholder:text-[#667781] focus:outline-none max-h-[120px]"
         />
 
+        </div>
         {canSend || editing ? (
           <button
             type="button"
             onClick={submit}
             disabled={!canSend}
             title="Send"
-            className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#5c0035] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#008f72] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <FaPaperPlane className="text-sm" />
           </button>
@@ -333,7 +335,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
             type="button"
             onClick={startRecording}
             title="Record a voice message"
-            className="w-9 h-9 rounded-full bg-[#730042] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#5c0035] transition-colors"
+            className="w-10 h-10 rounded-full bg-[#00a884] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#008f72] transition-colors"
           >
             <FaMicrophone className="text-sm" />
           </button>
