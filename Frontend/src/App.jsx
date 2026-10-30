@@ -513,6 +513,7 @@ function App() {
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
             <Route path="/overtime"       element={<Overtime />} />
             <Route path="/meetings"       element={<MeetingsPage />} />
+            <Route path="/meetings/:id"   element={<MeetingsPage />} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

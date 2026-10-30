@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getMeetings,
@@ -10,6 +11,7 @@ import {
   getMeetingJoinInfo,
   downloadMeetingIcs,
   checkAvailability,
+  getMeetingCalendar,
 } from "../../api/meeting/meeting.api";
 
 export const MEETING_KEYS = {
@@ -85,3 +87,35 @@ export const useDownloadMeetingIcs = () =>
 
 // Busy check while picking a time: mutate({ people, startTime, endTime, excludeMeetingId? })
 export const useCheckAvailability = () => useMutation({ mutationFn: checkAvailability });
+
+const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// month: "YYYY-MM". Every meeting mutation invalidates ["meetings"], so a newly scheduled /
+// rescheduled / cancelled meeting shows up here without a refresh.
+export const useMeetingCalendar = (month, enabled = true) =>
+  useQuery({
+    queryKey: [...MEETING_KEYS.all, "calendar", month, LOCAL_TZ],
+    queryFn: () => getMeetingCalendar({ month, tz: LOCAL_TZ }),
+    enabled: enabled && /^\d{4}-\d{2}$/.test(month || ""),
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
+
+// For small calendars (dashboards): Map<dayOfMonth, [{ id, title, startTime, status }]>.
+// month0 is a 0-based month index like the dashboard calendars use.
+export const useMeetingDays = (month0, year) => {
+  const key = `${year}-${String(month0 + 1).padStart(2, "0")}`;
+  const { data } = useMeetingCalendar(key);
+  return useMemo(() => {
+    const map = new Map();
+    if (!data) return map;
+    const byId = new Map((data.meetings || []).map((m) => [m.id, m]));
+    for (const [dayKey, ids] of Object.entries(data.days || {})) {
+      if (!dayKey.startsWith(key)) continue;
+      const day = Number(dayKey.slice(8, 10));
+      const list = ids.map((id) => byId.get(id)).filter(Boolean).map((m) => ({ id: m.id, title: m.title, startTime: m.startTime, status: m.status }));
+      if (list.length) map.set(day, list);
+    }
+    return map;
+  }, [data, key]);
+};

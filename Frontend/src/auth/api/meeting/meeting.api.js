@@ -50,3 +50,8 @@ export const downloadMeetingIcs = async (id) =>
 
 // body: { people?: [{model,id}], audience?, startTime, endTime, excludeMeetingId? }
 export const checkAvailability = async (body) => (await api.post("meetings/availability", body)).data;
+
+// Month view for the calendar. month: "YYYY-MM"; tz: IANA zone used to bucket meetings into days.
+// -> { timezone, meetings: [...], days: { "YYYY-MM-DD": [meetingId] }, counts: { "YYYY-MM-DD": n }, liveNow: [ids] }
+export const getMeetingCalendar = async ({ month, tz, hosting } = {}) =>
+  (await api.get("meetings/calendar", { params: { month, tz, hosting: hosting || undefined } })).data;
