@@ -366,7 +366,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     if (otherInCall) return "On another call";
     if (online) return "Online";
     if (lastSeen) return `Last seen ${formatLastSeen(lastSeen)}`;
-    return other?.designation || "Offline";
+    return "Offline";
   })();
 
   const composerLock =
@@ -398,8 +398,13 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           />
           <div className="min-w-0">
             <p className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
+            {!isGroup && other?.designation && (
+              <p className="text-[10px] leading-tight text-gray-500 truncate" title={other.designation}>
+                {other.designation}
+              </p>
+            )}
             <p
-              className={`text-[11px] mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
+              className={`text-[10px] leading-tight mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
             >
               {subtitle}
             </p>
