@@ -18,6 +18,8 @@ import useCall from "../../realtime/useCall";
 import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
 import Avatar from "./Avatar";
 import MeetingHostControls from "../meeting/MeetingHostControls";
+import MeetingRoom from "../meeting/room/MeetingRoom";
+import WaitingScreen from "../meeting/room/WaitingScreen";
 import { formatDuration } from "./chatUtils";
 import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
 
@@ -114,6 +116,8 @@ function CallScreen() {
   }, [active?.callId]);
 
   if (!active) return null;
+
+  if (active.kind === "meeting" && !minimized) return <MeetingRoom onMinimize={() => setMinimized(true)} />;
 
   const statusText =
     active.status === "connected" ? formatDuration(elapsed) : active.status === "ringing" ? "Ringing…" : "Connecting…";
@@ -495,7 +499,11 @@ function RejoinCalls() {
 }
 
 export default function CallOverlay() {
-  const { lastEnded, clearLastEnded, error, clearError, inCall } = useCall();
+  const { lastEnded, clearLastEnded, error, clearError, inCall, requestResume } = useCall();
+
+  useEffect(() => {
+    requestResume();
+  }, [requestResume]);
 
   useEffect(() => {
     if (!lastEnded || inCall) return;
@@ -514,6 +522,7 @@ export default function CallOverlay() {
     <>
       <IncomingCalls />
       <RejoinCalls />
+      <WaitingScreen />
       <CallScreen />
     </>
   );
