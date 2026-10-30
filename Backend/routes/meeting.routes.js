@@ -10,6 +10,7 @@ const g = require("../controllers/meetingGuest.controller");
 const sp = require("../controllers/meetingSpace.controller");
 const an = require("../controllers/meetingAnnouncement.controller");
 const co = require("../controllers/meetingCollab.controller");
+const lv = require("../controllers/meetingLive.controller");
 
 // Outsiders (no account) - these two are public on purpose; everything else below needs a login.
 // The join call is protected by the emailed PIN (5 wrong tries -> 15 min lock + per-IP limit).
@@ -31,6 +32,8 @@ meetingRouter.get("/discover", asyncHandler(sp.discover));
 meetingRouter.post("/instant", asyncHandler(sp.instant));
 meetingRouter.get("/insights/me", asyncHandler(sp.insights));
 meetingRouter.get("/action-items/mine", asyncHandler(co.myActionItems));
+meetingRouter.get("/kudos/mine", asyncHandler(lv.myKudos));
+meetingRouter.get("/kudos/leaderboard", asyncHandler(lv.kudosLeaderboard));
 
 meetingRouter.get("/", asyncHandler(m.listMeetings));
 meetingRouter.post("/", asyncHandler(m.createMeeting));
@@ -83,5 +86,13 @@ meetingRouter.delete("/:id/polls/:pollId", asyncHandler(co.deletePoll));
 meetingRouter.get("/:id/feedback", asyncHandler(co.feedbackSummary));
 meetingRouter.get("/:id/feedback/mine", asyncHandler(co.myFeedback));
 meetingRouter.post("/:id/feedback", asyncHandler(co.submitFeedback));
+
+// Live extras (the realtime part is socket events, see utils/chat/meetingLive.service.js)
+meetingRouter.get("/:id/questions", asyncHandler(lv.listQuestions));
+meetingRouter.get("/:id/kudos", asyncHandler(lv.listKudos));
+meetingRouter.get("/:id/board", asyncHandler(lv.getBoard));
+meetingRouter.get("/:id/transcript", asyncHandler(lv.getTranscript));
+meetingRouter.post("/:id/transcript/share", asyncHandler(lv.shareTranscript));
+meetingRouter.get("/:id/minutes", asyncHandler(lv.minutes));
 
 module.exports = meetingRouter;

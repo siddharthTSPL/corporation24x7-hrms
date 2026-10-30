@@ -15,6 +15,12 @@ import {
   updateMeetingSettings,
   getMeetingReport,
   downloadMeetingReportCsv,
+  getMeetingReactions,
+  getMeetingBackgrounds,
+  uploadMeetingBackground,
+  deleteMeetingBackground,
+  getMeetingPreferences,
+  updateMeetingPreferences,
 } from "../../api/meeting/meeting.api";
 
 export const MEETING_KEYS = {
@@ -22,6 +28,8 @@ export const MEETING_KEYS = {
   list: (p) => ["meetings", "list", p || {}],
   one: (id) => ["meetings", "one", id],
   joinInfo: (id) => ["meetings", "joinInfo", id],
+  backgrounds: ["meetings", "backgrounds"],
+  preferences: ["meetings", "preferences"],
 };
 
 // Live changes (invites, reschedules, RSVPs, "meeting started") invalidate
@@ -142,3 +150,55 @@ export const useDownloadMeetingReport = () =>
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
   });
+
+export const useMeetingReactions = (enabled = true) =>
+  useQuery({
+    queryKey: [...MEETING_KEYS.all, "reactions"],
+    queryFn: getMeetingReactions,
+    enabled,
+    staleTime: Infinity,
+    select: (d) => d.reactions || d.emojis || [],
+  });
+
+export const useMeetingBackgrounds = (enabled = true) =>
+  useQuery({
+    queryKey: MEETING_KEYS.backgrounds,
+    queryFn: getMeetingBackgrounds,
+    enabled,
+    staleTime: 60000,
+  });
+
+export const useUploadMeetingBackground = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: uploadMeetingBackground,
+    onSuccess: () => qc.invalidateQueries({ queryKey: MEETING_KEYS.backgrounds }),
+  });
+};
+
+export const useDeleteMeetingBackground = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMeetingBackground,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MEETING_KEYS.backgrounds });
+      qc.invalidateQueries({ queryKey: MEETING_KEYS.preferences });
+    },
+  });
+};
+
+export const useMeetingPreferences = (enabled = true) =>
+  useQuery({
+    queryKey: MEETING_KEYS.preferences,
+    queryFn: getMeetingPreferences,
+    enabled,
+    staleTime: 60000,
+  });
+
+export const useUpdateMeetingPreferences = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateMeetingPreferences,
+    onSuccess: (data) => qc.setQueryData(MEETING_KEYS.preferences, (old) => ({ ...(old || {}), ...data })),
+  });
+};

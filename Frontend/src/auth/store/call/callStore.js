@@ -42,6 +42,30 @@ export const useCallStore = create((set) => ({
   removeReaction: (id) => set((s) => s.active
     ? { active: { ...s.active, reactions: (s.active.reactions || []).filter((reaction) => reaction.id !== id) } }
     : s),
+  setHands: (list) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = {};
+      (list || []).forEach((h) => {
+        hands[h.key] = { raisedAt: h.raisedAt, order: h.order, name: h.name };
+      });
+      return { active: { ...s.active, hands } };
+    }),
+  patchHand: (key, hand) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = { ...(s.active.hands || {}) };
+      if (hand) hands[key] = hand;
+      else delete hands[key];
+      return { active: { ...s.active, hands } };
+    }),
+  clearHands: (keys) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = { ...(s.active.hands || {}) };
+      (keys || Object.keys(hands)).forEach((k) => delete hands[k]);
+      return { active: { ...s.active, hands } };
+    }),
   patchPeer: (socketId, patch) =>
     set((s) => {
       if (!s.active) return s;

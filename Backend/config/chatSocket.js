@@ -9,6 +9,7 @@ const chat = require("../utils/chat/chat.service");
 const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
 const controls = require("../utils/chat/meetingControls.service");
+const live = require("../utils/chat/meetingLive.service");
 const presence = require("../utils/chat/presence");
 const { resolvePeople, personKey } = require("../utils/chat/people.utils");
 const { emitToOrganisation } = require("./socket");
@@ -31,6 +32,9 @@ const GUEST_EVENTS = new Set([
   "call:screen-share:start", "call:screen-share:stop",
   "call:hand:raise", "call:hand:lower", "call:reaction",
   "meeting:state", "meeting:lobby-leave",
+  // live extras guests may use: see the room's state, captions, Q&A, pulse, whiteboard (view only)
+  "meeting:live:state", "meeting:caption", "meeting:speaking", "meeting:board:state",
+  "meeting:qa:list", "meeting:qa:ask", "meeting:qa:upvote", "meeting:qa:delete", "meeting:pulse:send",
 ]);
 
 const registerChatSocket = (io, socket) => {
@@ -170,6 +174,7 @@ const registerChatSocket = (io, socket) => {
     const room = rooms.get(String(roomKey));
     if (!room || !room.peers.has(socket.id)) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
     if (!room.peers.has(to)) throw Object.assign(new Error("That participant is no longer in the call."), { statusCode: 404 });
+    if (!live.canSignal(room, socket.id, to)) throw Object.assign(new Error("You are in a different breakout room."), { statusCode: 403, code: "BREAKOUT_SEPARATED" });
     if (!data || typeof data !== "object" || JSON.stringify(data).length > MAX_SIGNAL_BYTES) {
       throw Object.assign(new Error("Invalid signal."), { statusCode: 400 });
     }
@@ -267,6 +272,58 @@ const registerChatSocket = (io, socket) => {
   on("call:mute-all", async ({ roomKey }) => controls.muteAll(anyRoom(roomKey), socket, actor));
 
   on("call:screen-share:force-stop", async ({ roomKey }) => controls.stopShareByHost(anyRoom(roomKey), socket, actor));
+
+  // ----- meeting live extras: breakouts, whiteboard, captions, Q&A, pulse, wheel, kudos, timer, agenda ... -----
+  // (all logic in utils/chat/meetingLive.service.js; every one of these only works inside a scheduled meeting)
+  const tooFast = (msg = "Slow down a little.") => Object.assign(new Error(msg), { statusCode: 429 });
+  const L = (fn) => async ({ roomKey, ...rest }) => fn(String(roomKey || ""), socket, actor, rest);
+
+  on("meeting:live:state", L(live.liveState));
+  on("meeting:flags", L(live.setFlags));
+  on("meeting:spotlight", L(live.spotlight));
+  on("meeting:recording", L(live.setRecording));
+  on("meeting:burst", L(live.burst));
+
+  on("meeting:timer:start", L(live.timerStart));
+  on("meeting:timer:control", L(live.timerControl));
+
+  on("meeting:agenda:set", L(live.agendaSet));
+  on("meeting:agenda:advance", L(live.agendaAdvance));
+
+  on("meeting:pulse:start", L(live.pulseStart));
+  on("meeting:pulse:send", async (p) => { if (!allow(socket, "pulse", 10, 10000)) throw tooFast(); return live.pulseSend(String(p.roomKey || ""), socket, actor, { score: p.score }); });
+  on("meeting:pulse:stop", L(live.pulseStop));
+
+  on("meeting:wheel:spin", L(live.wheelSpin));
+
+  on("meeting:breakout:create", L(live.breakoutCreate));
+  on("meeting:breakout:join", L(live.breakoutJoin));
+  on("meeting:breakout:leave", L(live.breakoutLeave));
+  on("meeting:breakout:move", L(live.breakoutMove));
+  on("meeting:breakout:broadcast", L(live.breakoutBroadcast));
+  on("meeting:breakout:help", async (p) => { if (!allow(socket, "bohelp", 3, 30000)) throw tooFast(); return live.breakoutHelp(String(p.roomKey || ""), socket, actor, { text: p.text }); });
+  on("meeting:breakout:close", L(live.breakoutClose));
+
+  on("meeting:board:state", L(live.boardState));
+  on("meeting:board:stroke", async (p) => { if (!allow(socket, "stroke", 150, 10000)) throw tooFast(); return live.boardStroke(String(p.roomKey || ""), socket, actor, { stroke: p.stroke }); });
+  on("meeting:board:undo", async (p) => { if (!allow(socket, "boardundo", 20, 10000)) throw tooFast(); return live.boardUndo(String(p.roomKey || ""), socket, actor, {}); });
+  on("meeting:board:clear", L(live.boardClear));
+
+  on("meeting:caption", async (p) => { if (!allow(socket, "caption", 40, 10000)) throw tooFast(); return live.caption(String(p.roomKey || ""), socket, actor, { text: p.text, final: p.final, lang: p.lang }); });
+  on("meeting:speaking", async (p) => { if (!allow(socket, "speaking", 30, 10000)) return {}; return live.speaking(String(p.roomKey || ""), socket, actor, { speaking: p.speaking }); });
+  on("meeting:talktime", L(live.talkTime));
+
+  on("meeting:decision:add", L(live.decisionAdd));
+  on("meeting:decision:remove", L(live.decisionRemove));
+
+  on("meeting:kudos:give", async (p) => { if (!allow(socket, "kudos", 8, 60000)) throw tooFast("Easy there - too many kudos at once."); return live.kudosGive(String(p.roomKey || ""), socket, actor, { toKey: p.toKey, message: p.message, badge: p.badge }); });
+
+  on("meeting:qa:list", L(live.qaList));
+  on("meeting:qa:ask", async (p) => { if (!allow(socket, "qaask", 6, 60000)) throw tooFast("You are asking too many questions at once."); return live.qaAsk(String(p.roomKey || ""), socket, actor, { text: p.text, anonymous: p.anonymous }); });
+  on("meeting:qa:upvote", async (p) => { if (!allow(socket, "qaup", 30, 10000)) throw tooFast(); return live.qaUpvote(String(p.roomKey || ""), socket, actor, { id: p.id }); });
+  on("meeting:qa:answer", L(live.qaAnswer));
+  on("meeting:qa:pin", L(live.qaPin));
+  on("meeting:qa:delete", L(live.qaDelete));
 
   // ----- disconnect: leave every call, flip presence -----
   socket.on("disconnect", async () => {

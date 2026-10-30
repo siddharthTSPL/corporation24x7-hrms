@@ -63,3 +63,23 @@ export const updateMeetingSettings = async ({ id, ...settings }) => (await api.p
 export const getMeetingReport = async (id) => (await api.get(`meetings/${id}/report`)).data;
 export const downloadMeetingReportCsv = async (id) =>
   (await api.get(`meetings/${id}/report`, { params: { format: "csv" }, responseType: "blob" })).data;
+
+export const getMeetingReactions = async () => (await api.get("meetings/reactions")).data;
+
+export const getMeetingBackgrounds = async () => (await api.get("meetings/backgrounds")).data;
+
+export const uploadMeetingBackground = async ({ file, name, scope = "personal" }) => {
+  const form = new FormData();
+  form.append("image", file);
+  if (name) form.append("name", name);
+  form.append("scope", scope);
+  return (await api.post("meetings/backgrounds", form)).data;
+};
+
+export const deleteMeetingBackground = async (bgId) => (await api.delete(`meetings/backgrounds/${bgId}`)).data;
+
+export const getMeetingPreferences = async () => (await api.get("meetings/preferences")).data;
+
+export const updateMeetingPreferences = async (body) => (await api.put("meetings/preferences", body)).data;
+
+export const getMeetingLiveState = async (id) => (await api.get(`meetings/${id}/live`)).data;
