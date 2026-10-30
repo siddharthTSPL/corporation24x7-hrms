@@ -12,6 +12,9 @@ import {
   downloadMeetingIcs,
   checkAvailability,
   getMeetingCalendar,
+  updateMeetingSettings,
+  getMeetingReport,
+  downloadMeetingReportCsv,
 } from "../../api/meeting/meeting.api";
 
 export const MEETING_KEYS = {
@@ -119,3 +122,23 @@ export const useMeetingDays = (month0, year) => {
     return map;
   }, [data, key]);
 };
+
+export const useUpdateMeetingSettings = () => useMeetingMutation(updateMeetingSettings); // { id, lobby?, muteOnEntry?, ... }
+
+export const useMeetingReport = (id, enabled = true) =>
+  useQuery({ queryKey: [...MEETING_KEYS.all, "report", id], queryFn: () => getMeetingReport(id), enabled: enabled && !!id, staleTime: 15000 });
+
+export const useDownloadMeetingReport = () =>
+  useMutation({
+    mutationFn: async (id) => {
+      const blob = await downloadMeetingReportCsv(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `meeting-attendance-${id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+  });

@@ -4,19 +4,16 @@
 // Negotiation uses the "perfect negotiation" pattern, so camera on/off in an audio
 // call and screen share can renegotiate at any time without glare.
 // Mesh is comfortable up to ~6-8 people; bigger all-hands need an SFU.
+import toast from "react-hot-toast";
 import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 
 const store = () => useCallStore.getState();
 const MESH_WARN_AT = 8;
-const FALLBACK_ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
-const CONNECT_TIMEOUT_MS = 30000;
-const normalizeIce = (list) => (Array.isArray(list) && list.length ? list : FALLBACK_ICE);
 
 let socket = null;
-let connectTimer = null;
-let ice = FALLBACK_ICE;
+let ice = [];
 let mySocketId = null;
 let busy = false; // start/join in flight
 const pcs = new Map(); // socketId -> peer entry
@@ -29,12 +26,9 @@ const friendlyMediaError = (err, wantVideo) => {
   const name = err?.name;
   if (name === "NotAllowedError" || name === "SecurityError")
     return new Error(`Allow microphone${wantVideo ? " and camera" : ""} access in your browser to join the call.`);
-  if (name === "NotFoundError" || name === "DevicesNotFoundError")
+  if (name === "NotFoundError" || name === "OverconstrainedError")
     return new Error("No microphone found. Plug one in and try again.");
-  if (name === "OverconstrainedError")
-    return new Error("Your camera or microphone doesn't support the requested settings.");
-  if (name === "NotReadableError" || name === "TrackStartError")
-    return new Error("Your microphone or camera is being used by another app.");
+  if (name === "NotReadableError") return new Error("Your microphone or camera is being used by another app.");
   return new Error(err?.message || "Could not access your microphone.");
 };
 
@@ -46,7 +40,7 @@ const getLocalMedia = async (wantVideo) => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio,
-      video: wantVideo ? { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
+      video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
     });
     return { stream, cameraBlocked: false };
   } catch (err) {
@@ -64,24 +58,6 @@ const getLocalMedia = async (wantVideo) => {
 };
 
 const stopStream = (s) => s && s.getTracks().forEach((t) => t.stop());
-
-const clearConnectTimer = () => {
-  clearTimeout(connectTimer);
-  connectTimer = null;
-};
-
-const armConnectTimer = () => {
-  clearConnectTimer();
-  connectTimer = setTimeout(() => {
-    connectTimer = null;
-    const a = store().active;
-    if (!a || a.status === "connected" || a.status === "ringing") return;
-    const roomKey = a.roomKey;
-    cleanup();
-    store().setError("Couldn't connect the call. Your network may be blocking it. Try again, or switch between Wi-Fi and mobile data.");
-    emitAck("call:leave", { roomKey }, 3000).catch(() => {});
-  }, CONNECT_TIMEOUT_MS);
-};
 
 // ------------------------------------------------------------------ peers
 
@@ -128,25 +104,11 @@ const createPeer = (socketId, { initiator }) => {
   pc.onicecandidate = (e) => e.candidate && sendSignal(socketId, { candidate: e.candidate });
 
   pc.ontrack = (e) => {
-    const active = store().active;
-    const peer = active?.peers[socketId] || {};
-    const remoteStream = e.streams[0] || null;
-    const isScreen = remoteStream
-      ? entry.remoteScreenStreamId === remoteStream.id || (!!entry.remoteCameraStreamId && entry.remoteCameraStreamId !== remoteStream.id)
-      : (!!peer.screen || active?.presenterSocketId === socketId);
-    if (remoteStream && !isScreen && !entry.remoteCameraStreamId) entry.remoteCameraStreamId = remoteStream.id;
-    if (remoteStream && isScreen) entry.remoteScreenStreamId = remoteStream.id;
-    let stream = remoteStream;
-    if (!stream) {
-      const streamKey = isScreen ? "remoteScreenStream" : "remoteMediaStream";
-      stream = entry[streamKey] || (entry[streamKey] = new MediaStream());
-      if (!stream.getTracks().some((track) => track.id === e.track.id)) stream.addTrack(e.track);
-    }
+    const stream = e.streams[0] || new MediaStream([e.track]);
+    const peer = store().active?.peers[socketId] || {};
     // first stream = camera/mic; a different second stream = their screen share
-    if (!isScreen && (!peer.stream || peer.stream.id === stream.id)) {
+    if (!peer.stream || peer.stream.id === stream.id) {
       store().patchPeer(socketId, { stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
-    } else if (isScreen) {
-      store().patchPeer(socketId, { screenStream: stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
     } else {
       store().patchPeer(socketId, { screenStream: stream, tracksVersion: (peer.tracksVersion || 0) + 1 });
     }
@@ -159,10 +121,7 @@ const createPeer = (socketId, { initiator }) => {
 
   pc.onconnectionstatechange = () => {
     store().patchPeer(socketId, { connectionState: pc.connectionState });
-    if (pc.connectionState === "connected") {
-      clearConnectTimer();
-      store().patchActive({ status: "connected" });
-    }
+    if (pc.connectionState === "connected") store().patchActive({ status: "connected" });
     if (pc.connectionState === "failed") {
       try { pc.restartIce(); } catch { /* ignore */ }
     }
@@ -219,7 +178,7 @@ const handleSignal = async (from, data) => {
 // ------------------------------------------------------------------ room lifecycle
 
 const setupRoom = (ack, stream, cameraBlocked) => {
-  ice = normalizeIce(ack.iceServers);
+  ice = ack.iceServers || [];
   mySocketId = ack.you.socketId;
   local.stream = stream;
 
@@ -243,6 +202,9 @@ const setupRoom = (ack, stream, cameraBlocked) => {
     cameraBlocked: !!cameraBlocked,
     mutedByHost: false,
     presenterSocketId: ack.presenterSocketId || null,
+    locked: !!ack.locked,
+    settings: ack.settings || {},
+    lobby: Array.isArray(ack.waiting) ? ack.waiting : [],
     peers: {},
   });
 
@@ -250,14 +212,12 @@ const setupRoom = (ack, stream, cameraBlocked) => {
     store().patchPeer(p.socketId, { ...p, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
     createPeer(p.socketId, { initiator: true });
   }
-  if (ack.peers.length) armConnectTimer();
   if (ack.peers.length + 1 > MESH_WARN_AT) {
     store().setError(`This call has ${ack.peers.length + 1} people. Video quality may drop on slower devices.`);
   }
 };
 
-function cleanup() {
-  clearConnectTimer();
+const cleanup = () => {
   [...pcs.keys()].forEach(closePeer);
   stopStream(local.stream);
   stopStream(local.screenStream);
@@ -266,7 +226,7 @@ function cleanup() {
   mySocketId = null;
   busy = false;
   store().setActive(null);
-}
+};
 
 const ensureIdle = () => {
   if (store().active || busy) throw new Error("You're already in a call.");
@@ -308,6 +268,14 @@ const joinCall = async ({ roomKey, media = "video" }) => {
     stream = m.stream;
     const hasVideo = stream.getVideoTracks().length > 0;
     const ack = await emitAckRetry("call:join", { roomKey, audio: true, video: hasVideo });
+    // Lobby: the host has to let this person in. Release the mic/camera and wait for "meeting:admitted".
+    if (ack.waiting === true) {
+      stopStream(stream);
+      busy = false;
+      store().removeIncoming(roomKey);
+      store().setWaiting({ roomKey, meetingId: ack.meetingId || roomKey.replace(/^meeting:/, ""), media, code: "LOBBY", title: ack.title, position: ack.position });
+      return ack;
+    }
     store().removeIncoming(roomKey);
     store().setWaiting(null);
     setupRoom(ack, stream, m.cameraBlocked);
@@ -330,7 +298,11 @@ const joinCall = async ({ roomKey, media = "video" }) => {
 // the server announces "meeting:started" (state.waiting is set meanwhile).
 const joinMeeting = (meetingId, { media = "video" } = {}) => joinCall({ roomKey: `meeting:${meetingId}`, media });
 
-const cancelWaiting = () => store().setWaiting(null);
+const cancelWaiting = () => {
+  const w = store().waiting;
+  store().setWaiting(null);
+  if (w?.code === "LOBBY") emitQuiet("meeting:lobby-leave", { roomKey: w.roomKey });
+};
 
 const declineCall = async (roomKey, reason = "declined") => {
   store().removeIncoming(roomKey);
@@ -445,6 +417,16 @@ const kick = (socketId) => emitAck("call:kick", { roomKey: store().active?.roomK
 const requestMute = (socketId) => emitAck("call:mute-request", { roomKey: store().active?.roomKey, socketId });
 const invitePeople = (keys) => emitAck("call:invite", { roomKey: store().active?.roomKey, keys });
 
+// Meeting host / co-host controls (the server rejects anyone else)
+const roomNow = () => store().active?.roomKey;
+const admit = (socketId) => emitAck("meeting:lobby-admit", { roomKey: roomNow(), socketId });
+const admitAll = () => emitAck("meeting:lobby-admit", { roomKey: roomNow(), all: true });
+const deny = (socketId, block = false) => emitAck("meeting:lobby-deny", { roomKey: roomNow(), socketId, block });
+const denyAll = () => emitAck("meeting:lobby-deny", { roomKey: roomNow(), all: true });
+const setLocked = (locked) => emitAck("meeting:lock", { roomKey: roomNow(), locked });
+const muteAll = () => emitAck("call:mute-all", { roomKey: roomNow() });
+const updateMeetingSettings = (settings) => emitAck("meeting:settings", { roomKey: roomNow(), settings });
+
 // ------------------------------------------------------------------ socket wiring
 
 // Called once by useChatRealtime. Returns a detach function.
@@ -474,10 +456,7 @@ const attach = (sock) => {
     if (!a || a.roomKey !== roomKey) return;
     store().patchPeer(peer.socketId, { ...peer, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
     createPeer(peer.socketId, { initiator: false }); // they will send us an offer
-    if (a.status === "ringing") {
-      store().patchActive({ status: "connecting" });
-      armConnectTimer();
-    }
+    if (a.status === "ringing") store().patchActive({ status: "connecting" }); // someone picked up
     if (Object.keys(store().active.peers).length + 1 > MESH_WARN_AT) {
       store().setError(`This call has ${Object.keys(store().active.peers).length + 1} people. Video quality may drop on slower devices.`);
     }
@@ -501,17 +480,8 @@ const attach = (sock) => {
     if (sharing) store().patchActive({ presenterSocketId: socketId });
     else if (a.presenterSocketId === socketId) store().patchActive({ presenterSocketId: null });
   };
-  const onReaction = (reaction) => {
-    if (store().active?.roomKey !== reaction.roomKey) return;
-    store().addReaction(reaction);
-    const id = store().active?.reactions?.at(-1)?.id;
-    setTimeout(() => store().removeReaction(id), 3200);
-  };
   const onAnswered = ({ roomKey }) => {
-    if (store().active?.roomKey === roomKey) {
-      if (store().active.status === "ringing") armConnectTimer();
-      store().patchActive({ status: "connecting" });
-    }
+    if (store().active?.roomKey === roomKey) store().patchActive({ status: "connecting" });
   };
   const onEnded = ({ roomKey, reason, status, durationSec }) => {
     onDismissed({ roomKey });
@@ -537,7 +507,37 @@ const attach = (sock) => {
   // host opened a meeting I was waiting for -> go in
   const onMeetingStarted = ({ meetingId }) => {
     const w = store().waiting;
-    if (w && w.meetingId === meetingId && !store().active) joinMeeting(meetingId, { media: w.media }).catch(() => {});
+    if (w && w.code !== "LOBBY" && w.meetingId === meetingId && !store().active) joinMeeting(meetingId, { media: w.media }).catch(() => {});
+  };
+  // host let me in from the lobby -> go in
+  const onAdmitted = ({ roomKey }) => {
+    const w = store().waiting;
+    if (!w || w.roomKey !== roomKey || store().active) return;
+    joinCall({ roomKey, media: w.media }).catch(() => {});
+  };
+  const onDenied = ({ roomKey }) => {
+    const w = store().waiting;
+    if (!w || w.roomKey !== roomKey) return;
+    store().setWaiting(null);
+    store().setError("The host did not let you into this meeting.");
+  };
+  // moderators: who is waiting in the lobby
+  const onLobbyUpdate = ({ roomKey, waiting }) => {
+    const a = store().active;
+    if (!a || a.roomKey !== roomKey) return;
+    const list = waiting || [];
+    const known = new Set((a.lobby || []).map((w) => w.socketId));
+    list.filter((w) => !known.has(w.socketId)).forEach((w) => toast(`${w.name || "Someone"} is waiting to join`, { icon: "🚪", id: `lobby-${w.socketId}` }));
+    store().patchActive({ lobby: list });
+  };
+  const onLocked = ({ roomKey, locked }) => {
+    if (store().active?.roomKey === roomKey) store().patchActive({ locked: !!locked });
+  };
+  const onRoles = ({ roomKey, hostKeys }) => {
+    if (store().active?.roomKey === roomKey && Array.isArray(hostKeys)) store().patchActive({ hostKeys });
+  };
+  const onMeetingSettings = ({ roomKey, settings }) => {
+    if (store().active?.roomKey === roomKey) store().patchActive({ settings: settings || {} });
   };
 
   // Network blip: the server drops us from the call on disconnect, so rejoin on reconnect.
@@ -555,10 +555,9 @@ const attach = (sock) => {
       [...pcs.keys()].forEach(closePeer);
       store().patchActive({ peers: {} });
       const ack = await emitAckRetry("call:join", { roomKey: a.roomKey, audio: a.audio, video: a.video });
-      ice = ack.iceServers?.length ? ack.iceServers : ice;
+      ice = ack.iceServers || ice;
       mySocketId = ack.you.socketId;
       store().patchActive({ mySocketId, status: "connecting", presenterSocketId: ack.presenterSocketId || null });
-      armConnectTimer();
       for (const p of ack.peers) {
         store().patchPeer(p.socketId, { ...p, stream: null, screenStream: null, connectionState: "new", tracksVersion: 0 });
         createPeer(p.socketId, { initiator: true });
@@ -577,13 +576,18 @@ const attach = (sock) => {
     "call:signal": onSignal,
     "call:media-state": onMediaState,
     "call:screen-share": onScreenShare,
-    "call:reaction": onReaction,
     "call:answered": onAnswered,
     "call:ended": onEnded,
     "call:kicked": onKicked,
     "call:mute-request": onMuteRequest,
     "call:updated": onCallUpdated,
     "meeting:started": onMeetingStarted,
+    "meeting:admitted": onAdmitted,
+    "meeting:denied": onDenied,
+    "meeting:lobby-update": onLobbyUpdate,
+    "meeting:locked": onLocked,
+    "meeting:roles": onRoles,
+    "meeting:settings": onMeetingSettings,
     disconnect: onDisconnect,
     connect: onConnect,
   };
@@ -614,4 +618,11 @@ export const callManager = {
   kick,
   requestMute,
   invitePeople,
+  admit,
+  admitAll,
+  deny,
+  denyAll,
+  setLocked,
+  muteAll,
+  updateMeetingSettings,
 };

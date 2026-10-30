@@ -54,6 +54,13 @@ export default function useCall() {
     kick: callManager.kick,
     requestMute: callManager.requestMute,
     invitePeople: callManager.invitePeople,
+    admit: callManager.admit,
+    admitAll: callManager.admitAll,
+    deny: callManager.deny,
+    denyAll: callManager.denyAll,
+    setLocked: callManager.setLocked,
+    muteAll: callManager.muteAll,
+    updateMeetingSettings: callManager.updateMeetingSettings,
     clearLastEnded: () => setLastEnded(null),
     clearError,
   };

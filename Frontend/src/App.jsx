@@ -106,6 +106,7 @@ const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
 const MeetingsPage = lazy(() => import("./pages/meetings/MeetingsPage"));
+const GuestJoinPage = lazy(() => import("./pages/meetings/GuestJoinPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
@@ -203,6 +204,8 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
+          {/* Public: outsiders invited to a meeting by email + PIN (no account) */}
+          <Route path="/meeting-guest/:id" element={<GuestJoinPage />} />
 
           {/* Public — opened from a companion sign-in link generated on a
               different, already-logged-in browser. No session required to

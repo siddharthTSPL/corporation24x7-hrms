@@ -55,3 +55,11 @@ export const checkAvailability = async (body) => (await api.post("meetings/avail
 // -> { timezone, meetings: [...], days: { "YYYY-MM-DD": [meetingId] }, counts: { "YYYY-MM-DD": n }, liveNow: [ids] }
 export const getMeetingCalendar = async ({ month, tz, hosting } = {}) =>
   (await api.get("meetings/calendar", { params: { month, tz, hosting: hosting || undefined } })).data;
+
+// Host / co-host: lobby, mute-on-entry, chat, reactions, hand raise, screen-share mode
+export const updateMeetingSettings = async ({ id, ...settings }) => (await api.patch(`meetings/${id}/settings`, { settings })).data;
+
+// Host / co-host: attendance report -> { meeting, summary, participants }
+export const getMeetingReport = async (id) => (await api.get(`meetings/${id}/report`)).data;
+export const downloadMeetingReportCsv = async (id) =>
+  (await api.get(`meetings/${id}/report`, { params: { format: "csv" }, responseType: "blob" })).data;

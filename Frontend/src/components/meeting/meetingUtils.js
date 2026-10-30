@@ -88,3 +88,24 @@ export const REMINDERS = [0, 5, 10, 15, 30, 60];
 
 export const personRef = (p) => ({ model: p.model, id: p.id });
 export const errMsg = (e) => e?.message || "Something went wrong";
+
+// "a@x.com, Priya <p@y.com>" (one per line, comma or semicolon) -> [{ email, name? }]
+export const parseGuestInput = (text = "") =>
+  String(text)
+    .split(/[\n;,]+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((t) => {
+      const m = t.match(/^(.*?)<\s*([^<>\s]+@[^<>\s]+)\s*>$/);
+      return m ? { name: m[1].trim().replace(/^"|"$/g, ""), email: m[2].toLowerCase() } : { email: t.toLowerCase() };
+    });
+
+export const GUEST_SKIP_REASON = {
+  invalid_email: "not a valid email",
+  already_member: "already in your organisation (invite them as a member instead)",
+  already_invited: "already invited",
+  limit_reached: "guest limit reached",
+};
+
+// Public link a guest opens (the app is served under /talent)
+export const guestJoinLink = (meetingId) => `${window.location.origin}/talent/meeting-guest/${meetingId}`;
