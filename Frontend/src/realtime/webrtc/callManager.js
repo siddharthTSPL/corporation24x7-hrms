@@ -1,9 +1,4 @@
-// WebRTC mesh call manager (non-React singleton). One RTCPeerConnection per other
-// participant *socket*; the backend only relays signalling over Socket.IO.
-//
-// Negotiation uses the "perfect negotiation" pattern, so camera on/off in an audio
-// call and screen share can renegotiate at any time without glare.
-// Mesh is comfortable up to ~6-8 people; bigger all-hands need an SFU.
+
 import toast from "react-hot-toast";
 import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
@@ -735,12 +730,6 @@ const attach = (sock) => {
     if (sharing) store().patchActive({ presenterSocketId: socketId });
     else if (a.presenterSocketId === socketId) store().patchActive({ presenterSocketId: null });
   };
-  const onReaction = (reaction) => {
-    if (store().active?.roomKey !== reaction.roomKey) return;
-    store().addReaction(reaction);
-    const id = store().active?.reactions?.at(-1)?.id;
-    setTimeout(() => store().removeReaction(id), 3200);
-  };
   const onAnswered = ({ roomKey }) => {
     if (store().active?.roomKey === roomKey) store().patchActive({ status: "connecting" });
   };
@@ -874,7 +863,6 @@ const attach = (sock) => {
     "call:kicked": onKicked,
     "call:hand": onHand,
     "call:hands-cleared": onHandsCleared,
-    "call:reaction": onReaction,
     "call:mute-request": onMuteRequest,
     "call:updated": onCallUpdated,
     "meeting:started": onMeetingStarted,
