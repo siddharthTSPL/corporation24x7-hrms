@@ -5,6 +5,7 @@ import { Modal, Btn, Field, inputCls } from "./ui";
 import PeoplePicker from "./PeoplePicker";
 import { useCreateMeeting, useUpdateMeeting, useCheckAvailability } from "../../auth/server-state/meeting/meeting.hook";
 import { useCreateInstantMeeting } from "../../auth/server-state/meeting/meetingSpace.hook";
+import { GUEST_SKIP_REASON, parseGuestInput } from "./meetingUtils";
 import { DURATIONS, REMINDERS, combineDateTime, errMsg, fmtTime, minutesBetween, nextSlot, personRef, toDateInput, toTimeInput } from "./meetingUtils";
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -28,6 +29,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const [media, setMedia] = useState(meeting?.media || "video");
   const [people, setPeople] = useState(originalPeople);
   const [everyone, setEveryone] = useState(false);
+  const [guestText, setGuestText] = useState("");
   const [freq, setFreq] = useState("none");
   const [count, setCount] = useState(4);
   const [reminder, setReminder] = useState(meeting?.reminderMinutes ?? 10);
@@ -41,6 +43,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const avail = useCheckAvailability();
   const saving = create.isPending || update.isPending || quick.isPending;
 
+  const guestList = parseGuestInput(guestText);
   const start = combineDateTime(date, time);
   const end = start ? new Date(start.getTime() + duration * 60000) : null;
   const canReschedule = !edit || meeting.status === "scheduled";
@@ -68,7 +71,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const submit = async () => {
     setError("");
     if (!instant && !title.trim()) return setError("Add a meeting title.");
-    if (!edit && !people.length && !(everyone && !instant)) return setError("Invite at least one person.");
+    if (!edit && !people.length && !guestList.length && !(everyone && !instant)) return setError("Invite at least one person.");
     if (!instant && canReschedule && (!start || start.getTime() < Date.now() - 5 * 60000)) return setError("Pick a start time that hasn't passed.");
 
     try {
@@ -104,12 +107,15 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
           media,
           attendees: people.map(personRef),
           audience: everyone ? { everyone: true } : undefined,
+          guests: guestList.length ? guestList : undefined,
           recurrence: freq === "none" ? undefined : { freq, interval: 1, count: Number(count) || 4 },
           reminderMinutes: reminder,
           allowJoinBeforeHost: joinBefore,
           sendEmail,
         });
         toast.success(res.occurrences > 1 ? `${res.occurrences} meetings scheduled` : "Meeting scheduled");
+        if (res.guests?.invited?.length) toast.success(`${res.guests.invited.length} outside guest${res.guests.invited.length > 1 ? "s" : ""} emailed a PIN`);
+        (res.guests?.skipped || []).forEach((g) => toast(`${g.email}: ${GUEST_SKIP_REASON[g.reason] || g.reason}`, { icon: "⚠️" }));
         if (res.conflicts?.length) toast(`${res.conflicts.length} invitee${res.conflicts.length > 1 ? "s have" : " has"} a clash at this time`, { icon: "⚠️" });
         onSaved?.(res.meeting);
       }
@@ -153,6 +159,12 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
             </label>
           )}
         </Field>
+
+        {!instant && !edit && (
+          <Field label="Outside guests (optional)" hint="People without an account. Each gets a personal PIN by email and waits in the lobby until you admit them. One email per line.">
+            <textarea className={inputCls} rows={2} value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
+          </Field>
+        )}
 
         {!instant && canReschedule && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

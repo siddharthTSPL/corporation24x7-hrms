@@ -19,10 +19,13 @@ import useCall from "../../realtime/useCall";
 import { emitAck } from "../../realtime/chatSocket";
 import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
 import Avatar from "./Avatar";
+import MeetingHostControls from "../meeting/MeetingHostControls";
+import MeetingRoom from "../meeting/room/MeetingRoom";
+import WaitingScreen from "../meeting/room/WaitingScreen";
 import { formatDuration } from "./chatUtils";
 import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
 
-function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false, refreshKey = 0 }) {
+export function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false, refreshKey = 0 }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -55,7 +58,7 @@ function MediaView({ stream, muted = false, mirror = false, hidden = false, cont
   );
 }
 
-function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting, avatarSize = 72, tracksVersion = 0 }) {
+export function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, label, reconnecting, avatarSize = 72, tracksVersion = 0 }) {
   return (
     <div className="relative w-full h-full min-h-0 rounded-xl overflow-hidden bg-gray-800 flex items-center justify-center">
       <MediaView stream={stream} muted={muted} mirror={mirror} hidden={!videoOn} refreshKey={tracksVersion} />
@@ -71,7 +74,7 @@ function Tile({ name, photo, seed, stream, muted, audioOn, videoOn, mirror, labe
   );
 }
 
-function CtrlButton({ onClick, active = true, danger = false, title, children, disabled }) {
+export function CtrlButton({ onClick, active = true, danger = false, title, children, disabled }) {
   return (
     <button
       type="button"
@@ -87,7 +90,7 @@ function CtrlButton({ onClick, active = true, danger = false, title, children, d
   );
 }
 
-function useElapsed(startedAt, running) {
+export function useElapsed(startedAt, running) {
   const [mountedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
 
@@ -103,7 +106,7 @@ function useElapsed(startedAt, running) {
   return Math.max(0, (now - base) / 1000);
 }
 
-function gridCols(n) {
+export function gridCols(n) {
   if (n <= 1) return "grid-cols-1";
   if (n === 2) return "grid-cols-1 md:grid-cols-2";
   if (n <= 4) return "grid-cols-2";
@@ -117,21 +120,18 @@ function CallScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteQuery, setInviteQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [reactionOpen, setReactionOpen] = useState(false);
   const { data: conversation } = useConversation(active?.conversationId);
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
-  const sendReaction = (emoji) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setReactions((items) => [...items.slice(-7), { id, emoji }]);
-    setEmojiOpen(false);
-    window.setTimeout(() => setReactions((items) => items.filter((item) => item.id !== id)), 2600);
-  };
 
   useEffect(() => {
     if (active?.callId) setMinimized(false);
   }, [active?.callId]);
 
   if (!active) return null;
+
+  if (active.kind === "meeting" && !minimized) return <MeetingRoom onMinimize={() => setMinimized(true)} />;
 
   const statusText =
     active.status === "connected" ? formatDuration(elapsed) : active.status === "ringing" ? "Ringing…" : "Connecting…";
@@ -296,7 +296,7 @@ function CallScreen() {
       stream: p.stream,
       muted: false,
       audioOn: p.audio !== false,
-      videoOn: !!p.video && !!p.stream,
+      videoOn: !!p.video && !!p.stream?.getVideoTracks().some((track) => track.readyState === "live"),
       mirror: false,
       reconnecting: p.connectionState === "disconnected" || p.connectionState === "failed",
       tracksVersion: p.tracksVersion || 0,
@@ -314,6 +314,7 @@ function CallScreen() {
         </div>
         <div className="flex items-center gap-2">
           {active.mutedByHost && <span className="text-[11px] bg-amber-500/20 text-amber-300 rounded-full px-2.5 py-1">Muted by host</span>}
+          {active.kind === "meeting" && isHost && <MeetingHostControls />}
           {active.kind !== "meeting" && (
             <button type="button" onClick={() => setInviteOpen(true)} title="Invite people" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
               <FaUserPlus className="text-sm" />
@@ -344,7 +345,7 @@ function CallScreen() {
           </>
         ) : active.kind === "direct" && active.media === "video" ? (
           <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-gray-900">
-            <Tile {...(peerTiles[0] || callingTile || selfTile)} avatarSize={144} />
+            <Tile {...(peerTiles[0] || callingTile || selfTile)} avatarSize={256} />
             <div className="absolute bottom-3 right-3 z-10 w-28 sm:w-36 aspect-[3/4] overflow-hidden rounded-xl border-2 border-white/80 shadow-2xl bg-gray-800">
               <Tile {...selfTile} avatarSize={56} />
             </div>
@@ -352,7 +353,7 @@ function CallScreen() {
         ) : (
           <div className={`grid ${gridCols(tiles.length)} auto-rows-fr gap-2 flex-1 min-h-0`}>
             {tiles.map((t) => (
-              <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 144 : 72} />
+              <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 256 : 72} />
             ))}
           </div>
         )}
@@ -360,12 +361,7 @@ function CallScreen() {
           <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-live="polite">
             <style>{"@keyframes callReactionFloat { 0% { transform: translateY(24px) scale(.7); opacity: 0; } 12% { opacity: 1; } 78% { opacity: 1; } 100% { transform: translateY(-190px) scale(1.2); opacity: 0; } }"}</style>
             {active.reactions.map((reaction) => (
-              <span
-                key={reaction.id}
-                className="absolute bottom-5 text-4xl sm:text-5xl drop-shadow-lg"
-                style={{ left: `${18 + ((reaction.id * 37) % 65)}%`, animation: "callReactionFloat 3.2s ease-out forwards" }}
-                title={reaction.name || "Participant"}
-              >
+              <span key={reaction.id} className="absolute bottom-5 text-4xl sm:text-5xl drop-shadow-lg" style={{ left: `${18 + ((reaction.id * 37) % 65)}%`, animation: "callReactionFloat 3.2s ease-out forwards" }} title={reaction.name || "Participant"}>
                 {reaction.emoji}
               </span>
             ))}
@@ -374,14 +370,6 @@ function CallScreen() {
       </div>
 
       {hiddenAudio}
-
-      {reactions.length > 0 && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-28 z-[95] flex justify-center gap-3 overflow-hidden" aria-live="polite">
-          {reactions.map((reaction, index) => (
-            <span key={reaction.id} className="call-reaction" style={{ animationDelay: `${index * 35}ms` }}>{reaction.emoji}</span>
-          ))}
-        </div>
-      )}
 
       {isPresenting && (
         <div className="text-center text-xs text-amber-300 pb-1">You're sharing your screen</div>
@@ -423,7 +411,19 @@ function CallScreen() {
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3 pb-6 pt-1">
+      <div className="relative flex items-center justify-center gap-3 pb-6 pt-1">
+        {reactionOpen && (
+          <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-[100] flex max-w-[calc(100vw-1.5rem)] gap-0.5 overflow-x-auto rounded-full border border-white/10 bg-slate-900/95 p-1.5 shadow-2xl">
+            {quickReactions.map((emoji) => (
+              <button key={emoji} type="button" onClick={() => sendReaction(emoji)} aria-label={`Send ${emoji} reaction`} className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full hover:bg-white/15 text-2xl transition-transform hover:scale-110">
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+        <CtrlButton onClick={() => setReactionOpen((open) => !open)} active={reactionOpen} title="Send a reaction">
+          <FaSmile />
+        </CtrlButton>
         {controls}
         {isHost && active.kind !== "direct" && (
           <button
@@ -553,7 +553,11 @@ function RejoinCalls() {
 }
 
 export default function CallOverlay() {
-  const { lastEnded, clearLastEnded, error, clearError, inCall } = useCall();
+  const { lastEnded, clearLastEnded, error, clearError, inCall, requestResume } = useCall();
+
+  useEffect(() => {
+    requestResume();
+  }, [requestResume]);
 
   useEffect(() => {
     if (!lastEnded || inCall) return;
@@ -572,6 +576,7 @@ export default function CallOverlay() {
     <>
       <IncomingCalls />
       <RejoinCalls />
+      <WaitingScreen />
       <CallScreen />
     </>
   );

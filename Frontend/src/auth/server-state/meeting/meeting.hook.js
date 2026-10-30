@@ -12,6 +12,15 @@ import {
   downloadMeetingIcs,
   checkAvailability,
   getMeetingCalendar,
+  updateMeetingSettings,
+  getMeetingReport,
+  downloadMeetingReportCsv,
+  getMeetingReactions,
+  getMeetingBackgrounds,
+  uploadMeetingBackground,
+  deleteMeetingBackground,
+  getMeetingPreferences,
+  updateMeetingPreferences,
 } from "../../api/meeting/meeting.api";
 
 export const MEETING_KEYS = {
@@ -19,6 +28,8 @@ export const MEETING_KEYS = {
   list: (p) => ["meetings", "list", p || {}],
   one: (id) => ["meetings", "one", id],
   joinInfo: (id) => ["meetings", "joinInfo", id],
+  backgrounds: ["meetings", "backgrounds"],
+  preferences: ["meetings", "preferences"],
 };
 
 // Live changes (invites, reschedules, RSVPs, "meeting started") invalidate
@@ -118,4 +129,76 @@ export const useMeetingDays = (month0, year) => {
     }
     return map;
   }, [data, key]);
+};
+
+export const useUpdateMeetingSettings = () => useMeetingMutation(updateMeetingSettings); // { id, lobby?, muteOnEntry?, ... }
+
+export const useMeetingReport = (id, enabled = true) =>
+  useQuery({ queryKey: [...MEETING_KEYS.all, "report", id], queryFn: () => getMeetingReport(id), enabled: enabled && !!id, staleTime: 15000 });
+
+export const useDownloadMeetingReport = () =>
+  useMutation({
+    mutationFn: async (id) => {
+      const blob = await downloadMeetingReportCsv(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `meeting-attendance-${id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+  });
+
+export const useMeetingReactions = (enabled = true) =>
+  useQuery({
+    queryKey: [...MEETING_KEYS.all, "reactions"],
+    queryFn: getMeetingReactions,
+    enabled,
+    staleTime: Infinity,
+    select: (d) => d.reactions || d.emojis || [],
+  });
+
+export const useMeetingBackgrounds = (enabled = true) =>
+  useQuery({
+    queryKey: MEETING_KEYS.backgrounds,
+    queryFn: getMeetingBackgrounds,
+    enabled,
+    staleTime: 60000,
+  });
+
+export const useUploadMeetingBackground = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: uploadMeetingBackground,
+    onSuccess: () => qc.invalidateQueries({ queryKey: MEETING_KEYS.backgrounds }),
+  });
+};
+
+export const useDeleteMeetingBackground = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMeetingBackground,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MEETING_KEYS.backgrounds });
+      qc.invalidateQueries({ queryKey: MEETING_KEYS.preferences });
+    },
+  });
+};
+
+export const useMeetingPreferences = (enabled = true) =>
+  useQuery({
+    queryKey: MEETING_KEYS.preferences,
+    queryFn: getMeetingPreferences,
+    enabled,
+    staleTime: 60000,
+  });
+
+export const useUpdateMeetingPreferences = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateMeetingPreferences,
+    onSuccess: (data) => qc.setQueryData(MEETING_KEYS.preferences, (old) => ({ ...(old || {}), ...data })),
+  });
 };

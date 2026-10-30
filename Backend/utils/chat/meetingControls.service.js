@@ -3,7 +3,7 @@ const { getIO } = require("../../config/socket");
 const rooms = require("./callRooms");
 const { httpError } = require("./people.utils");
 
-const REACTIONS = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎"];
+const REACTIONS = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎", "🔥", "💯", "🚀", "💡", "🤔", "😢"];
 const SCREEN_SHARE_MODES = ["everyone", "host"];
 const BOOLEAN_SETTINGS = ["lobby", "muteOnEntry", "allowUnmute", "chatEnabled", "reactionsEnabled", "handRaiseEnabled"];
 

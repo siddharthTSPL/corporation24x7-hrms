@@ -16,6 +16,12 @@ const resolveTarget = () => {
 // reference to this same object, so a logout/login can't leave some listeners
 // attached to a dead socket (the old code set `socket = null` on disconnect,
 // which silently orphaned chat/call listeners).
+// Outsiders (meeting guests) connect with a short-lived guest token instead of a login.
+let guestToken = null;
+export const setGuestToken = (t) => {
+  guestToken = t || null;
+};
+
 let socket = null;
 let wantConnected = false;
 let retryTimer = null;
@@ -65,7 +71,7 @@ export const getSocket = () => {
     path,
     withCredentials: true, // sends the same "token" cookie the REST API uses
     // This tab's own login token (re-read on every (re)connect). Falls back to the cookie when absent.
-    auth: (cb) => cb({ token: getTabToken() || undefined }),
+    auth: (cb) => cb(guestToken ? { guestToken } : { token: getTabToken() || undefined }),
     autoConnect: false,
     // Default order (long-polling first, then upgrade to WebSocket). Works
     // through ANY proxy (IIS/ARR, nginx, Cloudflare); if WebSocket is blocked
@@ -78,7 +84,7 @@ export const getSocket = () => {
 
   socket.on("socket:ready", ({ recipientModel, id, key }) => {
     const mine = key || (recipientModel && id ? `${recipientModel}:${id}` : null);
-    if (mine && !useChatStore.getState().myKey) useChatStore.getState().setMyKey(mine);
+    if (mine && useChatStore.getState().myKey !== mine) useChatStore.getState().setMyKey(mine);
   });
 
   socket.on("connect", () => {

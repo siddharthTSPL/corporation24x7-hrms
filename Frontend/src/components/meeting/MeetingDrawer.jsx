@@ -8,6 +8,9 @@ import NotesTab from "./tabs/NotesTab";
 import ActionItemsTab from "./tabs/ActionItemsTab";
 import PollsTab from "./tabs/PollsTab";
 import FeedbackTab from "./tabs/FeedbackTab";
+import GuestsTab from "./tabs/GuestsTab";
+import SettingsTab from "./tabs/SettingsTab";
+import ReportTab from "./tabs/ReportTab";
 
 const STATUS = { live: ["live", "Live now"], scheduled: ["brand", "Scheduled"], ended: ["gray", "Ended"], cancelled: ["red", "Cancelled"] };
 
@@ -24,6 +27,8 @@ export default function MeetingDrawer({ id, onClose, onEdit }) {
     { id: "actions", label: "Action items" },
     { id: "polls", label: "Polls" },
     ...(m?.status === "ended" || moderator ? [{ id: "feedback", label: "Feedback" }] : []),
+    ...(moderator && (m?.status === "scheduled" || m?.status === "live") ? [{ id: "guests", label: "Guests", badge: 0 }, { id: "settings", label: "Settings" }] : []),
+    ...(moderator && (m?.status === "ended" || m?.status === "live") ? [{ id: "report", label: "Report" }] : []),
   ];
   const [tone, label] = STATUS[m?.status] || STATUS.scheduled;
 
@@ -51,6 +56,9 @@ export default function MeetingDrawer({ id, onClose, onEdit }) {
         {m && tab === "actions" && <ActionItemsTab meeting={m} moderator={moderator} />}
         {m && tab === "polls" && <PollsTab meeting={m} moderator={moderator} />}
         {m && tab === "feedback" && <FeedbackTab meeting={m} moderator={moderator} />}
+        {m && moderator && tab === "guests" && <GuestsTab meeting={m} />}
+        {m && moderator && tab === "settings" && <SettingsTab meeting={m} />}
+        {m && moderator && tab === "report" && <ReportTab meeting={m} />}
       </div>
     </Drawer>
   );

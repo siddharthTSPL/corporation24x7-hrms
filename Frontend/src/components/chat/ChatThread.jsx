@@ -366,15 +366,15 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     if (otherInCall) return "On another call";
     if (online) return "Online";
     if (lastSeen) return `Last seen ${formatLastSeen(lastSeen)}`;
-    return other?.designation || "Offline";
+    return "Offline";
   })();
 
   const composerLock =
     conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#F8F7FA]">
-      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-3 border-b border-[#eee8ef] shadow-[0_2px_12px_rgba(36,10,28,0.035)]">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#efeae2]">
+      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-2 border-b border-[#e9edef]">
         {showBack && (
           <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
             <FaArrowLeft className="text-sm" />
@@ -398,8 +398,13 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           />
           <div className="min-w-0">
             <p className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
+            {!isGroup && other?.designation && (
+              <p className="text-[10px] leading-tight text-gray-500 truncate" title={other.designation}>
+                {other.designation}
+              </p>
+            )}
             <p
-              className={`text-[11px] mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
+              className={`text-[10px] leading-tight mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
             >
               {subtitle}
             </p>
@@ -522,7 +527,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           ref={scrollRef}
           data-chat-scroll
           onScroll={onScroll}
-          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          className="chat-thread-scroll chat-hide-scroll absolute inset-0 overflow-y-auto overscroll-contain px-3 py-2"
           style={wallpaperStyle(conv?.wallpaper)}
         >
           {isLoading ? (
@@ -555,8 +560,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
               {items.map((it) =>
                 it.kind === "day" ? (
-                  <div key={it.key} className="flex justify-center my-3">
-                    <span className="text-[11px] font-semibold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-0.5">
+                  <div key={it.key} className="flex justify-center my-2">
+                    <span className="text-[11px] font-medium text-[#54656f] bg-[#e9edef] rounded-full px-3 py-0.5 shadow-[0_1px_1px_rgba(0,0,0,.04)]">
                       {it.label}
                     </span>
                   </div>
@@ -595,7 +600,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             type="button"
             onClick={scrollToBottom}
             title="Jump to latest"
-            className="absolute bottom-3 right-4 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-md text-gray-600 hover:bg-gray-50 flex items-center justify-center z-10"
+            className="absolute bottom-3 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#d9e1e5] bg-white/95 text-[#54656f] shadow-[0_3px_12px_rgba(17,27,33,.14)] transition-all hover:-translate-y-0.5 hover:border-[#00a884] hover:text-[#008f72] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a884]/40"
           >
             <FaChevronDown className="text-sm" />
           </button>
