@@ -67,6 +67,7 @@ export default function useCall() {
     sendReaction: callManager.sendReaction,
     setCoHost: callManager.setCoHost,
     setVideoEffect: callManager.setVideoEffect,
+    switchDevice: callManager.switchDevice,
     resumeMeeting: callManager.resumeMeeting,
     requestResume: callManager.requestResume,
     clearLastEnded: () => setLastEnded(null),

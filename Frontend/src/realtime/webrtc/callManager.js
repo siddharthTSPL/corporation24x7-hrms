@@ -9,6 +9,7 @@ import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import { createEffectProcessor, loadEffectImage } from "./videoEffects";
+import { audioConstraints, videoConstraints, setMediaPrefs } from "./mediaPrefs";
 
 const store = () => useCallStore.getState();
 const MESH_WARN_AT = 8;
@@ -68,11 +69,11 @@ const getLocalMedia = async (wantVideo) => {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("Calls need a secure (https) connection and a supported browser.");
   }
-  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const audio = audioConstraints();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio,
-      video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : false,
+      video: wantVideo ? videoConstraints() : false,
     });
     return { stream, cameraBlocked: false };
   } catch (err) {
@@ -363,7 +364,8 @@ const joinCall = async ({ roomKey, media = "video", audio = true, video = true }
 // Join a meeting. If the host hasn't started it yet this rejects with
 // err.code === "WAITING_FOR_HOST" and the manager keeps retrying automatically when
 // the server announces "meeting:started" (state.waiting is set meanwhile).
-const joinMeeting = (meetingId, { media = "video" } = {}) => joinCall({ roomKey: `meeting:${meetingId}`, media });
+const joinMeeting = (meetingId, { media = "video", audio = true, video = true } = {}) =>
+  joinCall({ roomKey: `meeting:${meetingId}`, media, audio, video });
 
 const cancelWaiting = () => {
   const w = store().waiting;
@@ -493,7 +495,7 @@ const toggleVideo = async () => {
     return;
   }
   try {
-    const cam = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const cam = await navigator.mediaDevices.getUserMedia({ video: videoConstraints() });
     const t = cam.getVideoTracks()[0];
     local.camera = t;
     local.stream.addTrack(t);
@@ -512,6 +514,53 @@ const toggleVideo = async () => {
   }
 };
 
+// Change microphone / camera in the middle of a meeting (also remembered for next time).
+const switchDevice = async (kind, deviceId) => {
+  const a = store().active;
+  if (kind === "audio") setMediaPrefs({ audioDeviceId: deviceId });
+  else setMediaPrefs({ videoDeviceId: deviceId });
+  if (!a || !local.stream) return;
+
+  if (kind === "audio") {
+    const fresh = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints({ audioDeviceId: deviceId }) }).catch((err) => {
+      throw friendlyMediaError(err, false);
+    });
+    const next = fresh.getAudioTracks()[0];
+    const prev = local.stream.getAudioTracks()[0];
+    next.enabled = prev ? prev.enabled : a.audio;
+    if (prev) {
+      local.stream.removeTrack(prev);
+      prev.stop();
+    }
+    local.stream.addTrack(next);
+    pcs.forEach((e) => {
+      const sender = e.pc.getSenders().find((s) => s.track?.kind === "audio" && s.track !== local.screenStream?.getAudioTracks()[0]) || null;
+      if (sender) sender.replaceTrack(next).catch(() => {});
+    });
+    store().patchActive({ localStream: new MediaStream(local.stream.getTracks()) });
+    return;
+  }
+
+  if (!local.camera) return; // no camera running yet: the choice is used the next time it is turned on
+  const fresh = await navigator.mediaDevices.getUserMedia({ video: videoConstraints({ videoDeviceId: deviceId }) }).catch((err) => {
+    throw friendlyMediaError(err, true);
+  });
+  const next = fresh.getVideoTracks()[0];
+  next.enabled = local.camera.enabled;
+  const oldCamera = local.camera;
+  const hadEffect = !!local.processor;
+  if (local.processor) {
+    local.processor.stop();
+    local.processor = null;
+  }
+  local.camera = next;
+  swapSentVideo(next);
+  oldCamera.stop();
+  store().patchActive({ localStream: new MediaStream(local.stream.getTracks()) });
+  const fx = store().active?.effect;
+  if (hadEffect && fx && fx.effect !== "none") await setVideoEffect(fx).catch(() => {});
+};
+
 const stopScreenShare = async () => {
   const a = store().active;
   if (!a || !local.screenStream) return;
@@ -520,23 +569,27 @@ const stopScreenShare = async () => {
       try { e.pc.removeTrack(e.screenSender); } catch { /* ignore */ }
       e.screenSender = null;
     }
+    if (e.screenAudioSender) {
+      try { e.pc.removeTrack(e.screenAudioSender); } catch { /* ignore */ }
+      e.screenAudioSender = null;
+    }
   });
   stopStream(local.screenStream);
   local.screenStream = null;
-  store().patchActive({ screen: false, screenStream: null, presenterSocketId: a.presenterSocketId === mySocketId ? null : a.presenterSocketId });
+  store().patchActive({ screen: false, screenStream: null, screenAudio: false, presenterSocketId: a.presenterSocketId === mySocketId ? null : a.presenterSocketId });
   try { await emitAck("call:screen-share:stop", { roomKey: a.roomKey }, 3000); } catch { /* ignore */ }
 };
 
 // Share your screen / a window / a tab. Only one person can present at a time
 // (rejects with err.code === "SHARE_IN_USE" if someone else already is).
-const startScreenShare = async () => {
+const startScreenShare = async ({ audio = false } = {}) => {
   const a = store().active;
   if (!a || local.screenStream) return;
   if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Screen sharing isn't supported on this device or browser.");
 
   let ds;
   try {
-    ds = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
+    ds = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: !!audio });
   } catch (err) {
     if (err?.name === "NotAllowedError" || err?.name === "AbortError") return; // user pressed Cancel
     throw err;
@@ -552,10 +605,12 @@ const startScreenShare = async () => {
   const track = ds.getVideoTracks()[0];
   track.onended = () => stopScreenShare(); // browser's own "Stop sharing" button
   local.screenStream = ds;
+  const shareAudio = ds.getAudioTracks()[0] || null; // tab / system audio, only when the browser offers it
   pcs.forEach((e) => {
     e.screenSender = e.pc.addTrack(track, ds); // fires negotiationneeded
+    e.screenAudioSender = shareAudio ? e.pc.addTrack(shareAudio, ds) : null;
   });
-  store().patchActive({ screen: true, screenStream: ds, presenterSocketId: mySocketId });
+  store().patchActive({ screen: true, screenStream: ds, screenAudio: !!shareAudio, presenterSocketId: mySocketId });
   emitQuiet("call:media-state", { roomKey: a.roomKey, screen: true });
 };
 
@@ -714,7 +769,10 @@ const attach = (sock) => {
   // host opened a meeting I was waiting for -> go in
   const onMeetingStarted = ({ meetingId }) => {
     const w = store().waiting;
-    if (w && w.code !== "LOBBY" && w.code !== "RESUME" && w.meetingId === meetingId && !store().active) joinMeeting(meetingId, { media: w.media }).catch(() => {});
+    if (w && w.code !== "LOBBY" && w.code !== "RESUME" && w.meetingId === meetingId && !store().active) {
+      const saved = readSession();
+      joinMeeting(meetingId, { media: w.media, audio: saved?.audio, video: saved?.video }).catch(() => {});
+    }
   };
   // host let me in from the lobby -> go in
   const onAdmitted = ({ roomKey }) => {
@@ -848,6 +906,7 @@ export const callManager = {
   sendReaction,
   setCoHost,
   setVideoEffect,
+  switchDevice,
   resumeMeeting,
   requestResume,
   hasSavedMeeting,
