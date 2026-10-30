@@ -373,8 +373,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#F7F9FB]">
-      <div className="flex items-center gap-2 px-3 py-2.5 bg-white border-b border-gray-100">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#F8F7FA]">
+      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-3 border-b border-[#eee8ef] shadow-[0_2px_12px_rgba(36,10,28,0.035)]">
         {showBack && (
           <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
             <FaArrowLeft className="text-sm" />
@@ -397,9 +397,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             seed={other?.key || conversationId}
           />
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{conv?.name || "…"}</p>
+            <p className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
             <p
-              className={`text-[11px] truncate ${typing ? "text-[#730042] font-medium" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600" : "text-gray-500"}`}
+              className={`text-[11px] mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
             >
               {subtitle}
             </p>
@@ -517,7 +517,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
         />
       )}
 
-      <div className="relative flex-1 min-h-0">
+      <div className="chat-message-list relative flex-1 min-h-0">
         <div
           ref={scrollRef}
           data-chat-scroll

@@ -206,7 +206,7 @@ export default function MessageBubble({
         </div>
       )}
 
-      <div ref={wrapRef} className={`relative max-w-[78%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
+      <div ref={wrapRef} className={`relative max-w-[82%] sm:max-w-[76%] flex flex-col ${mine ? "items-end" : "items-start"}`}>
         {showName && (
           <span className="text-[11px] font-semibold mb-0.5 px-1" style={{ color: colorFor(m.senderKey) }}>
             {m.sender?.name || "Former member"}
@@ -221,7 +221,7 @@ export default function MessageBubble({
             setPanel("more");
           }}
         >
-          <div className={`${bare ? "px-1 py-0.5" : "px-3 py-2"} text-sm break-words ${radius} ${bubbleTone}`}>
+          <div className={`${bare ? "px-1 py-0.5" : "px-3.5 py-2.5"} chat-message-bubble ${mine && !bare && !deleted ? "chat-message-bubble-mine" : !mine && !bare && !deleted ? "chat-message-bubble-theirs" : ""} text-[13px] leading-[1.55] break-words ${radius} ${bubbleTone}`}>
             {deleted ? (
               <span className="inline-flex items-center gap-1.5 text-xs">
                 <FaBan className="text-[10px]" /> This message was deleted

@@ -13,6 +13,7 @@ import {
   FaUserPlus,
   FaSearch,
   FaCheck,
+  FaSmile,
 } from "react-icons/fa";
 import useCall from "../../realtime/useCall";
 import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
@@ -104,9 +105,17 @@ function CallScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteQuery, setInviteQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [reactions, setReactions] = useState([]);
   const { data: conversation } = useConversation(active?.conversationId);
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
+  const sendReaction = (emoji) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setReactions((items) => [...items.slice(-7), { id, emoji }]);
+    setEmojiOpen(false);
+    window.setTimeout(() => setReactions((items) => items.filter((item) => item.id !== id)), 2600);
+  };
 
   useEffect(() => {
     if (active?.callId) setMinimized(false);
@@ -323,6 +332,14 @@ function CallScreen() {
 
       {hiddenAudio}
 
+      {reactions.length > 0 && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-28 z-[95] flex justify-center gap-3 overflow-hidden" aria-live="polite">
+          {reactions.map((reaction, index) => (
+            <span key={reaction.id} className="call-reaction" style={{ animationDelay: `${index * 35}ms` }}>{reaction.emoji}</span>
+          ))}
+        </div>
+      )}
+
       {isPresenting && (
         <div className="text-center text-xs text-amber-300 pb-1">You're sharing your screen</div>
       )}
@@ -363,7 +380,24 @@ function CallScreen() {
         </div>
       )}
 
-      <div className="flex items-center justify-center gap-3 pb-6 pt-1">
+      <div className="relative flex items-center justify-center gap-3 pb-6 pt-1">
+        <div className="relative">
+          <CtrlButton onClick={() => setEmojiOpen((open) => !open)} active={emojiOpen} title="Send a reaction">
+            <FaSmile />
+          </CtrlButton>
+          {emojiOpen && (
+            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-2xl border border-white/10 bg-slate-900/95 p-2.5 shadow-2xl backdrop-blur-xl">
+              {[
+                ["👍", "Like"], ["❤️", "Love"], ["😂", "Laugh"], ["👏", "Clap"],
+                ["🎉", "Celebrate"], ["😮", "Wow"], ["🙌", "Raise hands"], ["🔥", "Fire"],
+              ].map(([emoji, label]) => (
+                <button key={emoji} type="button" title={label} onClick={() => sendReaction(emoji)} className="flex h-10 w-10 items-center justify-center rounded-xl text-2xl transition hover:scale-125 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-fuchsia-400">
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {controls}
         {isHost && active.kind !== "direct" && (
           <button
