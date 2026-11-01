@@ -557,7 +557,7 @@ function ContactTab({ manager, onSuccess, onError }) {
     countryIso:       DEFAULT_COUNTRY_ISO,
     stateIso:         "",
     city:             manager?.office_location  || "",
-    date_of_joining:  toDateInputValue(manager?.date_of_joining),
+    date_of_joining:  toDateInputValue(manager?.date_of_joining || manager?.createdAt),
     date_of_birth:    toDateInputValue(manager?.date_of_birth),
   });
 
@@ -593,7 +593,7 @@ useEffect(() => {
       countryIso:       DEFAULT_COUNTRY_ISO,
       stateIso:         "",
       city:             cityName,
-      date_of_joining:  toDateInputValue(manager.date_of_joining),
+      date_of_joining:  toDateInputValue(manager.date_of_joining || manager.createdAt),
       date_of_birth:    toDateInputValue(manager.date_of_birth),
     });
 

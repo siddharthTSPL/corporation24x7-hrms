@@ -105,6 +105,11 @@ const superAdminSchema = new mongoose.Schema(
       default: "",
     },
 
+    date_of_joining: {
+      type: Date,
+      default: null,
+    },
+
     department: {
       type: String,
       trim: true,

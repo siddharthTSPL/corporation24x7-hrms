@@ -558,6 +558,7 @@ const getMe = async (req, res, next) => {
         email: superAdmin.email,
         empid: superAdmin.empid,
         designation: superAdmin.designation,
+        date_of_joining: superAdmin.date_of_joining,
         department: superAdmin.department,
         phone: superAdmin.phone,
         profile_image: superAdmin.profile_image,
@@ -633,6 +634,17 @@ const updateSuperAdmin = async (req, res, next) => {
   ].forEach((field) => {
     if (req.body[field] !== undefined) superAdmin[field] = req.body[field];
   });
+  if (req.body.date_of_joining !== undefined) {
+    if (req.body.date_of_joining === null || req.body.date_of_joining === "") {
+      superAdmin.date_of_joining = null;
+    } else {
+      const parsedDate = new Date(req.body.date_of_joining);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ success: false, message: "Invalid date of joining" });
+      }
+      superAdmin.date_of_joining = parsedDate;
+    }
+  }
   await superAdmin.save();
   invalidateUserCache(superAdmin._id);
   res.status(200).json({
@@ -645,6 +657,7 @@ const updateSuperAdmin = async (req, res, next) => {
       email: superAdmin.email,
       empid: superAdmin.empid,
       designation: superAdmin.designation,
+      date_of_joining: superAdmin.date_of_joining,
       department: superAdmin.department,
       phone: superAdmin.phone,
       profile_image: superAdmin.profile_image,
