@@ -139,8 +139,8 @@ export default function PreJoinDialog({ title = "Meeting", audioOnly = false, on
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center overflow-y-auto bg-black/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Get ready to join">
-      <div className="grid w-full max-w-4xl gap-5 rounded-3xl border border-white/10 bg-[#16161a] p-4 text-white shadow-2xl sm:p-6 md:grid-cols-[1.3fr_1fr]">
-        <div>
+      <div className="grid w-full max-w-4xl gap-5 rounded-3xl border border-white/10 bg-[#16161a] p-4 text-white shadow-2xl sm:p-6 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <div className="min-w-0">
           <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#26262b]">
             {camOn && preview ? <MediaView stream={preview} muted mirror /> : (
               <div className="flex h-full items-center justify-center text-sm text-gray-400">{audioOnly ? "Audio meeting" : camOn ? "Starting camera…" : "Camera is off"}</div>
@@ -173,7 +173,7 @@ export default function PreJoinDialog({ title = "Meeting", audioOnly = false, on
           )}
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <div>
             <p className="text-lg font-semibold">Ready to join?</p>
             <p className="truncate text-sm text-gray-400">{title}</p>

@@ -192,7 +192,7 @@ function CallScreen() {
 
   const hiddenAudio = (
     <div className="hidden">
-      {presenter && <MediaView stream={presenter.screenStream} muted />}
+      {presenter && <MediaView stream={presenter.screenStream} />}
     </div>
   );
 

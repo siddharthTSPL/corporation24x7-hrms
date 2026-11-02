@@ -140,7 +140,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   const [mySpeech, setMySpeech] = useState(false);
   const [capLang, setCapLang] = useState("en-IN");
   const [sounds, setSounds] = useState(true);
-  const [shareAudio, setShareAudio] = useState(false);
+  const [shareAudio, setShareAudio] = useState(true);
   const [help, setHelp] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState(null);
   const [hideNoVideo, setHideNoVideo] = useState(false);

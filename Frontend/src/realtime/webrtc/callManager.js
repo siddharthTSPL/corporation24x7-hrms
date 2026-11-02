@@ -125,6 +125,8 @@ const addLocalTracks = (entry) => {
   if (local.screenStream) {
     const t = local.screenStream.getVideoTracks()[0];
     if (t) entry.screenSender = entry.pc.addTrack(t, local.screenStream);
+    const sa = local.screenStream.getAudioTracks()[0];
+    if (sa) entry.screenAudioSender = entry.pc.addTrack(sa, local.screenStream);
   }
 };
 
@@ -609,14 +611,22 @@ const stopScreenShare = async () => {
 
 // Share your screen / a window / a tab. Only one person can present at a time
 // (rejects with err.code === "SHARE_IN_USE" if someone else already is).
-const startScreenShare = async ({ audio = false } = {}) => {
+const startScreenShare = async ({ audio = true } = {}) => {
   const a = store().active;
   if (!a || local.screenStream) return;
   if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Screen sharing isn't supported on this device or browser.");
 
   let ds;
   try {
-    ds = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: !!audio });
+    const opts = {
+      video: { cursor: "always" },
+      audio: audio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : false,
+    };
+    if (audio) {
+      opts.systemAudio = "include";
+      opts.suppressLocalAudioPlayback = true;
+    }
+    ds = await navigator.mediaDevices.getDisplayMedia(opts);
   } catch (err) {
     if (err?.name === "NotAllowedError" || err?.name === "AbortError") return; // user pressed Cancel
     throw err;
@@ -734,13 +744,16 @@ const attach = (sock) => {
     if (store().active?.roomKey === roomKey) handleSignal(from, data);
   };
   const onMediaState = ({ roomKey, socketId, audio, video, screen }) => {
-    if (store().active?.roomKey !== roomKey) return;
+    const a = store().active;
+    if (!a || a.roomKey !== roomKey) return;
+    if (socketId === mySocketId || !a.peers[socketId]) return;
     store().patchPeer(socketId, { audio, video, screen });
   };
   const onScreenShare = ({ roomKey, socketId, sharing }) => {
     const a = store().active;
     if (!a || a.roomKey !== roomKey) return;
-    store().patchPeer(socketId, { screen: sharing, ...(sharing ? {} : { screenStream: null }) });
+    if (socketId === mySocketId) return;
+    if (a.peers[socketId]) store().patchPeer(socketId, { screen: sharing, ...(sharing ? {} : { screenStream: null }) });
     if (sharing) store().patchActive({ presenterSocketId: socketId });
     else if (a.presenterSocketId === socketId) store().patchActive({ presenterSocketId: null });
   };

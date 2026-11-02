@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { FaHourglassHalf, FaDoorOpen, FaClock, FaSyncAlt, FaShieldAlt, FaVideo } from "react-icons/fa";
+import { FaHourglassHalf, FaDoorOpen, FaClock, FaSyncAlt, FaShieldAlt, FaCheck, FaVideo, FaUserTie, FaLock } from "react-icons/fa";
 import useCall from "../../../realtime/useCall";
-import logo from "../../../assets/TorchX Favicon.png";
+import talentLogo from "../../../assets/Talent.png";
+import techTorchLogo from "../../../assets/TechTorchLogo.png";
 
 const COPY = {
   LOBBY: {
     icon: FaDoorOpen,
     title: "Waiting to be let in",
-    body: "The host has been notified. You'll join automatically as soon as they admit you.",
-    tip: "Keep this tab open. Your camera and microphone stay off until you're in.",
+    body: "The host has been notified of your request. You'll join automatically as soon as they admit you.",
+    tip: "Your camera and microphone stay off until you're admitted.",
     status: "Waiting for admission",
+    steps: ["You're in the waiting room", "Host has been notified", "Admission by host"],
+    active: 2,
   },
   WAITING_FOR_HOST: {
     icon: FaHourglassHalf,
@@ -18,24 +21,54 @@ const COPY = {
     body: "This meeting hasn't started yet. You'll be taken in the moment the host opens it.",
     tip: "No need to refresh. We'll connect you automatically.",
     status: "Host hasn't started yet",
+    steps: ["You're in the waiting room", "Host starts the meeting", "You're connected automatically"],
+    active: 1,
   },
   TOO_EARLY: {
     icon: FaClock,
-    title: "Not open yet",
+    title: "The room isn't open yet",
     body: "The room opens a few minutes before the start time. We'll let you in when it does.",
-    tip: "You can leave this tab open in the background.",
+    tip: "You can keep this tab open in the background.",
     status: "Room opens shortly",
+    steps: ["You're checked in", "Room opens before start time", "You're connected automatically"],
+    active: 1,
   },
   RESUME: {
     icon: FaSyncAlt,
     title: "Rejoining your meeting",
     body: "Picking up right where you left off.",
-    tip: "This takes a moment.",
+    tip: "This only takes a moment.",
     status: "Reconnecting",
+    steps: ["Session found", "Restoring your connection", "Back in the meeting"],
+    active: 1,
   },
 };
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+function Steps({ steps, active }) {
+  return (
+    <ol className="w-full space-y-3 text-left">
+      {steps.map((label, i) => {
+        const done = i < active;
+        const current = i === active;
+        return (
+          <li key={label} className="flex items-center gap-3">
+            <span
+              className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                done ? "bg-emerald-500 text-white" : current ? "bg-[#CD166E] text-white" : "bg-gray-200 text-gray-400"
+              }`}
+            >
+              {done ? <FaCheck /> : i + 1}
+              {current && <span className="absolute inset-0 rounded-full bg-[#CD166E]/50" style={{ animation: "torchx-step 1.8s ease-out infinite" }} />}
+            </span>
+            <span className={`text-sm ${done ? "text-gray-500" : current ? "font-semibold text-gray-900" : "text-gray-400"}`}>{label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export default function WaitingScreen({ title: titleOverride, hostName, onCancel }) {
   const { waiting, cancelWaiting, active } = useCall();
@@ -56,80 +89,102 @@ export default function WaitingScreen({ title: titleOverride, hostName, onCancel
   const spin = waiting.code === "RESUME";
 
   return createPortal(
-    <div className="fixed inset-0 z-[92] flex flex-col items-center justify-center overflow-hidden bg-[#0b0509] px-6 text-center text-white">
+    <div className="fixed inset-0 z-[92] overflow-y-auto bg-[#fbf7f9] text-gray-900">
       <style>{`
-        @keyframes torchx-ring { 0% { transform: scale(.6); opacity: .6; } 100% { transform: scale(2.3); opacity: 0; } }
-        @keyframes torchx-breathe { 0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(205,22,110,.45); } 50% { transform: scale(1.07); box-shadow: 0 0 80px rgba(205,22,110,.75); } }
-        @keyframes torchx-orb { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(40px, -30px) scale(1.15); } }
-        @keyframes torchx-orb2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-50px, 30px) scale(1.2); } }
-        @keyframes torchx-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
-        @keyframes torchx-dot { 0%, 80%, 100% { transform: translateY(0); opacity: .35; } 40% { transform: translateY(-6px); opacity: 1; } }
-        @keyframes torchx-rise { 0% { opacity: 0; transform: translateY(14px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes torchx-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.9); opacity: 0; } }
+        @keyframes torchx-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        @keyframes torchx-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+        @keyframes torchx-step { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(2.1); opacity: 0; } }
+        @keyframes torchx-rise { 0% { opacity: 0; transform: translateY(16px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes torchx-float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, -24px); } }
       `}</style>
 
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,#3a0b24_0%,#14070e_45%,#0b0509_80%)]" />
-      <div className="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full bg-[#CD166E]/25 blur-3xl" style={{ animation: "torchx-orb 9s ease-in-out infinite" }} />
-      <div className="pointer-events-none absolute -bottom-32 -right-24 h-[26rem] w-[26rem] rounded-full bg-[#730042]/40 blur-3xl" style={{ animation: "torchx-orb2 11s ease-in-out infinite" }} />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:28px_28px]" />
-
-      <div className="absolute left-0 right-0 top-0 flex items-center justify-between px-5 py-4 sm:px-8" style={{ animation: "torchx-rise .6s ease-out both" }}>
-        <div className="flex items-center gap-2.5">
-          <img src={logo} alt="TorchX" className="h-8 w-8 rounded-lg object-contain" />
-          <span className="text-sm font-semibold tracking-wide">TorchX <span className="text-[#f08bbd]">Suite</span></span>
-        </div>
-        <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-gray-300 backdrop-blur">
-          <FaShieldAlt className="text-[#f08bbd]" /> Secure meeting
-        </span>
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-[#CD166E]/10 blur-3xl" style={{ animation: "torchx-float 12s ease-in-out infinite" }} />
+        <div className="absolute -bottom-48 -right-40 h-[38rem] w-[38rem] rounded-full bg-[#730042]/10 blur-3xl" style={{ animation: "torchx-float 14s ease-in-out infinite reverse" }} />
+        <div className="absolute inset-0 opacity-60 [background-image:radial-gradient(#d9c7d1_1px,transparent_1px)] [background-size:26px_26px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center" style={{ animation: "torchx-rise .7s ease-out .1s both" }}>
-        <div className="relative mb-9 flex h-40 w-40 items-center justify-center">
-          <span className="absolute inset-0 rounded-full border border-[#CD166E]/60 bg-[#CD166E]/20" style={{ animation: "torchx-ring 3s ease-out infinite" }} />
-          <span className="absolute inset-0 rounded-full border border-[#CD166E]/50 bg-[#CD166E]/15" style={{ animation: "torchx-ring 3s ease-out 1s infinite" }} />
-          <span className="absolute inset-0 rounded-full border border-[#CD166E]/40 bg-[#CD166E]/10" style={{ animation: "torchx-ring 3s ease-out 2s infinite" }} />
-          <span className="relative flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#730042] via-[#a3105a] to-[#CD166E] ring-4 ring-white/10" style={{ animation: "torchx-breathe 2.6s ease-in-out infinite" }}>
-            <Icon className={`text-4xl ${spin ? "animate-spin" : ""}`} />
+      <div className="relative z-10 flex min-h-full flex-col items-center px-4 py-6 sm:py-10">
+        <header className="flex w-full max-w-5xl items-center justify-between" style={{ animation: "torchx-rise .5s ease-out both" }}>
+          <img src={talentLogo} alt="TorchX Talent" className="h-10 w-auto sm:h-12" />
+          <span className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-sm">
+            <FaLock className="text-[#730042]" /> End-to-end secure meeting
           </span>
-          <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#1b0e15] shadow-lg">
-            <img src={logo} alt="" className="h-5 w-5 object-contain" />
-          </span>
-        </div>
+        </header>
 
-        <span className="flex items-center gap-2 rounded-full border border-[#CD166E]/30 bg-[#CD166E]/10 px-3.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-[#f08bbd]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#f08bbd]" style={{ animation: "torchx-dot 1.4s ease-in-out infinite" }} />
-          {copy.status}
-        </span>
+        <main className="flex w-full flex-1 items-center justify-center py-6">
+          <div className="w-full max-w-4xl overflow-hidden rounded-[28px] border border-white bg-white shadow-[0_30px_80px_-20px_rgba(115,0,66,0.25)] ring-1 ring-gray-200/70 md:grid md:grid-cols-[1.1fr_1fr]" style={{ animation: "torchx-rise .6s ease-out .1s both" }}>
+            <section className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#730042] via-[#8f0a52] to-[#CD166E] px-8 py-10 text-center text-white">
+              <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+              <div className="pointer-events-none absolute -bottom-20 -left-12 h-56 w-56 rounded-full bg-black/20 blur-2xl" />
 
-        <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.title}</h1>
-        <p className="mt-3 max-w-md text-sm leading-relaxed text-gray-300">{copy.body}</p>
+              <div className="relative flex h-44 w-44 items-center justify-center">
+                <span className="absolute h-[92px] w-[92px] rounded-full border border-white/50 bg-white/10" style={{ animation: "torchx-ring 3s ease-out infinite" }} />
+                <span className="absolute h-[92px] w-[92px] rounded-full border border-white/40 bg-white/10" style={{ animation: "torchx-ring 3s ease-out 1s infinite" }} />
+                <span className="absolute h-[92px] w-[92px] rounded-full border border-white/30 bg-white/10" style={{ animation: "torchx-ring 3s ease-out 2s infinite" }} />
+                <span className="relative flex h-[92px] w-[92px] items-center justify-center rounded-full bg-white text-[#730042] shadow-2xl" style={{ animation: "torchx-breathe 2.6s ease-in-out infinite" }}>
+                  <Icon className={`text-4xl ${spin ? "animate-spin" : ""}`} />
+                </span>
+              </div>
 
-        <div className="mt-7 flex w-full max-w-sm items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 text-left shadow-xl backdrop-blur">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E]">
-            <FaVideo />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{title}</p>
-            <p className="truncate text-xs text-gray-400">{hostName ? `Hosted by ${hostName}` : "TorchX Meetings"}</p>
+              <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] backdrop-blur">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                {copy.status}
+              </span>
+
+              <h1 className="mt-4 text-2xl font-semibold leading-tight sm:text-3xl">{copy.title}</h1>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/80">{copy.body}</p>
+
+              <div className="mt-7 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/20">
+                <span className="block h-full w-1/4 rounded-full bg-white" style={{ animation: "torchx-shimmer 1.8s ease-in-out infinite" }} />
+              </div>
+              <p className="mt-3 font-mono text-xs tracking-widest text-white/70">WAITING {fmt(elapsed)}</p>
+            </section>
+
+            <section className="flex flex-col justify-center gap-6 px-7 py-8 sm:px-9">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">Meeting</p>
+                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3.5">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#730042] to-[#CD166E] text-white">
+                    <FaVideo />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
+                    <p className="flex items-center gap-1.5 truncate text-xs text-gray-500">
+                      <FaUserTie className="shrink-0 text-gray-400" />
+                      {hostName ? `Hosted by ${hostName}` : "TorchX Talent Meetings"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">Progress</p>
+                <Steps steps={copy.steps} active={copy.active} />
+              </div>
+
+              {waiting.position ? (
+                <p className="rounded-xl border border-[#CD166E]/20 bg-[#CD166E]/5 px-4 py-2.5 text-center text-xs font-medium text-[#730042]">You're number {waiting.position} in line</p>
+              ) : null}
+
+              <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3.5 py-3 text-xs leading-relaxed text-gray-500">
+                <FaShieldAlt className="mt-0.5 shrink-0 text-[#730042]" />
+                <span>{copy.tip}</span>
+              </div>
+
+              <button type="button" onClick={onCancel || cancelWaiting} className="rounded-full border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 transition hover:border-[#730042] hover:bg-[#730042] hover:text-white">
+                {waiting.code === "RESUME" ? "Cancel" : "Leave waiting room"}
+              </button>
+            </section>
           </div>
-          <span className="rounded-lg bg-black/30 px-2.5 py-1 font-mono text-xs text-gray-200">{fmt(elapsed)}</span>
-        </div>
+        </main>
 
-        <div className="mt-6 h-1 w-full max-w-sm overflow-hidden rounded-full bg-white/10">
-          <span className="block h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#CD166E] to-transparent" style={{ animation: "torchx-shimmer 1.8s ease-in-out infinite" }} />
-        </div>
-
-        {waiting.position ? (
-          <p className="mt-5 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-xs text-gray-200">You're number {waiting.position} in line</p>
-        ) : null}
-
-        <p className="mt-5 max-w-sm text-xs text-gray-400">{copy.tip}</p>
-
-        <button type="button" onClick={onCancel || cancelWaiting} className="mt-7 rounded-full border border-white/20 bg-white/5 px-7 py-2.5 text-sm font-medium text-gray-100 backdrop-blur transition hover:border-[#CD166E]/60 hover:bg-[#CD166E]/20">
-          {waiting.code === "RESUME" ? "Cancel" : "Leave waiting room"}
-        </button>
+        <footer className="flex items-center gap-2 text-[11px] text-gray-400">
+          <span>Powered by</span>
+          <img src={techTorchLogo} alt="TechTorch Solutions" className="h-4 w-auto opacity-70" />
+        </footer>
       </div>
-
-      <p className="absolute bottom-4 text-[11px] text-gray-500">Powered by TorchX Suite · TechTorch Solutions</p>
     </div>,
     document.body,
   );
