@@ -6,6 +6,7 @@ import {
   FaPhoneAlt,
   FaVideo,
   FaEllipsisV,
+  FaFileDownload,
   FaBellSlash,
   FaBell,
   FaInfoCircle,
@@ -49,6 +50,7 @@ import WallpaperSheet from "./WallpaperSheet";
 import ForwardSheet from "./ForwardSheet";
 import DeleteDialog from "./DeleteDialog";
 import ChatSearchBar from "./ChatSearchBar";
+import { useExportChat } from "../../auth/server-state/chat/chatSettings.hook";
 import { wallpaperStyle } from "./emojiData";
 import { copyToClipboard, deliveryStatus, formatDayLabel, formatLastSeen, isSameDay, previewOf } from "./chatUtils";
 
@@ -124,6 +126,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const exportChat = useExportChat();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sheet, setSheet] = useState(null); // null | "wallpaper" | "forward"
@@ -486,6 +489,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
                   }}
                 />
                 <MenuButton icon={FaEraser} label="Clear chat" onClick={handleClear} />
+                <MenuButton icon={FaFileDownload} label="Export chat (.txt)" onClick={() => { setMenuOpen(false); exportChat.mutate({ id: conversationId, format: "txt" }); }} />
+                <MenuButton icon={FaFileDownload} label="Export chat (.json)" onClick={() => { setMenuOpen(false); exportChat.mutate({ id: conversationId, format: "json" }); }} />
                 {conv?.type === "group" && <MenuButton icon={FaSignOutAlt} label="Exit group" onClick={handleExitGroup} danger />}
               </div>
             )}

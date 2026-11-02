@@ -1,4 +1,5 @@
-import { FaArrowLeft, FaBriefcase, FaBuilding, FaUserTie, FaCalendarAlt, FaPhoneAlt, FaVideo, FaCommentDots, FaEnvelope, FaBellSlash, FaThumbtack, FaEraser, FaInfoCircle } from "react-icons/fa";
+import { FaArrowLeft, FaBriefcase, FaBuilding, FaUserTie, FaCalendarAlt, FaPhoneAlt, FaVideo, FaCommentDots, FaEnvelope, FaBellSlash, FaThumbtack, FaEraser, FaInfoCircle, FaFlag } from "react-icons/fa";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import useCall from "../../realtime/useCall";
@@ -12,6 +13,7 @@ import {
   useClearChat,
 } from "../../auth/server-state/chat/chat.hook";
 import { formatLastSeen } from "./chatUtils";
+import ReportUserDialog from "./ReportUserDialog";
 
 const displayDate = (value) => {
   if (!value) return "";
@@ -71,6 +73,7 @@ export default function PersonInfoSheet({ person, conversation, onClose }) {
   const pinMutation = usePinConversation();
   const clearChat = useClearChat();
   usePresenceSync(person?.key ? [person.key] : []);
+  const [reportOpen, setReportOpen] = useState(false);
 
   if (!person) return null;
 
@@ -177,8 +180,12 @@ export default function PersonInfoSheet({ person, conversation, onClose }) {
             <button type="button" onClick={handleClear} className="flex w-full items-center gap-3 px-5 py-3.5 text-left text-sm text-red-600 hover:bg-red-50">
               <FaEraser className="w-4" /> Clear chat
             </button>
+            <button type="button" onClick={() => setReportOpen(true)} className="flex w-full items-center gap-3 border-t border-gray-100 px-5 py-3.5 text-left text-sm text-red-600 hover:bg-red-50">
+              <FaFlag className="w-4" /> Report {name}
+            </button>
           </section>
         )}
+        {reportOpen && <ReportUserDialog person={person} conversationId={conversationId} onClose={() => setReportOpen(false)} />}
       </div>
     </div>
   );
