@@ -11,6 +11,7 @@ export const SHORTCUTS = [
   ["R", "Reactions"],
   ["S", "Share screen"],
   ["W", "Whiteboard"],
+  ["G", "Switch grid / speaker view"],
   ["?", "Show shortcuts"],
   ["Esc", "Close panel"],
 ];

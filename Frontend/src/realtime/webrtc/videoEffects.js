@@ -102,6 +102,10 @@ export const createEffectProcessor = async (cameraTrack) => {
   const ctx = canvas.getContext("2d");
 
   const small = document.createElement("canvas");
+  const maskCanvas = document.createElement("canvas");
+  maskCanvas.width = Math.min(width, 320);
+  maskCanvas.height = Math.max(1, Math.round((maskCanvas.width * height) / width));
+  const mctx = maskCanvas.getContext("2d", { willReadFrequently: true });
   const sctx = small.getContext("2d");
   const supportsFilter = typeof ctx.filter === "string";
 
@@ -135,7 +139,20 @@ export const createEffectProcessor = async (cameraTrack) => {
     ready = true;
     ctx.save();
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(results.segmentationMask, 0, 0, width, height);
+    const mw = maskCanvas.width;
+    const mh = maskCanvas.height;
+    mctx.clearRect(0, 0, mw, mh);
+    mctx.drawImage(results.segmentationMask, 0, 0, mw, mh);
+    const frame = mctx.getImageData(0, 0, mw, mh);
+    const px = frame.data;
+    for (let i = 3; i < px.length; i += 4) {
+      const t = Math.min(1, Math.max(0, (px[i] / 255 - 0.2) / 0.4));
+      px[i] = Math.round(255 * t * t * (3 - 2 * t));
+    }
+    mctx.putImageData(frame, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(maskCanvas, 0, 0, width, height);
     ctx.globalCompositeOperation = "source-in";
     ctx.drawImage(results.image, 0, 0, width, height);
     ctx.globalCompositeOperation = "destination-over";

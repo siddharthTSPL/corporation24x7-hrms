@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaBan, FaTint } from "react-icons/fa";
 import { MediaView } from "../RoomMedia";
@@ -136,8 +137,8 @@ export default function PreJoinDialog({ title = "Meeting", audioOnly = false, on
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Get ready to join">
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex items-center justify-center overflow-y-auto bg-black/80 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Get ready to join">
       <div className="grid w-full max-w-4xl gap-5 rounded-3xl border border-white/10 bg-[#16161a] p-4 text-white shadow-2xl sm:p-6 md:grid-cols-[1.3fr_1fr]">
         <div>
           <div className="relative aspect-video overflow-hidden rounded-2xl bg-[#26262b]">
@@ -191,6 +192,7 @@ export default function PreJoinDialog({ title = "Meeting", audioOnly = false, on
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
