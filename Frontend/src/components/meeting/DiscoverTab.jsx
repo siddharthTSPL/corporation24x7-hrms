@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import { Search, Compass, Star, Users } from "lucide-react";
 import Avatar from "../chat/Avatar";
 import { useDiscoverMeetings, useSetMeetingInterest } from "../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Chip, Empty, Spinner, ErrorNote, inputCls } from "./ui";
+import { Btn, Chip, Empty, SkeletonList, ErrorNote } from "./ui";
+import { inputCls } from "./meetingClasses";
 import { fmtDateTime, errMsg } from "./meetingUtils";
 
 function DiscoverCard({ meeting: m, onOpen }) {
@@ -74,7 +75,7 @@ export default function DiscoverTab({ onOpen }) {
           <input type="checkbox" className="accent-[#730042]" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Only ones I'm interested in
         </label>
       </div>
-      {query.isLoading && <Spinner />}
+      {query.isLoading && <SkeletonList />}
       {query.isError && <ErrorNote error={query.error} retry={query.refetch} />}
       {!query.isLoading && !query.isError && list.length === 0 && <Empty icon={Compass} title="No open meetings" hint="When a host opens a meeting to the organisation, it shows up here." />}
       <ul className="grid gap-3 md:grid-cols-2">

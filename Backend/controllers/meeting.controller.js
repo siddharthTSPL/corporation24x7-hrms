@@ -11,6 +11,7 @@ const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
 const { getIceServers } = require("../utils/chat/ice.utils");
 const controls = require("../utils/chat/meetingControls.service");
+const { getOrgDefaults } = require("../utils/chat/meetingDefaults");
 const guestSvc = require("../utils/chat/guest.service");
 const { httpError, parseKey, personKey, requirePeople, resolvePeople, listAllPeople, shapePerson } = require("../utils/chat/people.utils");
 
@@ -319,6 +320,8 @@ const createMeeting = async (req, res) => {
   });
 
   const attendees = attendeeList.map((p) => ({ key: p.key, person: p.id, personModel: p.model, rsvp: p.key === host.key ? "accepted" : "invited", respondedAt: p.key === host.key ? new Date() : null }));
+  const orgDefaults = await getOrgDefaults(actor.organisation_id);
+  const reminderInput = parseInt(b.reminderMinutes, 10);
   const docs = occ.map((o, i) => {
     const _id = i === 0 ? firstId : new mongoose.Types.ObjectId();
     return {
@@ -336,11 +339,11 @@ const createMeeting = async (req, res) => {
       seriesId,
       conversation: conv._id,
       roomKey: rooms.meetingRoomKey(_id),
-      allowJoinBeforeHost: !!b.allowJoinBeforeHost,
+      allowJoinBeforeHost: b.allowJoinBeforeHost === undefined ? orgDefaults.allowJoinBeforeHost : !!b.allowJoinBeforeHost,
       visibility: b.visibility === "organisation" ? "organisation" : "invite_only",
       capacity: Math.min(Math.max(parseInt(b.capacity, 10) || 0, 0), 5000),
-      settings: controls.normalizeSettings(b.settings),
-      reminderMinutes: Math.min(Math.max(parseInt(b.reminderMinutes, 10) || 10, 0), 1440),
+      settings: controls.normalizeSettings(b.settings, orgDefaults.settings),
+      reminderMinutes: Math.min(Math.max(Number.isFinite(reminderInput) ? reminderInput : orgDefaults.reminderMinutes, 0), 1440),
     };
   });
   const created = await Meeting.insertMany(docs);

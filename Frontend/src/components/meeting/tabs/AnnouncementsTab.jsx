@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import { Pin, Trash2, Megaphone, Eye } from "lucide-react";
 import Avatar from "../../chat/Avatar";
 import { useAnnouncements, useAutoMarkAnnouncementsSeen, useCreateAnnouncement, useDeleteAnnouncement, useUpdateAnnouncement } from "../../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Chip, Empty, Spinner, ErrorNote, inputCls } from "../ui";
+import { Btn, Chip, Empty, SkeletonList, ErrorNote } from "../ui";
+import { inputCls } from "../meetingClasses";
 import { fmtDateTime, errMsg } from "../meetingUtils";
 
 const AUDIENCES = {
@@ -81,7 +82,7 @@ export default function AnnouncementsTab({ meeting: m, moderator }) {
   return (
     <div className="space-y-4 p-5">
       {canPost && <Compose meeting={m} />}
-      {q.isLoading && <Spinner />}
+      {q.isLoading && <SkeletonList />}
       {q.isError && <ErrorNote error={q.error} retry={q.refetch} />}
       {!q.isLoading && !q.isError && items.length === 0 && <Empty icon={Megaphone} title="No announcements yet" hint={canPost ? "Updates you send here also reach attendees as notifications." : "The host's updates will show up here."} />}
 

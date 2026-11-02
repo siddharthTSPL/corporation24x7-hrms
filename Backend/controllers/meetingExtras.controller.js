@@ -8,6 +8,7 @@ const imagekit = require("../utils/imagekit.utils");
 const chat = require("../utils/chat/chat.service");
 const rooms = require("../utils/chat/callRooms");
 const controls = require("../utils/chat/meetingControls.service");
+const { getOrgDefaults, saveOrgDefaults } = require("../utils/chat/meetingDefaults");
 const { httpError, resolvePeople, parseKey } = require("../utils/chat/people.utils");
 
 const ADMIN_ROLES = new Set(["admin", "senior_admin", "super_admin"]);
@@ -322,6 +323,19 @@ const meetingReport = async (req, res) => {
   ok(res, report);
 };
 
+const getDefaults = async (req, res) => {
+  const actor = actorOf(req);
+  const defaults = await getOrgDefaults(actor.organisation_id);
+  ok(res, { defaults, canEdit: isAdminRole(req) });
+};
+
+const updateDefaults = async (req, res) => {
+  const actor = actorOf(req);
+  if (!isAdminRole(req)) throw httpError("Only admins can change the default meeting settings.", 403);
+  const defaults = await saveOrgDefaults(actor.organisation_id, actor.key, req.body && req.body.defaults ? req.body.defaults : req.body);
+  ok(res, { defaults, canEdit: true });
+};
+
 const reactionList = async (req, res) => {
   ok(res, { reactions: controls.REACTIONS });
 };
@@ -336,4 +350,6 @@ module.exports = {
   updateSettings,
   meetingReport,
   reactionList,
+  getDefaults,
+  updateDefaults,
 };

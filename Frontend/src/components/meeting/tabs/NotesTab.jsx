@@ -1,36 +1,24 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
 import { FileText, Mail } from "lucide-react";
 import { useMeetingNotes, useSaveMeetingNotes, useShareMeetingNotes } from "../../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Chip, Empty, Spinner, ErrorNote, inputCls } from "../ui";
+import { Btn, Chip, Empty, SkeletonList, ErrorNote } from "../ui";
+import { inputCls } from "../meetingClasses";
 import { fmtDateTime, errMsg } from "../meetingUtils";
 
 export default function NotesTab({ meeting: m }) {
   const q = useMeetingNotes(m.id);
-  const save = useSaveMeetingNotes();
-  const share = useShareMeetingNotes();
   const note = q.data?.note;
   const canEdit = !!q.data?.canEdit && m.status !== "cancelled";
 
-  const [content, setContent] = useState("");
-  const [decisions, setDecisions] = useState("");
-  useEffect(() => {
-    setContent(note?.content || "");
-    setDecisions((note?.decisions || []).join("\n"));
-  }, [note?.version]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const dirty = content !== (note?.content || "") || decisions !== (note?.decisions || []).join("\n");
-  const body = () => ({ id: m.id, content, decisions: decisions.split("\n").map((d) => d.trim()).filter(Boolean), version: note?.version });
-  const fail = (e) => toast.error(e.status === 409 ? "Someone else changed these notes. We've loaded the latest version." : errMsg(e));
-
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <SkeletonList />;
   if (q.isError) return <ErrorNote error={q.error} retry={q.refetch} />;
 
   if (!canEdit) {
     if (!note) return <Empty icon={FileText} title="No notes shared yet" hint="The host will publish notes and decisions here after the meeting." />;
     return (
       <div className="space-y-4 p-5">
-        <p className="text-xs text-gray-500">Shared {note.publishedAt ? fmtDateTime(note.publishedAt) : ""}</p>
+        <p className="text-xs text-gray-600">Shared {note.publishedAt ? fmtDateTime(note.publishedAt) : ""}</p>
         <p className="whitespace-pre-wrap text-sm text-gray-800">{note.content || "—"}</p>
         {note.decisions?.length > 0 && (
           <div>
@@ -46,9 +34,22 @@ export default function NotesTab({ meeting: m }) {
     );
   }
 
+  return <NotesEditor key={note?.version ?? "new"} meeting={m} note={note} />;
+}
+
+function NotesEditor({ meeting: m, note }) {
+  const save = useSaveMeetingNotes();
+  const share = useShareMeetingNotes();
+  const [content, setContent] = useState(note?.content || "");
+  const [decisions, setDecisions] = useState((note?.decisions || []).join("\n"));
+
+  const dirty = content !== (note?.content || "") || decisions !== (note?.decisions || []).join("\n");
+  const body = () => ({ id: m.id, content, decisions: decisions.split("\n").map((d) => d.trim()).filter(Boolean), version: note?.version });
+  const fail = (e) => toast.error(e.status === 409 ? "Someone else changed these notes. We've loaded the latest version." : errMsg(e));
+
   return (
     <div className="space-y-4 p-5">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
         {note?.published ? <Chip tone="green">Visible to attendees</Chip> : <Chip>Private draft</Chip>}
         {note?.updatedAt && (
           <span>
@@ -58,10 +59,10 @@ export default function NotesTab({ meeting: m }) {
         )}
       </div>
 
-      <textarea className={inputCls} rows={10} maxLength={20000} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Meeting notes" />
+      <textarea aria-label="Meeting notes" className={inputCls} rows={10} maxLength={20000} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Meeting notes" />
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Decisions</label>
-        <textarea className={inputCls} rows={4} value={decisions} onChange={(e) => setDecisions(e.target.value)} placeholder="One decision per line" />
+        <label htmlFor="notes-decisions" className="mb-1 block text-sm font-medium text-gray-700">Decisions</label>
+        <textarea id="notes-decisions" className={inputCls} rows={4} value={decisions} onChange={(e) => setDecisions(e.target.value)} placeholder="One decision per line" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

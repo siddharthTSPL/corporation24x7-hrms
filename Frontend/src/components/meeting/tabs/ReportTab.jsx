@@ -1,7 +1,7 @@
 import toast from "react-hot-toast";
 import { Download } from "lucide-react";
 import { useMeetingReport, useDownloadMeetingReport } from "../../../auth/server-state/meeting/meeting.hook";
-import { Btn, Chip, Empty, ErrorNote, Spinner } from "../ui";
+import { Btn, Chip, Empty, ErrorNote, SkeletonList } from "../ui";
 import { errMsg, fmtDateTime, fmtDuration } from "../meetingUtils";
 
 const Stat = ({ label, value }) => (
@@ -16,7 +16,7 @@ export default function ReportTab({ meeting: m }) {
   const q = useMeetingReport(m.id);
   const csv = useDownloadMeetingReport();
 
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <SkeletonList />;
   if (q.isError) return <ErrorNote error={q.error} retry={q.refetch} />;
   const { summary: s, participants = [] } = q.data;
 

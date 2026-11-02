@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { BarChart3 } from "lucide-react";
 import { useMeetingInsights } from "../../auth/server-state/meeting/meetingSpace.hook";
-import { Empty, Spinner, ErrorNote } from "./ui";
+import { Empty, SkeletonList, ErrorNote } from "./ui";
 import { RSVP } from "./meetingUtils";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -18,7 +18,7 @@ const Stat = ({ label, value, hint }) => (
 export default function InsightsTab() {
   const params = useMemo(() => ({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone }), []);
   const q = useMeetingInsights(params);
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <SkeletonList />;
   if (q.isError) return <ErrorNote error={q.error} retry={q.refetch} />;
   const d = q.data;
   if (!d?.totals?.meetings) return <Empty icon={BarChart3} title="No meetings in the last 30 days" hint="Your meeting load shows up here once you have a few on the calendar." />;

@@ -2,8 +2,9 @@ import { Video, Mic, Repeat, Users, Clock } from "lucide-react";
 import Avatar from "../chat/Avatar";
 import { useRespondToMeeting } from "../../auth/server-state/meeting/meeting.hook";
 import JoinButton from "./JoinButton";
-import { Chip, cx } from "./ui";
-import { fmtTime, fmtDuration, minutesBetween, errMsg } from "./meetingUtils";
+import { Chip, Skeleton } from "./ui";
+import { cx } from "./meetingClasses";
+import { fmtTime, fmtDate, fmtDuration, minutesBetween, errMsg } from "./meetingUtils";
 import toast from "react-hot-toast";
 
 const RSVP_BUTTONS = [
@@ -17,17 +18,18 @@ export function RsvpButtons({ meeting: m, size = "sm" }) {
   if (m.isHost || m.status !== "scheduled" || !m.myRsvp) return null;
   const set = (rsvp) => respond.mutate({ id: m.id, rsvp }, { onError: (e) => toast.error(errMsg(e)) });
   return (
-    <div className="inline-flex overflow-hidden rounded-lg border border-gray-200" onClick={(e) => e.stopPropagation()}>
+    <div role="group" aria-label="Your response" className="inline-flex overflow-hidden rounded-lg border border-gray-300" onClick={(e) => e.stopPropagation()}>
       {RSVP_BUTTONS.map(([v, label]) => (
         <button
           key={v}
+          type="button"
           onClick={() => set(v)}
           disabled={respond.isPending}
           aria-pressed={m.myRsvp === v}
           className={cx(
-            "border-r border-gray-200 last:border-r-0 transition-colors",
-            size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm",
-            m.myRsvp === v ? "bg-[#730042] text-white" : "bg-white text-gray-600 hover:bg-gray-50",
+            "border-r border-gray-300 transition-colors last:border-r-0",
+            size === "sm" ? "min-h-9 px-3 text-xs sm:min-h-8 sm:px-2.5" : "min-h-11 px-4 text-sm sm:min-h-10 sm:px-3.5",
+            m.myRsvp === v ? "bg-[#730042] text-white" : "bg-white text-gray-700 hover:bg-gray-50",
           )}
         >
           {label}
@@ -37,70 +39,115 @@ export function RsvpButtons({ meeting: m, size = "sm" }) {
   );
 }
 
-export default function MeetingCard({ meeting: m, onOpen }) {
+export function MeetingCardSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="w-14 space-y-2 sm:w-16">
+        <Skeleton className="h-4 w-12" />
+        <Skeleton className="h-3 w-9" />
+      </div>
+      <div className="flex-1 space-y-2.5">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+export default function MeetingCard({ meeting: m, onOpen, showDate = false }) {
   const live = m.status === "live";
   const ended = m.status === "ended";
+  const cancelled = m.status === "cancelled";
   const Media = m.media === "audio" ? Mic : Video;
   const mins = minutesBetween(m.startTime, m.endTime);
+  const hasActions = live || m.status === "scheduled";
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <article
       onClick={() => onOpen(m.id)}
-      onKeyDown={(e) => e.key === "Enter" && onOpen(m.id)}
       className={cx(
-        "flex gap-4 rounded-xl border bg-white p-4 text-left transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#730042]",
-        live ? "border-red-200" : "border-gray-200",
+        "relative flex cursor-pointer flex-col gap-3 rounded-xl border bg-white p-3.5 transition-shadow hover:shadow-md focus-within:shadow-md sm:flex-row sm:gap-4 sm:p-4",
+        live ? "border-red-300 ring-1 ring-red-100" : "border-gray-200",
+        cancelled && "opacity-75",
       )}
     >
-      <div className="w-16 shrink-0 border-r border-gray-100 pr-4">
-        <p className="text-sm font-semibold text-gray-900">{fmtTime(m.startTime)}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{fmtDuration(mins)}</p>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className={cx("truncate text-[15px] font-semibold", ended ? "text-gray-600" : "text-gray-900")}>{m.title}</h3>
-          {live && (
-            <Chip tone="live">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" /> Live{m.live?.participants ? ` · ${m.live.participants} in call` : ""}
-            </Chip>
-          )}
-          {m.isHost && <Chip tone="brand">Host</Chip>}
-          {m.isCoHost && <Chip tone="brand">Co-host</Chip>}
-          {m.myRsvp && !m.isHost && m.status === "scheduled" && m.myRsvp === "invited" && <Chip tone="amber">Reply needed</Chip>}
+      <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+        <div className="w-14 shrink-0 border-r border-gray-100 pr-3 sm:w-16 sm:pr-4">
+          <p className="text-sm font-semibold text-gray-900">{fmtTime(m.startTime)}</p>
+          <p className="mt-0.5 text-xs text-gray-600">{showDate ? fmtDate(m.startTime, { day: "numeric", month: "short" }) : fmtDuration(mins)}</p>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-          <span className="inline-flex items-center gap-1.5">
-            <Avatar name={m.host?.name} photo={m.host?.photo} size={18} />
-            {m.isHost ? "You" : m.host?.name}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Media size={13} /> {m.media === "audio" ? "Audio" : "Video"}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Users size={13} /> {m.attendeeCount}
-            {m.rsvp?.accepted > 0 && ` · ${m.rsvp.accepted} going`}
-          </span>
-          {m.seriesId && (
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="min-w-0 max-w-full">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpen(m.id);
+                }}
+                className={cx(
+                  "block max-w-full truncate rounded text-left text-[15px] font-semibold after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-xl",
+                  ended || cancelled ? "text-gray-600" : "text-gray-900",
+                  cancelled && "line-through",
+                )}
+              >
+                {m.title}
+                <span className="sr-only">
+                  {live ? ", live now" : `, ${fmtDate(m.startTime)} at ${fmtTime(m.startTime)}`}
+                  {cancelled ? ", cancelled" : ""}
+                </span>
+              </button>
+            </h3>
+            {live && (
+              <Chip tone="live">
+                <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-white motion-reduce:animate-none" /> Live{m.live?.participants ? ` · ${m.live.participants} in call` : ""}
+              </Chip>
+            )}
+            {cancelled && <Chip tone="red">Cancelled</Chip>}
+            {m.isHost && <Chip tone="brand">Host</Chip>}
+            {m.isCoHost && <Chip tone="brand">Co-host</Chip>}
+            {m.myRsvp && !m.isHost && m.status === "scheduled" && m.myRsvp === "invited" && <Chip tone="amber">Reply needed</Chip>}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+            <span className="inline-flex items-center gap-1.5">
+              <Avatar name={m.host?.name} photo={m.host?.photo} size={18} />
+              {m.isHost ? "You" : m.host?.name}
+            </span>
             <span className="inline-flex items-center gap-1">
-              <Repeat size={13} /> Repeats
+              <Media size={13} aria-hidden="true" /> {m.media === "audio" ? "Audio" : "Video"}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Users size={13} aria-hidden="true" /> {m.attendeeCount}
+              {m.rsvp?.accepted > 0 && ` · ${m.rsvp.accepted} going`}
+            </span>
+            {m.seriesId && (
+              <span className="inline-flex items-center gap-1">
+                <Repeat size={13} aria-hidden="true" /> Repeats
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {(hasActions || ended) && (
+        <div
+          className={cx(
+            "relative z-10 flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-col sm:items-end sm:justify-center",
+            hasActions && "border-t border-gray-100 pt-3 sm:border-0 sm:pt-0",
+          )}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <JoinButton meeting={m} size="sm" />
+          {!live && <RsvpButtons meeting={m} />}
+          {ended && (
+            <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+              <Clock size={12} aria-hidden="true" /> Ended
             </span>
           )}
         </div>
-      </div>
-
-      <div className="flex shrink-0 flex-col items-end justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-        <JoinButton meeting={m} size="sm" />
-        {!live && <RsvpButtons meeting={m} />}
-        {ended && (
-          <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-            <Clock size={12} /> Ended
-          </span>
-        )}
-      </div>
-    </div>
+      )}
+    </article>
   );
 }

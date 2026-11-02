@@ -21,6 +21,8 @@ import {
   deleteMeetingBackground,
   getMeetingPreferences,
   updateMeetingPreferences,
+  getMeetingDefaults,
+  updateMeetingDefaults,
 } from "../../api/meeting/meeting.api";
 
 export const MEETING_KEYS = {
@@ -30,6 +32,7 @@ export const MEETING_KEYS = {
   joinInfo: (id) => ["meetings", "joinInfo", id],
   backgrounds: ["meetings", "backgrounds"],
   preferences: ["meetings", "preferences"],
+  defaults: ["meetings", "defaults"],
 };
 
 // Live changes (invites, reschedules, RSVPs, "meeting started") invalidate
@@ -200,5 +203,21 @@ export const useUpdateMeetingPreferences = () => {
   return useMutation({
     mutationFn: updateMeetingPreferences,
     onSuccess: (data) => qc.setQueryData(MEETING_KEYS.preferences, (old) => ({ ...(old || {}), ...data })),
+  });
+};
+
+export const useMeetingDefaults = (enabled = true) =>
+  useQuery({
+    queryKey: MEETING_KEYS.defaults,
+    queryFn: getMeetingDefaults,
+    enabled,
+    staleTime: 60000,
+  });
+
+export const useUpdateMeetingDefaults = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateMeetingDefaults,
+    onSuccess: (data) => qc.setQueryData(MEETING_KEYS.defaults, data),
   });
 };

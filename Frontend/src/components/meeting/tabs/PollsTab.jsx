@@ -2,7 +2,8 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { BarChart3, Plus, X } from "lucide-react";
 import { useMeetingPolls, useCreatePoll, useVotePoll, useClosePoll, useDeletePoll } from "../../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Chip, Empty, Spinner, ErrorNote, cx, inputCls } from "../ui";
+import { Btn, Chip, Empty, SkeletonList, ErrorNote } from "../ui";
+import { cx, inputCls } from "../meetingClasses";
 import { errMsg } from "../meetingUtils";
 
 function CreatePoll({ meetingId, onDone }) {
@@ -145,7 +146,7 @@ export default function PollsTab({ meeting: m, moderator }) {
           <Plus size={15} /> New poll
         </Btn>
       ))}
-      {q.isLoading && <Spinner />}
+      {q.isLoading && <SkeletonList />}
       {q.isError && <ErrorNote error={q.error} retry={q.refetch} />}
       {!q.isLoading && !q.isError && polls.length === 0 && !creating && <Empty icon={BarChart3} title="No polls yet" hint={moderator ? "Ask the group a quick question before, during or after the meeting." : "Polls from the host will appear here."} />}
       <ul className="space-y-3">

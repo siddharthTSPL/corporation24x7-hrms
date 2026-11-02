@@ -1,22 +1,12 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Star } from "lucide-react";
+import Stars from "../Stars";
 import Avatar from "../../chat/Avatar";
 import { useMyMeetingFeedback, useSubmitMeetingFeedback, useMeetingFeedbackSummary } from "../../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Empty, Spinner, ErrorNote, cx, inputCls } from "../ui";
+import { Btn, Empty, SkeletonList, ErrorNote } from "../ui";
+import { cx, inputCls } from "../meetingClasses";
 import { FEEDBACK_TAGS, errMsg } from "../meetingUtils";
-
-function Stars({ value, onChange, size = 28 }) {
-  return (
-    <div className="flex gap-1" role="radiogroup" aria-label="Rating">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${n} star${n > 1 ? "s" : ""}`} onClick={() => onChange?.(n)} disabled={!onChange} className="disabled:cursor-default">
-          <Star size={size} className={n <= value ? "fill-amber-400 text-amber-400" : "text-gray-300"} />
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function RateForm({ meeting: m }) {
   const q = useMyMeetingFeedback(m.id);
@@ -27,7 +17,7 @@ function RateForm({ meeting: m }) {
   const [comment, setComment] = useState(null);
   const [anonymous, setAnonymous] = useState(null);
 
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <SkeletonList />;
   if (q.isError) return <ErrorNote error={q.error} retry={q.refetch} />;
   if (!q.data?.canRate) return <Empty icon={Star} title="Feedback opens when the meeting ends" />;
 
@@ -62,7 +52,7 @@ function RateForm({ meeting: m }) {
 
 function Summary({ meeting: m }) {
   const q = useMeetingFeedbackSummary(m.id);
-  if (q.isLoading) return <Spinner />;
+  if (q.isLoading) return <SkeletonList />;
   if (q.isError) return <ErrorNote error={q.error} retry={q.refetch} />;
   const d = q.data;
   if (!d?.count) return <Empty icon={Star} title="No feedback yet" hint="Ratings appear here once attendees respond after the meeting." />;

@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import { ListChecks, Trash2, Plus } from "lucide-react";
 import Avatar from "../../chat/Avatar";
 import { useMeetingActionItems, useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from "../../../auth/server-state/meeting/meetingSpace.hook";
-import { Btn, Chip, Empty, Spinner, ErrorNote, Tabs, cx, inputCls } from "../ui";
+import { Btn, Chip, Empty, SkeletonList, ErrorNote, Tabs } from "../ui";
+import { cx, inputCls } from "../meetingClasses";
 import { fmtDate, errMsg } from "../meetingUtils";
 
 const PRIORITY = { high: "red", medium: "amber", low: "gray" };
@@ -97,8 +98,8 @@ export default function ActionItemsTab({ meeting: m, moderator }) {
   return (
     <div className="space-y-4 p-5">
       {m.status !== "cancelled" && <AddForm meeting={m} moderator={moderator} />}
-      <Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All" }, { id: "open", label: "Open" }, { id: "done", label: "Done" }]} />
-      {q.isLoading && <Spinner />}
+      <Tabs idPrefix="ai" label="Filter action items" value={f} onChange={setF} tabs={[{ id: "all", label: "All" }, { id: "open", label: "Open" }, { id: "done", label: "Done" }]} />
+      {q.isLoading && <SkeletonList />}
       {q.isError && <ErrorNote error={q.error} retry={q.refetch} />}
       {!q.isLoading && !q.isError && items.length === 0 && <Empty icon={ListChecks} title="No action items" hint="Capture follow-ups here so nothing gets lost after the call." />}
       <ul className="space-y-2">

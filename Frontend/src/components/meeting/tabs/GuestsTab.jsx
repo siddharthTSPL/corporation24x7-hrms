@@ -2,7 +2,8 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Link2, Mail, KeyRound, UserX, ShieldCheck } from "lucide-react";
 import { useInviteGuests, useResendGuestPin, useRevokeGuest } from "../../../auth/server-state/meeting/meetingGuest.hook";
-import { Btn, Chip, Field, inputCls } from "../ui";
+import { Btn, Chip, Field } from "../ui";
+import { inputCls } from "../meetingClasses";
 import { GUEST_SKIP_REASON, errMsg, fmtDateTime, guestJoinLink, parseGuestInput } from "../meetingUtils";
 
 // Outsiders (no account) invited by email. Each gets a personal 6-digit PIN by email, opens the
