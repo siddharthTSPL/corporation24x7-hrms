@@ -446,7 +446,7 @@ const listSalaryStructures = async (req, res) => {
   for (const [model, ids] of Object.entries(idsByModel)) {
     const Model = EMPLOYEE_MODEL_MAP[model];
     if (!Model) continue;
-    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining").lean();
+    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining createdAt").lean();
     for (const d of docs) detailsByEmployee.set(String(d._id), d);
   }
 
@@ -455,7 +455,7 @@ const listSalaryStructures = async (req, res) => {
     return {
       ...s,
       missingBankAccount: !details?.account_number,
-      missingDateOfJoining: !details?.date_of_joining,
+      missingDateOfJoining: !getEffectiveJoinDate(details),
     };
   });
 

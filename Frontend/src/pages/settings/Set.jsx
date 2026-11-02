@@ -841,7 +841,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
       countryIso,
       stateIso,
       city: cityName,
-      date_of_joining: toDateInputValue(adminData.date_of_joining),
+      date_of_joining: toDateInputValue(adminData.date_of_joining || adminData.createdAt),
       date_of_birth: toDateInputValue(adminData.date_of_birth),
     });
   }, [adminData]);

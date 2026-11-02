@@ -85,6 +85,12 @@ function formatDate(dateStr) {
   });
 }
 
+function toDateInputValue(date) {
+  if (!date) return "";
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
 function formatRole(role) {
   if (!role) return "—";
   return role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -713,6 +719,10 @@ function OverviewTab({ superAdmin }) {
           <ReadonlyField label="Email address" value={superAdmin?.email} />
           <ReadonlyField label="Employee ID" value={superAdmin?.empid} />
           <ReadonlyField label="Designation" value={superAdmin?.designation} />
+          <ReadonlyField
+            label="Date of joining"
+            value={formatDate(superAdmin?.date_of_joining || superAdmin?.createdAt)}
+          />
           <ReadonlyField label="Department" value={superAdmin?.department} />
           <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
           <div className="mb-4">
@@ -866,6 +876,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
     l_name: superAdmin?.l_name || "",
     empid: superAdmin?.empid || "",
     designation: superAdmin?.designation || "",
+    date_of_joining: toDateInputValue(superAdmin?.date_of_joining || superAdmin?.createdAt),
     department: superAdmin?.department || "",
   });
 
@@ -876,6 +887,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         l_name: superAdmin.l_name || "",
         empid: superAdmin.empid || "",
         designation: superAdmin.designation || "",
+        date_of_joining: toDateInputValue(superAdmin.date_of_joining || superAdmin.createdAt),
         department: superAdmin.department || "",
       });
     }
@@ -940,6 +952,13 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         value={form.department}
         onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
         placeholder="e.g. Management"
+      />
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={(e) => setForm((p) => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Defaults to your account creation date when no joining date is recorded."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
