@@ -1,11 +1,11 @@
 import { Video, Mic, Repeat, Users, Clock } from "lucide-react";
+import toast from "react-hot-toast";
 import Avatar from "../chat/Avatar";
 import { useRespondToMeeting } from "../../auth/server-state/meeting/meeting.hook";
 import JoinButton from "./JoinButton";
 import { Chip, Skeleton } from "./ui";
 import { cx } from "./meetingClasses";
 import { fmtTime, fmtDate, fmtDuration, minutesBetween, errMsg } from "./meetingUtils";
-import toast from "react-hot-toast";
 
 const RSVP_BUTTONS = [
   ["accepted", "Going"],
@@ -42,7 +42,7 @@ export function RsvpButtons({ meeting: m, size = "sm" }) {
 export function MeetingCardSkeleton() {
   return (
     <div aria-hidden="true" className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4">
-      <div className="w-14 space-y-2 sm:w-16">
+      <div className="w-16 space-y-2">
         <Skeleton className="h-4 w-12" />
         <Skeleton className="h-3 w-9" />
       </div>
@@ -66,16 +66,17 @@ export default function MeetingCard({ meeting: m, onOpen, showDate = false }) {
     <article
       onClick={() => onOpen(m.id)}
       className={cx(
-        "relative flex cursor-pointer flex-col gap-3 rounded-xl border bg-white p-3.5 transition-shadow hover:shadow-md focus-within:shadow-md sm:flex-row sm:gap-4 sm:p-4",
-        live ? "border-red-300 ring-1 ring-red-100" : "border-gray-200",
+        "relative flex cursor-pointer flex-col gap-3 rounded-xl border bg-white p-3.5 transition-colors hover:border-gray-300 hover:bg-gray-50/60 focus-within:border-[#730042] sm:flex-row sm:items-center sm:gap-4 sm:p-4",
+        live ? "border-red-200" : "border-gray-200",
         cancelled && "opacity-75",
       )}
     >
-      <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
-        <div className="w-14 shrink-0 border-r border-gray-100 pr-3 sm:w-16 sm:pr-4">
+      <div className="flex min-w-0 flex-1 items-stretch gap-3">
+        <div className="w-16 shrink-0 text-right sm:w-20">
           <p className="text-sm font-semibold text-gray-900">{fmtTime(m.startTime)}</p>
-          <p className="mt-0.5 text-xs text-gray-600">{showDate ? fmtDate(m.startTime, { day: "numeric", month: "short" }) : fmtDuration(mins)}</p>
+          <p className="mt-0.5 text-xs text-gray-500">{showDate ? fmtDate(m.startTime, { day: "numeric", month: "short" }) : fmtDuration(mins)}</p>
         </div>
+        <span aria-hidden="true" className={cx("w-1 shrink-0 rounded-full", live ? "bg-red-500" : ended || cancelled ? "bg-gray-300" : "bg-[#730042]")} />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -87,7 +88,7 @@ export default function MeetingCard({ meeting: m, onOpen, showDate = false }) {
                   onOpen(m.id);
                 }}
                 className={cx(
-                  "block max-w-full truncate rounded text-left text-[15px] font-semibold after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-xl",
+                  "block max-w-full truncate rounded text-left text-sm font-semibold after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-xl",
                   ended || cancelled ? "text-gray-600" : "text-gray-900",
                   cancelled && "line-through",
                 )}
@@ -110,7 +111,7 @@ export default function MeetingCard({ meeting: m, onOpen, showDate = false }) {
             {m.myRsvp && !m.isHost && m.status === "scheduled" && m.myRsvp === "invited" && <Chip tone="amber">Reply needed</Chip>}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <Avatar name={m.host?.name} photo={m.host?.photo} size={18} />
               {m.isHost ? "You" : m.host?.name}
@@ -132,15 +133,9 @@ export default function MeetingCard({ meeting: m, onOpen, showDate = false }) {
       </div>
 
       {(hasActions || ended) && (
-        <div
-          className={cx(
-            "relative z-10 flex flex-wrap items-center gap-2 sm:shrink-0 sm:flex-col sm:items-end sm:justify-center",
-            hasActions && "border-t border-gray-100 pt-3 sm:border-0 sm:pt-0",
-          )}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <JoinButton meeting={m} size="sm" />
+        <div className={cx("relative z-10 flex flex-wrap items-center gap-2 sm:shrink-0", hasActions && "border-t border-gray-100 pt-3 sm:border-0 sm:pt-0")} onClick={(e) => e.stopPropagation()}>
           {!live && <RsvpButtons meeting={m} />}
+          <JoinButton meeting={m} size="sm" />
           {ended && (
             <span className="inline-flex items-center gap-1 text-xs text-gray-600">
               <Clock size={12} aria-hidden="true" /> Ended

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { Modal, Btn, Field } from "./ui";
+import { AlertTriangle, CheckCircle2, Users, Clock, Video, Mic, Repeat, Bell, AlignLeft, SlidersHorizontal, Mail } from "lucide-react";
+import { Modal, Btn } from "./ui";
 import { inputCls } from "./meetingClasses";
 import PeoplePicker from "./PeoplePicker";
 import { useCreateMeeting, useUpdateMeeting, useCheckAvailability, useMeetingDefaults } from "../../auth/server-state/meeting/meeting.hook";
 import { useCreateInstantMeeting } from "../../auth/server-state/meeting/meetingSpace.hook";
 import { GUEST_SKIP_REASON, parseGuestInput } from "./meetingUtils";
-import { DURATIONS, REMINDERS, combineDateTime, errMsg, fmtTime, minutesBetween, nextSlot, personRef, toDateInput, toTimeInput } from "./meetingUtils";
+import { DURATIONS, REMINDERS, fmtDuration, combineDateTime, errMsg, fmtTime, minutesBetween, nextSlot, personRef, toDateInput, toTimeInput } from "./meetingUtils";
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -134,7 +134,8 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   };
 
   const busy = avail.data?.busy || [];
-  const heading = instant ? "Start a meeting now" : edit ? "Edit meeting" : "Schedule a meeting";
+  const heading = instant ? "Meet now" : edit ? "Edit meeting" : "New meeting";
+  const showWhen = !instant && canReschedule;
 
   return (
     <Modal
@@ -153,156 +154,154 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
         </>
       }
     >
-      <div className="space-y-4">
-        <Field label={instant ? "Title (optional)" : "Title"}>
-          <input className={inputCls} value={title} maxLength={150} data-autofocus placeholder={instant ? "Instant meeting" : "e.g. Sprint planning"} onChange={(e) => setTitle(e.target.value)} />
-        </Field>
+      <div className="space-y-5">
+        <input
+          className="w-full border-0 border-b border-gray-300 bg-transparent px-0 pb-2 text-lg text-gray-900 placeholder:text-gray-400 focus:border-[#730042] focus:outline-none focus:ring-0"
+          value={title}
+          maxLength={150}
+          data-autofocus
+          aria-label={instant ? "Title (optional)" : "Title"}
+          placeholder={instant ? "Add a title (optional)" : "Add a title"}
+          onChange={(e) => setTitle(e.target.value)}
+        />
 
-        <Field label={everyone ? "Invite" : "Invite people"}>
+        <Row icon={Users} label="Attendees">
           <PeoplePicker value={people} onChange={setPeople} />
           {!instant && !edit && (
-            <label className="mt-2 flex min-h-9 items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} className="accent-[#730042]" />
-              Invite everyone in the organisation
-            </label>
+            <>
+              <label className="mt-2 flex min-h-9 items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
+                Invite everyone in the organisation
+              </label>
+              <details className="mt-1">
+                <summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-[#730042]">Add outside guests{guestList.length ? ` (${guestList.length})` : ""}</summary>
+                <p className="mb-2 text-xs text-gray-600">People without an account get a personal PIN by email and wait in the lobby until you admit them. One email per line.</p>
+                <textarea className={inputCls} rows={2} aria-label="Outside guests" value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
+              </details>
+            </>
           )}
-        </Field>
+        </Row>
 
-        {!instant && !edit && (
-          <Field label="Outside guests (optional)" hint="People without an account. Each gets a personal PIN by email and waits in the lobby until you admit them. One email per line.">
-            <textarea className={inputCls} rows={2} value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
-          </Field>
-        )}
-
-        {!instant && canReschedule && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="Date">
-              <input type="date" className={inputCls} min={toDateInput(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />
-            </Field>
-            <Field label="Start">
-              <input type="time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
-            </Field>
-            <Field label="Duration" className="col-span-2 sm:col-span-1">
-              <select className={inputCls} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+        {showWhen && (
+          <Row icon={Clock} label="Time">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <input type="date" aria-label="Date" className={inputCls} min={toDateInput(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />
+              <input type="time" aria-label="Start time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
+              <select aria-label="Duration" className={`${inputCls} col-span-2 sm:col-span-1`} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
                 {DURATIONS.map((d) => (
                   <option key={d} value={d}>
-                    {d >= 60 ? `${d / 60} hr${d > 60 ? "s" : ""}` : `${d} min`}
+                    {fmtDuration(d)}
                   </option>
                 ))}
               </select>
-            </Field>
-          </div>
+            </div>
+            {start && end && (
+              <p className="mt-1.5 text-xs text-gray-600">
+                {fmtTime(start)} to {fmtTime(end)} · {TZ}
+              </p>
+            )}
+            {(people.length > 0 || everyone) && avail.data && (
+              <div role="status" className={`mt-2 flex gap-2 rounded-lg p-3 text-sm ${busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
+                {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
+                <div>
+                  {busy.length ? (
+                    <>
+                      <p className="font-medium">{new Set(busy.map((b) => b.key)).size} invitee(s) are busy then</p>
+                      <ul className="mt-1 space-y-0.5 text-xs">
+                        {busy.slice(0, 4).map((b, i) => (
+                          <li key={i}>
+                            {b.name}: {b.title || "another meeting"} ({fmtTime(b.startTime)}–{fmtTime(b.endTime)})
+                          </li>
+                        ))}
+                        {busy.length > 4 && <li>and {busy.length - 4} more</li>}
+                      </ul>
+                    </>
+                  ) : (
+                    "Everyone's free at this time."
+                  )}
+                </div>
+              </div>
+            )}
+          </Row>
         )}
+
         {instant && (
-          <Field label="Duration">
-            <select className={inputCls} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+          <Row icon={Clock} label="Duration">
+            <select aria-label="Duration" className={inputCls} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
               {DURATIONS.map((d) => (
                 <option key={d} value={d}>
-                  {d} min
+                  {fmtDuration(d)}
                 </option>
               ))}
             </select>
-          </Field>
+          </Row>
         )}
 
-        {!instant && canReschedule && (people.length > 0 || everyone) && avail.data && (
-          <div role="status" className={`flex gap-2 rounded-lg p-3 text-sm ${busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
-            {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
-            <div>
-              {busy.length ? (
-                <>
-                  <p className="font-medium">{new Set(busy.map((b) => b.key)).size} invitee(s) are busy then</p>
-                  <ul className="mt-1 space-y-0.5 text-xs">
-                    {busy.slice(0, 4).map((b, i) => (
-                      <li key={i}>
-                        {b.name}: {b.title || "another meeting"} ({fmtTime(b.startTime)}–{fmtTime(b.endTime)})
-                      </li>
-                    ))}
-                    {busy.length > 4 && <li>and {busy.length - 4} more</li>}
-                  </ul>
-                </>
-              ) : (
-                "Everyone's free at this time."
-              )}
-            </div>
+        <Row icon={media === "audio" ? Mic : Video} label="Type">
+          <div className="inline-flex overflow-hidden rounded-lg border border-gray-300" role="group" aria-label="Meeting type">
+            {[
+              ["video", "Video"],
+              ["audio", "Audio only"],
+            ].map(([v, label]) => (
+              <button key={v} type="button" onClick={() => setMedia(v)} aria-pressed={media === v} className={`min-h-10 border-r border-gray-300 px-5 text-sm last:border-r-0 ${media === v ? "bg-[#730042] text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}>
+                {label}
+              </button>
+            ))}
           </div>
-        )}
-
-        <div className="flex gap-2">
-          {["video", "audio"].map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setMedia(v)}
-              aria-pressed={media === v}
-              className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${media === v ? "border-[#730042] bg-[#730042]/5 text-[#730042]" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
-            >
-              {v === "video" ? "Video call" : "Audio only"}
-            </button>
-          ))}
-        </div>
+        </Row>
 
         {!instant && (
           <>
-            <Field label="Description">
-              <textarea className={inputCls} rows={2} maxLength={3000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this meeting about?" />
-            </Field>
-            <Field label="Agenda">
-              <textarea className={inputCls} rows={3} maxLength={3000} value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="One topic per line" />
-            </Field>
+            <Row icon={AlignLeft} label="Details">
+              <textarea className={inputCls} rows={2} maxLength={3000} aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add a description" />
+              <textarea className={`${inputCls} mt-2`} rows={3} maxLength={3000} aria-label="Agenda" value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Agenda (one topic per line)" />
+            </Row>
 
-            <details className="rounded-lg border border-gray-200 px-3 py-2">
-              <summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-gray-700">More options</summary>
-              <div className="mt-3 space-y-3 pb-1">
-                {!edit && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Repeat">
-                      <select className={inputCls} value={freq} onChange={(e) => setFreq(e.target.value)}>
-                        <option value="none">Does not repeat</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </Field>
-                    {freq !== "none" && (
-                      <Field label="Occurrences">
-                        <input type="number" min={2} max={52} className={inputCls} value={count} onChange={(e) => setCount(e.target.value)} />
-                      </Field>
-                    )}
-                  </div>
-                )}
-                <Field label="Remind attendees">
-                  <select className={inputCls} value={reminder} onChange={(e) => setReminderPick(Number(e.target.value))}>
-                    {REMINDERS.map((r) => (
-                      <option key={r} value={r}>
-                        {r === 0 ? "No reminder" : `${r} minutes before`}
-                      </option>
-                    ))}
+            {!edit && (
+              <Row icon={Repeat} label="Repeat">
+                <div className="flex flex-wrap items-center gap-3">
+                  <select aria-label="Repeat" className={`${inputCls} !w-auto`} value={freq} onChange={(e) => setFreq(e.target.value)}>
+                    <option value="none">Does not repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
                   </select>
-                </Field>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" checked={joinBefore} onChange={(e) => setJoinBeforePick(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
-                  Let people join before the host
-                </label>
-                {!edit && (
-                  <div className="space-y-2 rounded-lg bg-gray-50 p-3">
-                    <p className="text-xs font-medium text-gray-700">Meeting controls{defaultsQ.isSuccess ? " (your organisation's defaults are pre-selected)" : ""}</p>
-                    {[["lobby", "Waiting room"], ["muteOnEntry", "Mute people on entry"]].map(([key, label]) => (
-                      <label key={key} className="flex min-h-9 items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" checked={!!controls[key]} onChange={(e) => setControlPicks((c) => ({ ...c, [key]: e.target.checked }))} className="h-4 w-4 accent-[#730042]" />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {!edit && (
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} className="accent-[#730042]" />
-                    Email invitations
-                  </label>
-                )}
+                  {freq !== "none" && (
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      for <input type="number" min={2} max={52} aria-label="Occurrences" className={`${inputCls} !w-20`} value={count} onChange={(e) => setCount(e.target.value)} /> occurrences
+                    </label>
+                  )}
+                </div>
+              </Row>
+            )}
+
+            <Row icon={Bell} label="Reminder">
+              <select aria-label="Remind attendees" className={`${inputCls} !w-auto`} value={reminder} onChange={(e) => setReminderPick(Number(e.target.value))}>
+                {REMINDERS.map((r) => (
+                  <option key={r} value={r}>
+                    {r === 0 ? "No reminder" : `${r} minutes before`}
+                  </option>
+                ))}
+              </select>
+            </Row>
+
+            <Row icon={SlidersHorizontal} label="Options">
+              <div className="space-y-0.5">
+                <Check checked={joinBefore} onChange={setJoinBeforePick} label="Allow people to join before the host" />
+                {!edit &&
+                  [
+                    ["lobby", "Enable waiting room"],
+                    ["muteOnEntry", "Mute participants on entry"],
+                  ].map(([key, label]) => <Check key={key} checked={!!controls[key]} onChange={(v) => setControlPicks((c) => ({ ...c, [key]: v }))} label={label} />)}
               </div>
-            </details>
+              {!edit && defaultsQ.isSuccess && <p className="mt-1 text-xs text-gray-500">Your organisation's defaults are pre-selected.</p>}
+            </Row>
+
+            {!edit && (
+              <Row icon={Mail} label="Invitations">
+                <Check checked={sendEmail} onChange={setSendEmail} label="Email invitations to attendees" />
+              </Row>
+            )}
           </>
         )}
 
@@ -313,5 +312,26 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
         )}
       </div>
     </Modal>
+  );
+}
+
+function Row({ icon: Icon, label, children }) {
+  return (
+    <div className="flex gap-3 sm:gap-4">
+      <span className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center text-gray-500" title={label}>
+        <Icon size={18} aria-hidden="true" />
+        <span className="sr-only">{label}</span>
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function Check({ checked, onChange, label }) {
+  return (
+    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm text-gray-700">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
+      {label}
+    </label>
   );
 }
