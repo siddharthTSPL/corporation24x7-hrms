@@ -38,8 +38,22 @@ export const patchMessage = (qc, conversationId, messageId, patch) =>
     mapPages(old, (msgs) => msgs.map((m) => (m.id === messageId ? { ...m, ...patch } : m))),
   );
 
+// "Delete for me": the message just vanishes from my own list.
+export const removeMessage = (qc, conversationId, messageId) =>
+  qc.setQueryData(CHAT_KEYS.messages(conversationId), (old) => mapPages(old, (msgs) => msgs.filter((m) => m.id !== messageId)));
+
+// Someone's device received these messages -> grey double tick for the sender.
+export const addDelivered = (qc, conversationId, messageIds, byKey) => {
+  const ids = new Set(messageIds);
+  qc.setQueryData(CHAT_KEYS.messages(conversationId), (old) =>
+    mapPages(old, (msgs) =>
+      msgs.map((m) => (ids.has(m.id) && !(m.deliveredTo || []).includes(byKey) ? { ...m, deliveredTo: [...(m.deliveredTo || []), byKey] } : m)),
+    ),
+  );
+};
+
 export const markMessageDeleted = (qc, conversationId, messageId) =>
-  patchMessage(qc, conversationId, messageId, { deleted: true, text: "", attachments: [] });
+  patchMessage(qc, conversationId, messageId, { deleted: true, text: "", attachments: [], reactions: [] });
 
 // Patch one conversation inside the cached list; returns false if it isn't there.
 export const patchConversation = (qc, conversationId, updater) => {
@@ -75,5 +89,19 @@ export const removeConversation = (qc, conversationId) => {
   qc.removeQueries({ queryKey: CHAT_KEYS.messages(conversationId) });
 };
 
+const sentClientIds = new Set();
+
+export const registerSent = (clientId) => {
+  if (clientId) sentClientIds.add(clientId);
+  return clientId;
+};
+
+export const isMineMessage = (m, myKey) => {
+  if (!m) return false;
+  if (m.pending || m.failed) return true;
+  if (m.clientId && sentClientIds.has(m.clientId)) return true;
+  return !!m.senderKey && !!myKey && m.senderKey === myKey;
+};
+
 export const newClientId = () =>
-  `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+  registerSent(`c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`);

@@ -2,21 +2,28 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { connectSocket } from "./socket";
-import { emitQuiet } from "./chatSocket";
+import { emitAck, emitQuiet } from "./chatSocket";
+import { getMe } from "../auth/api/chat/chat.api";
 import { callManager } from "./webrtc/callManager";
 import { useChatStore } from "../auth/store/chat/chatStore";
 import { useCallStore } from "../auth/store/call/callStore";
 import {
   CHAT_KEYS,
+  isMineMessage,
   upsertMessage,
   markMessageDeleted,
+  removeMessage,
+  addDelivered,
   patchConversation,
   bumpConversationToTop,
   removeConversation,
 } from "../auth/server-state/chat/chatCache";
 import { MEETING_KEYS } from "../auth/server-state/meeting/meeting.hook";
+import { MEETING_SPACE_KEYS, MEETING_SPACE_EVENTS, patchAnnouncementSeen } from "../auth/server-state/meeting/meetingSpace.hook";
+import { RECEIPT_KEYS } from "../auth/server-state/chat/chatReceipt.hook";
 
-const preview = (m) => (m.text ? m.text : m.type === "file" ? m.attachments?.[0]?.name || "Attachment" : "");
+const preview = (m) =>
+  m.type === "sticker" ? "Sticker" : m.text ? m.text : m.type === "file" ? m.attachments?.[0]?.name || "Attachment" : "";
 
 // Mount ONCE inside the authenticated layout, next to useRealtimeSync:
 //     useChatRealtime(Boolean(auth?.role));
@@ -29,6 +36,7 @@ export default function useChatRealtime(enabled) {
     if (!enabled) {
       useChatStore.getState().reset();
       useCallStore.getState().reset();
+      qc.removeQueries({ queryKey: CHAT_KEYS.all });
       return undefined;
     }
 
@@ -37,8 +45,69 @@ export default function useChatRealtime(enabled) {
     const detachCalls = callManager.attach(socket);
 
     // --- identity + presence ---
-    const onReady = ({ recipientModel, id }) => chat().setMyKey(`${recipientModel}:${id}`);
-    const onPresence = ({ key, online, lastSeenAt }) => chat().setPresence(key, online, lastSeenAt || null);
+    const onPresence = ({ key, online, lastSeenAt, inCall }) => chat().setPresence(key, online, lastSeenAt || null, inCall);
+
+    let driftReconnects = 0;
+    let syncing = false;
+    let syncAgain = false;
+
+    const syncIdentity = async () => {
+      if (syncing) {
+        syncAgain = true;
+        return;
+      }
+      syncing = true;
+      try {
+        let restKey = null;
+        let socketKey = null;
+        try {
+          restKey = (await getMe())?.key || null;
+        } catch {
+          void 0;
+        }
+        if (socket.connected) {
+          try {
+            socketKey = (await emitAck("chat:whoami", {}, 5000, 0))?.key || null;
+          } catch {
+            void 0;
+          }
+        }
+        if (restKey && chat().myKey !== restKey) chat().setMyKey(restKey);
+        if (!restKey && socketKey && !chat().myKey) chat().setMyKey(socketKey);
+        if (restKey && socketKey) {
+          if (restKey !== socketKey && driftReconnects < 3) {
+            driftReconnects += 1;
+            console.warn("[socket] identity drift:", socketKey, "->", restKey, "- reconnecting");
+            socket.disconnect();
+            socket.connect();
+          } else if (restKey === socketKey) {
+            driftReconnects = 0;
+          }
+        }
+      } finally {
+        syncing = false;
+        if (syncAgain) {
+          syncAgain = false;
+          syncIdentity();
+        }
+      }
+    };
+    const onReady = () => {
+      syncIdentity();
+    };
+    const recheckIdentity = () => {
+      if (document.visibilityState === "visible" && socket.connected) syncIdentity();
+    };
+    window.addEventListener("focus", recheckIdentity);
+    document.addEventListener("visibilitychange", recheckIdentity);
+
+    // After a drop/reconnect we may have missed live events: refresh what's on screen.
+    let connectedOnce = socket.connected;
+    const onConnect = () => {
+      syncIdentity();
+      if (connectedOnce) qc.invalidateQueries({ queryKey: CHAT_KEYS.all });
+      connectedOnce = true;
+    };
 
     // --- messages ---
     const readTimers = new Map();
@@ -55,7 +124,7 @@ export default function useChatRealtime(enabled) {
     const onMessage = ({ conversationId, message }) => {
       upsertMessage(qc, conversationId, message);
       const { myKey, activeConversationId } = chat();
-      const mine = !!message.senderKey && message.senderKey === myKey;
+      const mine = isMineMessage(message, myKey);
       const viewing = activeConversationId === conversationId && document.visibilityState === "visible";
       const isLine = message.type === "system" || message.type === "call";
 
@@ -81,7 +150,13 @@ export default function useChatRealtime(enabled) {
     };
 
     const onMessageUpdated = ({ conversationId, message }) => upsertMessage(qc, conversationId, message);
-    const onMessageDeleted = ({ conversationId, messageId }) => markMessageDeleted(qc, conversationId, messageId);
+    const onMessageDeleted = ({ conversationId, messageId, forMe }) =>
+      forMe ? removeMessage(qc, conversationId, messageId) : markMessageDeleted(qc, conversationId, messageId);
+
+    const onDelivered = ({ conversationId, by, messageIds }) => addDelivered(qc, conversationId, messageIds || [], by);
+
+    // someone tried to call me while I was on another call
+    const onMissedBusy = ({ from }) => toast(`${from?.name || "Someone"} tried to call you while you were on another call.`, { icon: "📞", duration: 6000 });
 
     // someone read the chat: update "seen" ticks; if it was me (other tab) clear my badge
     const onRead = ({ conversationId, by, at }) => {
@@ -94,6 +169,7 @@ export default function useChatRealtime(enabled) {
         old ? { ...old, conversation: { ...old.conversation, participants: old.conversation.participants.map((p) => (p.key === by ? { ...p, lastReadAt: at } : p)) } } : old,
       );
       if (by === chat().myKey) refreshUnread();
+      qc.invalidateQueries({ queryKey: RECEIPT_KEYS.all });
     };
 
     const onTyping = ({ conversationId, key, name, isTyping }) => chat().setTyping(conversationId, key, name, isTyping);
@@ -110,6 +186,8 @@ export default function useChatRealtime(enabled) {
 
     // --- meetings (bell notifications already arrive via notification:new) ---
     const refreshMeetings = () => qc.invalidateQueries({ queryKey: MEETING_KEYS.all });
+    const refreshMeetingSpace = () => qc.invalidateQueries({ queryKey: MEETING_SPACE_KEYS.all });
+    const onAnnouncementSeen = ({ meetingId, announcementId, seenCount }) => patchAnnouncementSeen(qc, meetingId, announcementId, seenCount);
     const onMeetingReminder = ({ title, minutes }) =>
       toast(`"${title}" starts in ${minutes} minute${minutes === 1 ? "" : "s"}`, { icon: "📅", duration: 8000 });
 
@@ -119,26 +197,41 @@ export default function useChatRealtime(enabled) {
     socket.on("chat:message:updated", onMessageUpdated);
     socket.on("chat:message:deleted", onMessageDeleted);
     socket.on("chat:read", onRead);
+    socket.on("chat:delivered", onDelivered);
+    socket.on("call:missed-busy", onMissedBusy);
+    socket.on("connect", onConnect);
     socket.on("chat:typing", onTyping);
     socket.on("chat:conversation:updated", onConversationUpdated);
     for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.on(ev, refreshMeetings);
     socket.on("meeting:reminder", onMeetingReminder);
+    for (const ev of MEETING_SPACE_EVENTS) socket.on(ev, refreshMeetingSpace);
+    socket.on("meeting:announcement:seen", onAnnouncementSeen);
+    socket.on("meeting:interest", refreshMeetings);
     socket.on("call:ended", () => qc.invalidateQueries({ queryKey: CHAT_KEYS.callHistory }));
+    syncIdentity();
 
     return () => {
       readTimers.forEach(clearTimeout);
       clearTimeout(unreadTimer);
       detachCalls();
+      window.removeEventListener("focus", recheckIdentity);
+      document.removeEventListener("visibilitychange", recheckIdentity);
       socket.off("socket:ready", onReady);
       socket.off("presence:update", onPresence);
       socket.off("chat:message", onMessage);
       socket.off("chat:message:updated", onMessageUpdated);
       socket.off("chat:message:deleted", onMessageDeleted);
       socket.off("chat:read", onRead);
+      socket.off("chat:delivered", onDelivered);
+      socket.off("call:missed-busy", onMissedBusy);
+      socket.off("connect", onConnect);
       socket.off("chat:typing", onTyping);
       socket.off("chat:conversation:updated", onConversationUpdated);
       for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.off(ev, refreshMeetings);
       socket.off("meeting:reminder", onMeetingReminder);
+      for (const ev of MEETING_SPACE_EVENTS) socket.off(ev, refreshMeetingSpace);
+      socket.off("meeting:announcement:seen", onAnnouncementSeen);
+      socket.off("meeting:interest", refreshMeetings);
     };
   }, [enabled, qc]);
 }

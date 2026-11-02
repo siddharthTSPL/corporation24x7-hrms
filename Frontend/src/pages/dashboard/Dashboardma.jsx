@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { useMeetingDays } from "../../auth/server-state/meeting/meeting.hook";
 import { useNavigate } from "react-router-dom";
 import { useManagerAnnouncements } from "../../auth/server-state/manager/managerannounce/managerannounce.hook";
 import { useGetMeManager } from "../../auth/server-state/manager/managerauth/managerauth.hook";
@@ -447,6 +448,7 @@ function SegBar({ segments }) {
 }
 
 function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLeaves = [], holidays = [], weekOffDates = [], todayShiftEnd = null }) {
+  const meetingDays = useMeetingDays(month, new Date().getFullYear());
   const year     = new Date().getFullYear();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMo = new Date(year, month + 1, 0).getDate();
@@ -548,7 +550,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
           <div
             key={i}
             className="md-cal-day"
-            title={cell ? (cell.label ? `Holiday: ${cell.label}` : cell.status.replace("_", " ")) : ""}
+            title={cell ? ([cell.label ? `Holiday: ${cell.label}` : cell.status.replace("_", " "), ...(meetingDays.get(cell.day) || []).map((m) => `Meeting: ${m.title}`)].join(" · ")) : ""}
             style={{
               outline: cell?.isToday ? "1.5px solid #730042" : "none",
               outlineOffset: -1.5,
@@ -562,6 +564,7 @@ function Calendar({ month, joiningDate, attendanceMap = new Map(), myApprovedLea
             ) : (
               cell?.day
             )}
+            {cell && meetingDays.has(cell.day) && <span style={{ position:"absolute", bottom:2, left:"50%", transform:"translateX(-50%)", width:4, height:4, borderRadius:"50%", background:"#730042" }} />}
           </div>
         ))}
       </div>

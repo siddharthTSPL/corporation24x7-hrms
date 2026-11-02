@@ -19,6 +19,7 @@ require('../automatic/Trainingreminders');
 require('../automatic/Featurelaunchnotify');
 require('../automatic/Hourlyleavesync');
 require('../automatic/Meetingreminders');
+require('../automatic/Meetingactionreminders');
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -54,13 +55,25 @@ app.use(morgan("dev"));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());
+// Per-tab sessions: a browser tab may send its OWN login token in X-Tab-Token.
+// It wins over the shared "token" cookie, so two accounts can be logged in at
+// the same time in different tabs of one browser (every auth middleware reads
+// req.cookies.token, so this single line covers all of them).
+app.use((req, _res, next) => {
+  const tabToken = req.headers["x-tab-token"];
+  if (typeof tabToken === "string" && tabToken.length > 20 && tabToken.length < 4096) {
+    req.cookies = req.cookies || {};
+    req.cookies.token = tabToken;
+  }
+  next();
+});
 app.use(compression());
 
 const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tab-Token"],
 };
 
 app.use(cors(corsOptions));

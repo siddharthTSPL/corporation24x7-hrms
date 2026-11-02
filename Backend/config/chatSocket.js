@@ -8,6 +8,8 @@
 const chat = require("../utils/chat/chat.service");
 const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
+const controls = require("../utils/chat/meetingControls.service");
+const live = require("../utils/chat/meetingLive.service");
 const presence = require("../utils/chat/presence");
 const { resolvePeople, personKey } = require("../utils/chat/people.utils");
 const { emitToOrganisation } = require("./socket");
@@ -23,13 +25,32 @@ const allow = (socket, bucket, max, windowMs) => {
   return rec.n <= max;
 };
 
+// Outsiders (meeting guests) only get the in-meeting subset: no chat, no org presence,
+// no inviting, no host controls. Everything else is refused before the handler runs.
+const GUEST_EVENTS = new Set([
+  "chat:whoami", "call:join", "call:leave", "call:signal", "call:media-state",
+  "call:screen-share:start", "call:screen-share:stop",
+  "call:hand:raise", "call:hand:lower", "call:reaction",
+  "meeting:state", "meeting:lobby-leave",
+  // live extras guests may use: see the room's state, captions, Q&A, pulse, whiteboard (view only)
+  "meeting:live:state", "meeting:caption", "meeting:speaking", "meeting:board:state",
+  "meeting:qa:list", "meeting:qa:ask", "meeting:qa:upvote", "meeting:qa:delete", "meeting:pulse:send",
+]);
+
 const registerChatSocket = (io, socket) => {
+  const isGuest = !!socket.data.isGuest;
   const actor = chat.toActor({ id: socket.data.id, recipientModel: socket.data.recipientModel, organisation_id: socket.data.organisation_id });
   socket.data.callRooms = new Set();
 
   // Lazily resolved once per socket (name/photo shown to other people in calls).
   let personPromise = null;
   const getPerson = () => {
+    if (isGuest) {
+      return Promise.resolve({
+        key: actor.key, id: actor.id, model: "Guest", name: socket.data.guestName || "Guest",
+        photo: "", role: "Guest", email: socket.data.guestEmail || "", isGuest: true,
+      });
+    }
     if (!personPromise) {
       personPromise = resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]).then(
         (m) => m.get(actor.key) || { key: actor.key, id: actor.id, model: actor.model, name: "Unknown", photo: "" }
@@ -43,6 +64,7 @@ const registerChatSocket = (io, socket) => {
     socket.on(event, async (payload, ack) => {
       if (typeof payload === "function") { ack = payload; payload = {}; }
       const reply = typeof ack === "function" ? ack : () => {};
+      if (isGuest && !GUEST_EVENTS.has(event)) return reply({ ok: false, error: "Not available for guests.", code: "GUEST_FORBIDDEN" });
       try {
         const data = await handler(payload || {});
         reply({ ok: true, ...(data || {}) });
@@ -54,18 +76,23 @@ const registerChatSocket = (io, socket) => {
   };
 
   // ----- presence -----
-  if (presence.add(actor.key, socket.id)) {
-    emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true });
+  if (!isGuest && presence.add(actor.key, socket.id)) {
+    emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true, inCall: presence.isInCall(actor.key) });
   }
+  // everything people sent me while I was away is now "delivered" (grey double tick for them)
+  if (!isGuest) chat.markDeliveredForActor(actor).catch((err) => console.error("[socket] mark delivered failed:", err.message));
   // calls that started while this person was offline / reconnecting
-  for (const room of rooms.ringingFor(actor.key)) {
+  for (const room of isGuest ? [] : rooms.ringingFor(actor.key)) {
     socket.emit("call:incoming", {
-      callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media,
+      callId: room.callId, roomKey: room.roomKey, kind: room.kind, media: room.media, to: actor.key,
       conversationId: room.conversationId, conversationName: room.title || room.initiatorName || "",
-      from: { key: room.initiatorKey, name: room.initiatorName || "" }, ringSeconds: calls.RING_SECONDS,
+      from: { key: room.initiatorKey, name: room.initiatorName || "", photo: room.initiatorPhoto || "" }, ringSeconds: calls.RING_SECONDS,
       startedAt: new Date(room.createdAt),
     });
   }
+
+  // Who am I? (lets the client rebuild its identity even if it missed "socket:ready")
+  on("chat:whoami", async () => ({ key: actor.key, model: actor.model, id: actor.id }));
 
   on("presence:query", async ({ keys }) => {
     const list = Array.isArray(keys) ? keys.filter((k) => typeof k === "string").slice(0, 200) : [];
@@ -73,9 +100,9 @@ const registerChatSocket = (io, socket) => {
   });
 
   // ----- chat -----
-  on("chat:send", async ({ conversationId, text, replyTo, clientId }) => {
+  on("chat:send", async ({ conversationId, text, replyTo, clientId, sticker }) => {
     if (!allow(socket, "send", 20, 10000)) throw Object.assign(new Error("You're sending messages too fast."), { statusCode: 429 });
-    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId });
+    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId, sticker });
     return { message };
   });
 
@@ -112,7 +139,14 @@ const registerChatSocket = (io, socket) => {
 
   on("call:join", async ({ roomKey, audio, video }) => {
     if (!roomKey) throw Object.assign(new Error("roomKey is required."), { statusCode: 400 });
+    // a guest token is good for exactly one meeting
+    if (isGuest && String(roomKey) !== `meeting:${socket.data.guestMeetingId}`) throw Object.assign(new Error("This invitation is for a different meeting."), { statusCode: 403, code: "GUEST_WRONG_MEETING" });
     return calls.joinRoom(socket, actor, await getPerson(), String(roomKey), { audio: audio !== false, video });
+  });
+
+  on("call:invite", async ({ roomKey, keys }) => {
+    if (!allow(socket, "callInvite", 10, 10000)) throw Object.assign(new Error("You're inviting people too quickly."), { statusCode: 429 });
+    return calls.inviteToGroupCall(socket, actor, await getPerson(), String(roomKey || ""), keys);
   });
 
   on("call:decline", async ({ roomKey, reason }) => {
@@ -140,6 +174,7 @@ const registerChatSocket = (io, socket) => {
     const room = rooms.get(String(roomKey));
     if (!room || !room.peers.has(socket.id)) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
     if (!room.peers.has(to)) throw Object.assign(new Error("That participant is no longer in the call."), { statusCode: 404 });
+    if (!live.canSignal(room, socket.id, to)) throw Object.assign(new Error("You are in a different breakout room."), { statusCode: 403, code: "BREAKOUT_SEPARATED" });
     if (!data || typeof data !== "object" || JSON.stringify(data).length > MAX_SIGNAL_BYTES) {
       throw Object.assign(new Error("Invalid signal."), { statusCode: 400 });
     }
@@ -162,6 +197,7 @@ const registerChatSocket = (io, socket) => {
     const room = rooms.get(String(roomKey));
     const peer = room && room.peers.get(socket.id);
     if (!peer) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
+    controls.assertCanShare(room, actor.key);
     if (room.presenterSocketId && room.presenterSocketId !== socket.id) {
       const cur = room.peers.get(room.presenterSocketId);
       throw Object.assign(new Error(`${cur ? cur.name : "Someone"} is already sharing their screen.`), { statusCode: 409, code: "SHARE_IN_USE" });
@@ -195,8 +231,104 @@ const registerChatSocket = (io, socket) => {
     io.to(socketId).emit("call:mute-request", { roomKey: room.roomKey, by: actor.key });
   });
 
+  // ----- meeting: hands, reactions, lobby, host controls -----
+  const meetingRoom = (roomKey) => controls.requireMeetingRoom(roomKey);
+  const anyRoom = (roomKey) => controls.requireRoom(roomKey);
+
+  on("call:hand:raise", async ({ roomKey }) => controls.raiseHand(anyRoom(roomKey), socket, actor));
+
+  on("call:hand:lower", async ({ roomKey, key }) => controls.lowerHand(anyRoom(roomKey), socket, actor, key));
+
+  on("call:hand:lower-all", async ({ roomKey }) => controls.lowerAllHands(anyRoom(roomKey), socket, actor));
+
+  on("call:reaction", async ({ roomKey, emoji }) => {
+    if (!allow(socket, "reaction", 12, 10000)) throw Object.assign(new Error("You're reacting too fast."), { statusCode: 429 });
+    controls.sendReaction(anyRoom(roomKey), socket, actor, String(emoji || ""));
+  });
+
+  on("meeting:state", async ({ roomKey }) => {
+    const room = meetingRoom(roomKey);
+    if (!room.peers.has(socket.id)) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
+    return { state: controls.liveState(room, { forModerator: rooms.isModerator(room, actor.key) }) };
+  });
+
+  on("meeting:lobby-leave", async ({ roomKey }) => {
+    controls.leaveLobby(rooms.get(String(roomKey)), socket);
+  });
+
+  on("meeting:lobby-admit", async ({ roomKey, socketId, all }) => controls.admit(meetingRoom(roomKey), socket, actor, { socketId: socketId ? String(socketId) : null, all: !!all }));
+
+  on("meeting:lobby-deny", async ({ roomKey, socketId, all, block }) => controls.deny(meetingRoom(roomKey), socket, actor, { socketId: socketId ? String(socketId) : null, all: !!all, block: !!block }));
+
+  on("meeting:lock", async ({ roomKey, locked }) => controls.setLocked(meetingRoom(roomKey), socket, actor, locked !== false));
+
+  on("meeting:settings", async ({ roomKey, settings }) => {
+    const next = await controls.updateSettingsFromSocket(meetingRoom(roomKey), socket, actor, settings);
+    return { settings: next };
+  });
+
+  on("meeting:set-cohost", async ({ roomKey, key, cohost }) => controls.setCoHost(meetingRoom(roomKey), socket, actor, key, cohost !== false));
+
+  on("call:mute-all", async ({ roomKey }) => controls.muteAll(anyRoom(roomKey), socket, actor));
+
+  on("call:screen-share:force-stop", async ({ roomKey }) => controls.stopShareByHost(anyRoom(roomKey), socket, actor));
+
+  // ----- meeting live extras: breakouts, whiteboard, captions, Q&A, pulse, wheel, kudos, timer, agenda ... -----
+  // (all logic in utils/chat/meetingLive.service.js; every one of these only works inside a scheduled meeting)
+  const tooFast = (msg = "Slow down a little.") => Object.assign(new Error(msg), { statusCode: 429 });
+  const L = (fn) => async ({ roomKey, ...rest }) => fn(String(roomKey || ""), socket, actor, rest);
+
+  on("meeting:live:state", L(live.liveState));
+  on("meeting:flags", L(live.setFlags));
+  on("meeting:spotlight", L(live.spotlight));
+  on("meeting:recording", L(live.setRecording));
+  on("meeting:burst", L(live.burst));
+
+  on("meeting:timer:start", L(live.timerStart));
+  on("meeting:timer:control", L(live.timerControl));
+
+  on("meeting:agenda:set", L(live.agendaSet));
+  on("meeting:agenda:advance", L(live.agendaAdvance));
+
+  on("meeting:pulse:start", L(live.pulseStart));
+  on("meeting:pulse:send", async (p) => { if (!allow(socket, "pulse", 10, 10000)) throw tooFast(); return live.pulseSend(String(p.roomKey || ""), socket, actor, { score: p.score }); });
+  on("meeting:pulse:stop", L(live.pulseStop));
+
+  on("meeting:wheel:spin", L(live.wheelSpin));
+
+  on("meeting:breakout:create", L(live.breakoutCreate));
+  on("meeting:breakout:join", L(live.breakoutJoin));
+  on("meeting:breakout:leave", L(live.breakoutLeave));
+  on("meeting:breakout:move", L(live.breakoutMove));
+  on("meeting:breakout:broadcast", L(live.breakoutBroadcast));
+  on("meeting:breakout:help", async (p) => { if (!allow(socket, "bohelp", 3, 30000)) throw tooFast(); return live.breakoutHelp(String(p.roomKey || ""), socket, actor, { text: p.text }); });
+  on("meeting:breakout:close", L(live.breakoutClose));
+
+  on("meeting:board:state", L(live.boardState));
+  on("meeting:board:stroke", async (p) => { if (!allow(socket, "stroke", 150, 10000)) throw tooFast(); return live.boardStroke(String(p.roomKey || ""), socket, actor, { stroke: p.stroke }); });
+  on("meeting:board:undo", async (p) => { if (!allow(socket, "boardundo", 20, 10000)) throw tooFast(); return live.boardUndo(String(p.roomKey || ""), socket, actor, {}); });
+  on("meeting:board:clear", L(live.boardClear));
+  on("meeting:board:view", L(live.boardView));
+
+  on("meeting:caption", async (p) => { if (!allow(socket, "caption", 40, 10000)) throw tooFast(); return live.caption(String(p.roomKey || ""), socket, actor, { text: p.text, final: p.final, lang: p.lang }); });
+  on("meeting:speaking", async (p) => { if (!allow(socket, "speaking", 30, 10000)) return {}; return live.speaking(String(p.roomKey || ""), socket, actor, { speaking: p.speaking }); });
+  on("meeting:talktime", L(live.talkTime));
+
+  on("meeting:decision:add", L(live.decisionAdd));
+  on("meeting:decision:remove", L(live.decisionRemove));
+
+  on("meeting:kudos:give", async (p) => { if (!allow(socket, "kudos", 8, 60000)) throw tooFast("Easy there - too many kudos at once."); return live.kudosGive(String(p.roomKey || ""), socket, actor, { toKey: p.toKey, message: p.message, badge: p.badge }); });
+
+  on("meeting:qa:list", L(live.qaList));
+  on("meeting:qa:ask", async (p) => { if (!allow(socket, "qaask", 6, 60000)) throw tooFast("You are asking too many questions at once."); return live.qaAsk(String(p.roomKey || ""), socket, actor, { text: p.text, anonymous: p.anonymous }); });
+  on("meeting:qa:upvote", async (p) => { if (!allow(socket, "qaup", 30, 10000)) throw tooFast(); return live.qaUpvote(String(p.roomKey || ""), socket, actor, { id: p.id }); });
+  on("meeting:qa:answer", L(live.qaAnswer));
+  on("meeting:qa:pin", L(live.qaPin));
+  on("meeting:qa:delete", L(live.qaDelete));
+
   // ----- disconnect: leave every call, flip presence -----
   socket.on("disconnect", async () => {
+    controls.leaveAllLobbies(socket);
     for (const roomKey of [...(socket.data.callRooms || [])]) {
       try {
         await calls.leaveRoom(socket, roomKey, "disconnected");
@@ -204,8 +336,8 @@ const registerChatSocket = (io, socket) => {
         console.error("[socket] leave-on-disconnect failed:", err.message);
       }
     }
-    if (presence.remove(actor.key, socket.id)) {
-      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, lastSeenAt: presence.lastSeenAt(actor.key) });
+    if (!isGuest && presence.remove(actor.key, socket.id)) {
+      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, inCall: false, lastSeenAt: presence.lastSeenAt(actor.key) });
     }
   });
 };

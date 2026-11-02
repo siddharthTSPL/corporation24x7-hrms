@@ -6,18 +6,21 @@ import { create } from "zustand";
 export const useChatStore = create((set, get) => ({
   myKey: null, // "User:<id>" - set when the socket reports ready
   activeConversationId: null,
-  presence: {}, // key -> { online, lastSeenAt }
+  presence: {}, // key -> { online, lastSeenAt, inCall }
   typing: {}, // conversationId -> { [key]: { name, until } }
 
   setMyKey: (myKey) => set({ myKey }),
   setActiveConversation: (id) => set({ activeConversationId: id }),
 
-  setPresence: (key, online, lastSeenAt = null) =>
-    set((s) => ({ presence: { ...s.presence, [key]: { online, lastSeenAt } } })),
+  // inCall === undefined keeps whatever we already knew
+  setPresence: (key, online, lastSeenAt = null, inCall) =>
+    set((s) => ({
+      presence: { ...s.presence, [key]: { online, lastSeenAt, inCall: inCall === undefined ? !!s.presence[key]?.inCall : !!inCall } },
+    })),
   setPresenceMany: (list) =>
     set((s) => {
       const next = { ...s.presence };
-      for (const p of list || []) next[p.key] = { online: p.online, lastSeenAt: p.lastSeenAt || null };
+      for (const p of list || []) next[p.key] = { online: p.online, lastSeenAt: p.lastSeenAt || null, inCall: !!p.inCall };
       return { presence: next };
     }),
 

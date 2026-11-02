@@ -61,9 +61,9 @@ export const getMessages = async ({ id, before, limit = 40 }) =>
   (await api.get(`chat/conversations/${id}/messages`, { params: { before, limit } })).data;
 
 // JSON for text, multipart when files are attached (max 5 files, 15 MB each).
-export const sendMessageRest = async ({ id, text, replyTo, clientId, files = [], onUploadProgress }) => {
+export const sendMessageRest = async ({ id, text, replyTo, clientId, sticker, files = [], onUploadProgress }) => {
   if (!files.length) {
-    return (await api.post(`chat/conversations/${id}/messages`, { text, replyTo, clientId })).data;
+    return (await api.post(`chat/conversations/${id}/messages`, { text, replyTo, clientId, sticker })).data;
   }
   const fd = new FormData();
   if (text) fd.append("text", text);
@@ -76,7 +76,29 @@ export const sendMessageRest = async ({ id, text, replyTo, clientId, files = [],
 export const editMessage = async ({ messageId, text }) =>
   (await api.patch(`chat/messages/${messageId}`, { text })).data;
 
-export const deleteMessage = async (messageId) => (await api.delete(`chat/messages/${messageId}`)).data;
+// scope: "everyone" (default) | "me"
+export const deleteMessage = async ({ messageId, scope = "everyone" }) =>
+  (await api.delete(`chat/messages/${messageId}`, { params: scope === "me" ? { scope: "me" } : {} })).data;
+
+export const reactToMessage = async ({ messageId, emoji }) => (await api.post(`chat/messages/${messageId}/react`, { emoji })).data;
+
+export const forwardMessage = async ({ messageId, conversationIds }) =>
+  (await api.post(`chat/messages/${messageId}/forward`, { conversationIds })).data;
+
+// ---- per-person chat settings ----
+export const setWallpaper = async ({ id, wallpaper }) => (await api.patch(`chat/conversations/${id}/wallpaper`, { wallpaper })).data;
+
+export const uploadWallpaper = async ({ id, file }) => {
+  const fd = new FormData();
+  fd.append("image", file);
+  return (await api.post(`chat/conversations/${id}/wallpaper/upload`, fd)).data;
+};
+
+export const setPinnedChat = async ({ id, pinned }) => (await api.patch(`chat/conversations/${id}/pin`, { pinned })).data;
+
+export const clearChat = async (id) => (await api.post(`chat/conversations/${id}/clear`)).data;
+
+export const getMe = async () => (await api.get("chat/me")).data;
 
 export const searchMessages = async ({ q, conversationId }) =>
   (await api.get("chat/search", { params: { q, conversationId } })).data;

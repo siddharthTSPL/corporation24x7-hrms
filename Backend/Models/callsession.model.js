@@ -24,7 +24,7 @@ const callSessionSchema = new mongoose.Schema(
       {
         key: String,
         person: { type: mongoose.Schema.Types.ObjectId, refPath: "participants.personModel" },
-        personModel: { type: String, enum: PERSON_MODELS },
+        personModel: { type: String, enum: [...PERSON_MODELS, "Guest"] }, // "Guest" = outsider invited by email + PIN
         joinedAt: Date,
         leftAt: Date,
         _id: false,

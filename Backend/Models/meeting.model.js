@@ -15,6 +15,38 @@ const attendeeSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Outsiders (no account in this organisation) invited by email. They get a personal
+// 6-digit PIN by mail; only a salted hash of it is stored. See utils/chat/guest.service.js.
+const guestSchema = new mongoose.Schema(
+  {
+    guestId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true, maxlength: 254 },
+    name: { type: String, trim: true, maxlength: 80, default: "" },
+    pinHash: { type: String, default: "" },
+    pinSalt: { type: String, default: "" },
+    pinAttempts: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
+    invitedAt: { type: Date, default: Date.now },
+    invitedByKey: { type: String, default: "" },
+    lastJoinedAt: { type: Date, default: null },
+    joinCount: { type: Number, default: 0 },
+    revoked: { type: Boolean, default: false },
+    revokedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const interestSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true },
+    person: { type: mongoose.Schema.Types.ObjectId, refPath: "interested.personModel", required: true },
+    personModel: { type: String, enum: PERSON_MODELS, required: true },
+    note: { type: String, trim: true, maxlength: 200, default: "" },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const meetingSchema = new mongoose.Schema(
   {
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
@@ -37,6 +69,9 @@ const meetingSchema = new mongoose.Schema(
     attendees: { type: [attendeeSchema], default: [] },
     attendeeKeys: { type: [String], default: [], index: true },
 
+    // Outsiders invited by email + PIN. Always wait in the lobby until the host admits them.
+    guests: { type: [guestSchema], default: [] },
+
     // How the invite list was built. Stored so the UI can show "Everyone in the organisation".
     audience: {
       everyone: { type: Boolean, default: false },
@@ -55,6 +90,22 @@ const meetingSchema = new mongoose.Schema(
     conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", default: undefined }, // in-meeting chat
     roomKey: { type: String, required: true }, // meeting:<id>
     allowJoinBeforeHost: { type: Boolean, default: false },
+
+    settings: {
+      lobby: { type: Boolean, default: false },
+      muteOnEntry: { type: Boolean, default: false },
+      allowUnmute: { type: Boolean, default: true },
+      chatEnabled: { type: Boolean, default: true },
+      reactionsEnabled: { type: Boolean, default: true },
+      handRaiseEnabled: { type: Boolean, default: true },
+      screenShare: { type: String, enum: ["everyone", "host"], default: "everyone" },
+    },
+
+    visibility: { type: String, enum: ["invite_only", "organisation"], default: "invite_only", index: true },
+    capacity: { type: Number, default: 0, min: 0, max: 5000 },
+    interested: { type: [interestSchema], default: [] },
+    interestedKeys: { type: [String], default: [], index: true },
+    lastNudgeAt: { type: Date, default: null },
 
     reminderMinutes: { type: Number, default: 10, min: 0, max: 1440 },
     reminderSentAt: { type: Date, default: null },
