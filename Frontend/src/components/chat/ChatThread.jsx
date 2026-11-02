@@ -36,6 +36,7 @@ import {
   useIsOnline,
   useIsInCall,
   useLastSeen,
+  usePresenceSync,
 } from "../../auth/server-state/chat/chat.hook";
 import { CHAT_KEYS, newClientId, isMineMessage } from "../../auth/server-state/chat/chatCache";
 import { useChatStore } from "../../auth/store/chat/chatStore";
@@ -114,7 +115,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
   const typingNames = useTypingNames(conversationId);
   const online = useIsOnline(!isGroup ? other?.key : null, !!other?.online);
   const otherInCall = useIsInCall(!isGroup ? other?.key : null, !!other?.inCall);
-  const lastSeen = useLastSeen(!isGroup ? other?.key : null);
+  const lastSeen = useLastSeen(!isGroup ? other?.key : null, other?.lastSeenAt || null);
+  usePresenceSync(!isGroup && other?.key ? [other.key] : []);
   const onlineGroupRecipients = isGroup && (conv?.participants || []).some((p) =>
     p.key !== myKey && (presenceMap[p.key] ? presenceMap[p.key].online : !!p.online),
   );

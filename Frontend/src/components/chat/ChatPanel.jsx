@@ -9,7 +9,7 @@ import ChatThread from "./ChatThread";
 import NewChatSheet from "./NewChatSheet";
 import GroupInfoSheet from "./GroupInfoSheet";
 import PersonInfoSheet from "./PersonInfoSheet";
-import CallSoundSettings from "./Callsoundsettings";
+import ChatSettingsSheet from "./ChatSettingsSheet";
 
 const useMediaQuery = (query) => {
   const [matches, setMatches] = useState(() => (typeof window === "undefined" ? false : window.matchMedia(query).matches));
@@ -36,7 +36,7 @@ function EmptyThread({ onNew }) {
         </span>
       </div>
 
-      <h3 className="text-lg font-bold text-gray-900">Your messages</h3>
+      <h3 className="text-lg font-bold text-gray-900">Welcome to TorchX Spark</h3>
       <p className="text-sm text-gray-500 mt-1.5 max-w-[260px] leading-relaxed">
         Pick a conversation from the list, or start a new one with anyone in your organisation.
       </p>
@@ -168,14 +168,14 @@ export default function ChatPanel() {
               {infoConv.type !== "direct" ? (
                 <GroupInfoSheet conversation={infoConv} onClose={() => setInfoOpen(false)} />
               ) : (
-                <PersonInfoSheet person={infoConv.otherPerson} onClose={() => setInfoOpen(false)} />
+                <PersonInfoSheet person={infoConv.otherPerson} conversation={infoConv} onClose={() => setInfoOpen(false)} />
               )}
             </div>
           )}
 
           {soundSettingsOpen && (
             <div className={sheetClass}>
-              <CallSoundSettings onClose={() => setSoundSettingsOpen(false)} />
+              <ChatSettingsSheet onClose={() => setSoundSettingsOpen(false)} />
             </div>
           )}
         </motion.div>

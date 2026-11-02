@@ -328,11 +328,11 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
     <div className="flex flex-col h-full min-h-0 bg-white">
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
-          <h2 className="text-[22px] leading-none font-extrabold tracking-tight text-gray-900">Chats</h2>
+          <h2 className="text-[22px] leading-none font-extrabold tracking-tight text-gray-900">TorchX Spark</h2>
           <RealtimeStatus />
         </div>
         <div className="flex items-center gap-0.5">
-          <IconBtn title="Call & sound settings" onClick={() => setSoundSettingsOpen(true)}>
+          <IconBtn title="Settings" onClick={() => setSoundSettingsOpen(true)}>
             <FaCog className="text-[13px]" />
           </IconBtn>
           {canExpand && (

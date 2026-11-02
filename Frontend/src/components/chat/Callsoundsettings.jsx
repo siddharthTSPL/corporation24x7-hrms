@@ -30,7 +30,10 @@ const Toggle = ({ on, onChange }) => (
 );
 
 // Call ringtone + message sound preferences (saved per browser).
-export default function CallSoundSettings({ onClose }) {
+export default function CallSoundSettings({ onClose, section }) {
+  const showCalls = !section || section === "calls";
+  const showNotif = !section || section === "notifications";
+  const title = section === "calls" ? "Calls" : section === "notifications" ? "Notifications" : "Call & sound settings";
   const [s, setS] = useState(getCallSoundSettings);
   const [msgSound, setMsgSound] = useState(isSoundEnabled);
   const [perm, setPerm] = useState(desktopAlertPermission);
@@ -100,10 +103,11 @@ export default function CallSoundSettings({ onClose }) {
         <button type="button" onClick={onClose} title="Back to chat" className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center">
           <FaArrowLeft className="text-sm" />
         </button>
-        <h3 className="text-base font-bold text-gray-900">Call & sound settings</h3>
+        <h3 className="text-base font-bold text-gray-900">{title}</h3>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
 
+        {showCalls && (<>
         <Row label="Ring on incoming calls"><Toggle on={s.ringEnabled} onChange={(v) => patch({ ringEnabled: v })} /></Row>
 
         <Row label="Ringtone">
@@ -162,7 +166,9 @@ export default function CallSoundSettings({ onClose }) {
         </Row>
 
         <Row label="Vibrate (phones)"><Toggle on={s.vibrate} onChange={(v) => patch({ vibrate: v })} /></Row>
+        </>)}
 
+        {showNotif && (<>
         <Row label="Message sound">
           <Toggle
             on={msgSound}
@@ -187,6 +193,7 @@ export default function CallSoundSettings({ onClose }) {
             </button>
           )}
         </Row>
+        </>)}
       </div>
     </div>
   );

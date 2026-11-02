@@ -28,6 +28,7 @@ import {
   getIceServers,
   getActiveCalls,
   getCallHistory,
+  getPresence,
 } from "../../api/chat/chat.api";
 import { emitAck, emitQuiet } from "../../../realtime/chatSocket";
 import { useChatStore } from "../../store/chat/chatStore";
@@ -438,7 +439,38 @@ export const useIsOnline = (key, fallback = false) =>
 export const useIsInCall = (key, fallback = false) =>
   useChatStore((s) => (key && s.presence[key] ? !!s.presence[key].inCall : fallback));
 
-export const useLastSeen = (key) => useChatStore((s) => (key ? s.presence[key]?.lastSeenAt || null : null));
+export const useLastSeen = (key, fallback = null) =>
+  useChatStore((s) => (key ? s.presence[key]?.lastSeenAt || fallback || null : null));
+
+const presenceItems = (res) => {
+  const raw = Array.isArray(res) ? res : res?.presence || res?.items || res?.users || res?.data || res;
+  const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.entries(raw).map(([key, v]) => ({ key, ...(v || {}) })) : [];
+  return list
+    .map((p) => ({
+      key: p?.key || p?.userKey,
+      online: !!p?.online,
+      lastSeenAt: p?.lastSeenAt || p?.last_seen_at || null,
+      inCall: !!p?.inCall,
+    }))
+    .filter((p) => p.key);
+};
+
+export const usePresenceSync = (keys) => {
+  const joined = (keys || []).filter(Boolean).sort().join(",");
+  const { data } = useQuery({
+    queryKey: ["chat", "presence", joined],
+    queryFn: () => getPresence(joined.split(",")),
+    enabled: !!joined,
+    staleTime: 15000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+  useEffect(() => {
+    if (!data) return;
+    const items = presenceItems(data);
+    if (items.length) useChatStore.getState().setPresenceMany(items);
+  }, [data]);
+};
 
 // ---------------------------------------------------------------- calls (REST side)
 

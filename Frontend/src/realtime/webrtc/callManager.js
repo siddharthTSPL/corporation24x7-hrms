@@ -138,11 +138,30 @@ const closePeer = (socketId) => {
   pcs.delete(socketId);
 };
 
+const iceUrls = (server) => [].concat(server?.urls || server?.url || []).map(String);
+
+const buildIceServers = () => {
+  const base = Array.isArray(ice) ? ice : [];
+  const extra = [];
+  if (!base.some((server) => iceUrls(server).some((u) => /^(stun|turn)s?:/i.test(u)))) {
+    extra.push({ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] });
+  }
+  const turnUrl = import.meta.env.VITE_TURN_URL;
+  if (turnUrl) {
+    extra.push({
+      urls: turnUrl.split(",").map((u) => u.trim()).filter(Boolean),
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    });
+  }
+  return [...base, ...extra];
+};
+
 const createPeer = (socketId, { initiator }) => {
   const existing = pcs.get(socketId);
   if (existing) return existing;
 
-  const pc = new RTCPeerConnection({ iceServers: ice });
+  const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
   const entry = {
     pc,
     polite: String(mySocketId) < String(socketId), // exactly one side yields on glare
@@ -157,6 +176,13 @@ const createPeer = (socketId, { initiator }) => {
   pcs.set(socketId, entry);
 
   pc.onicecandidate = (e) => e.candidate && sendSignal(socketId, { candidate: e.candidate });
+  pc.oniceconnectionstatechange = () => console.info("[call] ice", socketId, pc.iceConnectionState);
+  pc.onicecandidateerror = (e) => console.warn("[call] ice candidate error", e.errorCode, e.url, e.errorText);
+  setTimeout(() => {
+    if (pcs.get(socketId)?.pc !== pc || pc.connectionState === "connected") return;
+    console.warn("[call] not connected after 12s", { socketId, connection: pc.connectionState, ice: pc.iceConnectionState, signaling: pc.signalingState });
+    try { pc.restartIce(); } catch { /* ignore */ }
+  }, 12000);
 
   pc.ontrack = (e) => {
     const active = store().active;

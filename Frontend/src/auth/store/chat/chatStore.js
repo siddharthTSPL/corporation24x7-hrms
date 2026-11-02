@@ -14,13 +14,17 @@ export const useChatStore = create((set, get) => ({
 
   // inCall === undefined keeps whatever we already knew
   setPresence: (key, online, lastSeenAt = null, inCall) =>
-    set((s) => ({
-      presence: { ...s.presence, [key]: { online, lastSeenAt, inCall: inCall === undefined ? !!s.presence[key]?.inCall : !!inCall } },
-    })),
+    set((s) => {
+      const prev = s.presence[key];
+      const seen = lastSeenAt || (online ? prev?.lastSeenAt || null : new Date().toISOString());
+      return {
+        presence: { ...s.presence, [key]: { online, lastSeenAt: seen, inCall: inCall === undefined ? !!prev?.inCall : !!inCall } },
+      };
+    }),
   setPresenceMany: (list) =>
     set((s) => {
       const next = { ...s.presence };
-      for (const p of list || []) next[p.key] = { online: p.online, lastSeenAt: p.lastSeenAt || null, inCall: !!p.inCall };
+      for (const p of list || []) next[p.key] = { online: !!p.online, lastSeenAt: p.lastSeenAt || next[p.key]?.lastSeenAt || null, inCall: !!p.inCall };
       return { presence: next };
     }),
 

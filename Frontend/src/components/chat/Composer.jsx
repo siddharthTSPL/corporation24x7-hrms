@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaReply, FaPen, FaRegSmile, FaMicrophone, FaTrash, FaLock } from "react-icons/fa";
 import { useTypingEmitter } from "../../auth/server-state/chat/chat.hook";
 import EmojiStickerPicker from "./EmojiStickerPicker";
+import { getChatPrefs } from "./chatPrefs";
 import { ACCEPT_ATTR, ALLOWED_MIME, MAX_FILES, MAX_FILE_BYTES, formatSize } from "./chatUtils";
 
 const MAX_VOICE_SECONDS = 5 * 60;
@@ -178,9 +179,12 @@ export default function Composer({ conversationId, replyTo, editing, initialText
   };
 
   const onKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      submit();
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      const sends = getChatPrefs().enterIsSend ? !e.shiftKey : e.ctrlKey || e.metaKey;
+      if (sends) {
+        e.preventDefault();
+        submit();
+      }
     }
     if (e.key === "Escape" && (editing || replyTo)) onCancelContext();
   };
