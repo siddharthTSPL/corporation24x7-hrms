@@ -12,6 +12,7 @@ import {
 import { MediaView, PanelHeader } from "./RoomMedia";
 import { PRESET_BACKGROUNDS, readSavedEffect, writeSavedEffect } from "./effectPresets";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRestoreEffect({ isGuest }) {
   const { active, setVideoEffect } = useCall();
   const { data: prefData, isFetched } = useMeetingPreferences(!isGuest && !!active);

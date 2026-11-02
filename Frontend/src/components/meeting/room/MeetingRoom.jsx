@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useViewportCover } from "../meetingHooks";
+import "../meetingA11y.css";
 import toast from "react-hot-toast";
 import {
   FaMicrophone,
@@ -17,6 +19,11 @@ import {
   FaLink,
   FaLock,
   FaCheck,
+  FaClosedCaptioning,
+  FaThLarge,
+  FaEllipsisH,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 import useCall from "../../../realtime/useCall";
 import { useConversation, useChatMessages } from "../../../auth/server-state/chat/chat.hook";
@@ -30,6 +37,20 @@ import PeoplePanel from "./PeoplePanel";
 import EffectsPanel, { useRestoreEffect } from "./EffectsPanel";
 import HostPanel from "./HostPanel";
 import { MediaView, RoomButton } from "./RoomMedia";
+import { emitAck } from "../../../realtime/chatSocket";
+import useLiveBridge from "./live/useLiveBridge";
+import useCaptions from "./live/useCaptions";
+import useRoomShortcuts from "./live/useRoomShortcuts";
+import { EV } from "./live/liveEvents";
+import { useLiveStore } from "./live/liveStore";
+import { playSound, setSoundsEnabled } from "./live/sounds";
+import QAPanel from "./live/QAPanel";
+import PollsPanel from "./live/PollsPanel";
+import TranscriptPanel from "./live/TranscriptPanel";
+import ActivitiesPanel from "./live/ActivitiesPanel";
+import WhiteboardOverlay from "./live/WhiteboardOverlay";
+import { ActivitiesMenu, MoreMenu, ShortcutsHelp } from "./live/RoomMenus";
+import { RecordingBadge, CaptionsStrip, TimerAgendaBar, PresentingBanner, BoardNudge } from "./live/LiveOverlays";
 
 const gridCols = (n) => {
   if (n <= 1) return "grid-cols-1";
@@ -39,6 +60,8 @@ const gridCols = (n) => {
   if (n <= 9) return "grid-cols-2 md:grid-cols-3";
   return "grid-cols-3 lg:grid-cols-4";
 };
+
+const pageSizeNow = () => (typeof window !== "undefined" && window.innerWidth < 640 ? 6 : 12);
 
 const useClock = (startedAt, running) => {
   const [now, setNow] = useState(() => Date.now());
@@ -97,12 +120,25 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     toggleAudio, toggleVideo, startScreenShare, stopScreenShare, leave, endForAll, raiseHand, lowerHand,
   } = useCall();
 
+  useViewportCover();
   const [panel, setPanel] = useState(null);
   const [tray, setTray] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [pinnedId, setPinnedId] = useState(null);
   const [copied, setCopied] = useState(false);
   const [seenLastId, setSeenLastId] = useState(null);
+  const [layout, setLayout] = useState("grid"); // "grid" | "speaker"
+  const [page, setPage] = useState(0);
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [menu, setMenu] = useState(null); // "activities" | "more"
+  const [captionsOn, setCaptionsOn] = useState(false);
+  const [mySpeech, setMySpeech] = useState(false);
+  const [capLang, setCapLang] = useState("en-IN");
+  const [sounds, setSounds] = useState(true);
+  const [shareAudio, setShareAudio] = useState(false);
+  const [help, setHelp] = useState(false);
+  const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const prevPeerIds = useRef(null);
   const seededRef = useRef(false);
   const lastToastRef = useRef(null);
 
@@ -112,6 +148,10 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   const elapsed = useClock(active?.startedAt, active?.status === "connected");
 
   useRestoreEffect({ isGuest: guest });
+  useLiveBridge();
+  const speaking = useLiveStore((st) => st.speaking);
+  const talk = useLiveStore((st) => st.talk);
+  const spotlightKey = useLiveStore((st) => st.spotlightKey);
 
   const self = conversation?.participants?.find((p) => p.key === myKey);
   const selfName = guest ? guestName || "You" : self?.name || "You";
@@ -126,33 +166,73 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   const handsBlocked = settings.handRaiseEnabled === false && !isHost;
   const reactionsBlocked = settings.reactionsEnabled === false && !isHost;
 
+  const openPanel = (name) => {
+    setTray(false);
+    setMenu(null);
+    setPanel((cur) => (cur === name ? null : name));
+  };
+  const myKeyOrMe = myKey || "me";
+
+  useCaptions({ roomKey: active?.roomKey, myKey, name: selfName, micOn: !!active?.audio, enabled: mySpeech, lang: capLang });
+  useEffect(() => { setSoundsEnabled(sounds); }, [sounds]);
+
+  // pick the "active speaker" (stays on someone until another person has talked for a moment)
+  useEffect(() => {
+    const keys = Object.keys(speaking);
+    if (!keys.length || keys.includes(activeSpeaker)) return undefined;
+    const t = setTimeout(() => setActiveSpeaker(keys.find((k) => k !== myKeyOrMe) || keys[0]), 900);
+    return () => clearTimeout(t);
+  }, [speaking, activeSpeaker, myKeyOrMe]);
+
+  // join / leave chimes
+  useEffect(() => {
+    const ids = new Set(peers.map((p) => p.socketId));
+    const prev = prevPeerIds.current;
+    prevPeerIds.current = ids;
+    if (!prev) return;
+    if ([...ids].some((i) => !prev.has(i))) playSound("join");
+    else if ([...prev].some((i) => !ids.has(i))) playSound("leave");
+  }, [peers]);
+
+  const shortcutRun = (fn) => () => Promise.resolve().then(fn).catch((err) => toast.error(err?.message || "Something went wrong."));
+  useRoomShortcuts({
+    m: () => toggleAudio(),
+    v: shortcutRun(toggleVideo),
+    h: shortcutRun(() => (myHand ? lowerHand() : handsBlocked ? undefined : raiseHand())),
+    c: () => chatAllowed && openPanel("chat"),
+    p: () => openPanel("people"),
+    r: () => !reactionsBlocked && setTray((v) => !v),
+    s: shortcutRun(() => (canShare && !shareBlocked ? (isPresenting || active?.screen ? stopScreenShare() : startScreenShare({ audio: shareAudio })) : undefined)),
+    w: () => setBoardOpen((v) => !v),
+    "?": () => setHelp(true),
+    Escape: () => { setPanel(null); setTray(false); setMenu(null); setHelp(false); },
+  }, !!active);
+
   useEffect(() => {
     if (!chatReady || seededRef.current) return;
     seededRef.current = true;
+// eslint-disable-next-line react-hooks/set-state-in-effect
     setSeenLastId(messages.length ? messages[messages.length - 1].id : null);
   }, [chatReady, messages]);
 
   const unread = useMemo(() => {
-    if (!seededRef.current && !chatReady) return 0;
+    if (!chatReady) return 0;
     const idx = seenLastId ? messages.findIndex((m) => m.id === seenLastId) : -1;
     return messages.slice(idx + 1).filter((m) => m.senderKey !== myKey && !m.deletedAt).length;
   }, [messages, seenLastId, myKey, chatReady]);
 
   useEffect(() => {
-    if (panel === "chat" || !seededRef.current || !messages.length) return;
+    if (!seededRef.current || !messages.length) return;
     const last = messages[messages.length - 1];
     if (last.senderKey === myKey || last.pending || lastToastRef.current === last.id) return;
     lastToastRef.current = last.id;
+    playSound("chat");
+    if (panel === "chat") return;
     toast(`${last.sender?.name || "Someone"}: ${String(last.text || "Sent a file").slice(0, 80)}`, { icon: "💬", id: "meeting-chat-new" });
   }, [messages, panel, myKey]);
 
-  useEffect(() => {
-    if (panel === "host" && !isHost) setPanel(null);
-  }, [panel, isHost]);
-
-  useEffect(() => {
-    if (pinnedId && pinnedId !== "me" && !peers.some((p) => p.socketId === pinnedId)) setPinnedId(null);
-  }, [peers, pinnedId]);
+  if (panel === "host" && !isHost) setPanel(null);
+  if (pinnedId && pinnedId !== "me" && !peers.some((p) => p.socketId === pinnedId)) setPinnedId(null);
 
   if (!active) return null;
 
@@ -177,6 +257,9 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     handRaised: myHand,
     handOrder: myHand ? orderOf(myKey) : 0,
     isHostTile: (active.hostKeys || []).includes(myKey) && active.ownerKey === myKey,
+    speaking: !!speaking[myKeyOrMe],
+    spotlighted: !!spotlightKey && spotlightKey === myKeyOrMe,
+    talkSec: talk[myKeyOrMe] || 0,
   };
 
   const peerTiles = peers.map((p) => ({
@@ -193,19 +276,20 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     handRaised: !!hands[p.key],
     handOrder: hands[p.key] ? orderOf(p.key) : 0,
     isHostTile: active.ownerKey === p.key,
+    speaking: !!speaking[p.key || p.socketId],
+    spotlighted: !!spotlightKey && (spotlightKey === p.key || spotlightKey === p.socketId),
+    talkSec: talk[p.key || p.socketId] || 0,
   }));
 
   const allTiles = [selfTile, ...peerTiles];
   const pinned = pinnedId ? allTiles.find((t) => t.id === pinnedId) : null;
+  const spotlit = allTiles.find((t) => t.spotlighted) || null; // host's "spotlight for everyone" beats a personal pin
+  const speakerTile = layout === "speaker" ? allTiles.find((t) => t.seed === activeSpeaker) || peerTiles[0] || selfTile : null;
+  const focus = spotlit || pinned || speakerTile;
   const togglePin = (id) => setPinnedId((cur) => (cur === id ? null : id));
 
   const status =
     active.status === "reconnecting" ? "Reconnecting…" : active.status === "connected" ? formatDuration(elapsed) : "Connecting…";
-
-  const openPanel = (name) => {
-    setTray(false);
-    setPanel((cur) => (cur === name ? null : name));
-  };
 
   const copyLink = async () => {
     const url = `${window.location.origin}${import.meta.env.BASE_URL || "/"}meetings/${active.meetingId}`;
@@ -224,27 +308,32 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   };
 
   const toggleHand = run(() => (myHand ? lowerHand() : raiseHand()));
-  const toggleShare = run(() => (isPresenting || active.screen ? stopScreenShare() : startScreenShare()));
+  const toggleShare = run(() => (isPresenting || active.screen ? stopScreenShare() : startScreenShare({ audio: shareAudio })));
+  const toggleSpotlight = (tile) => run(() => emitAck(EV.spotlight, { roomKey: active.roomKey, key: tile.spotlighted ? null : tile.seed }))();
+  const onCaptions = (v) => {
+    setCaptionsOn(v);
+    if (v) setMySpeech(true); // turning captions on also lets your own speech be captioned for others
+  };
 
   const renderStage = () => {
-    if (presenter || pinned) {
-      const rest = (pinned ? allTiles.filter((t) => t.id !== pinned.id) : allTiles);
+    if (presenter || focus) {
+      const rest = focus ? allTiles.filter((t) => t.id !== focus.id) : allTiles;
       return (
         <div className="flex h-full min-h-0 flex-col gap-2 lg:flex-row">
           <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl bg-black ring-1 ring-white/5">
             {presenter ? (
               <>
-                <MediaView stream={presenter.screenStream} muted contain />
+                <MediaView stream={presenter.screenStream} contain />
                 <div className="absolute left-3 top-3 rounded-full bg-black/65 px-3 py-1.5 text-xs backdrop-blur-sm">{presenter.name || "Someone"} is presenting</div>
               </>
             ) : (
-              <RoomTile tile={pinned} large pinned onPin={() => togglePin(pinned.id)} />
+              <RoomTile tile={focus} large pinned={focus === pinned} onPin={focus.spotlighted ? undefined : () => togglePin(focus.id)} onSpotlight={isHost ? () => toggleSpotlight(focus) : undefined} />
             )}
           </div>
           <div className="flex min-h-0 gap-2 overflow-auto lg:w-56 lg:flex-col">
             {rest.map((t) => (
               <div key={t.id} className="aspect-video h-24 shrink-0 lg:h-auto lg:w-full">
-                <RoomTile tile={t} compact onPin={() => togglePin(t.id)} />
+                <RoomTile tile={t} compact onPin={() => togglePin(t.id)} onSpotlight={isHost ? () => toggleSpotlight(t) : undefined} />
               </div>
             ))}
           </div>
@@ -256,7 +345,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       const other = peerTiles[0];
       return (
         <div className="relative h-full min-h-0">
-          <RoomTile tile={other} large onPin={() => togglePin(other.id)} />
+          <RoomTile tile={other} large onPin={() => togglePin(other.id)} onSpotlight={isHost ? () => toggleSpotlight(other) : undefined} />
           <div className="absolute bottom-3 right-3 z-10 aspect-video w-36 overflow-hidden rounded-xl shadow-2xl ring-1 ring-white/20 sm:w-48">
             <RoomTile tile={selfTile} compact />
           </div>
@@ -272,12 +361,26 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       );
     }
 
-    const many = allTiles.length > 12;
+    // 12 tiles per page (6 on phones). You are always on every page, the others are split across pages.
+    const size = pageSizeNow();
+    const pageCount = Math.max(1, Math.ceil(peerTiles.length / (size - 1)));
+    const current = Math.min(page, pageCount - 1);
+    const shown = pageCount > 1 ? [selfTile, ...peerTiles.slice(current * (size - 1), (current + 1) * (size - 1))] : allTiles;
+    const speakingElsewhere = pageCount > 1 && peerTiles.some((t, i) => t.speaking && Math.floor(i / (size - 1)) !== current);
     return (
-      <div className={`grid h-full min-h-0 gap-2 ${gridCols(allTiles.length)} ${many ? "auto-rows-[minmax(150px,1fr)] overflow-y-auto" : "auto-rows-fr"}`}>
-        {allTiles.map((t) => (
-          <RoomTile key={t.id} tile={t} onPin={t.id === "me" ? undefined : () => togglePin(t.id)} />
-        ))}
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className={`grid min-h-0 flex-1 gap-2 ${gridCols(shown.length)} auto-rows-fr`}>
+          {shown.map((t) => (
+            <RoomTile key={t.id} tile={t} onPin={t.id === "me" ? undefined : () => togglePin(t.id)} onSpotlight={isHost ? () => toggleSpotlight(t) : undefined} />
+          ))}
+        </div>
+        {pageCount > 1 && (
+          <div className="flex items-center justify-center gap-3 text-xs text-gray-300">
+            <button type="button" aria-label="Previous page" disabled={current === 0} onClick={() => setPage(current - 1)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30"><FaChevronLeft /></button>
+            <span>Page {current + 1} of {pageCount}{speakingElsewhere ? " · someone is speaking on another page" : ""}</span>
+            <button type="button" aria-label="Next page" disabled={current >= pageCount - 1} onClick={() => setPage(current + 1)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30"><FaChevronRight /></button>
+          </div>
+        )}
       </div>
     );
   };
@@ -287,11 +390,15 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     people: <PeoplePanel onClose={() => setPanel(null)} selfPerson={{ name: selfName, photo: self?.photo }} />,
     effects: <EffectsPanel onClose={() => setPanel(null)} isGuest={guest} />,
     host: <HostPanel onClose={() => setPanel(null)} onEndAll={() => setConfirmEnd(true)} />,
+    qa: <QAPanel onClose={() => setPanel(null)} />,
+    polls: <PollsPanel onClose={() => setPanel(null)} />,
+    activities: <ActivitiesPanel onClose={() => setPanel(null)} />,
+    transcript: <TranscriptPanel onClose={() => setPanel(null)} captionsOn={captionsOn} onCaptions={onCaptions} mySpeech={mySpeech} onMySpeech={setMySpeech} lang={capLang} onLang={setCapLang} />,
   }[panel];
 
   return (
-    <div className="fixed inset-0 z-[90] flex flex-col bg-[#101013] text-white">
-      <header className="flex items-center gap-3 px-4 py-3">
+    <div className="mtg-root mtg-room fixed inset-0 z-[90] flex flex-col bg-[#101013] text-white">
+      <header className="mtg-room-header mtg-safe-t mtg-safe-x flex items-center gap-3 py-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{active.title || "Meeting"}</p>
           <p className="flex items-center gap-2 text-xs text-gray-400">
@@ -302,6 +409,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <RecordingBadge />
           {active.locked && (
             <span className="hidden items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-medium text-amber-200 sm:flex">
               <FaLock className="text-[9px]" /> Locked
@@ -326,23 +434,29 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
         <div className="mx-4 mb-2 rounded-xl bg-amber-500/15 px-4 py-2 text-center text-xs text-amber-200">Connection lost. Trying to get you back in…</div>
       )}
 
-      <div className="relative flex min-h-0 flex-1 gap-3 px-3 pb-2">
+      <TimerAgendaBar onOpen={() => openPanel("activities")} />
+
+      <main className="mtg-safe-x relative flex min-h-0 flex-1 gap-3 pb-2">
         <div className="relative min-w-0 flex-1">
           {renderStage()}
           <ReactionLayer />
+          {captionsOn && <CaptionsStrip />}
+          {boardOpen && <WhiteboardOverlay guest={guest} onClose={() => setBoardOpen(false)} />}
+          <BoardNudge open={boardOpen} />
           {isHost && panel !== "people" && <LobbyBanner onOpen={() => openPanel("people")} />}
         </div>
 
         {panelBody && (
-          <aside className="fixed inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#1b1b20] shadow-2xl md:static md:z-auto md:w-[380px] md:shrink-0 md:rounded-2xl">
+          <aside aria-label="Meeting panel" className="mtg-sheet fixed inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#1b1b20] shadow-2xl md:static md:z-auto md:w-[380px] md:shrink-0 md:rounded-2xl">
+            <span className="mtg-sheet-handle" aria-hidden="true" />
             {panelBody}
           </aside>
         )}
-      </div>
+      </main>
 
-      {isPresenting && <p className="pb-1 text-center text-xs text-amber-300">You're sharing your screen</p>}
+      {isPresenting && <PresentingBanner onStop={run(stopScreenShare)} />}
 
-      <footer className="relative flex flex-wrap items-center justify-center gap-2 px-3 pb-5 pt-2 sm:gap-3">
+      <footer className="mtg-room-footer mtg-safe-x mtg-safe-b relative flex flex-wrap items-center justify-center gap-2 pt-2 sm:gap-3">
         {tray && !reactionsBlocked && (
           <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2">
             <ReactionTray onDone={() => setTray(false)} canLoad={!guest} />
@@ -386,11 +500,48 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
           </RoomButton>
         )}
 
+        <RoomButton onClick={() => onCaptions(!captionsOn)} active={captionsOn} title={captionsOn ? "Turn captions off" : "Turn captions on"} className="hidden sm:flex">
+          <FaClosedCaptioning />
+        </RoomButton>
+
+        <div className="relative">
+          <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "activities" ? null : "activities")); }} active={menu === "activities" || boardOpen || ["qa", "polls", "activities", "transcript"].includes(panel)} title="Activities">
+            <FaThLarge />
+          </RoomButton>
+          {menu === "activities" && (
+            <ActivitiesMenu
+              boardOpen={boardOpen}
+              onClose={() => setMenu(null)}
+              onPick={(id) => (id === "board" ? setBoardOpen((v) => !v) : openPanel(id))}
+            />
+          )}
+        </div>
+
+        <div className="relative">
+          <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "more" ? null : "more")); }} active={menu === "more"} title="More options">
+            <FaEllipsisH />
+          </RoomButton>
+          {menu === "more" && (
+            <MoreMenu
+              onClose={() => setMenu(null)}
+              layout={layout}
+              onLayout={(v) => { setLayout(v); setPage(0); }}
+              sounds={sounds}
+              onSounds={setSounds}
+              shareAudio={shareAudio}
+              onShareAudio={setShareAudio}
+              onShortcuts={() => { setMenu(null); setHelp(true); }}
+            />
+          )}
+        </div>
+
         <RoomButton onClick={onLeave} danger wide title="Leave meeting" className="ml-1">
           <FaPhoneSlash />
           <span className="hidden text-sm font-semibold sm:inline">Leave</span>
         </RoomButton>
       </footer>
+
+      {help && <ShortcutsHelp onClose={() => setHelp(false)} />}
 
       {confirmEnd && (
         <EndDialog

@@ -4,7 +4,8 @@ import { CalendarPlus, Pencil, XCircle, StopCircle, Video, Mic, Repeat, BellRing
 import Avatar from "../../chat/Avatar";
 import JoinButton from "../JoinButton";
 import { RsvpButtons } from "../MeetingCard";
-import { Btn, Chip, Modal, Field, inputCls } from "../ui";
+import { Btn, Chip, Modal, Field } from "../ui";
+import { inputCls } from "../meetingClasses";
 import { useCancelMeeting, useEndMeeting, useDownloadMeetingIcs } from "../../../auth/server-state/meeting/meeting.hook";
 import { useNudgeMeetingInvitees, useUpdateMeetingSpace, useInterestedPeople, usePromoteInterestedPeople } from "../../../auth/server-state/meeting/meetingSpace.hook";
 import { RSVP, errMsg, fmtDate, fmtDuration, fmtTime, minutesBetween } from "../meetingUtils";

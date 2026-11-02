@@ -78,6 +78,10 @@ export const uploadMeetingBackground = async ({ file, name, scope = "personal" }
 
 export const deleteMeetingBackground = async (bgId) => (await api.delete(`meetings/backgrounds/${bgId}`)).data;
 
+export const getMeetingDefaults = async () => (await api.get("meetings/defaults")).data;
+
+export const updateMeetingDefaults = async (defaults) => (await api.put("meetings/defaults", { defaults })).data;
+
 export const getMeetingPreferences = async () => (await api.get("meetings/preferences")).data;
 
 export const updateMeetingPreferences = async (body) => (await api.put("meetings/preferences", body)).data;

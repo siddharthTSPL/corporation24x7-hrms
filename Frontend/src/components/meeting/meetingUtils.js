@@ -109,3 +109,12 @@ export const GUEST_SKIP_REASON = {
 
 // Public link a guest opens (the app is served under /talent)
 export const guestJoinLink = (meetingId) => `${window.location.origin}/talent/meeting-guest/${meetingId}`;
+
+export const MEETING_TOGGLES = [
+  ["lobby", "Waiting room", "Members wait until you admit them. (Outside guests always wait.)"],
+  ["muteOnEntry", "Mute people on entry", "Everyone except hosts joins muted."],
+  ["allowUnmute", "Let people unmute themselves", "Turn off to keep participants muted unless you unmute them."],
+  ["chatEnabled", "In-meeting chat", "Participants can send messages during the meeting."],
+  ["reactionsEnabled", "Reactions", "Participants can send emoji reactions."],
+  ["handRaiseEnabled", "Raise hand", "Participants can raise a hand to speak."],
+];

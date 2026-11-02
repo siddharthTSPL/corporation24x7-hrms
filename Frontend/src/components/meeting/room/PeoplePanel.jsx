@@ -1,9 +1,12 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { FaCheck, FaTimes, FaBan, FaMicrophoneSlash, FaMicrophone, FaHandPaper, FaUserShield, FaUserMinus, FaEllipsisV, FaVideoSlash, FaVideo } from "react-icons/fa";
+import { FaCheck, FaTimes, FaBan, FaMicrophoneSlash, FaMicrophone, FaHandPaper, FaUserShield, FaUserMinus, FaEllipsisV, FaVideoSlash, FaVideo, FaBullseye } from "react-icons/fa";
 import useCall from "../../../realtime/useCall";
 import Avatar from "../../chat/Avatar";
 import { PanelHeader } from "./RoomMedia";
+import { emitAck } from "../../../realtime/chatSocket";
+import { EV } from "./live/liveEvents";
+import { useLiveStore } from "./live/liveStore";
 
 const run = (fn) => Promise.resolve().then(fn).catch((err) => toast.error(err?.message || "Something went wrong."));
 
@@ -65,16 +68,26 @@ function PersonRow({ p, isMe, isHostRow, canModerate, handOrder, menuOpen, onMen
   const isModerator = (active?.hostKeys || []).includes(p.key);
   const isOwner = p.key === active?.ownerKey;
   const canAct = canModerate && !isMe && !isOwner;
+  const rowId = p.key || p.socketId;
+  const speakingNow = useLiveStore((st) => !!st.speaking[rowId]);
+  const talkSec = useLiveStore((st) => st.talk[rowId] || 0);
+  const spotlit = useLiveStore((st) => !!rowId && st.spotlightKey === rowId);
 
   return (
     <div className="relative flex items-center gap-3 px-4 py-2.5 hover:bg-white/5">
-      <Avatar name={p.name} photo={p.photo} size={36} seed={p.key || p.socketId} />
+      <span className={`rounded-full ${speakingNow && p.audio !== false ? "ring-2 ring-emerald-400" : ""}`}><Avatar name={p.name} photo={p.photo} size={36} seed={p.key || p.socketId} /></span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium text-white">
           <span className="truncate">{isMe ? `${p.name || "You"} (You)` : p.name || "Participant"}</span>
           {isHostRow && <span className="shrink-0 rounded bg-white/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-gray-200">{isOwner ? "Host" : "Co-host"}</span>}
         </p>
         {p.model === "Guest" || p.isGuest ? <p className="text-[11px] text-gray-500">Outside guest</p> : null}
+        {talkSec > 0 || spotlit ? (
+          <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
+            {spotlit && <span className="flex items-center gap-1 text-pink-300"><FaBullseye className="text-[9px]" /> Spotlight</span>}
+            {talkSec > 0 && <span>Spoke {talkSec >= 60 ? `${Math.floor(talkSec / 60)}m ${talkSec % 60}s` : `${talkSec}s`}</span>}
+          </p>
+        ) : null}
       </div>
       {handOrder ? (
         <span className="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-semibold text-gray-900">
@@ -87,7 +100,7 @@ function PersonRow({ p, isMe, isHostRow, canModerate, handOrder, menuOpen, onMen
       <span className={`hidden h-7 w-7 items-center justify-center rounded-full text-xs sm:flex ${p.video ? "text-gray-400" : "text-gray-600"}`}>
         {p.video ? <FaVideo /> : <FaVideoSlash />}
       </span>
-      {canAct || (handOrder && canModerate) ? (
+      {canModerate ? (
         <button type="button" onClick={onMenu} aria-label="Participant actions" className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white">
           <FaEllipsisV className="text-xs" />
         </button>
@@ -100,6 +113,11 @@ function PersonRow({ p, isMe, isHostRow, canModerate, handOrder, menuOpen, onMen
               <FaHandPaper className="text-xs text-gray-400" /> Lower hand
             </button>
           ) : null}
+          {canModerate && (
+            <button type="button" onClick={() => { run(() => emitAck(EV.spotlight, { roomKey: active?.roomKey, key: spotlit ? null : rowId })); onMenu(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-gray-200 hover:bg-white/10">
+              <FaBullseye className="text-xs text-gray-400" /> {spotlit ? "Remove spotlight" : "Spotlight for everyone"}
+            </button>
+          )}
           {canAct && p.audio !== false && (
             <button type="button" onClick={() => { run(() => requestMute(p.socketId)); onMenu(); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-gray-200 hover:bg-white/10">
               <FaMicrophoneSlash className="text-xs text-gray-400" /> Mute

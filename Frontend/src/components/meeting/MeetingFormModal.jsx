@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { Modal, Btn, Field, inputCls } from "./ui";
+import { Modal, Btn, Field } from "./ui";
+import { inputCls } from "./meetingClasses";
 import PeoplePicker from "./PeoplePicker";
-import { useCreateMeeting, useUpdateMeeting, useCheckAvailability } from "../../auth/server-state/meeting/meeting.hook";
+import { useCreateMeeting, useUpdateMeeting, useCheckAvailability, useMeetingDefaults } from "../../auth/server-state/meeting/meeting.hook";
 import { useCreateInstantMeeting } from "../../auth/server-state/meeting/meetingSpace.hook";
 import { GUEST_SKIP_REASON, parseGuestInput } from "./meetingUtils";
 import { DURATIONS, REMINDERS, combineDateTime, errMsg, fmtTime, minutesBetween, nextSlot, personRef, toDateInput, toTimeInput } from "./meetingUtils";
@@ -32,11 +33,17 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const [guestText, setGuestText] = useState("");
   const [freq, setFreq] = useState("none");
   const [count, setCount] = useState(4);
-  const [reminder, setReminder] = useState(meeting?.reminderMinutes ?? 10);
-  const [joinBefore, setJoinBefore] = useState(meeting?.allowJoinBeforeHost ?? false);
+  const [reminderPick, setReminderPick] = useState(meeting?.reminderMinutes ?? null);
+  const [joinBeforePick, setJoinBeforePick] = useState(meeting?.allowJoinBeforeHost ?? null);
+  const [controlPicks, setControlPicks] = useState({});
   const [sendEmail, setSendEmail] = useState(true);
   const [error, setError] = useState("");
 
+  const defaultsQ = useMeetingDefaults(!edit);
+  const orgDefaults = defaultsQ.data?.defaults;
+  const reminder = reminderPick ?? orgDefaults?.reminderMinutes ?? 10;
+  const joinBefore = joinBeforePick ?? orgDefaults?.allowJoinBeforeHost ?? false;
+  const controls = { ...(orgDefaults?.settings || {}), ...controlPicks };
   const create = useCreateMeeting();
   const update = useUpdateMeeting();
   const quick = useCreateInstantMeeting();
@@ -109,8 +116,9 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
           audience: everyone ? { everyone: true } : undefined,
           guests: guestList.length ? guestList : undefined,
           recurrence: freq === "none" ? undefined : { freq, interval: 1, count: Number(count) || 4 },
-          reminderMinutes: reminder,
-          allowJoinBeforeHost: joinBefore,
+          reminderMinutes: reminderPick ?? undefined,
+          allowJoinBeforeHost: joinBeforePick ?? undefined,
+          settings: Object.keys(controlPicks).length ? controlPicks : undefined,
           sendEmail,
         });
         toast.success(res.occurrences > 1 ? `${res.occurrences} meetings scheduled` : "Meeting scheduled");
@@ -147,13 +155,13 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
     >
       <div className="space-y-4">
         <Field label={instant ? "Title (optional)" : "Title"}>
-          <input className={inputCls} value={title} maxLength={150} autoFocus placeholder={instant ? "Instant meeting" : "e.g. Sprint planning"} onChange={(e) => setTitle(e.target.value)} />
+          <input className={inputCls} value={title} maxLength={150} data-autofocus placeholder={instant ? "Instant meeting" : "e.g. Sprint planning"} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
         <Field label={everyone ? "Invite" : "Invite people"}>
           <PeoplePicker value={people} onChange={setPeople} />
           {!instant && !edit && (
-            <label className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+            <label className="mt-2 flex min-h-9 items-center gap-2 text-sm text-gray-700">
               <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} className="accent-[#730042]" />
               Invite everyone in the organisation
             </label>
@@ -198,8 +206,8 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
         )}
 
         {!instant && canReschedule && (people.length > 0 || everyone) && avail.data && (
-          <div className={`flex gap-2 rounded-lg p-3 text-sm ${busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
-            {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" />}
+          <div role="status" className={`flex gap-2 rounded-lg p-3 text-sm ${busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
+            {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
             <div>
               {busy.length ? (
                 <>
@@ -227,7 +235,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
               type="button"
               onClick={() => setMedia(v)}
               aria-pressed={media === v}
-              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${media === v ? "border-[#730042] bg-[#730042]/5 text-[#730042]" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
+              className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${media === v ? "border-[#730042] bg-[#730042]/5 text-[#730042]" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
             >
               {v === "video" ? "Video call" : "Audio only"}
             </button>
@@ -244,7 +252,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
             </Field>
 
             <details className="rounded-lg border border-gray-200 px-3 py-2">
-              <summary className="cursor-pointer text-sm font-medium text-gray-700">More options</summary>
+              <summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-gray-700">More options</summary>
               <div className="mt-3 space-y-3 pb-1">
                 {!edit && (
                   <div className="grid grid-cols-2 gap-3">
@@ -264,7 +272,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                   </div>
                 )}
                 <Field label="Remind attendees">
-                  <select className={inputCls} value={reminder} onChange={(e) => setReminder(Number(e.target.value))}>
+                  <select className={inputCls} value={reminder} onChange={(e) => setReminderPick(Number(e.target.value))}>
                     {REMINDERS.map((r) => (
                       <option key={r} value={r}>
                         {r === 0 ? "No reminder" : `${r} minutes before`}
@@ -273,9 +281,20 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                   </select>
                 </Field>
                 <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" checked={joinBefore} onChange={(e) => setJoinBefore(e.target.checked)} className="accent-[#730042]" />
+                  <input type="checkbox" checked={joinBefore} onChange={(e) => setJoinBeforePick(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
                   Let people join before the host
                 </label>
+                {!edit && (
+                  <div className="space-y-2 rounded-lg bg-gray-50 p-3">
+                    <p className="text-xs font-medium text-gray-700">Meeting controls{defaultsQ.isSuccess ? " (your organisation's defaults are pre-selected)" : ""}</p>
+                    {[["lobby", "Waiting room"], ["muteOnEntry", "Mute people on entry"]].map(([key, label]) => (
+                      <label key={key} className="flex min-h-9 items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" checked={!!controls[key]} onChange={(e) => setControlPicks((c) => ({ ...c, [key]: e.target.checked }))} className="h-4 w-4 accent-[#730042]" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
                 {!edit && (
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} className="accent-[#730042]" />

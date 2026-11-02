@@ -25,6 +25,8 @@ meetingRouter.get("/reactions", asyncHandler(x.reactionList));
 meetingRouter.get("/backgrounds", asyncHandler(x.listBackgrounds));
 meetingRouter.post("/backgrounds", backgroundUpload.single("image"), asyncHandler(x.uploadBackground));
 meetingRouter.delete("/backgrounds/:bgId", asyncHandler(x.deleteBackground));
+meetingRouter.get("/defaults", asyncHandler(x.getDefaults));
+meetingRouter.put("/defaults", asyncHandler(x.updateDefaults));
 meetingRouter.get("/preferences", asyncHandler(x.getPreferences));
 meetingRouter.put("/preferences", asyncHandler(x.updatePreferences));
 

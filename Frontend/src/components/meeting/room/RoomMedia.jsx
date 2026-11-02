@@ -34,6 +34,8 @@ export function RoomButton({ onClick, active = false, danger = false, disabled =
       onClick={onClick}
       title={title}
       aria-label={title}
+      aria-pressed={danger || wide ? undefined : active}
+      data-active={active || undefined}
       disabled={disabled}
       className={`relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-full text-[15px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-12 ${wide ? "px-5" : "w-11 sm:w-12"} ${tone} ${className}`}
     >
@@ -55,7 +57,7 @@ export function PanelHeader({ title, subtitle, onClose, right }) {
         {subtitle ? <p className="truncate text-xs text-gray-400">{subtitle}</p> : null}
       </div>
       {right}
-      <button type="button" onClick={onClose} aria-label="Close panel" className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-white/10 hover:text-white">
+      <button type="button" onClick={onClose} aria-label="Close panel" className="flex h-10 w-10 items-center justify-center sm:h-8 sm:w-8 rounded-full text-gray-400 hover:bg-white/10 hover:text-white">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
           <path d="M2 2l10 10M12 2L2 12" />
         </svg>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Search, X } from "lucide-react";
 import Avatar from "../chat/Avatar";
 import { useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
-import { inputCls } from "./ui";
+import { inputCls } from "./meetingClasses";
 
 // value: array of directory people ({ key, id, model, name, photo, designation, department })
 export default function PeoplePicker({ value = [], onChange, placeholder = "Search by name, ID or department", disabled }) {

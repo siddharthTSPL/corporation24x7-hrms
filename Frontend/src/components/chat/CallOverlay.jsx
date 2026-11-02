@@ -19,9 +19,11 @@ import useCall from "../../realtime/useCall";
 import { emitAck } from "../../realtime/chatSocket";
 import { useActiveCalls, useConversation, useDirectorySearch } from "../../auth/server-state/chat/chat.hook";
 import Avatar from "./Avatar";
-import MeetingHostControls from "../meeting/MeetingHostControls";
 import MeetingRoom from "../meeting/room/MeetingRoom";
 import WaitingScreen from "../meeting/room/WaitingScreen";
+import PostMeetingScreen from "../meeting/PostMeetingScreen";
+import MeetingSoonBanner from "../meeting/MeetingSoonBanner";
+import { playSound } from "../meeting/room/live/sounds";
 import { formatDuration } from "./chatUtils";
 import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
 
@@ -90,7 +92,7 @@ export function CtrlButton({ onClick, active = true, danger = false, title, chil
   );
 }
 
-export function useElapsed(startedAt, running) {
+function useElapsed(startedAt, running) {
   const [mountedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
 
@@ -106,7 +108,7 @@ export function useElapsed(startedAt, running) {
   return Math.max(0, (now - base) / 1000);
 }
 
-export function gridCols(n) {
+function gridCols(n) {
   if (n <= 1) return "grid-cols-1";
   if (n === 2) return "grid-cols-1 md:grid-cols-2";
   if (n <= 4) return "grid-cols-2";
@@ -126,6 +128,7 @@ function CallScreen() {
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
 
   useEffect(() => {
+// eslint-disable-next-line react-hooks/set-state-in-effect
     if (active?.callId) setMinimized(false);
   }, [active?.callId]);
 
@@ -138,7 +141,7 @@ function CallScreen() {
   const directTarget = conversation?.type === "direct" ? conversation.otherPerson : null;
   const title = active.kind === "direct"
     ? directTarget?.name || active.title || conversation?.name || "Call"
-    : active.title || conversation?.name || (active.kind === "meeting" ? "Meeting" : "Call");
+    : active.title || conversation?.name || "Call";
   const presenter = peers.find((p) => p.screenStream);
   const self = conversation?.participants?.find((p) => p.key === myKey);
   const waitingTarget = active.kind === "direct" && peers.length === 0
@@ -194,14 +197,14 @@ function CallScreen() {
   );
 
   const quickReactions = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎"];
-  // const sendReaction = async (emoji) => {
-  //   try {
-  //     await emitAck("call:reaction", { roomKey: active.roomKey, emoji }, 5000);
-  //   } catch (err) {
-  //     toast.error(err?.message || "Couldn't send reaction.");
-  //   }
-  //   setReactionOpen(false);
-  // };
+  const sendReaction = async (emoji) => {
+    try {
+      await emitAck("call:reaction", { roomKey: active.roomKey, emoji }, 5000);
+    } catch (err) {
+      toast.error(err?.message || "Couldn't send reaction.");
+    }
+    setReactionOpen(false);
+  };
 
   if (minimized) {
     const miniParticipants = active.kind === "direct"
@@ -314,12 +317,9 @@ function CallScreen() {
         </div>
         <div className="flex items-center gap-2">
           {active.mutedByHost && <span className="text-[11px] bg-amber-500/20 text-amber-300 rounded-full px-2.5 py-1">Muted by host</span>}
-          {active.kind === "meeting" && isHost && <MeetingHostControls />}
-          {active.kind !== "meeting" && (
-            <button type="button" onClick={() => setInviteOpen(true)} title="Invite people" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
-              <FaUserPlus className="text-sm" />
-            </button>
-          )}
+          <button type="button" onClick={() => setInviteOpen(true)} title="Invite people" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
+            <FaUserPlus className="text-sm" />
+          </button>
           <button type="button" onClick={() => setMinimized(true)} title="Minimise" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
             <FaCompressAlt className="text-xs" />
           </button>
@@ -553,7 +553,28 @@ function RejoinCalls() {
 }
 
 export default function CallOverlay() {
-  const { lastEnded, clearLastEnded, error, clearError, inCall, requestResume } = useCall();
+  const { active, waiting, lastEnded, clearLastEnded, error, clearError, inCall, requestResume } = useCall();
+  const [tracked, setTracked] = useState(null);
+  const [post, setPost] = useState(null);
+  const lobbyRoom = useRef(null);
+
+  const current = active?.kind === "meeting" ? { id: active.meetingId || String(active.roomKey || "").replace(/^meeting:/, ""), title: active.title } : null;
+  if ((current?.id ?? null) !== (tracked?.id ?? null)) {
+    setTracked(current);
+    if (!current && tracked?.id) setPost(tracked);
+    if (current) setPost(null);
+  }
+
+  useEffect(() => {
+    if (waiting?.code === "LOBBY") lobbyRoom.current = waiting.roomKey;
+  }, [waiting]);
+
+  useEffect(() => {
+    if (active?.roomKey && lobbyRoom.current === active.roomKey) {
+      lobbyRoom.current = null;
+      playSound("admitted");
+    }
+  }, [active?.roomKey]);
 
   useEffect(() => {
     requestResume();
@@ -562,7 +583,11 @@ export default function CallOverlay() {
   useEffect(() => {
     if (!lastEnded || inCall) return;
     const dur = lastEnded.durationSec ? ` · ${formatDuration(lastEnded.durationSec)}` : "";
-    toast(`Call ended${dur}`, { icon: "📞" });
+    if (String(lastEnded.roomKey || "").startsWith("meeting:")) {
+      if (lastEnded.reason === "removed") toast("You were removed from the meeting", { icon: "🚪" });
+    } else {
+      toast(`Call ended${dur}`, { icon: "📞" });
+    }
     clearLastEnded();
   }, [lastEnded, inCall, clearLastEnded]);
 
@@ -578,6 +603,8 @@ export default function CallOverlay() {
       <RejoinCalls />
       <WaitingScreen />
       <CallScreen />
+      <MeetingSoonBanner />
+      {post && !active && lastEnded?.reason !== "removed" && <PostMeetingScreen key={post.id} meeting={post} onClose={() => setPost(null)} />}
     </>
   );
 }
