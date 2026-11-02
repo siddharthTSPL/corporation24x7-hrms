@@ -308,6 +308,7 @@ const registerChatSocket = (io, socket) => {
   on("meeting:board:stroke", async (p) => { if (!allow(socket, "stroke", 150, 10000)) throw tooFast(); return live.boardStroke(String(p.roomKey || ""), socket, actor, { stroke: p.stroke }); });
   on("meeting:board:undo", async (p) => { if (!allow(socket, "boardundo", 20, 10000)) throw tooFast(); return live.boardUndo(String(p.roomKey || ""), socket, actor, {}); });
   on("meeting:board:clear", L(live.boardClear));
+  on("meeting:board:view", L(live.boardView));
 
   on("meeting:caption", async (p) => { if (!allow(socket, "caption", 40, 10000)) throw tooFast(); return live.caption(String(p.roomKey || ""), socket, actor, { text: p.text, final: p.final, lang: p.lang }); });
   on("meeting:speaking", async (p) => { if (!allow(socket, "speaking", 30, 10000)) return {}; return live.speaking(String(p.roomKey || ""), socket, actor, { speaking: p.speaking }); });

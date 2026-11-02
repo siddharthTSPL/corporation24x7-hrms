@@ -17,6 +17,7 @@ export const EV = {
   qaDelete: "meeting:qa:delete",
   qaChanged: ["meeting:qa", "meeting:question", "meeting:qa:ask", "meeting:qa:upvote", "meeting:qa:answer", "meeting:qa:pin", "meeting:qa:delete"],
 
+  boardState: "meeting:board:state",
   boardStroke: "meeting:board:stroke",
   boardUndo: "meeting:board:undo",
   boardClear: "meeting:board:clear",
@@ -33,7 +34,6 @@ export const EV = {
   pulseStart: "meeting:pulse:start",
   pulseVote: "meeting:pulse:vote",
   pulseClose: "meeting:pulse:close",
-  wheelSpin: "meeting:wheel:spin",
   kudosGive: "meeting:kudos:give",
   kudosReceived: "meeting:kudos-received",
   decisionAdd: "meeting:decision:add",
@@ -46,6 +46,6 @@ export const LISTEN = [
   EV.speaking, EV.spotlight, EV.caption, EV.recording, EV.flags,
   EV.boardStroke, EV.boardUndo, EV.boardClear, EV.boardView,
   EV.timerStart, EV.timerPause, EV.timerResume, EV.timerReset, EV.agendaSet, EV.agendaNext, EV.agendaToggle,
-  EV.pulseStart, EV.pulseVote, EV.pulseClose, EV.wheelSpin, EV.kudosReceived,
+  EV.pulseStart, EV.pulseVote, EV.pulseClose, EV.kudosReceived,
   ...EV.decisionChanged, ...EV.qaChanged,
 ];

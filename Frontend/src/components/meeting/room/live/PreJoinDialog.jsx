@@ -182,7 +182,7 @@ export default function PreJoinDialog({ title = "Meeting", audioOnly = false, on
           <div className="space-y-3 rounded-2xl bg-white/5 p-3.5">
             <Switch checked={!micOn} onChange={(v) => setMicOn(!v)} label="Join muted" />
             {!audioOnly && <Switch checked={!camOn} onChange={(v) => setCamOn(!v)} label="Join with camera off" />}
-            <Switch checked={prefs.noiseSuppression} onChange={(v) => setProc({ noiseSuppression: v })} label="Noise suppression" hint="Filters keyboard and background noise" />
+            <Switch checked={prefs.noiseSuppression} onChange={(v) => setProc({ noiseSuppression: v })} label="AI noise cancellation" hint="Removes keyboard, fan and background noise from your voice" />
             <Switch checked={prefs.echoCancellation} onChange={(v) => setProc({ echoCancellation: v })} label="Echo cancellation" hint="Turn off only if you use headphones" />
           </div>
           <div className="mt-auto flex gap-2">

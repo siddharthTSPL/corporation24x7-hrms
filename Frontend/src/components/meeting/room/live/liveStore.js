@@ -13,10 +13,20 @@ const fresh = () => ({
   timer: { label: "", durationSec: 0, endsAt: null, remainingSec: 0, running: false },
   agenda: { items: [], currentId: null },
   pulse: null, // { id, question, scale, open, votes: {1:n..}, total, mine }
-  wheel: null, // { id, names: [], winner, at }
   decisions: [],
   kudosFeed: [],
 });
+
+// the server stores strokes as { k, points: [x1,y1,x2,y2,...] }; the board draws { key, points: [[x,y],...] }
+const normStroke = (s = {}) => {
+  const raw = Array.isArray(s.points) ? s.points : [];
+  let points = raw;
+  if (raw.length && typeof raw[0] === "number") {
+    points = [];
+    for (let i = 0; i + 1 < raw.length; i += 2) points.push([raw[i], raw[i + 1]]);
+  }
+  return { ...s, key: s.key || s.k || "", points };
+};
 
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const who = (p = {}) => p.key || p.socketId || p.by || "";
@@ -92,12 +102,22 @@ export const useLiveStore = create((set, get) => ({
     const on = p.on ?? p.recording ?? p.active ?? p.status === "recording";
     set({ recording: { on: !!on, by: p.by || p.name || "", since: on ? num(p.since ?? p.startedAt, Date.now()) : null } });
   },
-  setFlags: (p = {}) => set((s) => ({ flags: { ...s.flags, ...(p.flags || p) } })),
+  setFlags: (p = {}) =>
+    set((s) => {
+      const flags = { ...s.flags, ...(p.flags || p) };
+      // boardAnyone=false means only the host may draw
+      const board = typeof flags.boardAnyone === "boolean" ? { ...s.board, viewOnly: !flags.boardAnyone } : s.board;
+      return { flags, board };
+    }),
 
-  boardLoad: (strokes) => set((s) => ({ board: { ...s.board, strokes: strokes || [], loaded: true } })),
-  boardAdd: (stroke) =>
-    set((s) => (s.board.strokes.some((x) => x.id === stroke.id) ? s : { board: { ...s.board, strokes: [...s.board.strokes, stroke] } })),
+  boardLoad: (strokes) => set((s) => ({ board: { ...s.board, strokes: (strokes || []).map(normStroke), loaded: true } })),
+  boardAdd: (raw) =>
+    set((s) => {
+      const stroke = normStroke(raw);
+      return s.board.strokes.some((x) => x.id === stroke.id) ? s : { board: { ...s.board, strokes: [...s.board.strokes, stroke] } };
+    }),
   boardRemove: (id) => set((s) => ({ board: { ...s.board, strokes: s.board.strokes.filter((x) => x.id !== id) } })),
+  boardReplace: (strokes, viewOnly) => set((s) => ({ board: { ...s.board, strokes: (strokes || []).map(normStroke), loaded: true, viewOnly: viewOnly ?? s.board.viewOnly } })),
   boardRemoveLastOf: (key) =>
     set((s) => {
       const idx = [...s.board.strokes].map((x) => x.key).lastIndexOf(key);
@@ -128,10 +148,6 @@ export const useLiveStore = create((set, get) => ({
 
   pulseApply: (p) => set((s) => ({ pulse: normalizePulse(p, s.pulse) })),
   pulseMine: (value) => set((s) => (s.pulse ? { pulse: { ...s.pulse, mine: value } } : s)),
-  wheelApply: (p = {}) => {
-    const names = (p.names || p.candidates || []).map((n) => (typeof n === "string" ? n : n.name));
-    set({ wheel: { id: `${Date.now()}`, names, winner: p.winnerName || p.winner?.name || p.winner || "", winnerKey: p.winnerKey || p.winner?.key || "", at: Date.now() } });
-  },
   decisionsSet: (list) => set({ decisions: list }),
   decisionApply: (p = {}) =>
     set((s) => {

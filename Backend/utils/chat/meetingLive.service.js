@@ -24,10 +24,10 @@ const controls = require("./meetingControls.service");
 const { httpError, resolvePeople, parseKey } = require("./people.utils");
 
 const MAX_STROKES = 1500;
-const MAX_POINTS = 240; // numbers per stroke (= 120 x/y pairs)
+const MAX_POINTS = 2000; // numbers per stroke (= 1000 x/y pairs)
 const MAX_TRANSCRIPT = 4000;
 const MAX_OPEN_QUESTIONS = 300;
-const BOARD_TOOLS = ["pen", "highlighter", "line", "rect", "ellipse", "arrow", "text"];
+const BOARD_TOOLS = ["pen", "eraser", "highlighter", "line", "rect", "ellipse", "arrow", "text"];
 const BURSTS = ["confetti", "fireworks", "balloons", "clap", "hearts", "party"];
 const FLUSH_EVERY_MS = 10000;
 
@@ -792,9 +792,16 @@ const canSignal = (room, fromSocketId, toSocketId) => {
 const sanitizeStroke = (raw, key) => {
   if (!raw || typeof raw !== "object") throw httpError("Invalid stroke.", 400);
   const tool = BOARD_TOOLS.includes(raw.tool) ? raw.tool : "pen";
+  // accepts flat [x1,y1,x2,y2,...], pairs [[x,y],...] or objects [{x,y},...] (the web client sends pairs)
+  const flat = [];
+  for (const n of Array.isArray(raw.points) ? raw.points : []) {
+    if (Array.isArray(n)) flat.push(n[0], n[1]);
+    else if (n && typeof n === "object") flat.push(n.x, n.y);
+    else flat.push(n);
+    if (flat.length >= MAX_POINTS) break;
+  }
   const pts = [];
-  const src = Array.isArray(raw.points) ? raw.points.slice(0, MAX_POINTS) : [];
-  for (const n of src) {
+  for (const n of flat.slice(0, MAX_POINTS)) {
     const v = Number(n);
     if (!Number.isFinite(v)) throw httpError("Invalid stroke points.", 400);
     pts.push(Math.round(Math.min(Math.max(v, -0.5), 1.5) * 10000) / 10000);
@@ -816,19 +823,19 @@ const sanitizeStroke = (raw, key) => {
 const boardState = wrap(async (room, socket) => {
   inRoom(room, socket);
   const L = room.live;
-  return { open: L.flags.boardOpen, anyone: L.flags.boardAnyone, strokes: L.board.strokes };
+  return { open: L.flags.boardOpen, anyone: L.flags.boardAnyone, viewOnly: !L.flags.boardAnyone, strokes: L.board.strokes.map((x) => ({ ...x, key: x.k })) };
 });
 
 const boardStroke = wrap(async (room, socket, actor, p) => {
   inRoom(room, socket);
   const L = room.live;
-  if (!L.flags.boardOpen) throw withCode("The whiteboard is closed.", "BOARD_CLOSED", 409);
+  L.flags.boardOpen = true; // anyone opening the board opens it for the room
   if (!L.flags.boardAnyone && !rooms.isModerator(room, actor.key)) throw withCode("Only the host can draw right now.", "BOARD_HOST_ONLY", 403);
   const stroke = sanitizeStroke(p.stroke, actor.key);
   L.board.strokes.push(stroke);
   if (L.board.strokes.length > MAX_STROKES) L.board.strokes.splice(0, L.board.strokes.length - MAX_STROKES);
   L.board.dirty = true;
-  socket.to(roomOf(room.roomKey)).emit("meeting:board:stroke", { roomKey: room.roomKey, stroke });
+  socket.to(roomOf(room.roomKey)).emit("meeting:board:stroke", { roomKey: room.roomKey, key: actor.key, stroke: { ...stroke, key: stroke.k } });
   return { id: stroke.id };
 });
 
@@ -839,7 +846,7 @@ const boardUndo = wrap(async (room, socket, actor) => {
     if (L.board.strokes[i].k === actor.key) {
       const [gone] = L.board.strokes.splice(i, 1);
       L.board.dirty = true;
-      emitRoom(room, "meeting:board:remove", { id: gone.id, by: actor.key });
+      emitRoom(room, "meeting:board:undo", { strokeId: gone.id, id: gone.id, by: actor.key, key: actor.key });
       return { removed: gone.id };
     }
   }
@@ -853,6 +860,15 @@ const boardClear = wrap(async (room, socket, actor) => {
   L.board.dirty = true;
   emitRoom(room, "meeting:board:clear", { by: actor.key });
   return {};
+});
+
+const boardView = wrap(async (room, socket, actor, p) => {
+  modOnly(room, socket, actor);
+  const L = room.live;
+  L.flags.boardAnyone = !p.viewOnly;
+  emitRoom(room, "meeting:board:view", { viewOnly: !!p.viewOnly, by: actor.key });
+  emitRoom(room, "meeting:flags", { flags: L.flags, by: actor.key });
+  return { viewOnly: !!p.viewOnly };
 });
 
 // ---------------------------------------------------------------- captions / transcript / talk time
@@ -1165,6 +1181,7 @@ module.exports = {
   boardStroke,
   boardUndo,
   boardClear,
+  boardView,
   caption,
   speaking,
   talkTime,

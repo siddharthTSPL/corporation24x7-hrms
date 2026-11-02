@@ -42,7 +42,7 @@ export function ActivitiesMenu({ onPick, onClose, boardOpen }) {
       <Item icon={<FaQuestionCircle />} label="Q&A" hint="Ask and upvote questions" onClick={() => pick("qa")} />
       <Item icon={<FaPoll />} label="Polls" hint="Vote on quick questions" onClick={() => pick("polls")} />
       <Item icon={<FaChalkboard />} label={boardOpen ? "Close whiteboard" : "Whiteboard"} hint="Draw together" onClick={() => pick("board")} />
-      <Item icon={<FaStopwatch />} label="Activities" hint="Timer, agenda, pulse, wheel, kudos, decisions" onClick={() => pick("activities")} />
+      <Item icon={<FaStopwatch />} label="Activities" hint="Timer, agenda, pulse, kudos, decisions" onClick={() => pick("activities")} />
       <Item icon={<FaClosedCaptioning />} label="Captions & transcript" onClick={() => pick("transcript")} />
     </Popup>
   );

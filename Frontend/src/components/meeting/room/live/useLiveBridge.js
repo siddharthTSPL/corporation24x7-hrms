@@ -47,7 +47,8 @@ export default function useLiveBridge() {
       [EV.boardStroke]: (p) => mine(p) && p?.stroke && st().boardAdd({ ...p.stroke, key: p.stroke.key || idOf(p) }),
       [EV.boardUndo]: (p) => {
         if (!mine(p)) return;
-        if (p?.strokeId) st().boardRemove(p.strokeId);
+        const id = p?.strokeId || p?.id;
+        if (id) st().boardRemove(id);
         else if (idOf(p)) st().boardRemoveLastOf(idOf(p));
       },
       [EV.boardClear]: (p) => mine(p) && st().boardClear(),
@@ -68,7 +69,6 @@ export default function useLiveBridge() {
       [EV.pulseStart]: (p) => mine(p) && st().pulseApply({ ...p, open: true, votes: p?.votes || {}, total: 0 }),
       [EV.pulseVote]: (p) => mine(p) && st().pulseApply(p),
       [EV.pulseClose]: (p) => mine(p) && st().pulseApply({ ...p, open: false }),
-      [EV.wheelSpin]: (p) => mine(p) && st().wheelApply(p),
       [EV.kudosReceived]: (p) => {
         if (p?.roomKey && p.roomKey !== roomKey) return;
         st().kudosPush({ id: `${Date.now()}`, from: p?.fromName || p?.from?.name || "Someone", message: p?.message || p?.text || "", emoji: p?.emoji || "🎉" });

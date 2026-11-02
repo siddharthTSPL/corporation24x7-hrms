@@ -4,7 +4,8 @@ import { emitAck, emitAckRetry, emitQuiet } from "../chatSocket";
 import { useCallStore } from "../../auth/store/call/callStore";
 import { useChatStore } from "../../auth/store/chat/chatStore";
 import { createEffectProcessor, loadEffectImage } from "./videoEffects";
-import { audioConstraints, videoConstraints, setMediaPrefs } from "./mediaPrefs";
+import { audioConstraints, videoConstraints, setMediaPrefs, getMediaPrefs } from "./mediaPrefs";
+import { enhanceMicTrack } from "./noiseSuppress";
 
 const store = () => useCallStore.getState();
 const MESH_WARN_AT = 8;
@@ -60,11 +61,23 @@ const friendlyMediaError = (err, wantVideo) => {
   return new Error(err?.message || "Could not access your microphone.");
 };
 
+// Swap the raw microphone for the AI-cleaned one (when "Noise suppression" is on and the browser supports it).
+const cleanMic = async (stream) => {
+  const raw = stream.getAudioTracks()[0];
+  if (!raw || !getMediaPrefs().noiseSuppression) return stream;
+  const clean = await enhanceMicTrack(raw);
+  if (clean) {
+    stream.removeTrack(raw);
+    stream.addTrack(clean);
+  }
+  return stream;
+};
+
 const getLocalMedia = async (wantVideo) => {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("Calls need a secure (https) connection and a supported browser.");
   }
-  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const audio = { ...audioConstraints(), channelCount: 1 };
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio,
@@ -73,7 +86,7 @@ const getLocalMedia = async (wantVideo) => {
     stream.getAudioTracks().forEach((track) => {
       try { track.contentHint = "speech"; } catch { /* optional browser hint */ }
     });
-    return { stream, cameraBlocked: false };
+    return { stream: await cleanMic(stream), cameraBlocked: false };
   } catch (err) {
     if (wantVideo) {
       // camera denied/missing: join with audio only instead of failing the call
@@ -82,7 +95,7 @@ const getLocalMedia = async (wantVideo) => {
         stream.getAudioTracks().forEach((track) => {
           try { track.contentHint = "speech"; } catch { /* optional browser hint */ }
         });
-        return { stream, cameraBlocked: true };
+        return { stream: await cleanMic(stream), cameraBlocked: true };
       } catch (err2) {
         throw friendlyMediaError(err2, false);
       }
@@ -538,6 +551,7 @@ const switchDevice = async (kind, deviceId) => {
     const fresh = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints({ audioDeviceId: deviceId }) }).catch((err) => {
       throw friendlyMediaError(err, false);
     });
+    await cleanMic(fresh);
     const next = fresh.getAudioTracks()[0];
     const prev = local.stream.getAudioTracks()[0];
     next.enabled = prev ? prev.enabled : a.audio;

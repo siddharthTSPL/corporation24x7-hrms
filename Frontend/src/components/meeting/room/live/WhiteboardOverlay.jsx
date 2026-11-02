@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FaPen, FaEraser, FaUndo, FaTrash, FaTimes, FaDownload, FaEye } from "react-icons/fa";
 import useCall from "../../../../realtime/useCall";
 import { emitAck } from "../../../../realtime/chatSocket";
-import { useMeetingBoard } from "../../../../auth/server-state/meeting/meetingLive.hook";
 import { EV } from "./liveEvents";
 import { useLiveStore } from "./liveStore";
 import { act } from "./liveHelpers";
@@ -30,11 +29,9 @@ function paint(ctx, w, h, stroke) {
 export default function WhiteboardOverlay({ onClose, guest = false }) {
   const { active, isHost, myKey } = useCall();
   const roomKey = active?.roomKey;
-  const meetingId = active?.meetingId;
   const selfKey = myKey || "me";
   const board = useLiveStore((s) => s.board);
-  const { boardLoad, boardAdd, boardRemove, boardClear, boardViewOnly } = useLiveStore.getState();
-  const { data } = useMeetingBoard(meetingId, !guest && !!meetingId);
+  const { boardAdd, boardRemove, boardClear, boardViewOnly, boardReplace } = useLiveStore.getState();
 
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
@@ -45,10 +42,17 @@ export default function WhiteboardOverlay({ onClose, guest = false }) {
 
   const canDraw = !guest && (!board.viewOnly || isHost);
 
-  // first open: take what the server already has
+  // every time the board opens: take what the room already has (strokes + who may draw)
   useEffect(() => {
-    if (data?.strokes && !useLiveStore.getState().board.loaded) boardLoad(data.strokes);
-  }, [data, boardLoad]);
+    if (!roomKey) return undefined;
+    let gone = false;
+    emitAck(EV.boardState, { roomKey })
+      .then((res) => {
+        if (!gone) boardReplace(res.strokes, typeof res.viewOnly === "boolean" ? res.viewOnly : undefined);
+      })
+      .catch(() => {});
+    return () => { gone = true; };
+  }, [roomKey, boardReplace]);
 
   const redraw = useCallback(() => {
     const c = canvasRef.current;
@@ -99,8 +103,16 @@ export default function WhiteboardOverlay({ onClose, guest = false }) {
     const s = drawing.current;
     drawing.current = null;
     if (!s) return;
-    boardAdd(s);
-    act(() => emitAck(EV.boardStroke, { roomKey, stroke: s }));
+    const MAX_PAIRS = 900; // server keeps up to 1000 points per stroke
+    let pts = s.points;
+    if (pts.length > MAX_PAIRS) {
+      const step = pts.length / MAX_PAIRS;
+      pts = Array.from({ length: MAX_PAIRS }, (_, i) => s.points[Math.min(s.points.length - 1, Math.floor(i * step))]);
+      pts[pts.length - 1] = s.points[s.points.length - 1];
+    }
+    const stroke = { ...s, points: pts };
+    boardAdd(stroke);
+    act(() => emitAck(EV.boardStroke, { roomKey, stroke }));
   };
 
   const undo = () => {

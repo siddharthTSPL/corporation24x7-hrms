@@ -66,7 +66,7 @@ export function PresentingBanner({ onStop }) {
 }
 
 // tells people someone started drawing while the board is closed
-export function BoardNudge({ open }) {
+export function BoardNudge({ open, onOpen }) {
   const count = useLiveStore((s) => s.board.strokes.length);
   const seen = useRef(count);
   useEffect(() => {
@@ -75,10 +75,11 @@ export function BoardNudge({ open }) {
       return;
     }
     if (count > seen.current) {
-      toast("Someone is drawing on the whiteboard", { icon: "🖊️", id: "board-nudge", duration: 5000 });
+      toast("Someone is drawing on the whiteboard", { icon: "🖊️", id: "board-nudge", duration: 3000 });
       seen.current = count;
+      onOpen?.(); // open the board for everyone so they can draw together
     }
-  }, [open, count]);
+  }, [open, count, onOpen]);
   useEffect(() => () => toast.dismiss("board-nudge"), []);
   return null;
 }

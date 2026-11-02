@@ -10,7 +10,7 @@ import {
   useDeleteMeetingBackground,
 } from "../../../auth/server-state/meeting/meeting.hook";
 import { MediaView, PanelHeader } from "./RoomMedia";
-import { PRESET_BACKGROUNDS, readSavedEffect, writeSavedEffect } from "./effectPresets";
+import { PRESET_GROUPS, BLUR_LEVELS, readSavedEffect, writeSavedEffect } from "./effectPresets";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useRestoreEffect({ isGuest }) {
@@ -174,9 +174,11 @@ export default function EffectsPanel({ onClose, isGuest }) {
             <Option label="None" selected={fx.effect === "none"} disabled={!cameraOn || !!busy} onClick={() => apply({ effect: "none" }, "none")}>
               <div className="flex h-full w-full items-center justify-center bg-white/10 text-gray-300"><FaBan /></div>
             </Option>
-            <Option label="Blur" selected={fx.effect === "blur"} disabled={!cameraOn || !!busy} onClick={() => apply({ effect: "blur", blurIntensity: intensity }, "blur")}>
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-600 to-slate-800 text-gray-100"><FaTint /></div>
-            </Option>
+            {BLUR_LEVELS.map((lv) => (
+              <Option key={lv.id} label={lv.label} selected={fx.effect === "blur" && Math.abs((fx.blurIntensity || 50) - lv.value) < 15} disabled={!cameraOn || !!busy} onClick={() => { setIntensity(lv.value); apply({ effect: "blur", blurIntensity: lv.value }, lv.id); }}>
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-600 to-slate-800 text-gray-100" style={{ filter: `blur(${lv.value / 40}px)` }}><FaTint /></div>
+              </Option>
+            ))}
           </div>
           {fx.effect === "blur" && (
             <div className="mt-3 rounded-xl bg-white/5 px-3 py-2.5">
@@ -187,8 +189,12 @@ export default function EffectsPanel({ onClose, isGuest }) {
         </div>
 
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Backgrounds</p>
-          <div className="grid grid-cols-3 gap-2">{PRESET_BACKGROUNDS.map((bg) => bgCard(bg, false))}</div>
+          {PRESET_GROUPS.map((g) => (
+            <div key={g.title} className="mb-4 last:mb-0">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{g.title}</p>
+              <div className="grid grid-cols-3 gap-2">{g.items.map((bg) => bgCard(bg, false))}</div>
+            </div>
+          ))}
         </div>
 
         {!isGuest && org.length > 0 && (

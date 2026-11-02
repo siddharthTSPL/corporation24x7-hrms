@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { FaPlay, FaPause, FaRedo, FaForward, FaPlus, FaTrash } from "react-icons/fa";
 import useCall from "../../../../realtime/useCall";
 import { emitAck } from "../../../../realtime/chatSocket";
@@ -131,50 +131,6 @@ function PulseTab({ roomKey, isHost }) {
   );
 }
 
-// ---------------------------------------------------------------- Wheel
-function WheelTab({ roomKey, isHost }) {
-  const { peers, active, myKey } = useCall();
-  const wheel = useLiveStore((s) => s.wheel);
-  const [shown, setShown] = useState("");
-  const [spinning, setSpinning] = useState(false);
-  const timer = useRef(null);
-  const names = useMemo(() => [active?.localStream ? "You" : "", ...peers.map((p) => p.name || "Participant")].filter(Boolean), [peers, active?.localStream]);
-
-  // slot-machine style reveal whenever a result arrives
-  useEffect(() => {
-    if (!wheel?.winner) return undefined;
-    const pool = wheel.names.length ? wheel.names : names;
-    let i = 0;
-// eslint-disable-next-line react-hooks/set-state-in-effect
-    setSpinning(true);
-    timer.current = setInterval(() => {
-      setShown(pool[i % pool.length] || wheel.winner);
-      i += 1;
-      if (i > 22) {
-        clearInterval(timer.current);
-        setShown(wheel.winnerKey && wheel.winnerKey === myKey ? "You" : wheel.winner);
-        setSpinning(false);
-      }
-    }, 90);
-    return () => clearInterval(timer.current);
-  }, [wheel?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <div className="space-y-4 px-4 py-4">
-      <div className="rounded-2xl bg-gradient-to-br from-[#3b0022] to-[#730042] p-6 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-pink-200">Picked</p>
-        <p className={`mt-2 min-h-10 truncate text-3xl font-semibold text-white ${spinning ? "opacity-80" : ""}`}>{shown || "🎡"}</p>
-      </div>
-      {isHost ? (
-        <PillButton tone="brand" disabled={spinning || !peers.length} onClick={() => act(() => emitAck(EV.wheelSpin, { roomKey, names }))}>Spin the wheel</PillButton>
-      ) : (
-        <p className="text-center text-xs text-gray-500">The host spins the wheel for everyone.</p>
-      )}
-      {!peers.length && isHost && <p className="text-xs text-gray-500">You need at least one more person in the meeting.</p>}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- Kudos
 function KudosTab({ roomKey, meetingId }) {
   const { peers } = useCall();
@@ -239,7 +195,7 @@ function DecisionsTab({ roomKey, isHost }) {
   );
 }
 
-const TABS = [["plan", "Timer & agenda"], ["pulse", "Pulse"], ["wheel", "Wheel"], ["kudos", "Kudos"], ["decisions", "Decisions"]];
+const TABS = [["plan", "Timer & agenda"], ["pulse", "Pulse"], ["kudos", "Kudos"], ["decisions", "Decisions"]];
 
 export default function ActivitiesPanel({ onClose, initialTab = "plan" }) {
   const { active, isHost } = useCall();
@@ -252,7 +208,6 @@ export default function ActivitiesPanel({ onClose, initialTab = "plan" }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "plan" && <PlanTab roomKey={roomKey} isHost={isHost} />}
         {tab === "pulse" && <PulseTab roomKey={roomKey} isHost={isHost} />}
-        {tab === "wheel" && <WheelTab roomKey={roomKey} isHost={isHost} />}
         {tab === "kudos" && <KudosTab roomKey={roomKey} meetingId={active?.meetingId} />}
         {tab === "decisions" && <DecisionsTab roomKey={roomKey} isHost={isHost} />}
       </div>

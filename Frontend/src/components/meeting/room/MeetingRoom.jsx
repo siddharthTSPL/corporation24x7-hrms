@@ -442,7 +442,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
           <ReactionLayer />
           {captionsOn && <CaptionsStrip />}
           {boardOpen && <WhiteboardOverlay guest={guest} onClose={() => setBoardOpen(false)} />}
-          <BoardNudge open={boardOpen} />
+          <BoardNudge open={boardOpen} onOpen={() => setBoardOpen(true)} />
           {isHost && panel !== "people" && <LobbyBanner onOpen={() => openPanel("people")} />}
         </div>
 
