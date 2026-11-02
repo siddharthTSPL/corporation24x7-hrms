@@ -21,6 +21,9 @@ import {
   FaCheck,
   FaClosedCaptioning,
   FaThLarge,
+  FaColumns,
+  FaExpand,
+  FaCompress,
   FaEllipsisH,
   FaChevronLeft,
   FaChevronRight,
@@ -49,7 +52,7 @@ import PollsPanel from "./live/PollsPanel";
 import TranscriptPanel from "./live/TranscriptPanel";
 import ActivitiesPanel from "./live/ActivitiesPanel";
 import WhiteboardOverlay from "./live/WhiteboardOverlay";
-import { ActivitiesMenu, MoreMenu, ShortcutsHelp } from "./live/RoomMenus";
+import { ActivitiesMenu, MoreMenu, ShortcutsHelp, ViewMenu } from "./live/RoomMenus";
 import { RecordingBadge, CaptionsStrip, TimerAgendaBar, PresentingBanner, BoardNudge } from "./live/LiveOverlays";
 
 const gridCols = (n) => {
@@ -99,17 +102,19 @@ function LobbyBanner({ onOpen }) {
   const lobby = active?.lobby || [];
   if (!lobby.length) return null;
   const first = lobby[0];
+  const one = lobby.length === 1;
   return (
-    <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex w-[min(460px,calc(100%-1.5rem))] -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-400/40 bg-[#2a2418]/95 px-4 py-3 shadow-2xl backdrop-blur">
-      <Avatar name={first.name} photo={first.photo} size={38} seed={first.key} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-amber-50">{first.name || "Someone"}{lobby.length > 1 ? ` and ${lobby.length - 1} more` : ""}</p>
-        <p className="text-[11px] text-amber-200/70">{lobby.length > 1 ? "are waiting to join" : "is waiting to join"}</p>
-      </div>
-      <button type="button" onClick={onOpen} className="rounded-full px-3 py-1.5 text-xs font-semibold text-amber-100 hover:bg-white/10">View</button>
-      <button type="button" onClick={run(() => admit(first.socketId))} className="flex items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600">
-        <FaCheck className="text-[10px]" /> Admit
-      </button>
+    <div role="status" className="pointer-events-auto flex max-w-[calc(100%-1.5rem)] items-center gap-2.5 rounded-full border border-[#FBBF24]/35 bg-[#2a2310]/95 py-1.5 pl-1.5 pr-1.5 shadow-2xl backdrop-blur">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FBBF24]/25 text-xs text-[#FDE68A]"><FaUsers /></span>
+      <span className="min-w-0 truncate text-sm font-semibold text-[#FDE68A]">
+        {one ? `${first.name || "Someone"} is waiting to join` : `${lobby.length} people waiting to join`}
+      </span>
+      {one && (
+        <button type="button" onClick={run(() => admit(first.socketId))} className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-600">
+          <FaCheck className="text-[10px]" /> Admit
+        </button>
+      )}
+      <button type="button" onClick={onOpen} className="shrink-0 rounded-full bg-[#FBBF24] px-4 py-1.5 text-xs font-bold text-gray-900 hover:bg-[#fcd34d]">Review</button>
     </div>
   );
 }
@@ -135,9 +140,12 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   const [mySpeech, setMySpeech] = useState(false);
   const [capLang, setCapLang] = useState("en-IN");
   const [sounds, setSounds] = useState(true);
-  const [shareAudio, setShareAudio] = useState(false);
+  const [shareAudio, setShareAudio] = useState(true);
   const [help, setHelp] = useState(false);
   const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [hideNoVideo, setHideNoVideo] = useState(false);
+  const [hideSelf, setHideSelf] = useState(false);
+  const [fullscreen, setFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
   const prevPeerIds = useRef(null);
   const seededRef = useRef(false);
   const lastToastRef = useRef(null);
@@ -175,6 +183,15 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
 
   useCaptions({ roomKey: active?.roomKey, myKey, name: selfName, micOn: !!active?.audio, enabled: mySpeech, lang: capLang });
   useEffect(() => { setSoundsEnabled(sounds); }, [sounds]);
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => toast.error("Full screen isn't available here."));
+  };
 
   // pick the "active speaker" (stays on someone until another person has talked for a moment)
   useEffect(() => {
@@ -204,6 +221,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     r: () => !reactionsBlocked && setTray((v) => !v),
     s: shortcutRun(() => (canShare && !shareBlocked ? (isPresenting || active?.screen ? stopScreenShare() : startScreenShare({ audio: shareAudio })) : undefined)),
     w: () => setBoardOpen((v) => !v),
+    g: () => { setLayout((v) => (v === "grid" ? "speaker" : "grid")); setPage(0); },
     "?": () => setHelp(true),
     Escape: () => { setPanel(null); setTray(false); setMenu(null); setHelp(false); },
   }, !!active);
@@ -281,10 +299,14 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     talkSec: talk[p.key || p.socketId] || 0,
   }));
 
-  const allTiles = [selfTile, ...peerTiles];
+  // "Change view" filters. People hidden from the screen are still heard (their audio keeps playing).
+  const shownPeerTiles = hideNoVideo ? peerTiles.filter((t) => t.videoOn || t.spotlighted || t.id === pinnedId) : peerTiles;
+  const hiddenPeerTiles = peerTiles.filter((t) => !shownPeerTiles.includes(t));
+  const showSelf = !hideSelf || shownPeerTiles.length === 0;
+  const allTiles = [...(showSelf ? [selfTile] : []), ...shownPeerTiles];
   const pinned = pinnedId ? allTiles.find((t) => t.id === pinnedId) : null;
   const spotlit = allTiles.find((t) => t.spotlighted) || null; // host's "spotlight for everyone" beats a personal pin
-  const speakerTile = layout === "speaker" ? allTiles.find((t) => t.seed === activeSpeaker) || peerTiles[0] || selfTile : null;
+  const speakerTile = layout === "speaker" ? allTiles.find((t) => t.seed === activeSpeaker) || shownPeerTiles[0] || allTiles[0] : null;
   const focus = spotlit || pinned || speakerTile;
   const togglePin = (id) => setPinnedId((cur) => (cur === id ? null : id));
 
@@ -341,8 +363,8 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       );
     }
 
-    if (allTiles.length === 2) {
-      const other = peerTiles[0];
+    if (showSelf && shownPeerTiles.length === 1) {
+      const other = shownPeerTiles[0];
       return (
         <div className="relative h-full min-h-0">
           <RoomTile tile={other} large onPin={() => togglePin(other.id)} onSpotlight={isHost ? () => toggleSpotlight(other) : undefined} />
@@ -356,17 +378,18 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     if (allTiles.length === 1) {
       return (
         <div className="h-full min-h-0">
-          <RoomTile tile={selfTile} large />
+          <RoomTile tile={allTiles[0]} large />
         </div>
       );
     }
 
     // 12 tiles per page (6 on phones). You are always on every page, the others are split across pages.
     const size = pageSizeNow();
-    const pageCount = Math.max(1, Math.ceil(peerTiles.length / (size - 1)));
+    const perPage = showSelf ? size - 1 : size;
+    const pageCount = Math.max(1, Math.ceil(shownPeerTiles.length / perPage));
     const current = Math.min(page, pageCount - 1);
-    const shown = pageCount > 1 ? [selfTile, ...peerTiles.slice(current * (size - 1), (current + 1) * (size - 1))] : allTiles;
-    const speakingElsewhere = pageCount > 1 && peerTiles.some((t, i) => t.speaking && Math.floor(i / (size - 1)) !== current);
+    const shown = pageCount > 1 ? [...(showSelf ? [selfTile] : []), ...shownPeerTiles.slice(current * perPage, (current + 1) * perPage)] : allTiles;
+    const speakingElsewhere = pageCount > 1 && shownPeerTiles.some((t, i) => t.speaking && Math.floor(i / perPage) !== current);
     return (
       <div className="flex h-full min-h-0 flex-col gap-2">
         <div className={`grid min-h-0 flex-1 gap-2 ${gridCols(shown.length)} auto-rows-fr`}>
@@ -398,32 +421,36 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
 
   return (
     <div className="mtg-root mtg-room fixed inset-0 z-[90] flex flex-col bg-[#101013] text-white">
-      <header className="mtg-room-header mtg-safe-t mtg-safe-x flex items-center gap-3 py-3">
+      <header className="mtg-room-header mtg-safe-t mtg-safe-x flex items-start gap-3 py-3 sm:items-center">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{active.title || "Meeting"}</p>
-          <p className="flex items-center gap-2 text-xs text-gray-400">
-            <span className={`h-1.5 w-1.5 rounded-full ${active.status === "connected" ? "bg-emerald-400" : "animate-pulse bg-amber-400"}`} />
-            <span className={active.status === "connected" ? "text-emerald-300" : "text-amber-200"}>{status}</span>
-            <span className="text-gray-600">·</span>
+          <p className="truncate text-base font-semibold leading-tight">{active.title || "Meeting"}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-400">
+            <span className={`h-[7px] w-[7px] rounded-full ${active.status === "connected" ? "bg-[#34D399]" : "animate-pulse bg-[#FBBF24]"}`} />
+            <span className={`font-medium ${active.status === "connected" ? "text-[#6EE7B7]" : "text-amber-200"}`}>{active.status === "connected" ? "Connected" : status}</span>
+            {active.status === "connected" && <><span aria-hidden="true">·</span><span className="tabular-nums">{status}</span></>}
+            <span aria-hidden="true">·</span>
             <span>{peers.length + 1} in meeting</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <RecordingBadge />
           {active.locked && (
-            <span className="hidden items-center gap-1.5 rounded-full bg-amber-400/15 px-2.5 py-1 text-[11px] font-medium text-amber-200 sm:flex">
-              <FaLock className="text-[9px]" /> Locked
+            <span className="flex h-[30px] items-center gap-1.5 rounded-full bg-[#FBBF24]/15 px-3 text-xs font-semibold text-[#FDE68A]">
+              <FaLock className="text-[10px]" /> Locked
             </span>
           )}
-          {active.mutedByHost && <span className="rounded-full bg-amber-500/20 px-2.5 py-1 text-[11px] text-amber-300">Muted by host</span>}
+          {active.mutedByHost && <span className="rounded-full bg-amber-500/20 px-2.5 py-1.5 text-[11px] text-amber-300">Muted by host</span>}
           {!guest && active.meetingId && (
-            <button type="button" onClick={copyLink} title="Copy meeting link" className="flex h-9 items-center gap-2 rounded-full bg-white/10 px-3 text-xs font-medium hover:bg-white/20">
+            <button type="button" onClick={copyLink} title="Copy meeting link" className="flex h-[34px] items-center gap-2 rounded-full border border-[#2E2E35] bg-[#1B1B20] px-3.5 text-xs font-semibold hover:bg-[#26262b]">
               {copied ? <FaCheck className="text-emerald-300" /> : <FaLink />}
               <span className="hidden sm:inline">{copied ? "Copied" : "Copy link"}</span>
             </button>
           )}
+          <button type="button" onClick={toggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen"} aria-label={fullscreen ? "Exit full screen" : "Full screen"} className="hidden h-[34px] w-[34px] items-center justify-center rounded-full border border-[#2E2E35] bg-[#1B1B20] text-xs hover:bg-[#26262b] sm:flex">
+            {fullscreen ? <FaCompress /> : <FaExpand />}
+          </button>
           {onMinimize && (
-            <button type="button" onClick={onMinimize} title="Minimise" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20">
+            <button type="button" onClick={onMinimize} title="Minimise" aria-label="Minimise" className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#2E2E35] bg-[#1B1B20] hover:bg-[#26262b]">
               <FaCompressAlt className="text-xs" />
             </button>
           )}
@@ -439,15 +466,23 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       <main className="mtg-safe-x relative flex min-h-0 flex-1 gap-3 pb-2">
         <div className="relative min-w-0 flex-1">
           {renderStage()}
+          {hiddenPeerTiles.length > 0 && (
+            <div aria-hidden="true" className="absolute h-0 w-0 overflow-hidden">
+              {hiddenPeerTiles.map((t) => <MediaView key={t.id} stream={t.stream} hidden />)}
+            </div>
+          )}
           <ReactionLayer />
-          {captionsOn && <CaptionsStrip />}
           {boardOpen && <WhiteboardOverlay guest={guest} onClose={() => setBoardOpen(false)} />}
           <BoardNudge open={boardOpen} onOpen={() => setBoardOpen(true)} />
-          {isHost && panel !== "people" && <LobbyBanner onOpen={() => openPanel("people")} />}
+          {/* captions live at the TOP of the stage, with the "waiting to join" pill under them */}
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex flex-col items-center gap-2">
+            {captionsOn && <CaptionsStrip />}
+            {isHost && panel !== "people" && <LobbyBanner onOpen={() => openPanel("people")} />}
+          </div>
         </div>
 
         {panelBody && (
-          <aside aria-label="Meeting panel" className="mtg-sheet fixed inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#1b1b20] shadow-2xl md:static md:z-auto md:w-[380px] md:shrink-0 md:rounded-2xl">
+          <aside aria-label="Meeting panel" className="mtg-sheet fixed inset-x-0 bottom-0 top-16 z-40 flex flex-col overflow-hidden rounded-t-3xl border border-[#2E2E35] bg-[#1B1B20] shadow-2xl md:static md:z-auto md:w-[380px] md:shrink-0 md:rounded-[20px]">
             <span className="mtg-sheet-handle" aria-hidden="true" />
             {panelBody}
           </aside>
@@ -456,89 +491,113 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
 
       {isPresenting && <PresentingBanner onStop={run(stopScreenShare)} />}
 
-      <footer className="mtg-room-footer mtg-safe-x mtg-safe-b relative flex flex-wrap items-center justify-center gap-2 pt-2 sm:gap-3">
-        {tray && !reactionsBlocked && (
-          <div className="absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2">
-            <ReactionTray onDone={() => setTray(false)} canLoad={!guest} />
+      <footer className="mtg-room-footer mtg-safe-x mtg-safe-b flex justify-center pt-2">
+        <div role="toolbar" aria-label="Meeting controls" className="relative flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[28px] border border-[#2E2E35] bg-[#1B1B20]/95 px-2.5 py-2 shadow-[0_14px_44px_rgba(0,0,0,0.55)] backdrop-blur sm:gap-2 sm:px-3">
+          <RoomButton onClick={toggleAudio} active={!active.audio} title={active.audio ? "Mute (M)" : "Unmute (M)"}>
+            {active.audio ? <FaMicrophone /> : <FaMicrophoneSlash className="text-red-600" />}
+          </RoomButton>
+          <RoomButton onClick={run(toggleVideo)} active={!active.video} title={active.video ? "Turn camera off (V)" : "Turn camera on (V)"}>
+            {active.video ? <FaVideo /> : <FaVideoSlash className="text-red-600" />}
+          </RoomButton>
+          <RoomButton onClick={() => openPanel("effects")} active={panel === "effects" || active.effect?.effect !== "none"} disabled={!hasCameraTrack} title="Backgrounds & effects">
+            <FaMagic />
+          </RoomButton>
+
+          <div className="relative">
+            <RoomButton onClick={() => { setMenu(null); setTray((v) => !v); }} active={tray} disabled={reactionsBlocked} title={reactionsBlocked ? "Reactions are off" : "Reactions (R)"}>
+              <FaRegSmile />
+            </RoomButton>
+            {tray && !reactionsBlocked && (
+              <div className="fixed inset-x-3 bottom-24 z-50 flex justify-center sm:absolute sm:inset-x-auto sm:bottom-full sm:left-1/2 sm:mb-3 sm:w-max sm:-translate-x-1/2">
+                <ReactionTray onDone={() => setTray(false)} canLoad={!guest} />
+              </div>
+            )}
           </div>
-        )}
 
-        <RoomButton onClick={toggleAudio} active={!active.audio} title={active.audio ? "Mute" : "Unmute"}>
-          {active.audio ? <FaMicrophone /> : <FaMicrophoneSlash className="text-red-600" />}
-        </RoomButton>
-        <RoomButton onClick={run(toggleVideo)} active={!active.video} title={active.video ? "Turn camera off" : "Turn camera on"}>
-          {active.video ? <FaVideo /> : <FaVideoSlash className="text-red-600" />}
-        </RoomButton>
-        <RoomButton onClick={() => openPanel("effects")} active={panel === "effects" || active.effect?.effect !== "none"} disabled={!hasCameraTrack} title="Backgrounds & effects">
-          <FaMagic />
-        </RoomButton>
-        <RoomButton onClick={() => setTray((v) => !v)} active={tray} disabled={reactionsBlocked} title={reactionsBlocked ? "Reactions are off" : "Reactions"}>
-          <FaRegSmile />
-        </RoomButton>
-        <RoomButton onClick={toggleHand} active={myHand} disabled={handsBlocked} title={handsBlocked ? "Raise hand is off" : myHand ? "Lower hand" : "Raise hand"}>
-          <FaHandPaper className={myHand ? "text-amber-600" : ""} />
-        </RoomButton>
-        {canShare && (
-          <RoomButton onClick={toggleShare} active={isPresenting || active.screen} disabled={shareBlocked} title={shareBlocked ? "Only the host can share" : active.screen ? "Stop sharing" : "Share screen"} className="hidden sm:flex">
-            <FaDesktop />
+          <RoomButton onClick={toggleHand} active={myHand} disabled={handsBlocked} title={handsBlocked ? "Raise hand is off" : myHand ? "Lower hand (H)" : "Raise hand (H)"}>
+            <FaHandPaper className={myHand ? "text-amber-600" : ""} />
           </RoomButton>
-        )}
-
-        <span className="mx-1 hidden h-7 w-px bg-white/10 md:block" />
-
-        <RoomButton onClick={() => openPanel("people")} active={panel === "people"} badge={lobbyCount || (handKeys.length ? handKeys.length : 0)} title="People">
-          <FaUsers />
-        </RoomButton>
-        {chatAllowed && (
-          <RoomButton onClick={() => openPanel("chat")} active={panel === "chat"} badge={panel === "chat" ? 0 : unread} title="Chat">
-            <FaCommentDots />
-          </RoomButton>
-        )}
-        {isHost && (
-          <RoomButton onClick={() => openPanel("host")} active={panel === "host"} title="Host controls">
-            <FaShieldAlt />
-          </RoomButton>
-        )}
-
-        <RoomButton onClick={() => onCaptions(!captionsOn)} active={captionsOn} title={captionsOn ? "Turn captions off" : "Turn captions on"} className="hidden sm:flex">
-          <FaClosedCaptioning />
-        </RoomButton>
-
-        <div className="relative">
-          <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "activities" ? null : "activities")); }} active={menu === "activities" || boardOpen || ["qa", "polls", "activities", "transcript"].includes(panel)} title="Activities">
-            <FaThLarge />
-          </RoomButton>
-          {menu === "activities" && (
-            <ActivitiesMenu
-              boardOpen={boardOpen}
-              onClose={() => setMenu(null)}
-              onPick={(id) => (id === "board" ? setBoardOpen((v) => !v) : openPanel(id))}
-            />
+          {canShare && (
+            <RoomButton onClick={toggleShare} active={isPresenting || active.screen} disabled={shareBlocked} title={shareBlocked ? "Only the host can share" : active.screen ? "Stop sharing (S)" : "Share screen (S)"} className="hidden sm:flex">
+              <FaDesktop />
+            </RoomButton>
           )}
-        </div>
 
-        <div className="relative">
-          <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "more" ? null : "more")); }} active={menu === "more"} title="More options">
-            <FaEllipsisH />
+          <span aria-hidden="true" className="mx-1 hidden h-7 w-px bg-[#2E2E35] md:block" />
+
+          <RoomButton onClick={() => openPanel("people")} active={panel === "people"} badge={lobbyCount || handKeys.length || 0} badgeTone="amber" title="People (P)">
+            <FaUsers />
           </RoomButton>
-          {menu === "more" && (
-            <MoreMenu
-              onClose={() => setMenu(null)}
-              layout={layout}
-              onLayout={(v) => { setLayout(v); setPage(0); }}
-              sounds={sounds}
-              onSounds={setSounds}
-              shareAudio={shareAudio}
-              onShareAudio={setShareAudio}
-              onShortcuts={() => { setMenu(null); setHelp(true); }}
-            />
+          {chatAllowed && (
+            <RoomButton onClick={() => openPanel("chat")} active={panel === "chat"} badge={panel === "chat" ? 0 : unread} title="Chat (C)">
+              <FaCommentDots />
+            </RoomButton>
           )}
-        </div>
+          {isHost && (
+            <RoomButton onClick={() => openPanel("host")} active={panel === "host"} title="Host controls">
+              <FaShieldAlt />
+            </RoomButton>
+          )}
 
-        <RoomButton onClick={onLeave} danger wide title="Leave meeting" className="ml-1">
-          <FaPhoneSlash />
-          <span className="hidden text-sm font-semibold sm:inline">Leave</span>
-        </RoomButton>
+          <RoomButton onClick={() => onCaptions(!captionsOn)} active={captionsOn} title={captionsOn ? "Turn captions off" : "Turn captions on"} className="hidden sm:flex">
+            <FaClosedCaptioning />
+          </RoomButton>
+
+          <div className="relative">
+            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "view" ? null : "view")); }} active={menu === "view" || layout !== "grid" || hideNoVideo || hideSelf} title="Change view (G)">
+              <FaColumns />
+            </RoomButton>
+            {menu === "view" && (
+              <ViewMenu
+                onClose={() => setMenu(null)}
+                layout={layout}
+                onLayout={(v) => { setLayout(v); setPage(0); }}
+                hideNoVideo={hideNoVideo}
+                onHideNoVideo={setHideNoVideo}
+                hideSelf={hideSelf}
+                onHideSelf={setHideSelf}
+                fullscreen={fullscreen}
+                onFullscreen={toggleFullscreen}
+              />
+            )}
+          </div>
+
+          <div className="relative">
+            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "activities" ? null : "activities")); }} active={menu === "activities" || boardOpen || ["qa", "polls", "activities", "transcript"].includes(panel)} title="Activities: Q&A, polls, whiteboard">
+              <FaThLarge />
+            </RoomButton>
+            {menu === "activities" && (
+              <ActivitiesMenu
+                boardOpen={boardOpen}
+                onClose={() => setMenu(null)}
+                onPick={(id) => (id === "board" ? setBoardOpen((v) => !v) : openPanel(id))}
+              />
+            )}
+          </div>
+
+          <div className="relative">
+            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "more" ? null : "more")); }} active={menu === "more"} title="More options">
+              <FaEllipsisH />
+            </RoomButton>
+            {menu === "more" && (
+              <MoreMenu
+                onClose={() => setMenu(null)}
+                layout={layout}
+                onLayout={(v) => { setLayout(v); setPage(0); }}
+                sounds={sounds}
+                onSounds={setSounds}
+                shareAudio={shareAudio}
+                onShareAudio={setShareAudio}
+                onShortcuts={() => { setMenu(null); setHelp(true); }}
+              />
+            )}
+          </div>
+
+          <RoomButton onClick={onLeave} danger wide title="Leave meeting" className="ml-1">
+            <FaPhoneSlash />
+            <span className="hidden text-sm font-semibold sm:inline">Leave</span>
+          </RoomButton>
+        </div>
       </footer>
 
       {help && <ShortcutsHelp onClose={() => setHelp(false)} />}

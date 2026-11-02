@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FaQuestionCircle, FaPoll, FaChalkboard, FaStopwatch, FaClosedCaptioning, FaTimes } from "react-icons/fa";
+import { FaQuestionCircle, FaPoll, FaChalkboard, FaStopwatch, FaClosedCaptioning, FaTimes, FaCheck } from "react-icons/fa";
 import useCall from "../../../../realtime/useCall";
 import { getMediaPrefs } from "../../../../realtime/webrtc/mediaPrefs";
 import { DeviceSelect } from "./DeviceFields";
@@ -20,7 +20,7 @@ function Popup({ onClose, children, className = "" }) {
     };
   }, [onClose]);
   return (
-    <div ref={ref} className={`absolute bottom-full z-50 mb-2 w-72 overflow-hidden rounded-2xl border border-white/10 bg-[#25252b] p-1.5 text-sm shadow-2xl ${className}`}>
+    <div ref={ref} className={`absolute bottom-full z-50 mb-3 w-72 overflow-hidden rounded-2xl border border-[#2E2E35] bg-[#1B1B20] p-1.5 text-sm shadow-2xl ${className}`}>
       {children}
     </div>
   );
@@ -44,6 +44,68 @@ export function ActivitiesMenu({ onPick, onClose, boardOpen }) {
       <Item icon={<FaChalkboard />} label={boardOpen ? "Close whiteboard" : "Whiteboard"} hint="Draw together" onClick={() => pick("board")} />
       <Item icon={<FaStopwatch />} label="Activities" hint="Timer, agenda, pulse, kudos, decisions" onClick={() => pick("activities")} />
       <Item icon={<FaClosedCaptioning />} label="Captions & transcript" onClick={() => pick("transcript")} />
+    </Popup>
+  );
+}
+
+
+// ---- Change view: how the screen is laid out for ME (nobody else's screen changes) ----
+const LayoutThumb = ({ kind }) =>
+  kind === "grid" ? (
+    <svg viewBox="0 0 48 32" className="h-8 w-12" aria-hidden="true">
+      {[0, 1].map((r) => [0, 1, 2].map((c) => <rect key={`${r}${c}`} x={1 + c * 16} y={1 + r * 16} width="14" height="14" rx="3" fill="currentColor" opacity=".85" />))}
+    </svg>
+  ) : (
+    <svg viewBox="0 0 48 32" className="h-8 w-12" aria-hidden="true">
+      <rect x="1" y="1" width="46" height="21" rx="3" fill="currentColor" opacity=".85" />
+      {[0, 1, 2].map((c) => <rect key={c} x={1 + c * 16} y="24" width="14" height="7" rx="2" fill="currentColor" opacity=".5" />)}
+    </svg>
+  );
+
+function Toggle({ label, hint, on, onChange }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-gray-100 hover:bg-white/5">
+      <span className="min-w-0 flex-1">
+        <span className="block">{label}</span>
+        {hint ? <span className="block text-[11px] text-gray-500">{hint}</span> : null}
+      </span>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${on ? "bg-[#CD166E]" : "bg-white/20"}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+      </span>
+    </button>
+  );
+}
+
+export function ViewMenu({ onClose, layout, onLayout, hideNoVideo, onHideNoVideo, hideSelf, onHideSelf, onFullscreen, fullscreen }) {
+  const options = [
+    ["grid", "Grid", "Everyone the same size"],
+    ["speaker", "Speaker", "Active speaker big, others below"],
+  ];
+  return (
+    <Popup onClose={onClose} className="left-1/2 w-[19rem] -translate-x-1/2">
+      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Change view</p>
+      <div className="grid grid-cols-2 gap-2 px-2 pb-2">
+        {options.map(([id, label, hint]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onLayout(id)}
+            aria-pressed={layout === id}
+            className={`relative flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center transition-colors ${layout === id ? "border-[#CD166E] bg-[#730042]/30 text-white" : "border-[#2E2E35] bg-white/5 text-gray-300 hover:bg-white/10"}`}
+          >
+            <LayoutThumb kind={id} />
+            <span className="text-xs font-semibold">{label}</span>
+            <span className="text-[10px] leading-tight text-gray-500">{hint}</span>
+            {layout === id && <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#CD166E] text-[8px] text-white"><FaCheck /></span>}
+          </button>
+        ))}
+      </div>
+      <div className="my-1 h-px bg-white/10" />
+      <Toggle label="Only people with camera on" hint="Others still stay audible" on={hideNoVideo} onChange={onHideNoVideo} />
+      <Toggle label="Hide my own tile" hint="Only on your screen" on={hideSelf} onChange={onHideSelf} />
+      <button type="button" onClick={() => { onClose(); onFullscreen(); }} className="flex min-h-11 w-full items-center rounded-xl px-3 py-2 text-left text-gray-100 hover:bg-white/5">
+        {fullscreen ? "Exit full screen" : "Full screen"}
+      </button>
     </Popup>
   );
 }
