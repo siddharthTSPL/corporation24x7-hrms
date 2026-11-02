@@ -17,6 +17,7 @@ import {
   patchConversation,
   bumpConversationToTop,
   removeConversation,
+  patchPerson,
 } from "../auth/server-state/chat/chatCache";
 import { MEETING_KEYS } from "../auth/server-state/meeting/meeting.hook";
 import { MEETING_SPACE_KEYS, MEETING_SPACE_EVENTS, patchAnnouncementSeen } from "../auth/server-state/meeting/meetingSpace.hook";
@@ -184,6 +185,13 @@ export default function useChatRealtime(enabled) {
       qc.invalidateQueries({ queryKey: CHAT_KEYS.conversation(conversationId) });
     };
 
+    const onPersonUpdated = ({ key, about, status }) => {
+      const patch = {};
+      if (about !== undefined) patch.about = about;
+      if (status !== undefined) patch.status = status;
+      patchPerson(qc, key, patch);
+    };
+
     // --- meetings (bell notifications already arrive via notification:new) ---
     const refreshMeetings = () => qc.invalidateQueries({ queryKey: MEETING_KEYS.all });
     const refreshMeetingSpace = () => qc.invalidateQueries({ queryKey: MEETING_SPACE_KEYS.all });
@@ -202,6 +210,7 @@ export default function useChatRealtime(enabled) {
     socket.on("connect", onConnect);
     socket.on("chat:typing", onTyping);
     socket.on("chat:conversation:updated", onConversationUpdated);
+    socket.on("chat:person:updated", onPersonUpdated);
     for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.on(ev, refreshMeetings);
     socket.on("meeting:reminder", onMeetingReminder);
     for (const ev of MEETING_SPACE_EVENTS) socket.on(ev, refreshMeetingSpace);
@@ -227,6 +236,7 @@ export default function useChatRealtime(enabled) {
       socket.off("connect", onConnect);
       socket.off("chat:typing", onTyping);
       socket.off("chat:conversation:updated", onConversationUpdated);
+      socket.off("chat:person:updated", onPersonUpdated);
       for (const ev of ["meeting:started", "meeting:updated", "meeting:rsvp", "meeting:ended"]) socket.off(ev, refreshMeetings);
       socket.off("meeting:reminder", onMeetingReminder);
       for (const ev of MEETING_SPACE_EVENTS) socket.off(ev, refreshMeetingSpace);

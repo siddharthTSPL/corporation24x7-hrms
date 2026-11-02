@@ -160,3 +160,16 @@ export const setStarredFlag = (qc, conversationId, messageId, starred) => {
   if (conversationId) patchMessage(qc, conversationId, messageId, { starred: !!starred });
   qc.invalidateQueries({ queryKey: ["chat", "starred"] });
 };
+
+// chat:person:updated { key, about?, status? } -> someone changed their About / status; patch every cached copy of them
+export const patchPerson = (qc, key, patch) => {
+  if (!key || !patch) return;
+  const apply = (p) => (p && p.key === key ? { ...p, ...patch } : p);
+  const fix = (c) => ({
+    ...c,
+    otherPerson: apply(c.otherPerson),
+    participants: Array.isArray(c.participants) ? c.participants.map(apply) : c.participants,
+  });
+  qc.setQueriesData({ queryKey: CHAT_KEYS.conversations }, (old) => (old?.conversations ? { ...old, conversations: old.conversations.map(fix) } : old));
+  qc.setQueriesData({ queryKey: ["chat", "conversation"] }, (old) => (old?.conversation ? { ...old, conversation: fix(old.conversation) } : old));
+};

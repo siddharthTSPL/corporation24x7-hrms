@@ -28,6 +28,12 @@ const add = (key, socketId) => {
   const wasOffline = !set || set.size === 0;
   if (!set) sockets.set(key, (set = new Set()));
   set.add(socketId);
+  // make sure a last-seen row exists for everyone who connects, so even after a crash / restart
+  // (when the disconnect never got saved) they show "Last seen ..." instead of a bare "Offline".
+  // $setOnInsert never overwrites a real last-seen time.
+  if (wasOffline && !isGuestKey(key)) {
+    ChatPresence.updateOne({ key }, { $setOnInsert: { lastSeenAt: new Date() } }, { upsert: true }).catch(() => {});
+  }
   return wasOffline; // true => this connection flipped them online
 };
 

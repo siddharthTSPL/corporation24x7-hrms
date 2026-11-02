@@ -25,7 +25,7 @@ import { colorFor, formatClock, formatSize, groupReactions, isAudio, isEmojiOnly
 function Attachment({ a, mine }) {
   if (a.uploading || !a.url) {
     return (
-      <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${mine ? "bg-white/15" : "bg-gray-100"}`}>
+      <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${mine ? "bg-white/15" : "bg-gray-100"}`}>
         <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         <span className="truncate max-w-[180px]">{a.name || "Uploading"}</span>
       </div>
@@ -34,7 +34,7 @@ function Attachment({ a, mine }) {
   if (isImage(a.mime)) {
     return (
       <a href={a.url} target="_blank" rel="noopener noreferrer" className="block">
-        <img src={a.url} alt={a.name} loading="lazy" className="rounded-lg max-h-56 max-w-full object-cover" />
+        <img src={a.url} alt={a.name} loading="lazy" className="rounded-xl max-h-56 max-w-full object-cover" />
       </a>
     );
   }
@@ -42,14 +42,14 @@ function Attachment({ a, mine }) {
     return <audio controls src={a.url} className="max-w-[230px] h-10" />;
   }
   if (isVideo(a.mime)) {
-    return <video controls src={a.url} className="rounded-lg max-h-56 max-w-full" />;
+    return <video controls src={a.url} className="rounded-xl max-h-56 max-w-full" />;
   }
   return (
     <a
       href={a.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 ${mine ? "bg-white/15 hover:bg-white/25" : "bg-gray-100 hover:bg-gray-200"} transition-colors`}
+      className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${mine ? "bg-white/15 hover:bg-white/25" : "bg-gray-50 border border-gray-200 hover:bg-gray-100"} transition-colors`}
     >
       <FaFileAlt className="text-base flex-shrink-0 opacity-80" />
       <div className="min-w-0">
@@ -62,8 +62,8 @@ function Attachment({ a, mine }) {
 
 // sent = one tick, delivered = two grey ticks, seen = two blue ticks
 function Ticks({ status, tone }) {
-  const base = tone === "dark" ? "text-gray-400" : "text-white/70";
-  const seen = tone === "dark" ? "text-sky-500" : "text-sky-300";
+  const base = tone === "dark" ? "text-gray-400" : "text-white/75";
+  const seen = tone === "dark" ? "text-sky-500" : "text-sky-200";
   if (status === "sending") return <FaClock className={`text-[9px] ${base}`} title="Sending" />;
   if (status === "failed") return <FaExclamationCircle className="text-[10px] text-red-400" title="Not sent" />;
   if (status === "seen") return <FaCheckDouble className={`text-[10px] ${seen}`} title="Seen" />;
@@ -73,7 +73,7 @@ function Ticks({ status, tone }) {
 
 function Linkified({ text, mine }) {
   return (
-    <span className="whitespace-pre-wrap leading-snug">
+    <span className="whitespace-pre-wrap leading-[1.5]">
       {splitLinks(text).map((part, i) =>
         part.url ? (
           <a
@@ -81,7 +81,7 @@ function Linkified({ text, mine }) {
             href={part.url}
             target="_blank"
             rel="noopener noreferrer"
-            className={`underline break-all ${mine ? "text-emerald-800" : "text-sky-700"}`}
+            className={`underline underline-offset-2 break-all ${mine ? "text-white decoration-white/60" : "text-[#730042] decoration-[#730042]/40"}`}
           >
             {part.url}
           </a>
@@ -111,7 +111,7 @@ function MenuItem({ icon: Icon, label, onClick, danger }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left whitespace-nowrap ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
+      className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-left whitespace-nowrap transition-colors ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
     >
       <Icon className={`text-xs ${danger ? "text-red-400" : "text-gray-400"}`} /> {label}
     </button>
@@ -162,10 +162,10 @@ export default function MessageBubble({
     const videoCall = m.meta?.media === "video" || /video/i.test(callText);
     return (
       <div data-mid={m.id} className="flex justify-center my-1.5">
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-700 bg-white/90 border border-gray-100 rounded-xl px-2.5 py-1 max-w-[85%] text-center shadow-[0_1px_2px_rgba(0,0,0,.08)]">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600 bg-white border border-gray-200 rounded-full px-3 py-1 max-w-[85%] text-center shadow-sm">
           {isCallEvent && missed && <FaPhoneSlash title="Missed call" className="text-[11px] text-red-500 flex-shrink-0" />}
-          {isCallEvent && videoCall && <FaVideo title="Video call" className={`text-[11px] flex-shrink-0 ${missed ? "text-red-500" : "text-[#54656f]"}`} />}
-          {isCallEvent && !missed && !videoCall && <FaPhoneAlt title="Voice call" className="text-[10px] text-[#54656f] flex-shrink-0" />}
+          {isCallEvent && videoCall && <FaVideo title="Video call" className={`text-[11px] flex-shrink-0 ${missed ? "text-red-500" : "text-gray-500"}`} />}
+          {isCallEvent && !missed && !videoCall && <FaPhoneAlt title="Voice call" className="text-[10px] text-gray-500 flex-shrink-0" />}
           <span>{m.text}</span>
           {m.createdAt && <span className="text-[9px] text-gray-400 whitespace-nowrap">{formatClock(m.createdAt)}</span>}
         </span>
@@ -190,15 +190,16 @@ export default function MessageBubble({
     : `rounded-2xl ${first ? "" : "rounded-tl-md"} ${last ? "" : "rounded-bl-md"}`;
 
   const bubbleTone = deleted
-    ? "bg-gray-100 text-gray-400 italic"
+    ? "bg-gray-100 text-gray-400 italic border border-gray-200"
     : bare
       ? "bg-transparent text-gray-900"
       : mine
-        ? `bg-[#d9fdd3] text-[#111b21] ${m.failed ? "opacity-70" : ""}`
-        : "bg-white text-[#111b21]";
+        ? `bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white ${m.failed ? "opacity-70" : ""}`
+        : "bg-white text-gray-900";
 
-  const footerTone = "text-[#667781]";
-  const tickTone = "dark";
+  const lightOnBrand = mine && !bare && !deleted;
+  const footerTone = lightOnBrand ? "text-white/75" : "text-gray-400";
+  const tickTone = lightOnBrand ? "light" : "dark";
   const pick = (fn) => () => {
     setPanel(null);
     fn(m);
@@ -231,7 +232,7 @@ export default function MessageBubble({
             setPanel("more");
           }}
         >
-          <div className={`${bare ? "px-1 py-0.5" : "px-3 py-1.5"} chat-message-bubble ${mine && !bare && !deleted ? "chat-message-bubble-mine" : !mine && !bare && !deleted ? "chat-message-bubble-theirs" : ""} text-[13px] leading-[1.35] break-words ${radius} ${bubbleTone}`}>
+          <div className={`${bare ? "px-1 py-0.5" : "px-3.5 py-2"} chat-message-bubble ${mine && !bare && !deleted ? "chat-message-bubble-mine" : !mine && !bare && !deleted ? "chat-message-bubble-theirs" : ""} text-[13.5px] leading-[1.5] break-words ${radius} ${bubbleTone}`}>
             {deleted ? (
               <span className="inline-flex items-center gap-1.5 text-xs">
                 <FaBan className="text-[10px]" /> This message was deleted
@@ -248,7 +249,7 @@ export default function MessageBubble({
                   <button
                     type="button"
                     onClick={() => m.replyTo.id && onJump(m.replyTo.id)}
-                    className={`block w-full text-left mb-1.5 pl-2 border-l-2 rounded-sm py-0.5 ${mine && !bare ? "border-white/60 bg-white/10" : "border-[#730042] bg-gray-50"}`}
+                    className={`block w-full text-left mb-1.5 pl-2 border-l-2 rounded-sm py-0.5 ${mine && !bare ? "border-white/70 bg-white/10" : "border-[#730042] bg-[#FBF3F7]"}`}
                   >
                     <span className={`block text-[11px] font-semibold ${mine && !bare ? "text-white/90" : "text-[#730042]"}`}>
                       {m.replyTo.senderName || "Message"}
@@ -282,7 +283,7 @@ export default function MessageBubble({
 
           {canAct && (
             <div
-              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white border border-gray-200 rounded-full shadow-sm px-1 py-0.5 transition-opacity ${panel ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100"} ${mine ? "right-full mr-2" : "left-full ml-2"}`}
+              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white border border-gray-200 rounded-full shadow-md px-1 py-0.5 transition-opacity ${panel ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100"} ${mine ? "right-full mr-2" : "left-full ml-2"}`}
             >
               <button type="button" title="React" onClick={() => setPanel(panel === "react" ? null : "react")} className="w-6 h-6 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
                 <FaRegSmile className="text-[11px]" />
@@ -297,7 +298,7 @@ export default function MessageBubble({
           )}
 
           {panel === "react" && (
-            <div className={`absolute z-30 flex items-center gap-0.5 bg-white border border-gray-200 rounded-full shadow-lg px-1.5 py-1 ${popPos}`}>
+            <div className={`absolute z-30 flex items-center gap-0.5 bg-white border border-gray-100 rounded-full shadow-xl ring-1 ring-black/5 px-1.5 py-1 ${popPos}`}>
               {QUICK_REACTIONS.map((e) => (
                 <button
                   key={e}
@@ -315,7 +316,7 @@ export default function MessageBubble({
           )}
 
           {panel === "more" && (
-            <div className={`absolute z-30 w-48 bg-white border border-gray-200 rounded-xl shadow-lg py-1 ${popPos}`}>
+            <div className={`absolute z-30 w-48 bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 py-1 overflow-hidden ${popPos}`}>
               <MenuItem icon={FaReply} label="Reply" onClick={pick(onReply)} />
               {m.text && m.type !== "sticker" && <MenuItem icon={FaCopy} label="Copy" onClick={pick(onCopy)} />}
               <MenuItem icon={FaShare} label="Forward" onClick={pick(onForward)} />
@@ -332,7 +333,7 @@ export default function MessageBubble({
                   type="button"
                   onClick={() => onReact(m, r.emoji)}
                   title={r.mine ? "Tap to remove your reaction" : "React too"}
-                  className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-px text-xs shadow-sm ${r.mine ? "bg-[#F6E8EF] border-[#730042]/40" : "bg-white border-gray-200"}`}
+                  className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-px text-xs shadow-sm ${r.mine ? "bg-[#F6E8EF] border-[#730042]/30" : "bg-white border-gray-200"}`}
                 >
                   <span className="leading-none">{r.emoji}</span>
                   {r.count > 1 && <span className="text-[10px] font-semibold text-gray-600">{r.count}</span>}

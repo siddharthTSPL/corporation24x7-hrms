@@ -42,7 +42,7 @@ export function ProfilePage({ onBack, self }) {
     setText(s.status.preset === "custom" ? s.status.text : "");
   }, [s]);
 
-  if (!s) return <div className="flex h-full flex-col bg-[#f0f2f5]"><Header title="Profile & status" onBack={onBack} /><Loading /></div>;
+  if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Profile & status" onBack={onBack} /><Loading /></div>;
 
   const aboutDirty = about.trim() !== s.profile.about;
   const saveAbout = () => update.mutate({ profile: { about: about.trim() } }, { onSuccess: () => toast.success("About updated") });
@@ -53,7 +53,7 @@ export function ProfilePage({ onBack, self }) {
   const expires = s.status.expiresAt ? new Date(s.status.expiresAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Profile & status" onBack={onBack} />
       <PageBody>
         <section className="flex items-center gap-4 bg-white px-5 py-5">
@@ -113,10 +113,10 @@ export function ProfilePage({ onBack, self }) {
 export function PrivacyPage({ onBack }) {
   const { data: s } = useChatSettings();
   const update = useUpdateChatSettings();
-  if (!s) return <div className="flex h-full flex-col bg-[#f0f2f5]"><Header title="Privacy" onBack={onBack} /><Loading /></div>;
+  if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Privacy" onBack={onBack} /><Loading /></div>;
   const p = s.privacy;
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Privacy" onBack={onBack} />
       <PageBody>
         <Section note="When hidden, others won't see your online dot, “Online” or last seen — and you won't see theirs on your side only if they hide too.">
@@ -142,11 +142,11 @@ const ACCENTS = ["", "#730042", "#1A73E8", "#0F9D58", "#F4511E", "#7B1FA2", "#45
 export function AppearancePage({ onBack }) {
   const { data: s } = useChatSettings();
   const update = useUpdateChatSettings();
-  if (!s) return <div className="flex h-full flex-col bg-[#f0f2f5]"><Header title="Appearance" onBack={onBack} /><Loading /></div>;
+  if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Appearance" onBack={onBack} /><Loading /></div>;
   const a = s.appearance;
   const set = (patch) => update.mutate({ appearance: patch });
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Appearance" onBack={onBack} />
       <PageBody>
         <Section title="Theme">
@@ -180,12 +180,12 @@ export function AppearancePage({ onBack }) {
 export function NotificationRulesPage({ onBack }) {
   const { data: s } = useChatSettings();
   const update = useUpdateChatSettings();
-  if (!s) return <div className="flex h-full flex-col bg-[#f0f2f5]"><Header title="Do not disturb & alerts" onBack={onBack} /><Loading /></div>;
+  if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Do not disturb & alerts" onBack={onBack} /><Loading /></div>;
   const n = s.notifications;
   const dnd = n.dnd;
   const setDnd = (patch) => update.mutate({ notifications: { dnd: patch } });
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Do not disturb & alerts" onBack={onBack} />
       <PageBody>
         <Section title="Do not disturb" note={s.dndActiveNow ? "Do not disturb is active right now." : "Calls and notifications stay quiet inside this window."}>
@@ -224,7 +224,7 @@ export function StoragePage({ onBack }) {
   const total = st?.totalBytes || 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Storage & data" onBack={onBack} />
       <PageBody>
         <Section title="Usage">
@@ -296,7 +296,7 @@ export function ReportsPage({ onBack }) {
   const { data: reports = [], isLoading } = useChatReports({ status });
   const review = useReviewReport();
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="User reports" onBack={onBack} />
       <div className="bg-white px-5 py-3"><Segmented value={status} options={STATUS_TABS} onChange={setStatus} /></div>
       <PageBody>
@@ -338,7 +338,7 @@ export function ReportsPage({ onBack }) {
 export function AboutPage({ onBack }) {
   const { data, isLoading } = useChatAbout();
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f0f2f5]">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Help & about" onBack={onBack} />
       <PageBody>
         <section className="bg-white px-5 py-6 text-center">

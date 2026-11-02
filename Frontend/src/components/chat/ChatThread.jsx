@@ -63,7 +63,7 @@ function Skeleton() {
     <div className="space-y-3 p-4">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className={`flex ${i % 2 ? "justify-end" : "justify-start"} animate-pulse`}>
-          <div className={`h-10 rounded-2xl bg-gray-200 ${i % 2 ? "w-1/2" : "w-2/3"}`} />
+          <div className={`h-10 rounded-2xl bg-gray-200/80 ${i % 2 ? "w-1/2" : "w-2/3"}`} />
         </div>
       ))}
     </div>
@@ -75,7 +75,7 @@ function MenuButton({ icon: Icon, label, onClick, danger }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
+      className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium transition-colors ${danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"}`}
     >
       <Icon className={danger ? "text-red-400" : "text-gray-400"} /> {label}
     </button>
@@ -378,10 +378,10 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
     conv?.type === "group" && conv.settings?.onlyAdminsCanSend && conv.myRole !== "admin" ? "Only admins can send messages in this group." : "";
 
   return (
-    <div className="relative flex flex-col h-full min-h-0 bg-[#efeae2]">
-      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3 py-2 border-b border-[#e9edef]">
+    <div className="relative flex flex-col h-full min-h-0 bg-[#f5f6f8]">
+      <div className="chat-header-glass relative z-10 flex items-center gap-2 px-3.5 py-2.5">
         {showBack && (
-          <button type="button" onClick={onBack} className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
+          <button type="button" onClick={onBack} className="w-9 h-9 rounded-xl text-gray-500 hover:bg-[#F6E8EF] hover:text-[#730042] transition-colors flex items-center justify-center flex-shrink-0">
             <FaArrowLeft className="text-sm" />
           </button>
         )}
@@ -395,21 +395,26 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           <Avatar
             name={conv?.name || ""}
             photo={conv?.photo || ""}
-            size={38}
+            size={40}
             online={!isGroup ? online : null}
             busy={!isGroup && otherInCall}
             group={isGroup}
             seed={other?.key || conversationId}
           />
           <div className="min-w-0">
-            <p className="text-[13px] font-bold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
+            <p className="text-sm font-semibold tracking-[-0.01em] text-gray-900 truncate">{conv?.name || "…"}</p>
             {!isGroup && other?.designation && (
-              <p className="text-[10px] leading-tight text-gray-500 truncate" title={other.designation}>
+              <p className="text-[11px] leading-tight text-gray-500 truncate" title={other.designation}>
                 {other.designation}
               </p>
             )}
+            {!isGroup && other?.status?.text && (
+              <p className="text-[11px] leading-tight text-[#730042] truncate" title={other.status.text}>
+                {other.status.text}
+              </p>
+            )}
             <p
-              className={`text-[10px] leading-tight mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
+              className={`text-[11px] leading-tight mt-0.5 truncate ${typing ? "text-[#730042] font-semibold" : otherInCall && !isGroup ? "text-amber-600 font-medium" : online && !isGroup ? "text-emerald-600 font-medium" : "text-gray-500"}`}
             >
               {subtitle}
             </p>
@@ -422,7 +427,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             disabled={callsBlocked}
             onClick={() => call("audio")}
             title={callTitle("Voice call")}
-            className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
+            className="w-9 h-9 rounded-xl text-gray-500 hover:bg-[#F6E8EF] hover:text-[#730042] transition-colors disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
           >
             <FaPhoneAlt className="text-sm" />
           </button>
@@ -431,7 +436,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             disabled={callsBlocked}
             onClick={() => call("video")}
             title={callTitle("Video call")}
-            className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
+            className="w-9 h-9 rounded-xl text-gray-500 hover:bg-[#F6E8EF] hover:text-[#730042] transition-colors disabled:opacity-40 disabled:hover:bg-transparent flex items-center justify-center"
           >
             <FaVideo className="text-sm" />
           </button>
@@ -440,12 +445,12 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
-              className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl text-gray-500 hover:bg-[#F6E8EF] hover:text-[#730042] transition-colors flex items-center justify-center"
             >
               <FaEllipsisV className="text-sm" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1">
+              <div className="absolute right-0 top-10 z-20 w-56 bg-white border border-gray-100 rounded-xl shadow-xl ring-1 ring-black/5 py-1 overflow-hidden">
                 {isGroup && (
                   <MenuButton
                     icon={FaInfoCircle}
@@ -501,12 +506,12 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
               type="button"
               onClick={onToggleExpand}
               title={expanded ? "Collapse" : "Expand"}
-              className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center"
+              className="w-9 h-9 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors flex items-center justify-center"
             >
               {expanded ? <FaCompressAlt className="text-xs" /> : <FaExpandAlt className="text-xs" />}
             </button>
           )}
-          <button type="button" onClick={onClose} title="Close" className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center">
+          <button type="button" onClick={onClose} title="Close" className="w-9 h-9 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors flex items-center justify-center">
             <FaTimes className="text-sm" />
           </button>
         </div>
@@ -534,7 +539,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
           ref={scrollRef}
           data-chat-scroll
           onScroll={onScroll}
-          className="chat-thread-scroll chat-hide-scroll absolute inset-0 overflow-y-auto overscroll-contain px-3 py-2"
+          className="chat-thread-scroll chat-hide-scroll absolute inset-0 overflow-y-auto overscroll-contain px-4 py-3"
           style={wallpaperStyle(conv?.wallpaper)}
         >
           {isLoading ? (
@@ -547,7 +552,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
                     type="button"
                     onClick={fetchOlder}
                     disabled={isLoadingOlder}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#730042] bg-white border border-gray-200 rounded-full px-3 py-1 hover:bg-gray-50 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#730042] bg-white border border-gray-200 rounded-full px-3.5 py-1.5 shadow-sm hover:bg-[#FBF3F7] hover:border-[#730042]/30 transition-colors disabled:opacity-60"
                   >
                     <FaChevronUp className="text-[9px]" />
                     {isLoadingOlder ? "Loading…" : "Load earlier messages"}
@@ -557,9 +562,9 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
               {!messages.length && (
                 <div className="h-full flex flex-col items-center justify-center text-center py-16">
-                  <div className="bg-white/90 rounded-2xl px-6 py-5 flex flex-col items-center border border-gray-100">
+                  <div className="bg-white rounded-2xl px-8 py-6 flex flex-col items-center border border-gray-200 shadow-sm">
                     <Avatar name={conv?.name || ""} photo={conv?.photo || ""} size={64} group={isGroup} seed={other?.key || conversationId} />
-                    <p className="text-sm font-semibold text-gray-700 mt-3">{conv?.name}</p>
+                    <p className="text-sm font-semibold text-gray-900 mt-3">{conv?.name}</p>
                     <p className="text-xs text-gray-500 mt-1">No messages yet. Say hello! 👋</p>
                   </div>
                 </div>
@@ -567,8 +572,8 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
 
               {items.map((it) =>
                 it.kind === "day" ? (
-                  <div key={it.key} className="flex justify-center my-2">
-                    <span className="text-[11px] font-medium text-[#54656f] bg-[#e9edef] rounded-full px-3 py-0.5 shadow-[0_1px_1px_rgba(0,0,0,.04)]">
+                  <div key={it.key} className="flex justify-center my-3">
+                    <span className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm">
                       {it.label}
                     </span>
                   </div>
@@ -607,7 +612,7 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
             type="button"
             onClick={scrollToBottom}
             title="Jump to latest"
-            className="absolute bottom-3 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#d9e1e5] bg-white/95 text-[#54656f] shadow-[0_3px_12px_rgba(17,27,33,.14)] transition-all hover:-translate-y-0.5 hover:border-[#00a884] hover:text-[#008f72] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a884]/40"
+            className="absolute bottom-3 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-[0_6px_16px_-4px_rgba(15,23,42,.2)] transition-all hover:-translate-y-0.5 hover:border-[#730042]/40 hover:text-[#730042] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#730042]/30"
           >
             <FaChevronDown className="text-sm" />
           </button>
@@ -615,10 +620,10 @@ export default function ChatThread({ conversationId, listConv, onBack, expanded,
       </div>
 
       {typing && (
-        <div className="px-4 pb-1 bg-[#F7F9FB]">
-          <div className="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-full px-3 py-1.5">
+        <div className="px-4 pb-1.5 bg-[#f5f6f8]">
+          <div className="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
             {[0, 1, 2].map((i) => (
-              <span key={i} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+              <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#730042]/50 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
             ))}
           </div>
         </div>

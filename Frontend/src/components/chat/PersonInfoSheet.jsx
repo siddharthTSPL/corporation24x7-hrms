@@ -1,4 +1,4 @@
-import { FaArrowLeft, FaBriefcase, FaBuilding, FaUserTie, FaCalendarAlt, FaPhoneAlt, FaVideo, FaCommentDots, FaEnvelope, FaBellSlash, FaThumbtack, FaEraser, FaInfoCircle, FaFlag } from "react-icons/fa";
+import { FaArrowLeft, FaBriefcase, FaBuilding, FaUserTie, FaCalendarAlt, FaPhoneAlt, FaVideo, FaCommentDots, FaEnvelope, FaBellSlash, FaThumbtack, FaEraser, FaInfoCircle, FaFlag, FaCircle } from "react-icons/fa";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
@@ -109,7 +109,7 @@ export default function PersonInfoSheet({ person, conversation, onClose }) {
   ].filter(([, , value]) => !!value);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f0f2f5]">
+    <div className="flex flex-col h-full min-h-0 bg-[#f5f6f8]">
       <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-100 bg-white">
         <button type="button" onClick={onClose} title="Back to chat" className="w-8 h-8 rounded-full text-gray-600 hover:bg-gray-100 flex items-center justify-center">
           <FaArrowLeft className="text-sm" />
@@ -131,10 +131,17 @@ export default function PersonInfoSheet({ person, conversation, onClose }) {
           </div>
         </section>
 
-        {(person.designation || person.role) && (
+        {person.status?.text && (
+          <section className="mt-2 bg-white px-5 py-4">
+            <p className="flex items-center gap-2 text-xs font-medium text-[#730042]"><FaCircle className="text-[8px]" /> Status</p>
+            <p className="mt-1.5 break-words text-sm text-gray-800">{person.status.text}</p>
+          </section>
+        )}
+
+        {(person.about || person.designation || person.role) && (
           <section className="mt-2 bg-white px-5 py-4">
             <p className="flex items-center gap-2 text-xs font-medium text-[#730042]"><FaInfoCircle /> About</p>
-            <p className="mt-1.5 text-sm text-gray-800">{person.designation || person.role}</p>
+            <p className="mt-1.5 break-words text-sm text-gray-800">{person.about || person.designation || person.role}</p>
           </section>
         )}
 

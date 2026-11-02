@@ -116,6 +116,65 @@ function gridCols(n) {
   return "grid-cols-3 md:grid-cols-4";
 }
 
+// Lets the minimised call card be dragged anywhere on screen (mouse + touch).
+// Position is kept for the session and re-clamped when the window is resized.
+function useDraggable(storageKey) {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [pos, setPos] = useState(() => {
+    try {
+      const p = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const clamp = (x, y) => {
+    const el = ref.current;
+    const w = el?.offsetWidth || 360;
+    const h = el?.offsetHeight || 240;
+    return {
+      x: Math.max(8, Math.min(x, window.innerWidth - w - 8)),
+      y: Math.max(8, Math.min(y, window.innerHeight - h - 8)),
+    };
+  };
+
+  useEffect(() => {
+    const onResize = () => setPos((p) => (p ? clamp(p.x, p.y) : p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const onPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target.closest("button, a, input, textarea, select")) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    drag.current = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    if (!drag.current) return;
+    setPos(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy));
+  };
+  const onPointerUp = (e) => {
+    if (!drag.current) return;
+    drag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    setPos((p) => {
+      try { if (p) sessionStorage.setItem(storageKey, JSON.stringify(p)); } catch { /* ignore */ }
+      return p;
+    });
+  };
+
+  return {
+    ref,
+    style: pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined,
+    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp },
+  };
+}
+
 function CallScreen() {
   const { active, peers, myKey, isHost, isPresenting, toggleAudio, toggleVideo, startScreenShare, stopScreenShare, leave, endForAll, invitePeople } = useCall();
   const [minimized, setMinimized] = useState(false);
@@ -123,6 +182,7 @@ function CallScreen() {
   const [inviteQuery, setInviteQuery] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [reactionOpen, setReactionOpen] = useState(false);
+  const mini = useDraggable("torchx:callMiniPos");
   const { data: conversation } = useConversation(active?.conversationId);
   const { data: directoryPeople = [] } = useDirectorySearch(inviteQuery, { enabled: inviteOpen && conversation?.type === "direct" });
   const elapsed = useElapsed(active?.startedAt, active?.status === "connected");
@@ -213,7 +273,13 @@ function CallScreen() {
     const participantCount = active.kind === "direct" ? 1 : peers.length + 1;
     const connected = active.status === "connected";
     return (
-      <div className="fixed bottom-4 right-4 z-[90] w-[min(360px,calc(100vw-2rem))] rounded-2xl bg-slate-950 text-white shadow-[0_18px_55px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden">
+      <div
+        ref={mini.ref}
+        style={mini.style}
+        {...mini.handlers}
+        title="Drag to move"
+        className="fixed bottom-4 right-4 z-[1100] w-[min(360px,calc(100vw-2rem))] cursor-grab touch-none select-none rounded-2xl bg-slate-950 text-white shadow-[0_18px_55px_rgba(0,0,0,0.4)] border border-white/10 overflow-hidden active:cursor-grabbing"
+      >
         <div className="h-1 bg-gradient-to-r from-[#730042] via-fuchsia-500 to-emerald-400" />
         <div className="px-4 pt-3.5 pb-3">
           <div className="flex items-center gap-3">
@@ -309,7 +375,7 @@ function CallScreen() {
     : [selfTile, ...peerTiles];
 
   return (
-    <div className="fixed inset-0 z-[90] bg-gray-950 text-white flex flex-col">
+    <div className="fixed inset-0 z-[1100] bg-gray-950 text-white flex flex-col">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">{title}</p>
@@ -351,10 +417,12 @@ function CallScreen() {
             </div>
           </div>
         ) : (
-          <div className={`grid ${gridCols(tiles.length)} auto-rows-fr gap-2 flex-1 min-h-0`}>
-            {tiles.map((t) => (
-              <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 256 : 72} />
-            ))}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain rounded-xl [scrollbar-width:thin]">
+            <div className={`grid ${gridCols(tiles.length)} min-h-full auto-rows-[minmax(150px,1fr)] gap-2`}>
+              {tiles.map((t) => (
+                <Tile key={t.id} {...t} avatarSize={active.kind === "direct" ? 256 : 72} />
+              ))}
+            </div>
           </div>
         )}
         {!!active.reactions?.length && (
@@ -473,7 +541,7 @@ function IncomingCalls() {
   if (!incoming.length) return null;
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[95] flex flex-col gap-2 w-[min(360px,calc(100vw-2rem))]">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1200] flex flex-col gap-2 w-[min(360px,calc(100vw-2rem))]">
       {audioLocked && incoming.length > 0 && !inCall && (
         <div className="text-center text-[11px] text-amber-200 bg-amber-900/80 rounded-lg px-3 py-1">
           Click anywhere on the page to enable the ringtone
@@ -532,7 +600,7 @@ function RejoinCalls() {
   if (!available.length) return null;
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[94] flex flex-col gap-2 w-[min(420px,calc(100vw-2rem))]">
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[1200] flex flex-col gap-2 w-[min(420px,calc(100vw-2rem))]">
       {available.slice(0, 3).map((call) => (
         <div key={call.roomKey} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white shadow-xl border border-emerald-100">
           <div className="flex-1 min-w-0">

@@ -16,7 +16,7 @@ function ChatsPage({ onBack }) {
   const [prefs, setPrefs] = useState(getChatPrefs);
   const patch = (p) => setPrefs(setChatPrefs(p));
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f0f2f5]">
+    <div className="flex flex-col h-full min-h-0 bg-[#f5f6f8]">
       <Header title="Chats" onBack={onBack} />
       <PageBody>
         <Section>
@@ -27,7 +27,7 @@ function ChatsPage({ onBack }) {
             onChange={(v) => patch({ enterIsSend: v })}
           />
         </Section>
-        <p className="px-5 py-3 text-xs text-gray-500">Chat wallpaper is set per conversation from the ⋮ menu inside a chat.</p>
+        <p className="px-6 py-3 text-xs leading-relaxed text-gray-500">Chat wallpaper is set per conversation from the ⋮ menu inside a chat.</p>
       </PageBody>
     </div>
   );
@@ -57,14 +57,14 @@ export default function ChatSettingsSheet({ onClose }) {
 
   const status = s?.status;
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f0f2f5]">
+    <div className="flex flex-col h-full min-h-0 bg-[#f5f6f8]">
       <Header title="Settings" onBack={onClose} />
       <PageBody>
-        <button type="button" onClick={() => setPage("profile")} className="flex w-full items-center gap-4 bg-white px-5 py-5 text-left hover:bg-gray-50">
-          <Avatar name={self?.name || "You"} photo={self?.photo || ""} size={64} seed={myKey || "me"} />
+        <button type="button" onClick={() => setPage("profile")} className="group mx-4 mt-4 flex w-[calc(100%-2rem)] items-center gap-4 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-left shadow-sm transition-colors hover:bg-[#FBF3F7]">
+          <Avatar name={self?.name || "You"} photo={self?.photo || ""} size={56} seed={myKey || "me"} />
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-gray-900">{self?.name || "You"}</p>
-            <p className="truncate text-sm text-gray-500">{s?.profile?.about || self?.designation || self?.role || "Hey there! I am using TorchX Spark"}</p>
+            <p className="truncate text-base font-semibold tracking-tight text-gray-900">{self?.name || "You"}</p>
+            <p className="truncate text-sm text-gray-500">{s?.profile?.about || self?.designation || self?.role || "TorchX Talent member"}</p>
             {status?.preset && (
               <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
                 <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status.preset] || "bg-gray-400"}`} />
@@ -93,8 +93,8 @@ export default function ChatSettingsSheet({ onClose }) {
           <NavRow icon={FaQuestionCircle} title="Help & about" hint="Keyboard shortcuts, version" onClick={() => setPage("about")} />
         </Section>
 
-        <div className="px-5 py-6 text-center">
-          <p className="text-sm font-semibold text-[#730042]">TorchX Spark</p>
+        <div className="px-5 py-8 text-center">
+          <p className="text-sm font-semibold tracking-tight text-[#730042]">TorchX Spark</p>
           <p className="text-xs text-gray-400">from TorchX Talent</p>
         </div>
       </PageBody>

@@ -352,7 +352,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
               <RoomTile tile={focus} large pinned={focus === pinned} onPin={focus.spotlighted ? undefined : () => togglePin(focus.id)} onSpotlight={isHost ? () => toggleSpotlight(focus) : undefined} />
             )}
           </div>
-          <div className="flex min-h-0 gap-2 overflow-auto lg:w-56 lg:flex-col">
+          <div className="flex min-h-0 shrink-0 gap-2 overflow-auto overscroll-contain lg:w-56 lg:flex-col">
             {rest.map((t) => (
               <div key={t.id} className="aspect-video h-24 shrink-0 lg:h-auto lg:w-full">
                 <RoomTile tile={t} compact onPin={() => togglePin(t.id)} onSpotlight={isHost ? () => toggleSpotlight(t) : undefined} />
@@ -392,10 +392,12 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     const speakingElsewhere = pageCount > 1 && shownPeerTiles.some((t, i) => t.speaking && Math.floor(i / perPage) !== current);
     return (
       <div className="flex h-full min-h-0 flex-col gap-2">
-        <div className={`grid min-h-0 flex-1 gap-2 ${gridCols(shown.length)} auto-rows-fr`}>
-          {shown.map((t) => (
-            <RoomTile key={t.id} tile={t} onPin={t.id === "me" ? undefined : () => togglePin(t.id)} onSpotlight={isHost ? () => toggleSpotlight(t) : undefined} />
-          ))}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl [scrollbar-width:thin]">
+          <div className={`grid min-h-full gap-2 ${gridCols(shown.length)} auto-rows-[minmax(150px,1fr)]`}>
+            {shown.map((t) => (
+              <RoomTile key={t.id} tile={t} onPin={t.id === "me" ? undefined : () => togglePin(t.id)} onSpotlight={isHost ? () => toggleSpotlight(t) : undefined} />
+            ))}
+          </div>
         </div>
         {pageCount > 1 && (
           <div className="flex items-center justify-center gap-3 text-xs text-gray-300">
@@ -420,7 +422,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   }[panel];
 
   return (
-    <div className="mtg-root mtg-room fixed inset-0 z-[90] flex flex-col bg-[#101013] text-white">
+    <div className="mtg-root mtg-room fixed inset-0 z-[1100] flex flex-col bg-[#101013] text-white">
       <header className="mtg-room-header mtg-safe-t mtg-safe-x flex items-start gap-3 py-3 sm:items-center">
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold leading-tight">{active.title || "Meeting"}</p>
@@ -464,7 +466,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       <TimerAgendaBar onOpen={() => openPanel("activities")} />
 
       <main className="mtg-safe-x relative flex min-h-0 flex-1 gap-3 pb-2">
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-h-0 min-w-0 flex-1">
           {renderStage()}
           {hiddenPeerTiles.length > 0 && (
             <div aria-hidden="true" className="absolute h-0 w-0 overflow-hidden">

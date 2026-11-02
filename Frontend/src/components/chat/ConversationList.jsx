@@ -55,9 +55,9 @@ function IconBtn({ title, onClick, children, solid }) {
       type="button"
       onClick={onClick}
       title={title}
-      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
         solid
-          ? "bg-gradient-to-br from-[#8F0A55] to-[#640038] text-white shadow-md shadow-[#730042]/25 hover:shadow-lg"
+          ? "bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white shadow-md shadow-[#730042]/25 hover:shadow-lg"
           : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
       }`}
     >
@@ -78,7 +78,7 @@ function CallRow({ call, onSelect, onCallBack, inCall }) {
 
   return (
     <div className="px-2">
-      <div className="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-colors">
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
         <button
           type="button"
           disabled={!call.conversationId}
@@ -111,7 +111,7 @@ function CallRow({ call, onSelect, onCallBack, inCall }) {
             disabled={inCall}
             title={inCall ? "Already on a call" : isVideo ? "Video call back" : "Call back"}
             onClick={() => onCallBack(call)}
-            className="w-10 h-10 shrink-0 rounded-full bg-[#F6E8EF] text-[#730042] hover:bg-[#730042] hover:text-white disabled:opacity-40 disabled:hover:bg-[#F6E8EF] disabled:hover:text-[#730042] flex items-center justify-center transition-colors active:scale-90"
+            className="w-10 h-10 shrink-0 rounded-xl bg-[#F6E8EF] text-[#730042] hover:bg-[#730042] hover:text-white disabled:opacity-40 disabled:hover:bg-[#F6E8EF] disabled:hover:text-[#730042] flex items-center justify-center transition-colors active:scale-90"
           >
             {isVideo ? <FaVideo className="text-sm" /> : <FaPhoneAlt className="text-sm" />}
           </button>
@@ -147,12 +147,12 @@ function Row({ conv, active, myKey, onClick }) {
 
   return (
     <div className="relative px-2">
-      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-9 w-1 rounded-r-full bg-[#730042]" />}
+      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-[3px] rounded-r-full bg-[#730042]" />}
       <button
         type="button"
         onClick={onClick}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all duration-150 active:scale-[0.99] ${
-          active ? "bg-gradient-to-r from-[#F6E8EF] to-[#FBF3F7] shadow-sm" : "hover:bg-gray-50"
+        className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-150 active:scale-[0.99] ${
+          active ? "bg-[#FBF3F7] ring-1 ring-[#730042]/15" : "hover:bg-gray-50"
         }`}
       >
         <Avatar
@@ -166,7 +166,7 @@ function Row({ conv, active, myKey, onClick }) {
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <p className={`text-[14px] truncate ${unread ? "font-bold text-gray-900" : "font-semibold text-gray-800"}`}>
+            <p className={`text-[14px] truncate ${unread ? "font-semibold text-gray-900" : "font-medium text-gray-800"}`}>
               {conv.name || "Conversation"}
             </p>
             <span className={`text-[11px] flex-shrink-0 ${unread ? "text-[#730042] font-bold" : "text-gray-400"}`}>
@@ -198,7 +198,7 @@ function Row({ conv, active, myKey, onClick }) {
               {unread && (
                 <span
                   className={`min-w-[20px] h-5 px-1.5 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-sm ${
-                    conv.muted ? "bg-gray-400" : "bg-gradient-to-br from-[#8F0A55] to-[#640038]"
+                    conv.muted ? "bg-gray-400" : "bg-[#730042]"
                   }`}
                 >
                   {conv.unread > 99 ? "99+" : conv.unread}
@@ -216,7 +216,7 @@ function ActiveNow({ people, onSelect }) {
   if (!people.length) return null;
   return (
     <div className="pb-2">
-      <p className="px-5 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-gray-400">Active now</p>
+      <p className="px-5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-gray-400">Active now</p>
       <div className="chat-hide-scroll flex gap-3 overflow-x-auto px-4 pb-1">
         {people.map(({ conv, busy }) => (
           <button
@@ -256,7 +256,7 @@ function Skeleton() {
 }
 
 function SectionLabel({ children }) {
-  return <p className="px-5 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">{children}</p>;
+  return <p className="px-5 pt-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-gray-400">{children}</p>;
 }
 
 export default function ConversationList({ selectedId, onSelect, onNew, expanded, onToggleExpand, onClose, canExpand }) {
@@ -326,9 +326,9 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white">
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-[22px] leading-none font-extrabold tracking-tight text-gray-900">TorchX Spark</h2>
+          <h2 className="text-xl leading-none font-semibold tracking-tight text-gray-900">TorchX Spark</h2>
           <RealtimeStatus />
         </div>
         <div className="flex items-center gap-0.5">
@@ -349,14 +349,14 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
         </div>
       </div>
 
-      <div className="px-4 pb-2.5">
+      <div className="px-4 pb-3">
         <div className="relative group">
           <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs group-focus-within:text-[#730042] transition-colors" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats and messages"
-            className="w-full pl-9 pr-9 py-2.5 rounded-full bg-gray-100 border border-transparent text-sm placeholder:text-gray-400 focus:outline-none focus:bg-white focus:border-[#730042]/30 focus:ring-4 focus:ring-[#730042]/10 transition-all"
+            className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-sm placeholder:text-gray-400 focus:outline-none focus:bg-white focus:border-[#730042]/40 focus:ring-4 focus:ring-[#730042]/10 transition-all"
           />
           {query && (
             <button
@@ -370,20 +370,20 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
         </div>
       </div>
 
-      <div className="mx-4 mb-2 p-1 rounded-full bg-gray-100 flex">
+      <div className="mx-4 mb-2 p-1 rounded-xl bg-gray-100 flex">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`relative z-10 flex-1 py-1.5 rounded-full text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+            className={`relative z-10 flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
               tab === t.id ? "text-[#730042]" : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {tab === t.id && (
               <motion.span
                 layoutId="chat-tab-pill"
-                className="absolute inset-0 -z-10 rounded-full bg-white shadow-sm"
+                className="absolute inset-0 -z-10 rounded-lg bg-white shadow-sm ring-1 ring-black/5"
                 transition={{ type: "spring", stiffness: 500, damping: 38 }}
               />
             )}
@@ -440,7 +440,7 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
                   <button
                     type="button"
                     onClick={onNew}
-                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-br from-[#8F0A55] to-[#640038] text-white text-xs font-semibold shadow-md shadow-[#730042]/25 hover:shadow-lg transition-shadow"
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white text-xs font-semibold shadow-md shadow-[#730042]/25 hover:shadow-lg transition-shadow"
                   >
                     <FaRegEdit /> New chat
                   </button>
@@ -457,10 +457,10 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
                     <button
                       type="button"
                       onClick={() => onSelect(m.conversationId)}
-                      className="w-full text-left px-3 py-2.5 rounded-2xl hover:bg-gray-50 transition-colors"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-gray-800 truncate">{nameOf(m.conversationId)}</p>
+                        <p className="text-xs font-semibold text-gray-800 truncate">{nameOf(m.conversationId)}</p>
                         <span className="text-[10px] text-gray-400 flex-shrink-0">{formatListTime(m.createdAt)}</span>
                       </div>
                       <p className="text-[13px] text-gray-500 truncate mt-0.5">
