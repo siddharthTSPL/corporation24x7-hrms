@@ -1,14 +1,70 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, CheckCircle2, Users, Clock, Video, Mic, Repeat, Bell, AlignLeft, SlidersHorizontal, Mail } from "lucide-react";
-import { Modal, Btn } from "./ui";
-import { inputCls } from "./meetingClasses";
+import { AlertTriangle, CheckCircle2, Users, CalendarClock, Video, Mic, Repeat, Bell, AlignLeft, SlidersHorizontal, FileText, Zap, CalendarPlus, X, Check, Minus, Clock } from "lucide-react";
+import Avatar from "../chat/Avatar";
+import { Btn } from "./ui";
+import { useDialogFocus, useEsc } from "./meetingHooks";
+import { cx, inputCls } from "./meetingClasses";
 import PeoplePicker from "./PeoplePicker";
 import { useCreateMeeting, useUpdateMeeting, useCheckAvailability, useMeetingDefaults } from "../../auth/server-state/meeting/meeting.hook";
 import { useCreateInstantMeeting } from "../../auth/server-state/meeting/meetingSpace.hook";
-import { GUEST_SKIP_REASON, parseGuestInput } from "./meetingUtils";
-import { DURATIONS, REMINDERS, fmtDuration, combineDateTime, errMsg, fmtTime, minutesBetween, nextSlot, personRef, toDateInput, toTimeInput } from "./meetingUtils";
+import { GUEST_SKIP_REASON, parseGuestInput, DURATIONS, REMINDERS, addDays, combineDateTime, errMsg, fmtDate, fmtDuration, fmtTime, minutesBetween, nextSlot, personRef, startOfDay, toDateInput, toTimeInput } from "./meetingUtils";
 
+const QUICK_TIMES = [
+  ["In 1 hour", () => nextSlot(60)],
+  ["Tomorrow, 10 AM", () => { const d = addDays(startOfDay(), 1); d.setHours(10, 0, 0, 0); return d; }],
+  ["Next Monday", () => { const d = startOfDay(); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); d.setHours(10, 0, 0, 0); return d; }],
+];
+const FREQS = [["none", "Does not repeat"], ["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]];
+
+function Section({ icon: Icon, title, hint, children }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#730042]/10 text-[#730042]">
+          <Icon size={18} aria-hidden="true" />
+        </span>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          {hint && <p className="text-xs text-gray-500">{hint}</p>}
+        </div>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+const Label = ({ children }) => <span className="mb-1 block text-xs font-medium text-gray-600">{children}</span>;
+
+const Chipbtn = ({ active, onClick, children }) => (
+  <button type="button" onClick={onClick} aria-pressed={active} className={cx("min-h-9 rounded-lg border px-3 text-sm transition-colors", active ? "border-[#730042] bg-[#730042] font-medium text-white shadow-sm" : "border-gray-300 bg-white text-gray-700 hover:border-[#730042]/50 hover:bg-[#730042]/[0.04]")}>
+    {children}
+  </button>
+);
+
+const Switch = ({ checked, onChange, label, hint }) => (
+  <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-gray-50">
+    <span className="min-w-0">
+      <span className="block text-sm font-medium text-gray-800">{label}</span>
+      {hint && <span className="block text-xs text-gray-500">{hint}</span>}
+    </span>
+    <span className={cx("relative h-6 w-10 shrink-0 rounded-full transition-colors", checked ? "bg-[#730042]" : "bg-gray-300")}>
+      <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", checked ? "left-[18px]" : "left-0.5")} />
+    </span>
+  </button>
+);
+
+const SumRow = ({ on, children }) => (
+  <li className={cx("flex items-center gap-2 text-sm", on ? "text-gray-800" : "text-gray-400")}>
+    {on ? <Check size={14} className="text-emerald-600" aria-hidden="true" /> : <Minus size={14} aria-hidden="true" />}
+    {children}
+  </li>
+);
+
+/**
+ * mode: "create" | "edit" | "instant". Mount it only while open - state initialises from props.
+ * onSaved(meeting, { instant })
+ */
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /**
@@ -16,6 +72,9 @@ const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
  * onSaved(meeting, { instant })
  */
 export default function MeetingFormModal({ mode = "create", meeting, onClose, onSaved }) {
+  const dlgRef = useRef(null);
+  useEsc(true, onClose);
+  useDialogFocus(true, dlgRef);
   const edit = mode === "edit";
   const instant = mode === "instant";
   const slot = nextSlot();
@@ -134,204 +193,280 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   };
 
   const busy = avail.data?.busy || [];
-  const heading = instant ? "Meet now" : edit ? "Edit meeting" : "New meeting";
+  const heading = instant ? "Meet now" : edit ? "Edit meeting" : "Schedule a meeting";
+  const sub = instant ? "Start a call right away and invite people into it." : edit ? "Update the details. Attendees are notified of changes." : "Pick a time, invite people and we'll send the invitations.";
   const showWhen = !instant && canReschedule;
+  const setWhen = (d) => {
+    setDate(toDateInput(d));
+    setTime(toTimeInput(d));
+  };
+  const HeadIcon = instant ? Zap : CalendarPlus;
+  const Media = media === "audio" ? Mic : Video;
+  const total = people.length + guestList.length;
 
   return (
-    <Modal
-      open
-      wide
-      onClose={onClose}
-      title={heading}
-      footer={
-        <>
-          <Btn variant="ghost" onClick={onClose}>
-            Cancel
-          </Btn>
-          <Btn loading={saving} onClick={submit}>
-            {instant ? "Start and join" : edit ? "Save changes" : "Schedule"}
-          </Btn>
-        </>
-      }
-    >
-      <div className="space-y-5">
-        <input
-          className="w-full border-0 border-b border-gray-300 bg-transparent px-0 pb-2 text-lg text-gray-900 placeholder:text-gray-400 focus:border-[#730042] focus:outline-none focus:ring-0"
-          value={title}
-          maxLength={150}
-          data-autofocus
-          aria-label={instant ? "Title (optional)" : "Title"}
-          placeholder={instant ? "Add a title (optional)" : "Add a title"}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-
-        <Row icon={Users} label="Attendees">
-          <PeoplePicker value={people} onChange={setPeople} />
-          {!instant && !edit && (
-            <>
-              <label className="mt-2 flex min-h-9 items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
-                Invite everyone in the organisation
-              </label>
-              <details className="mt-1">
-                <summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-[#730042]">Add outside guests{guestList.length ? ` (${guestList.length})` : ""}</summary>
-                <p className="mb-2 text-xs text-gray-600">People without an account get a personal PIN by email and wait in the lobby until you admit them. One email per line.</p>
-                <textarea className={inputCls} rows={2} aria-label="Outside guests" value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
-              </details>
-            </>
-          )}
-        </Row>
-
-        {showWhen && (
-          <Row icon={Clock} label="Time">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <input type="date" aria-label="Date" className={inputCls} min={toDateInput(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />
-              <input type="time" aria-label="Start time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
-              <select aria-label="Duration" className={`${inputCls} col-span-2 sm:col-span-1`} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-                {DURATIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {fmtDuration(d)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {start && end && (
-              <p className="mt-1.5 text-xs text-gray-600">
-                {fmtTime(start)} to {fmtTime(end)} · {TZ}
-              </p>
-            )}
-            {(people.length > 0 || everyone) && avail.data && (
-              <div role="status" className={`mt-2 flex gap-2 rounded-lg p-3 text-sm ${busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700"}`}>
-                {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
+    <div className="mtg-root fixed inset-0 z-[80] overflow-y-auto bg-gray-900/55 backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mx-auto flex min-h-full items-end sm:items-center sm:p-6">
+        <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={heading} className="flex max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl">
+          <header className="relative overflow-hidden bg-gradient-to-r from-[#3d0023] via-[#730042] to-[#CD166E] px-5 py-4 text-white sm:px-7 sm:py-5">
+            <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
+                  <HeadIcon size={20} aria-hidden="true" />
+                </span>
                 <div>
-                  {busy.length ? (
-                    <>
-                      <p className="font-medium">{new Set(busy.map((b) => b.key)).size} invitee(s) are busy then</p>
-                      <ul className="mt-1 space-y-0.5 text-xs">
-                        {busy.slice(0, 4).map((b, i) => (
-                          <li key={i}>
-                            {b.name}: {b.title || "another meeting"} ({fmtTime(b.startTime)}–{fmtTime(b.endTime)})
-                          </li>
-                        ))}
-                        {busy.length > 4 && <li>and {busy.length - 4} more</li>}
-                      </ul>
-                    </>
-                  ) : (
-                    "Everyone's free at this time."
-                  )}
+                  <h2 className="text-lg font-semibold leading-tight">{heading}</h2>
+                  <p className="text-sm text-white/70">{sub}</p>
                 </div>
               </div>
-            )}
-          </Row>
-        )}
-
-        {instant && (
-          <Row icon={Clock} label="Duration">
-            <select aria-label="Duration" className={inputCls} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>
-                  {fmtDuration(d)}
-                </option>
-              ))}
-            </select>
-          </Row>
-        )}
-
-        <Row icon={media === "audio" ? Mic : Video} label="Type">
-          <div className="inline-flex overflow-hidden rounded-lg border border-gray-300" role="group" aria-label="Meeting type">
-            {[
-              ["video", "Video"],
-              ["audio", "Audio only"],
-            ].map(([v, label]) => (
-              <button key={v} type="button" onClick={() => setMedia(v)} aria-pressed={media === v} className={`min-h-10 border-r border-gray-300 px-5 text-sm last:border-r-0 ${media === v ? "bg-[#730042] text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}>
-                {label}
+              <button type="button" onClick={onClose} aria-label="Close dialog" className="flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition hover:bg-white/15 hover:text-white">
+                <X size={20} aria-hidden="true" />
               </button>
-            ))}
-          </div>
-        </Row>
+            </div>
+          </header>
 
-        {!instant && (
-          <>
-            <Row icon={AlignLeft} label="Details">
-              <textarea className={inputCls} rows={2} maxLength={3000} aria-label="Description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Add a description" />
-              <textarea className={`${inputCls} mt-2`} rows={3} maxLength={3000} aria-label="Agenda" value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder="Agenda (one topic per line)" />
-            </Row>
+          <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="min-h-0 space-y-4 overflow-y-auto bg-gray-50/70 p-4 sm:p-6">
+              <Section icon={FileText} title="Meeting details">
+                <label className="block">
+                  <Label>{instant ? "Title (optional)" : "Title"}</Label>
+                  <input className={inputCls} value={title} maxLength={150} data-autofocus placeholder={instant ? "Instant meeting" : "e.g. Sprint planning"} onChange={(e) => setTitle(e.target.value)} />
+                </label>
+                {!instant && (
+                  <label className="block">
+                    <Label>Description</Label>
+                    <textarea className={inputCls} rows={2} maxLength={3000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this meeting about?" />
+                  </label>
+                )}
+              </Section>
 
-            {!edit && (
-              <Row icon={Repeat} label="Repeat">
-                <div className="flex flex-wrap items-center gap-3">
-                  <select aria-label="Repeat" className={`${inputCls} !w-auto`} value={freq} onChange={(e) => setFreq(e.target.value)}>
-                    <option value="none">Does not repeat</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  {freq !== "none" && (
-                    <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                      for <input type="number" min={2} max={52} aria-label="Occurrences" className={`${inputCls} !w-20`} value={count} onChange={(e) => setCount(e.target.value)} /> occurrences
-                    </label>
+              <Section icon={Users} title="Attendees" hint="Search your organisation or add outside guests">
+                <PeoplePicker value={people} onChange={setPeople} />
+                {!instant && !edit && (
+                  <>
+                    <Switch checked={everyone} onChange={setEveryone} label="Invite everyone in the organisation" />
+                    <details className="rounded-lg border border-dashed border-gray-300 px-3">
+                      <summary className="min-h-10 cursor-pointer py-2.5 text-sm font-medium text-[#730042]">Add outside guests{guestList.length ? ` (${guestList.length})` : ""}</summary>
+                      <p className="mb-2 text-xs text-gray-600">People without an account get a personal PIN by email and wait in the lobby until you admit them. One email per line.</p>
+                      <textarea className={cx(inputCls, "mb-3")} rows={2} aria-label="Outside guests" value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
+                    </details>
+                  </>
+                )}
+              </Section>
+
+              {(showWhen || instant) && (
+                <Section icon={CalendarClock} title={instant ? "Duration" : "Date and time"}>
+                  {showWhen && (
+                    <>
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Quick times">
+                        {QUICK_TIMES.map(([label, fn]) => (
+                          <Chipbtn key={label} onClick={() => setWhen(fn())}>
+                            {label}
+                          </Chipbtn>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block">
+                          <Label>Date</Label>
+                          <input type="date" className={inputCls} min={toDateInput(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />
+                        </label>
+                        <label className="block">
+                          <Label>Start time</Label>
+                          <input type="time" className={inputCls} value={time} onChange={(e) => setTime(e.target.value)} />
+                        </label>
+                      </div>
+                    </>
                   )}
+                  <div>
+                    {showWhen && <Label>Duration</Label>}
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Duration">
+                      {DURATIONS.map((d) => (
+                        <Chipbtn key={d} active={duration === d} onClick={() => setDuration(d)}>
+                          {fmtDuration(d)}
+                        </Chipbtn>
+                      ))}
+                    </div>
+                  </div>
+
+                  {showWhen && (people.length > 0 || everyone) && avail.data && (
+                    <div role="status" className={cx("flex gap-2 rounded-lg p-3 text-sm", busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700")}>
+                      {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
+                      <div>
+                        {busy.length ? (
+                          <>
+                            <p className="font-medium">{new Set(busy.map((b) => b.key)).size} invitee(s) are busy then</p>
+                            <ul className="mt-1 space-y-0.5 text-xs">
+                              {busy.slice(0, 4).map((b, i) => (
+                                <li key={i}>
+                                  {b.name}: {b.title || "another meeting"} ({fmtTime(b.startTime)}–{fmtTime(b.endTime)})
+                                </li>
+                              ))}
+                              {busy.length > 4 && <li>and {busy.length - 4} more</li>}
+                            </ul>
+                          </>
+                        ) : (
+                          "Everyone's free at this time."
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Section>
+              )}
+
+              <Section icon={Video} title="Meeting type">
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    ["video", "Video call", "Camera and screen share", Video],
+                    ["audio", "Audio only", "Light on bandwidth", Mic],
+                  ].map(([v, label, hint, Icon]) => (
+                    <button key={v} type="button" onClick={() => setMedia(v)} aria-pressed={media === v} className={cx("flex items-start gap-3 rounded-xl border p-3 text-left transition", media === v ? "border-[#730042] bg-[#730042]/[0.05] ring-1 ring-[#730042]/30" : "border-gray-200 bg-white hover:border-[#730042]/40")}>
+                      <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", media === v ? "bg-[#730042] text-white" : "bg-gray-100 text-gray-500")}>
+                        <Icon size={18} aria-hidden="true" />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-semibold text-gray-900">{label}</span>
+                        <span className="block text-xs text-gray-500">{hint}</span>
+                      </span>
+                    </button>
+                  ))}
                 </div>
-              </Row>
-            )}
+              </Section>
 
-            <Row icon={Bell} label="Reminder">
-              <select aria-label="Remind attendees" className={`${inputCls} !w-auto`} value={reminder} onChange={(e) => setReminderPick(Number(e.target.value))}>
-                {REMINDERS.map((r) => (
-                  <option key={r} value={r}>
-                    {r === 0 ? "No reminder" : `${r} minutes before`}
-                  </option>
-                ))}
-              </select>
-            </Row>
+              {!instant && (
+                <>
+                  <Section icon={AlignLeft} title="Agenda" hint="One topic per line">
+                    <textarea className={inputCls} rows={3} maxLength={3000} aria-label="Agenda" value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder={"Status update\nBlockers\nNext steps"} />
+                  </Section>
 
-            <Row icon={SlidersHorizontal} label="Options">
-              <div className="space-y-0.5">
-                <Check checked={joinBefore} onChange={setJoinBeforePick} label="Allow people to join before the host" />
-                {!edit &&
-                  [
-                    ["lobby", "Enable waiting room"],
-                    ["muteOnEntry", "Mute participants on entry"],
-                  ].map(([key, label]) => <Check key={key} checked={!!controls[key]} onChange={(v) => setControlPicks((c) => ({ ...c, [key]: v }))} label={label} />)}
+                  <Section icon={SlidersHorizontal} title="Options">
+                    {!edit && (
+                      <div>
+                        <Label>Repeat</Label>
+                        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Repeat">
+                          {FREQS.map(([v, label]) => (
+                            <Chipbtn key={v} active={freq === v} onClick={() => setFreq(v)}>
+                              {label}
+                            </Chipbtn>
+                          ))}
+                          {freq !== "none" && (
+                            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                              <input type="number" min={2} max={52} aria-label="Occurrences" className={cx(inputCls, "!w-20")} value={count} onChange={(e) => setCount(e.target.value)} /> times
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <Label>Remind attendees</Label>
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Reminder">
+                        {REMINDERS.map((r) => (
+                          <Chipbtn key={r} active={reminder === r} onClick={() => setReminderPick(r)}>
+                            {r === 0 ? "No reminder" : `${r} min before`}
+                          </Chipbtn>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                      <Switch checked={joinBefore} onChange={setJoinBeforePick} label="Allow people to join before the host" />
+                      {!edit &&
+                        [
+                          ["lobby", "Waiting room", "Admit people one by one"],
+                          ["muteOnEntry", "Mute on entry", "Everyone except hosts joins muted"],
+                        ].map(([key, label, hint]) => <Switch key={key} checked={!!controls[key]} onChange={(v) => setControlPicks((c) => ({ ...c, [key]: v }))} label={label} hint={hint} />)}
+                      {!edit && <Switch checked={sendEmail} onChange={setSendEmail} label="Email invitations" hint="Attendees get an email with the join link" />}
+                    </div>
+                    {!edit && defaultsQ.isSuccess && <p className="text-xs text-gray-500">Your organisation's defaults are pre-selected.</p>}
+                  </Section>
+                </>
+              )}
+
+              {error && (
+                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {error}
+                </p>
+              )}
+            </div>
+
+            <aside aria-label="Summary" className="hidden overflow-y-auto border-l border-gray-200 bg-white p-5 lg:block">
+              <h3 className="text-sm font-semibold text-gray-900">Summary</h3>
+              <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
+                <div className="bg-gradient-to-br from-[#730042] to-[#CD166E] p-4 text-white">
+                  <p className="flex items-center gap-1.5 text-xs text-white/75">
+                    <Media size={13} aria-hidden="true" /> {media === "audio" ? "Audio call" : "Video call"}
+                  </p>
+                  <p className={cx("mt-1.5 break-words text-base font-semibold leading-snug", !title && "text-white/60")}>{title || (instant ? "Instant meeting" : "Untitled meeting")}</p>
+                </div>
+                <div className="space-y-3 p-4">
+                  <div className="flex gap-2.5">
+                    <Clock size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
+                    <div className="text-sm">
+                      {instant ? (
+                        <p className="text-gray-800">Starts right away · {fmtDuration(duration)}</p>
+                      ) : start ? (
+                        <>
+                          <p className="font-medium text-gray-900">{fmtDate(start, { weekday: "long", day: "numeric", month: "long" })}</p>
+                          <p className="text-gray-600">
+                            {fmtTime(start)} – {fmtTime(end)} · {fmtDuration(duration)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-gray-400">Pick a date and time</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2.5">
+                    <Users size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
+                    <div className="min-w-0 text-sm">
+                      {everyone ? (
+                        <p className="text-gray-800">Whole organisation</p>
+                      ) : total ? (
+                        <>
+                          <div className="flex -space-x-2">
+                            {people.slice(0, 5).map((p) => (
+                              <span key={p.key} className="rounded-full ring-2 ring-white">
+                                <Avatar name={p.name} photo={p.photo} size={26} />
+                              </span>
+                            ))}
+                          </div>
+                          <p className="mt-1.5 text-gray-600">
+                            {people.length} invited{guestList.length ? ` · ${guestList.length} guest${guestList.length > 1 ? "s" : ""}` : ""}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-gray-400">No one invited yet</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              {!edit && defaultsQ.isSuccess && <p className="mt-1 text-xs text-gray-500">Your organisation's defaults are pre-selected.</p>}
-            </Row>
 
-            {!edit && (
-              <Row icon={Mail} label="Invitations">
-                <Check checked={sendEmail} onChange={setSendEmail} label="Email invitations to attendees" />
-              </Row>
-            )}
-          </>
-        )}
+              {!instant && (
+                <ul className="mt-4 space-y-2">
+                  <SumRow on={reminder > 0}>{reminder > 0 ? `Reminder ${reminder} min before` : "No reminder"}</SumRow>
+                  {!edit && <SumRow on={freq !== "none"}>{freq !== "none" ? `Repeats ${freq}, ${Number(count) || 4} times` : "Does not repeat"}</SumRow>}
+                  {!edit && <SumRow on={!!controls.lobby}>Waiting room</SumRow>}
+                  {!edit && <SumRow on={!!controls.muteOnEntry}>Mute on entry</SumRow>}
+                  <SumRow on={joinBefore}>Join before host</SumRow>
+                  {!edit && <SumRow on={sendEmail}>Email invitations</SumRow>}
+                </ul>
+              )}
+            </aside>
+          </div>
 
-        {error && (
-          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
+          <footer className="mtg-safe-b flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 pt-3 sm:px-6">
+            <p className="min-w-0 truncate text-xs text-gray-500 lg:hidden">{!instant && start ? `${fmtDate(start, { weekday: "short", day: "numeric", month: "short" })}, ${fmtTime(start)} · ${fmtDuration(duration)}` : ""}</p>
+            <div className="ml-auto flex gap-2">
+              <Btn variant="ghost" onClick={onClose}>
+                Cancel
+              </Btn>
+              <Btn loading={saving} onClick={submit}>
+                {instant ? "Start and join" : edit ? "Save changes" : "Send invitations"}
+              </Btn>
+            </div>
+          </footer>
+        </div>
       </div>
-    </Modal>
-  );
-}
-
-function Row({ icon: Icon, label, children }) {
-  return (
-    <div className="flex gap-3 sm:gap-4">
-      <span className="mt-2 flex h-6 w-6 shrink-0 items-center justify-center text-gray-500" title={label}>
-        <Icon size={18} aria-hidden="true" />
-        <span className="sr-only">{label}</span>
-      </span>
-      <div className="min-w-0 flex-1">{children}</div>
     </div>
-  );
-}
-
-function Check({ checked, onChange, label }) {
-  return (
-    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-sm text-gray-700">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[#730042]" />
-      {label}
-    </label>
   );
 }
