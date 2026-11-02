@@ -20,7 +20,16 @@ const participantSchema = new mongoose.Schema(
     // per-person chat settings (every person sees their own wallpaper / pin)
     wallpaper: { type: String, default: "" }, // preset id ("preset:sunset"), "color:#hex" or an image url
     pinned: { type: Boolean, default: false },
+    archived: { type: Boolean, default: false }, // moved to "Archived chats" (comes back on a new message unless muted)
     clearedAt: { type: Date, default: null }, // "clear chat": older messages are hidden for this person only
+    favourite: { type: Boolean, default: false }, // shows up under the "Favourites" chip
+    mentionUnread: { type: Number, default: 0, min: 0 }, // unread @mentions of me (the "@" badge); reset when I open the chat
+    // half-typed message: comes back when the person returns, on any device
+    draft: {
+      text: { type: String, default: "", maxlength: 5000 },
+      replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "ChatMessage", default: undefined },
+      updatedAt: { type: Date, default: null },
+    },
   },
   { _id: false }
 );
@@ -37,6 +46,34 @@ const conversationSchema = new mongoose.Schema(
     // group rules (admins change them)
     settings: {
       onlyAdminsCanSend: { type: Boolean, default: false }, // announcement-style group
+      onlyAdminsCanEditInfo: { type: Boolean, default: true }, // name / description / photo (true = same as before this option existed)
+      onlyAdminsCanAddMembers: { type: Boolean, default: true },
+      onlyAdminsCanPin: { type: Boolean, default: false }, // pinning messages to the top of the chat
+    },
+
+    // disappearing messages: new messages vanish this many seconds after they are sent (0 = off)
+    disappearingSeconds: { type: Number, enum: [0, 86400, 604800, 7776000], default: 0 },
+
+    // messages pinned to the top of the chat (max 3, newest last)
+    pinnedMessages: {
+      type: [
+        {
+          message: { type: mongoose.Schema.Types.ObjectId, ref: "ChatMessage", required: true },
+          pinnedByKey: { type: String, default: "" },
+          pinnedAt: { type: Date, default: Date.now },
+          expiresAt: { type: Date, default: null },
+          _id: false,
+        },
+      ],
+      default: [],
+    },
+
+    // group invite link: anyone in the SAME organisation who has the code can join while `enabled`
+    invite: {
+      code: { type: String, default: undefined },
+      enabled: { type: Boolean, default: false },
+      createdByKey: { type: String, default: "" },
+      createdAt: { type: Date, default: null },
     },
 
     participants: { type: [participantSchema], default: [] },
@@ -67,7 +104,11 @@ conversationSchema.index(
   { unique: true, partialFilterExpression: { directKey: { $type: "string" } } }
 );
 
+conversationSchema.index({ "invite.code": 1 }, { unique: true, partialFilterExpression: { "invite.code": { $type: "string" } } });
+
 conversationSchema.statics.PERSON_MODELS = PERSON_MODELS;
 conversationSchema.statics.MAX_GROUP_MEMBERS = 256;
+conversationSchema.statics.DISAPPEARING_OPTIONS = [0, 86400, 604800, 7776000]; // off / 24 hours / 7 days / 90 days
+conversationSchema.statics.MAX_PINNED_MESSAGES = 3;
 
 module.exports = mongoose.models.Conversation || mongoose.model("Conversation", conversationSchema);

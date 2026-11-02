@@ -25,16 +25,20 @@ export const getPresence = async (keys = []) =>
   (await api.get("chat/presence", { params: { keys: keys.join(",") } })).data;
 
 // ---- conversations ----
-export const getConversations = async ({ limit = 50, before, type } = {}) =>
-  (await api.get("chat/conversations", { params: { limit, before, type } })).data;
+// filter: "all" | "unread" | "groups" | "direct" | "favourites" | "mentions"   archived: true -> archived chats only
+export const getConversations = async ({ limit = 50, before, type, filter, archived } = {}) =>
+  (await api.get("chat/conversations", {
+    params: { limit, before, type, filter: filter && filter !== "all" ? filter : undefined, archived: archived ? true : undefined },
+  })).data;
 
 export const getConversation = async (id) => (await api.get(`chat/conversations/${id}`)).data;
 
 export const openDirectChat = async (participant) =>
   (await api.post("chat/conversations/direct", { participant })).data;
 
-export const createGroupChat = async ({ name, description, members }) =>
-  (await api.post("chat/conversations/group", { name, description, members })).data;
+// settings (optional): { onlyAdminsCanSend, onlyAdminsCanEditInfo, onlyAdminsCanAddMembers, onlyAdminsCanPin }
+export const createGroupChat = async ({ name, description, members, settings }) =>
+  (await api.post("chat/conversations/group", { name, description, members, settings })).data;
 
 export const updateGroupChat = async ({ id, ...body }) =>
   (await api.patch(`chat/conversations/${id}`, body)).data;
@@ -61,20 +65,22 @@ export const getMessages = async ({ id, before, limit = 40 }) =>
   (await api.get(`chat/conversations/${id}/messages`, { params: { before, limit } })).data;
 
 // JSON for text, multipart when files are attached (max 5 files, 15 MB each).
-export const sendMessageRest = async ({ id, text, replyTo, clientId, sticker, files = [], onUploadProgress }) => {
+// mentions = ["User:..", ...] (person keys; "@all" in the text notifies everyone)
+export const sendMessageRest = async ({ id, text, replyTo, clientId, sticker, mentions, files = [], onUploadProgress }) => {
   if (!files.length) {
-    return (await api.post(`chat/conversations/${id}/messages`, { text, replyTo, clientId, sticker })).data;
+    return (await api.post(`chat/conversations/${id}/messages`, { text, replyTo, clientId, sticker, mentions })).data;
   }
   const fd = new FormData();
   if (text) fd.append("text", text);
   if (replyTo) fd.append("replyTo", replyTo);
   if (clientId) fd.append("clientId", clientId);
+  if (mentions?.length) fd.append("mentions", JSON.stringify(mentions));
   files.forEach((f) => fd.append("attachments", f));
   return (await api.post(`chat/conversations/${id}/messages`, fd, { onUploadProgress })).data;
 };
 
-export const editMessage = async ({ messageId, text }) =>
-  (await api.patch(`chat/messages/${messageId}`, { text })).data;
+export const editMessage = async ({ messageId, text, mentions }) =>
+  (await api.patch(`chat/messages/${messageId}`, { text, mentions })).data;
 
 // scope: "everyone" (default) | "me"
 export const deleteMessage = async ({ messageId, scope = "everyone" }) =>

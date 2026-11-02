@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { AlertTriangle, CheckCircle2, Users, CalendarClock, Video, Mic, Repeat, Bell, AlignLeft, SlidersHorizontal, FileText, Zap, CalendarPlus, X, Check, Minus, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Users, CalendarClock, Video, Mic, Repeat, Bell, AlignLeft, SlidersHorizontal, FileText, Zap, CalendarPlus, X, Check, Minus, Clock, Loader2, ListChecks } from "lucide-react";
 import Avatar from "../chat/Avatar";
 import { Btn } from "./ui";
 import { useDialogFocus, useEsc } from "./meetingHooks";
@@ -203,12 +203,21 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const HeadIcon = instant ? Zap : CalendarPlus;
   const Media = media === "audio" ? Mic : Video;
   const total = people.length + guestList.length;
+  const agendaCount = agenda.split("\n").filter((l) => l.trim()).length;
+  const busyPeople = [...new Map(busy.map((b) => [b.key, b])).values()];
+  const checks = [
+    [instant || !!title.trim(), "Title added"],
+    [edit || total > 0 || (everyone && !instant), "Attendees invited"],
+    [!showWhen || (!!start && start.getTime() >= Date.now() - 5 * 60000), "Start time is valid"],
+  ];
+  const ready = checks.filter(([ok]) => ok).length;
 
   return (
-    <div className="mtg-root fixed inset-0 z-[80] overflow-y-auto bg-gray-900/55 backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mx-auto flex min-h-full items-end sm:items-center sm:p-6">
-        <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={heading} className="flex max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl outline-none sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl">
-          <header className="relative overflow-hidden bg-gradient-to-r from-[#3d0023] via-[#730042] to-[#CD166E] px-5 py-4 text-white sm:px-7 sm:py-5">
+    <div className="mtg-root fixed inset-0 z-[80] bg-gray-900/55 backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <style>{`@keyframes mtgDrawerIn{from{transform:translateX(48px);opacity:0}to{transform:none;opacity:1}}@media (prefers-reduced-motion:reduce){.mtg-drawer{animation:none!important}}`}</style>
+      <div className="flex h-full justify-end">
+        <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={heading} style={{ animation: "mtgDrawerIn .28s ease-out" }} className="mtg-drawer flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl outline-none sm:rounded-l-2xl">
+          <header className="relative shrink-0 overflow-hidden bg-gradient-to-r from-[#3d0023] via-[#730042] to-[#CD166E] px-5 py-4 text-white sm:px-7 sm:py-5">
             <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
             <div className="relative flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -226,7 +235,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
             </div>
           </header>
 
-          <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-h-0 space-y-4 overflow-y-auto bg-gray-50/70 p-4 sm:p-6">
               <Section icon={FileText} title="Meeting details">
                 <label className="block">
@@ -249,7 +258,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                     <details className="rounded-lg border border-dashed border-gray-300 px-3">
                       <summary className="min-h-10 cursor-pointer py-2.5 text-sm font-medium text-[#730042]">Add outside guests{guestList.length ? ` (${guestList.length})` : ""}</summary>
                       <p className="mb-2 text-xs text-gray-600">People without an account get a personal PIN by email and wait in the lobby until you admit them. One email per line.</p>
-                      <textarea className={cx(inputCls, "mb-3")} rows={2} aria-label="Outside guests" value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
+                      <textarea className={cx(inputCls, "mb-3")} rows={2} aria-label="Outside guests" value={guestText} onChange={(e) => setGuestText(e.target.value)} placeholder={"client@company.com\nAlex Morgan <alex@example.com>"} />
                     </details>
                   </>
                 )}
@@ -290,7 +299,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                   </div>
 
                   {showWhen && (people.length > 0 || everyone) && avail.data && (
-                    <div role="status" className={cx("flex gap-2 rounded-lg p-3 text-sm", busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700")}>
+                    <div role="status" className={cx("flex gap-2 rounded-lg p-3 text-sm lg:hidden", busy.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-700")}>
                       {busy.length ? <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" /> : <CheckCircle2 size={16} className="mt-0.5 shrink-0" aria-hidden="true" />}
                       <div>
                         {busy.length ? (
@@ -388,73 +397,133 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
               )}
             </div>
 
-            <aside aria-label="Summary" className="hidden overflow-y-auto border-l border-gray-200 bg-white p-5 lg:block">
-              <h3 className="text-sm font-semibold text-gray-900">Summary</h3>
-              <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
-                <div className="bg-gradient-to-br from-[#730042] to-[#CD166E] p-4 text-white">
-                  <p className="flex items-center gap-1.5 text-xs text-white/75">
-                    <Media size={13} aria-hidden="true" /> {media === "audio" ? "Audio call" : "Video call"}
-                  </p>
-                  <p className={cx("mt-1.5 break-words text-base font-semibold leading-snug", !title && "text-white/60")}>{title || (instant ? "Instant meeting" : "Untitled meeting")}</p>
-                </div>
-                <div className="space-y-3 p-4">
-                  <div className="flex gap-2.5">
-                    <Clock size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
-                    <div className="text-sm">
-                      {instant ? (
-                        <p className="text-gray-800">Starts right away · {fmtDuration(duration)}</p>
-                      ) : start ? (
-                        <>
-                          <p className="font-medium text-gray-900">{fmtDate(start, { weekday: "long", day: "numeric", month: "long" })}</p>
-                          <p className="text-gray-600">
-                            {fmtTime(start)} – {fmtTime(end)} · {fmtDuration(duration)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-gray-400">Pick a date and time</p>
-                      )}
-                    </div>
+            <aside aria-label="Summary" className="hidden min-h-0 flex-col gap-5 overflow-y-auto border-l border-gray-200 bg-white p-5 lg:flex">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Summary</h3>
+                <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+                  <div className="bg-gradient-to-br from-[#730042] to-[#CD166E] p-4 text-white">
+                    <p className="flex items-center gap-1.5 text-xs text-white/75">
+                      <Media size={13} aria-hidden="true" /> {media === "audio" ? "Audio call" : "Video call"}
+                    </p>
+                    <p className={cx("mt-1.5 break-words text-base font-semibold leading-snug", !title && "text-white/60")}>{title || (instant ? "Instant meeting" : "Untitled meeting")}</p>
                   </div>
-                  <div className="flex gap-2.5">
-                    <Users size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
-                    <div className="min-w-0 text-sm">
-                      {everyone ? (
-                        <p className="text-gray-800">Whole organisation</p>
-                      ) : total ? (
-                        <>
-                          <div className="flex -space-x-2">
-                            {people.slice(0, 5).map((p) => (
-                              <span key={p.key} className="rounded-full ring-2 ring-white">
-                                <Avatar name={p.name} photo={p.photo} size={26} />
-                              </span>
-                            ))}
-                          </div>
-                          <p className="mt-1.5 text-gray-600">
-                            {people.length} invited{guestList.length ? ` · ${guestList.length} guest${guestList.length > 1 ? "s" : ""}` : ""}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-gray-400">No one invited yet</p>
-                      )}
+                  <div className="space-y-3 p-4">
+                    <div className="flex gap-2.5">
+                      <Clock size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
+                      <div className="text-sm">
+                        {instant ? (
+                          <p className="text-gray-800">Starts right away · {fmtDuration(duration)}</p>
+                        ) : start ? (
+                          <>
+                            <p className="font-medium text-gray-900">{fmtDate(start, { weekday: "long", day: "numeric", month: "long" })}</p>
+                            <p className="text-gray-600">
+                              {fmtTime(start)} – {fmtTime(end)} · {fmtDuration(duration)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-gray-400">Pick a date and time</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2.5">
+                      <Users size={16} className="mt-0.5 shrink-0 text-gray-400" aria-hidden="true" />
+                      <div className="min-w-0 flex-1 text-sm">
+                        {everyone ? (
+                          <p className="text-gray-800">Whole organisation</p>
+                        ) : total ? (
+                          <>
+                            <p className="font-medium text-gray-900">
+                              {people.length} invited{guestList.length ? ` · ${guestList.length} guest${guestList.length > 1 ? "s" : ""}` : ""}
+                            </p>
+                            <ul className="mt-2 space-y-1.5">
+                              {people.slice(0, 4).map((p) => (
+                                <li key={p.key} className="flex items-center gap-2">
+                                  <Avatar name={p.name} photo={p.photo} size={22} />
+                                  <span className="truncate text-xs text-gray-700">{p.name}</span>
+                                </li>
+                              ))}
+                              {people.length > 4 && <li className="pl-8 text-xs text-gray-500">+{people.length - 4} more</li>}
+                            </ul>
+                          </>
+                        ) : (
+                          <p className="text-gray-400">No one invited yet</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {showWhen && (
+                <div>
+                  <h4 className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Availability
+                    {avail.isPending && <Loader2 size={13} className="animate-spin text-[#730042]" aria-label="Checking availability" />}
+                  </h4>
+                  {!people.length && !everyone ? (
+                    <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-500">Add attendees to see who is free at this time.</p>
+                  ) : !avail.data ? (
+                    <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">Checking calendars…</p>
+                  ) : busyPeople.length ? (
+                    <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                      <p className="flex items-center gap-1.5 text-sm font-medium">
+                        <AlertTriangle size={15} className="shrink-0" aria-hidden="true" /> {busyPeople.length} {busyPeople.length > 1 ? "people are" : "person is"} busy
+                      </p>
+                      <ul className="mt-2 max-h-40 space-y-2 overflow-y-auto pr-1">
+                        {busyPeople.slice(0, 6).map((b, i) => (
+                          <li key={b.key || i} className="text-xs leading-snug">
+                            <span className="block font-medium">{b.name}</span>
+                            <span className="block text-amber-800/80">
+                              {b.title || "Another meeting"} · {fmtTime(b.startTime)}–{fmtTime(b.endTime)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {busyPeople.length > 6 && <p className="mt-2 text-xs text-amber-800/80">and {busyPeople.length - 6} more</p>}
+                    </div>
+                  ) : (
+                    <p role="status" className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                      <CheckCircle2 size={16} className="shrink-0" aria-hidden="true" /> Everyone is free at this time
+                    </p>
+                  )}
+                </div>
+              )}
+
               {!instant && (
-                <ul className="mt-4 space-y-2">
-                  <SumRow on={reminder > 0}>{reminder > 0 ? `Reminder ${reminder} min before` : "No reminder"}</SumRow>
-                  {!edit && <SumRow on={freq !== "none"}>{freq !== "none" ? `Repeats ${freq}, ${Number(count) || 4} times` : "Does not repeat"}</SumRow>}
-                  {!edit && <SumRow on={!!controls.lobby}>Waiting room</SumRow>}
-                  {!edit && <SumRow on={!!controls.muteOnEntry}>Mute on entry</SumRow>}
-                  <SumRow on={joinBefore}>Join before host</SumRow>
-                  {!edit && <SumRow on={sendEmail}>Email invitations</SumRow>}
-                </ul>
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Settings</h4>
+                  <ul className="space-y-2">
+                    <SumRow on={reminder > 0}>{reminder > 0 ? `Reminder ${reminder} min before` : "No reminder"}</SumRow>
+                    {!edit && <SumRow on={freq !== "none"}>{freq !== "none" ? `Repeats ${freq}, ${Number(count) || 4} times` : "Does not repeat"}</SumRow>}
+                    {!edit && <SumRow on={!!controls.lobby}>Waiting room</SumRow>}
+                    {!edit && <SumRow on={!!controls.muteOnEntry}>Mute on entry</SumRow>}
+                    <SumRow on={joinBefore}>Join before host</SumRow>
+                    <SumRow on={agendaCount > 0}>{agendaCount > 0 ? `${agendaCount} agenda topic${agendaCount > 1 ? "s" : ""}` : "No agenda"}</SumRow>
+                    {!edit && <SumRow on={sendEmail}>Email invitations</SumRow>}
+                  </ul>
+                </div>
+              )}
+
+              {!instant && (
+                <div className="mt-auto rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex items-center justify-between text-xs font-semibold text-gray-700">
+                    <span className="flex items-center gap-1.5"><ListChecks size={14} className="text-[#730042]" aria-hidden="true" /> Ready to send</span>
+                    <span>{ready}/{checks.length}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+                    <div className="h-full rounded-full bg-[#730042] transition-all" style={{ width: `${(ready / checks.length) * 100}%` }} />
+                  </div>
+                  <ul className="mt-2.5 space-y-1.5">
+                    {checks.map(([ok, label]) => (
+                      <SumRow key={label} on={ok}>{label}</SumRow>
+                    ))}
+                  </ul>
+                </div>
               )}
             </aside>
           </div>
 
-          <footer className="mtg-safe-b flex items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 pt-3 sm:px-6">
+          <footer className="mtg-safe-b flex shrink-0 items-center justify-between gap-3 border-t border-gray-200 bg-white px-4 pt-3 sm:px-6">
             <p className="min-w-0 truncate text-xs text-gray-500 lg:hidden">{!instant && start ? `${fmtDate(start, { weekday: "short", day: "numeric", month: "short" })}, ${fmtTime(start)} · ${fmtDuration(duration)}` : ""}</p>
             <div className="ml-auto flex gap-2">
               <Btn variant="ghost" onClick={onClose}>

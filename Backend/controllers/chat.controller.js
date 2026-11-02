@@ -2,6 +2,7 @@ const path = require("path");
 const mongoose = require("mongoose");
 const Conversation = require("../Models/conversation.model");
 const ChatMessage = require("../Models/chatmessage.model");
+const ChatStar = require("../Models/chatstar.model");
 const CallSession = require("../Models/callsession.model");
 const imagekit = require("../utils/imagekit.utils");
 const chat = require("../utils/chat/chat.service");
@@ -9,6 +10,15 @@ const rooms = require("../utils/chat/callRooms");
 const presence = require("../utils/chat/presence");
 const { getIceServers, hasTurn } = require("../utils/chat/ice.utils");
 const { httpError, escapeRegex, searchDirectory, resolvePeople, parseKey } = require("../utils/chat/people.utils");
+
+const extras = require("../utils/chat/chatExtras.service");
+
+// multipart forms send lists as a JSON string or repeated fields; JSON bodies send a real array
+const asList = (v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v !== "string" || !v.trim()) return [];
+  try { const j = JSON.parse(v); return Array.isArray(j) ? j : []; } catch { return v.split(",").map((x) => x.trim()).filter(Boolean); }
+};
 
 const actorOf = (req) => chat.toActor(req.actor);
 const ok = (res, data = {}, status = 200) => res.status(status).json({ success: true, ...data });
@@ -24,12 +34,15 @@ const searchPeople = async (req, res) => {
     limit: parseInt(req.query.limit, 10) || 20,
     department: req.query.department || "",
   });
-  ok(res, { people: people.map((p) => ({ ...p, online: presence.isOnline(p.key), inCall: presence.isInCall(p.key) })) });
+  await presence.hydrate(people.map((p) => p.key));
+  ok(res, { people: people.map((p) => ({ ...p, ...presence.publicState(p.key, actor.key) })) });
 };
 
 // ---------- conversations ----------
 
 // GET /chat/conversations?limit=50&before=<ISO date of lastMessageAt>
+//     &filter=all|unread|groups|direct|favourites|mentions     (the chips above the chat list)
+//     &archived=true                                            (only archived chats)
 const listConversations = async (req, res) => {
   const actor = actorOf(req);
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
@@ -39,6 +52,17 @@ const listConversations = async (req, res) => {
     // empty 1:1 / meeting chats stay hidden until someone says something
     $or: [{ type: "group" }, { "lastMessage.at": { $exists: true } }],
   };
+  const mine = (cond) => ({ participants: { $elemMatch: { key: actor.key, ...cond } } });
+  // ?archived=true -> only my archived chats; otherwise archived chats stay out of the main list
+  const and = [req.query.archived === "true" ? mine({ archived: true }) : { participants: { $not: { $elemMatch: { key: actor.key, archived: true } } } }];
+  const filter = String(req.query.filter || "all");
+  if (filter === "unread") and.push(mine({ unread: { $gt: 0 } }));
+  else if (filter === "favourites") and.push(mine({ favourite: true }));
+  else if (filter === "mentions") and.push(mine({ mentionUnread: { $gt: 0 } }));
+  else if (filter === "groups") q.type = "group";
+  else if (filter === "direct") q.type = "direct";
+  else if (filter !== "all") throw httpError("filter must be all, unread, groups, direct, favourites or mentions.");
+  q.$and = and;
   if (req.query.type && ["direct", "group", "meeting"].includes(req.query.type)) q.type = req.query.type;
   if (req.query.before) {
     const d = new Date(req.query.before);
@@ -59,7 +83,7 @@ const listConversations = async (req, res) => {
 const getConversation = async (req, res) => {
   const actor = actorOf(req);
   const conv = await chat.loadConversation(actor, req.params.id);
-  ok(res, { conversation: await chat.serializeOneConversation(conv, actor) });
+  ok(res, { conversation: await chat.serializeOneConversation(conv, actor), pinned: await extras.getPinned(actor, conv) });
 };
 
 // POST /chat/conversations/direct  { participant: { model, id } }
@@ -122,10 +146,15 @@ const markRead = async (req, res) => {
 
 // GET /chat/conversations/:id/messages?before=<messageId>&limit=40
 const getMessages = async (req, res) => {
-  const { messages, hasMore, nextCursor } = await chat.getMessages(actorOf(req), req.params.id, {
+  const actor = actorOf(req);
+  const { messages, hasMore, nextCursor } = await chat.getMessages(actor, req.params.id, {
     before: req.query.before || null,
     limit: req.query.limit,
   });
+  // mark the messages I have starred (star icon in the bubble)
+  const stars = await ChatStar.find({ key: actor.key, message: { $in: messages.map((m) => m.id) } }).select("message").lean();
+  const starred = new Set(stars.map((s) => String(s.message)));
+  for (const m of messages) m.starred = starred.has(m.id);
   ok(res, { messages, hasMore, nextCursor });
 };
 
@@ -157,13 +186,14 @@ const sendMessage = async (req, res) => {
     replyTo: req.body?.replyTo || null,
     clientId: req.body?.clientId || null,
     sticker: req.body?.sticker || null,
+    mentions: asList(req.body?.mentions),
     attachments,
   });
   ok(res, { message, duplicate }, duplicate ? 200 : 201);
 };
 
 const editMessage = async (req, res) => {
-  ok(res, { message: await chat.editMessage(actorOf(req), req.params.messageId, req.body?.text) });
+  ok(res, { message: await chat.editMessage(actorOf(req), req.params.messageId, req.body?.text, req.body?.mentions === undefined ? undefined : asList(req.body.mentions)) });
 };
 
 // DELETE /chat/messages/:id            -> delete for everyone
@@ -232,9 +262,10 @@ const searchMessages = async (req, res) => {
 
   const rows = await ChatMessage.find({
     conversation: { $in: convIds },
-    type: { $in: ["text", "file"] },
+    type: { $in: ["text", "file", "poll"] },
     deletedAt: null,
     deletedFor: { $ne: actor.key },
+    ...chat.notExpired(),
     text: new RegExp(escapeRegex(term), "i"),
   })
     .sort({ _id: -1 })
@@ -242,7 +273,7 @@ const searchMessages = async (req, res) => {
     .maxTimeMS(4000)
     .lean();
 
-  ok(res, { results: await chat.hydrateMessages(actor.organisation_id, rows) });
+  ok(res, { results: await chat.hydrateMessages(actor.organisation_id, rows, actor.key) });
 };
 
 const unreadCount = async (req, res) => {
@@ -252,7 +283,8 @@ const unreadCount = async (req, res) => {
 // GET /chat/presence?keys=User:abc,Manager:def
 const getPresence = async (req, res) => {
   const keys = String(req.query.keys || "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 200);
-  ok(res, { presence: presence.snapshot(keys) });
+  await presence.hydrate(keys);
+  ok(res, { presence: presence.snapshot(keys, actorOf(req).key) });
 };
 
 // ---------- calls ----------

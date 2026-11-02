@@ -31,9 +31,7 @@ const broadcastCallState = (key, organisation_id) => {
   if (String(key).startsWith("Guest:")) return; // outsiders are invisible to the org's presence list
   emitToOrganisation(organisation_id, "presence:update", {
     key,
-    online: presence.isOnline(key),
-    inCall: rooms.isInCall(key),
-    lastSeenAt: presence.isOnline(key) ? null : presence.lastSeenAt(key),
+    ...presence.publicState(key),
   });
 };
 

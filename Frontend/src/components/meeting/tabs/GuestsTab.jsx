@@ -56,8 +56,8 @@ export default function GuestsTab({ meeting: m }) {
 
       {!closed && (
         <section className="space-y-3">
-          <Field label="Invite by email" hint="One per line or comma-separated. Optional name: Priya Sharma <priya@example.com>">
-            <textarea className={inputCls} rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"client@company.com\nPriya Sharma <priya@example.com>"} />
+          <Field label="Invite by email" hint="One per line or comma-separated. Optional name: Alex Morgan <alex@example.com>">
+            <textarea className={inputCls} rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder={"client@company.com\nAlex Morgan <alex@example.com>"} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} className="accent-[#730042]" />

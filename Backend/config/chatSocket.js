@@ -76,8 +76,12 @@ const registerChatSocket = (io, socket) => {
   };
 
   // ----- presence -----
-  if (!isGuest && presence.add(actor.key, socket.id)) {
-    emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: true, inCall: presence.isInCall(actor.key) });
+  if (!isGuest) {
+    const flippedOnline = presence.add(actor.key, socket.id);
+    // load my privacy choices first, so "hide my online status" is honoured from the very first broadcast
+    presence.loadPrivacy([actor.key]).then(() => {
+      if (flippedOnline) emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, ...presence.publicState(actor.key) });
+    });
   }
   // everything people sent me while I was away is now "delivered" (grey double tick for them)
   if (!isGuest) chat.markDeliveredForActor(actor).catch((err) => console.error("[socket] mark delivered failed:", err.message));
@@ -96,13 +100,14 @@ const registerChatSocket = (io, socket) => {
 
   on("presence:query", async ({ keys }) => {
     const list = Array.isArray(keys) ? keys.filter((k) => typeof k === "string").slice(0, 200) : [];
-    return { presence: presence.snapshot(list) };
+    await presence.hydrate(list);
+    return { presence: presence.snapshot(list, actor.key) };
   });
 
   // ----- chat -----
-  on("chat:send", async ({ conversationId, text, replyTo, clientId, sticker }) => {
+  on("chat:send", async ({ conversationId, text, replyTo, clientId, sticker, mentions }) => {
     if (!allow(socket, "send", 20, 10000)) throw Object.assign(new Error("You're sending messages too fast."), { statusCode: 429 });
-    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId, sticker });
+    const { message } = await chat.sendMessage(actor, conversationId, { text, replyTo, clientId, sticker, mentions: Array.isArray(mentions) ? mentions : [] });
     return { message };
   });
 
@@ -122,6 +127,7 @@ const registerChatSocket = (io, socket) => {
   };
   on("chat:typing", async ({ conversationId, isTyping }) => {
     if (!allow(socket, "typing", 30, 10000)) return;
+    if (!presence.typingEnabled(actor.key)) return; // I turned the typing indicator off
     const keys = await memberKeysOf(conversationId);
     const person = await getPerson();
     chat.emitToKeys(keys.filter((k) => k !== actor.key), "chat:typing", {
@@ -337,7 +343,7 @@ const registerChatSocket = (io, socket) => {
       }
     }
     if (!isGuest && presence.remove(actor.key, socket.id)) {
-      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, online: false, inCall: false, lastSeenAt: presence.lastSeenAt(actor.key) });
+      emitToOrganisation(actor.organisation_id, "presence:update", { key: actor.key, ...presence.publicState(actor.key) });
     }
   });
 };

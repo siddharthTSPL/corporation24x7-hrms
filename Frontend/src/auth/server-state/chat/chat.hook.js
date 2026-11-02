@@ -88,11 +88,15 @@ export const useDirectorySearch = (query = "", { department = "", enabled = true
 
 // ---------------------------------------------------------------- conversations
 
-export const useConversations = (enabled = true) =>
+// useConversations()                              -> all chats
+// useConversations(true, { filter: "unread" })    -> chip: all|unread|groups|direct|favourites|mentions
+// useConversations(true, { archived: true })      -> archived chats
+export const useConversations = (enabled = true, { filter = "all", archived = false } = {}) =>
   useQuery({
-    queryKey: CHAT_KEYS.conversations,
+    // default list keeps the plain key; variants live under it so cache patches / invalidation reach all of them
+    queryKey: filter === "all" && !archived ? CHAT_KEYS.conversations : [...CHAT_KEYS.conversations, { filter, archived }],
     queryFn: async () => {
-      const r = await getConversations({ limit: 100 });
+      const r = await getConversations({ limit: 100, filter, archived });
       syncMyKey(r?.me || deriveMyKey(r?.conversations));
       return r;
     },
@@ -120,7 +124,7 @@ export const useOpenDirectChat = () => {
   });
 };
 
-// mutate({ name, description?, members: [{model,id}] })
+// mutate({ name, description?, members: [{model,id}], settings?: { onlyAdminsCanSend, ... } })
 export const useCreateGroupChat = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -140,7 +144,7 @@ const useGroupMutation = (fn) => {
     },
   });
 };
-export const useUpdateGroupChat = () => useGroupMutation(updateGroupChat); // { id, name?, description? }
+export const useUpdateGroupChat = () => useGroupMutation(updateGroupChat); // { id, name?, description?, settings? }
 export const useAddGroupMembers = () => useGroupMutation(addGroupMembers); // { id, members }
 export const useRemoveGroupMember = () => useGroupMutation(removeGroupMember); // { id, key }
 export const useSetGroupMemberRole = () => useGroupMutation(setGroupMemberRole); // { id, key, role }
@@ -174,9 +178,12 @@ export const useMarkConversationRead = () => {
       }
     },
     onMutate: (id) => {
-      patchConversation(qc, id, (c) => ({ ...c, unread: 0 }));
+      patchConversation(qc, id, (c) => ({ ...c, unread: 0, unreadMentions: 0 }));
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.unread }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.unread });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.counts }); // chip numbers
+    },
   });
 };
 
@@ -227,16 +234,16 @@ export const useChatMessages = (conversationId) => {
 export const useSendMessage = () => {
   const qc = useQueryClient();
   const mutation = useMutation({
-    mutationFn: async ({ conversationId, text, replyTo, files = [], clientId, sticker, onUploadProgress }) => {
+    mutationFn: async ({ conversationId, text, replyTo, files = [], clientId, sticker, mentions, onUploadProgress }) => {
       if (!files.length) {
         try {
-          const res = await emitAck("chat:send", { conversationId, text, replyTo, clientId, sticker });
+          const res = await emitAck("chat:send", { conversationId, text, replyTo, clientId, sticker, mentions });
           return res.message;
         } catch (err) {
           if (err.code !== "OFFLINE" && err.code !== "TIMEOUT") throw err;
         }
       }
-      const res = await sendMessageRest({ id: conversationId, text, replyTo, clientId, sticker, files, onUploadProgress });
+      const res = await sendMessageRest({ id: conversationId, text, replyTo, clientId, sticker, mentions, files, onUploadProgress });
       return res.message;
     },
     onMutate: ({ conversationId, text, replyTo, files = [], clientId, sticker }) => {
@@ -262,7 +269,11 @@ export const useSendMessage = () => {
         pending: true,
       });
     },
-    onSuccess: (message, vars) => upsertMessage(qc, vars.conversationId, message),
+    onSuccess: (message, vars) => {
+      upsertMessage(qc, vars.conversationId, message);
+      // sending clears the saved draft on the server
+      patchConversation(qc, vars.conversationId, (c) => ({ ...c, draft: null }));
+    },
     onError: (_e, vars) => patchMessage(qc, vars.conversationId, vars.clientId, { pending: false, failed: true }),
   });
 
@@ -273,7 +284,7 @@ export const useSendMessage = () => {
   return { send, isSending: mutation.isPending, error: mutation.error };
 };
 
-export const useEditMessage = () => {
+export const useEditMessage = () => { // { messageId, text, mentions? }
   const qc = useQueryClient();
   return useMutation({
     mutationFn: editMessage, // { messageId, text }

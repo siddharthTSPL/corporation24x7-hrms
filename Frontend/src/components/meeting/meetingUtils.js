@@ -89,7 +89,7 @@ export const REMINDERS = [0, 5, 10, 15, 30, 60];
 export const personRef = (p) => ({ model: p.model, id: p.id });
 export const errMsg = (e) => e?.message || "Something went wrong";
 
-// "a@x.com, Priya <p@y.com>" (one per line, comma or semicolon) -> [{ email, name? }]
+// "a@x.com, Alex <a@y.com>" (one per line, comma or semicolon) -> [{ email, name? }]
 export const parseGuestInput = (text = "") =>
   String(text)
     .split(/[\n;,]+/)

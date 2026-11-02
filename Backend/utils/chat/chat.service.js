@@ -4,14 +4,24 @@ const ChatMessage = require("../../Models/chatmessage.model");
 const imagekit = require("../imagekit.utils");
 const { emitToRecipient } = require("../../config/socket");
 const presence = require("./presence");
+const settingsService = require("./settings.service");
 const callRooms = require("./callRooms");
 const { httpError, personKey, parseKey, resolvePeople, requirePeople } = require("./people.utils");
+const { parseFormatting, stripFormatting, extractUrls } = require("./formatting");
+const linkPreview = require("./linkPreview.service");
 const Leave = require("../../Models/leave.model");
 const ManagerLeave = require("../../Models/maleave.model");
 const AdminLeave = require("../../Models/adleave.model");
 const { startOfISTDay, endOfISTDay } = require("../Istdate.utils");
 
 const MAX_TEXT = 5000;
+const MAX_MENTIONS = 50;
+const COUNTED_TYPES = ["text", "file", "sticker", "poll"]; // messages that get delivered / seen ticks
+
+// disappearing messages: a message whose expiresAt has passed behaves as if it was already deleted
+const notExpired = () => ({ expiresAt: { $not: { $lte: new Date() } } });
+
+const inviteUrl = (code) => `${String(process.env.FRONTEND_URL || "").replace(/\/+$/, "")}/chat/join/${code}`;
 
 // ---------- actor + emit helpers ----------
 
@@ -65,13 +75,13 @@ const requireGroupAdmin = (conv, actor) => {
 
 const serializeConversation = (conv, actor, people) => {
   const o = typeof conv.toObject === "function" ? conv.toObject() : conv;
+  // presence goes through publicState so people who hid their online status stay hidden
   const parts = o.participants.map((p) => ({
     ...(people.get(p.key) || fallbackPerson(p.key)),
     role: p.role,
     joinedAt: p.joinedAt,
     lastReadAt: p.lastReadAt,
-    online: presence.isOnline(p.key),
-    inCall: presence.isOnline(p.key) && callRooms.isInCall(p.key),
+    ...presence.publicState(p.key, actor.key),
   }));
   const me = o.participants.find((p) => p.key === actor.key);
 
@@ -92,13 +102,28 @@ const serializeConversation = (conv, actor, people) => {
     photo: photo || "",
     meetingId: o.meeting ? String(o.meeting) : null,
     participants: parts,
+    onlineCount: o.type === "direct" ? undefined : parts.filter((x) => x.online).length, // "5 online" in groups
     otherPerson,
     myRole: me ? me.role : null,
     unread: me ? me.unread : 0,
     muted: me ? !!me.muted : false,
     pinned: me ? !!me.pinned : false,
+    archived: me ? !!me.archived : false,
+    favourite: me ? !!me.favourite : false,
+    unreadMentions: me ? me.mentionUnread || 0 : 0, // > 0 => show the "@" badge on the chat row
+    draft: me && me.draft && me.draft.text ? { text: me.draft.text, replyTo: me.draft.replyTo ? String(me.draft.replyTo) : null, updatedAt: me.draft.updatedAt } : null,
     wallpaper: me ? me.wallpaper || "" : "",
-    settings: { onlyAdminsCanSend: !!(o.settings && o.settings.onlyAdminsCanSend) },
+    settings: {
+      onlyAdminsCanSend: !!(o.settings && o.settings.onlyAdminsCanSend),
+      onlyAdminsCanEditInfo: !(o.settings && o.settings.onlyAdminsCanEditInfo === false),
+      onlyAdminsCanAddMembers: !(o.settings && o.settings.onlyAdminsCanAddMembers === false),
+      onlyAdminsCanPin: !!(o.settings && o.settings.onlyAdminsCanPin),
+    },
+    disappearingSeconds: o.disappearingSeconds || 0,
+    // the code itself is only shown to admins; everyone just learns whether a link exists
+    invite: o.type === "group"
+      ? { enabled: !!(o.invite && o.invite.enabled), ...(me && me.role === "admin" && o.invite && o.invite.enabled ? { code: o.invite.code, link: inviteUrl(o.invite.code) } : {}) }
+      : undefined,
     lastMessage: o.lastMessage && o.lastMessage.at
       ? {
           id: o.lastMessage.message ? String(o.lastMessage.message) : null,
@@ -155,6 +180,7 @@ const loadPeopleForConversations = async (organisation_id, convs) => {
     const person = people.get(personKey("Admin", leave.admin));
     if (person) person.onLeave = true;
   }
+  await settingsService.decoratePeople(people); // about, status, last seen + privacy
   return people;
 };
 
@@ -166,12 +192,37 @@ const serializeOneConversation = async (conv, actor) => {
 const snippet = (m) => {
   if (m.deletedAt) return "";
   if (m.type === "sticker") return "Sticker";
+  if (m.type === "poll") return `Poll: ${String(m.poll?.question || m.text || "").slice(0, 120)}`;
   if (m.type === "file" && !m.text) return m.attachments?.length > 1 ? `${m.attachments.length} attachments` : m.attachments?.[0]?.name || "Attachment";
-  return String(m.text || "").slice(0, 140);
+  // previews show "hi there", not "hi *there*"
+  return stripFormatting(String(m.text || "")).slice(0, 140);
+};
+
+// Poll as the client sees it. `myVotes` is only meaningful when the viewer is known.
+const shapePoll = (m, viewerKey = null) => {
+  const p = m.poll;
+  if (!p || m.deletedAt) return null;
+  const voters = new Set();
+  for (const o of p.options || []) for (const k of o.votes || []) voters.add(k);
+  return {
+    question: p.question,
+    multiple: !!p.multiple,
+    anonymous: !!p.anonymous,
+    closed: !!p.closedAt,
+    closedAt: p.closedAt || null,
+    totalVoters: voters.size,
+    options: (p.options || []).map((o) => ({
+      id: o.id,
+      text: o.text,
+      count: (o.votes || []).length,
+      voters: p.anonymous ? undefined : o.votes || [], // anonymous polls never reveal who voted
+    })),
+    myVotes: viewerKey ? (p.options || []).filter((o) => (o.votes || []).includes(viewerKey)).map((o) => o.id) : [],
+  };
 };
 
 // Adds sender info + reply previews to a batch of messages (lean or docs).
-const hydrateMessages = async (organisation_id, messages) => {
+const hydrateMessages = async (organisation_id, messages, viewerKey = null) => {
   const list = messages.map((m) => (typeof m.toObject === "function" ? m.toObject() : m));
 
   const senderRefs = [];
@@ -206,6 +257,14 @@ const hydrateMessages = async (organisation_id, messages) => {
           : { id: String(m.replyTo), senderKey: "", senderName: "", text: "", deleted: true }
         : null,
       meta: m.meta || {},
+      entities: m.deletedAt ? [] : m.entities || [], // bold / italic / code ranges (see utils/chat/formatting.js)
+      mentions: m.deletedAt ? [] : (m.mentions || []).map((x) => ({ key: x.key, name: x.name })),
+      mentionsAll: !!m.mentionsAll && !m.deletedAt,
+      mentionedMe: viewerKey ? !m.deletedAt && (m.senderKey !== viewerKey) && (!!m.mentionsAll || (m.mentions || []).some((x) => x.key === viewerKey)) : undefined,
+      links: m.deletedAt ? [] : m.links || [],
+      linkPreviews: m.deletedAt ? [] : (m.linkPreviews || []).map((x) => ({ url: x.url, title: x.title, description: x.description, image: x.image, siteName: x.siteName })),
+      poll: shapePoll(m, viewerKey),
+      expiresAt: m.expiresAt || null, // set => disappearing message
       clientId: m.clientId || null,
       editedAt: m.editedAt || null,
       deleted: !!m.deletedAt,
@@ -253,7 +312,20 @@ const getOrCreateDirect = async (actor, otherRef) => {
   return conv;
 };
 
-const createGroup = async (actor, { name, description = "", members = [], photo = "" }) => {
+const SETTING_KEYS = ["onlyAdminsCanSend", "onlyAdminsCanEditInfo", "onlyAdminsCanAddMembers", "onlyAdminsCanPin"];
+const SETTING_LABEL = {
+  onlyAdminsCanSend: [["allowed only admins to send messages"], ["allowed everyone to send messages"]],
+  onlyAdminsCanEditInfo: [["changed group info to be editable by admins only"], ["allowed everyone to edit group info"]],
+  onlyAdminsCanAddMembers: [["changed adding members to admins only"], ["allowed everyone to add members"]],
+  onlyAdminsCanPin: [["changed pinning messages to admins only"], ["allowed everyone to pin messages"]],
+};
+const pickSettings = (input) => {
+  const out = {};
+  if (input && typeof input === "object") for (const k of SETTING_KEYS) if (typeof input[k] === "boolean") out[k] = input[k];
+  return out;
+};
+
+const createGroup = async (actor, { name, description = "", members = [], photo = "", settings = null }) => {
   const title = String(name || "").trim();
   if (!title) throw httpError("Group name is required.");
   if (title.length > 80) throw httpError("Group name is too long (max 80 characters).");
@@ -261,6 +333,7 @@ const createGroup = async (actor, { name, description = "", members = [], photo 
   const people = await requirePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }, ...members]);
   if (people.size < 2) throw httpError("Add at least one other person to the group.");
   if (people.size > Conversation.MAX_GROUP_MEMBERS) throw httpError(`A group can have at most ${Conversation.MAX_GROUP_MEMBERS} members.`);
+  await settingsService.assertCanBeAdded(actor, people.values());
 
   const participants = [...people.values()].map((p) => participantDoc(p, p.key === actor.key ? "admin" : "member"));
   const conv = await Conversation.create({
@@ -269,6 +342,7 @@ const createGroup = async (actor, { name, description = "", members = [], photo 
     name: title,
     description: String(description || "").trim().slice(0, 300),
     photo: photo || "",
+    settings: pickSettings(settings),
     participants,
     participantKeys: participants.map((p) => p.key),
     createdBy: actor.id,
@@ -285,7 +359,51 @@ const sanitizeText = (text) => String(text == null ? "" : text).replace(/\u0000/
 
 const STICKER_ID = /^[\w:.\-]{1,64}$/;
 
-const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false } = {}) => {
+// Who may post in this chat (announcement-style groups: admins only). Used by send AND by "schedule message".
+const assertCanPost = (conv, actor) => {
+  if (conv.type === "group" && conv.settings && conv.settings.onlyAdminsCanSend) {
+    const me = conv.participants.find((p) => p.key === actor.key);
+    if (!me || me.role !== "admin") throw httpError("Only admins can send messages in this group.", 403);
+  }
+};
+
+const ALL_MENTION = /(^|\s)@(all|everyone)\b/i;
+
+// `input` is a list of person keys (or {key}) the client tagged. Only people really in this chat count.
+const resolveMentions = async (conv, actor, input, body) => {
+  if (conv.type === "direct") return { mentions: [], mentionsAll: false };
+  const wanted = [...new Set((Array.isArray(input) ? input : []).map((x) => (x && typeof x === "object" ? x.key : x)).filter((k) => typeof k === "string"))]
+    .filter((k) => k !== actor.key && conv.participantKeys.includes(k))
+    .slice(0, MAX_MENTIONS);
+  let mentions = [];
+  if (wanted.length) {
+    const people = await resolvePeople(actor.organisation_id, wanted.map(parseKey));
+    mentions = wanted.map((k) => ({ key: k, name: people.get(k)?.name || "" }));
+  }
+  return { mentions, mentionsAll: ALL_MENTION.test(body || "") };
+};
+
+const normalizePoll = (poll) => {
+  const question = sanitizeText(poll && poll.question);
+  if (!question) throw httpError("Poll question is required.");
+  if (question.length > 255) throw httpError("Poll question is too long (max 255 characters).");
+  const seen = new Set();
+  const options = [];
+  for (const raw of Array.isArray(poll.options) ? poll.options : []) {
+    const text = sanitizeText(typeof raw === "string" ? raw : raw && raw.text);
+    if (!text) continue;
+    if (text.length > 100) throw httpError("Poll options can be at most 100 characters.");
+    const k = text.toLowerCase();
+    if (seen.has(k)) throw httpError("Poll options must be different from each other.");
+    seen.add(k);
+    options.push({ id: `o${options.length + 1}`, text, votes: [] });
+  }
+  if (options.length < 2) throw httpError("A poll needs at least 2 options.");
+  if (options.length > 12) throw httpError("A poll can have at most 12 options.");
+  return { question, multiple: !!poll.multiple, anonymous: !!poll.anonymous, options };
+};
+
+const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false, mentions: mentionInput = null, poll = null } = {}) => {
   const conv = await loadConversation(actor, conversationId);
 
   const liveRoom = callRooms.byConversation(conv._id);
@@ -294,16 +412,25 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
   }
 
   // announcement-style groups: only admins may post
-  if (conv.type === "group" && conv.settings && conv.settings.onlyAdminsCanSend) {
-    const me = conv.participants.find((p) => p.key === actor.key);
-    if (!me || me.role !== "admin") throw httpError("Only admins can send messages in this group.", 403);
-  }
+  assertCanPost(conv, actor);
 
+  let pollDoc = null;
+  if (poll) {
+    if (conv.type === "direct") throw httpError("Polls can only be created in group chats.");
+    if (attachments.length || sticker) throw httpError("A poll cannot have attachments.");
+    pollDoc = normalizePoll(poll);
+  }
   const stickerId = sticker ? String(sticker).trim() : "";
   if (stickerId && !STICKER_ID.test(stickerId)) throw httpError("Invalid sticker.");
-  const body = stickerId ? "" : sanitizeText(text);
+  const body = pollDoc ? pollDoc.question : stickerId ? "" : sanitizeText(text);
   if (body.length > MAX_TEXT) throw httpError(`Message is too long (max ${MAX_TEXT} characters).`);
   if (!body && !attachments.length && !stickerId) throw httpError("Message cannot be empty.");
+
+  const plainText = !pollDoc && !stickerId;
+  const { mentions, mentionsAll } = plainText ? await resolveMentions(conv, actor, mentionInput, body) : { mentions: [], mentionsAll: false };
+  const links = plainText ? extractUrls(body) : [];
+  const now = new Date();
+  const online = conv.participantKeys.filter((k) => k !== actor.key && presence.isOnline(k));
 
   if (replyTo) {
     assertObjectId(replyTo, "reply id");
@@ -316,7 +443,7 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
     msg = await ChatMessage.create({
       organisation_id: actor.organisation_id,
       conversation: conv._id,
-      type: stickerId ? "sticker" : attachments.length ? "file" : "text",
+      type: pollDoc ? "poll" : stickerId ? "sticker" : attachments.length ? "file" : "text",
       sender: actor.id,
       senderModel: actor.model,
       senderKey: actor.key,
@@ -324,8 +451,16 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
       attachments: stickerId ? [] : attachments,
       replyTo: replyTo || undefined,
       forwarded: !!forwarded,
+      poll: pollDoc || undefined,
+      entities: plainText ? parseFormatting(body) : [],
+      mentions,
+      mentionsAll,
+      links,
+      // disappearing messages: the clock starts when the message is sent
+      expiresAt: conv.disappearingSeconds ? new Date(now.getTime() + conv.disappearingSeconds * 1000) : null,
       // anyone who is online right now has the message on their device => "delivered"
-      deliveredTo: conv.participantKeys.filter((k) => k !== actor.key && presence.isOnline(k)),
+      deliveredTo: online,
+      deliveries: online.map((k) => ({ key: k, at: now })),
       clientId: clientId ? String(clientId).slice(0, 64) : undefined,
     });
   } catch (err) {
@@ -340,7 +475,40 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
   const [hydrated] = await hydrateMessages(actor.organisation_id, [msg]);
   await bumpConversation(conv, msg, hydrated.sender?.name || "", actor.key);
   emitToKeys(conv.participantKeys, "chat:message", { conversationId: String(conv._id), message: hydrated });
+
+  // people who were tagged get an extra event + the "@" badge on the chat row
+  const tagged = mentionsAll ? conv.participantKeys.filter((k) => k !== actor.key) : mentions.map((m) => m.key);
+  if (tagged.length) {
+    await Conversation.updateOne({ _id: conv._id }, { $inc: { "participants.$[m].mentionUnread": 1 } }, { arrayFilters: [{ "m.key": { $in: tagged } }] });
+    emitToKeys(tagged, "chat:mention", { conversationId: String(conv._id), messageId: String(msg._id), from: hydrated.sender, everyone: mentionsAll });
+  }
+
+  // I just sent something, so my saved draft for this chat is obsolete
+  const myPart = conv.participants.find((p) => p.key === actor.key);
+  if (myPart && myPart.draft && myPart.draft.text) {
+    await Conversation.updateOne({ _id: conv._id, "participants.key": actor.key }, { $unset: { "participants.$.draft": "" } });
+    emitToKeys([actor.key], "chat:draft", { conversationId: String(conv._id), draft: null });
+  }
+
+  // link cards are fetched in the background so sending is never slowed down
+  if (links.length) attachLinkPreviews(conv, msg).catch(() => {});
   return { message: hydrated, conversation: conv, duplicate: false };
+};
+
+// Fetches cards for the first few links, stores them on the message and tells everyone.
+const attachLinkPreviews = async (conv, msg) => {
+  const urls = (msg.links || []).slice(0, 3);
+  if (!urls.length) return;
+  const found = (await Promise.all(urls.map((u) => linkPreview.getPreview(u).catch(() => null)))).filter(Boolean);
+  if (!found.length) return;
+  const fresh = await ChatMessage.findOneAndUpdate(
+    { _id: msg._id, deletedAt: null, links: { $all: urls } },
+    { $set: { linkPreviews: found } },
+    { new: true }
+  );
+  if (!fresh) return; // deleted or edited in the meantime
+  const [hydrated] = await hydrateMessages(msg.organisation_id, [fresh]);
+  emitToKeys(conv.participantKeys, "chat:message:updated", { conversationId: String(conv._id), message: hydrated });
 };
 
 // Updates last-message preview + unread counters for everyone except the sender.
@@ -355,6 +523,12 @@ const bumpConversation = async (conv, msg, senderName, senderKey) => {
       $inc: { "participants.$[p].unread": 1 },
     },
     { arrayFilters: [{ "p.key": { $ne: senderKey } }] }
+  );
+  // archived chats pop back into the main list when someone writes (unless the chat is muted)
+  await Conversation.updateOne(
+    { _id: conv._id, participants: { $elemMatch: { archived: true, muted: { $ne: true }, key: { $ne: senderKey } } } },
+    { $set: { "participants.$[p].archived": false } },
+    { arrayFilters: [{ "p.key": { $ne: senderKey }, "p.muted": { $ne: true }, "p.archived": true }] }
   );
 };
 
@@ -385,7 +559,7 @@ const getMessages = async (actor, conversationId, { before = null, limit = 40 } 
   const conv = await loadConversation(actor, conversationId);
   const lim = Math.min(Math.max(parseInt(limit, 10) || 40, 1), 100);
   const me = conv.participants.find((p) => p.key === actor.key);
-  const q = { conversation: conv._id, deletedFor: { $ne: actor.key } };
+  const q = { conversation: conv._id, deletedFor: { $ne: actor.key }, ...notExpired() };
   if (me && me.clearedAt) q.createdAt = { $gt: me.clearedAt }; // "clear chat" hides older messages for me only
   if (before) {
     assertObjectId(before, "cursor");
@@ -396,7 +570,7 @@ const getMessages = async (actor, conversationId, { before = null, limit = 40 } 
   const page = rows.slice(0, lim).reverse(); // oldest -> newest for rendering
   return {
     conv,
-    messages: await hydrateMessages(actor.organisation_id, page),
+    messages: await hydrateMessages(actor.organisation_id, page, actor.key),
     hasMore,
     nextCursor: hasMore ? String(rows[lim - 1]._id) : null,
   };
@@ -405,28 +579,52 @@ const getMessages = async (actor, conversationId, { before = null, limit = 40 } 
 const markRead = async (actor, conversationId) => {
   const conv = await loadConversation(actor, conversationId);
   const at = new Date();
+  const prev = conv.participants.find((p) => p.key === actor.key)?.lastReadAt || new Date(0);
   await Conversation.updateOne(
     { _id: conv._id, "participants.key": actor.key },
-    { $set: { "participants.$.lastReadAt": at, "participants.$.unread": 0 } }
+    { $set: { "participants.$.lastReadAt": at, "participants.$.unread": 0, "participants.$.mentionUnread": 0 } }
+  );
+  // "Message info": remember exactly WHEN this person read each message that arrived since their last visit
+  await ChatMessage.updateMany(
+    {
+      conversation: conv._id,
+      senderKey: { $nin: ["", actor.key] },
+      type: { $in: COUNTED_TYPES },
+      createdAt: { $gt: new Date(new Date(prev).getTime() - 1000) },
+      "readBy.key": { $ne: actor.key },
+    },
+    { $push: { readBy: { key: actor.key, at } }, $addToSet: { deliveredTo: actor.key } }
   );
   // other people see "seen" ticks; my own other tabs clear their badge
   emitToKeys(conv.participantKeys, "chat:read", { conversationId: String(conv._id), by: actor.key, at });
   return at;
 };
 
-const editMessage = async (actor, messageId, text) => {
+// mentionEdit: undefined = keep the people already tagged; an array = the new list of tagged people
+const editMessage = async (actor, messageId, text, mentionEdit = undefined) => {
   assertObjectId(messageId, "message id");
   const msg = await ChatMessage.findOne({ _id: messageId, organisation_id: actor.organisation_id });
-  if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
+  if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call" || msg.type === "poll") throw httpError("Message not found.", 404);
+  if (msg.expiresAt && msg.expiresAt <= new Date()) throw httpError("Message not found.", 404);
   if (msg.senderKey !== actor.key) throw httpError("You can only edit your own messages.", 403);
   const body = sanitizeText(text);
   if (!body) throw httpError("Message cannot be empty.");
   if (body.length > MAX_TEXT) throw httpError(`Message is too long (max ${MAX_TEXT} characters).`);
 
   const conv = await loadConversation(actor, msg.conversation);
+  const oldLinks = (msg.links || []).join("\n");
   msg.text = body;
   msg.editedAt = new Date();
+  msg.entities = msg.type === "sticker" ? [] : parseFormatting(body);
+  msg.links = msg.type === "sticker" ? [] : extractUrls(body);
+  const keepKeys = mentionEdit === undefined ? (msg.mentions || []).map((m) => m.key) : mentionEdit;
+  const { mentions, mentionsAll } = await resolveMentions(conv, actor, keepKeys, body);
+  msg.mentions = mentions;
+  msg.mentionsAll = mentionsAll;
+  const linksChanged = msg.links.join("\n") !== oldLinks;
+  if (linksChanged) msg.linkPreviews = [];
   await msg.save();
+  if (linksChanged && msg.links.length) attachLinkPreviews(conv, msg).catch(() => {});
 
   const [hydrated] = await hydrateMessages(actor.organisation_id, [msg]);
   if (conv.lastMessage?.message && String(conv.lastMessage.message) === String(msg._id)) {
@@ -460,7 +658,14 @@ const deleteMessage = async (actor, messageId, scope = "everyone") => {
   msg.text = "";
   msg.attachments = [];
   msg.reactions = [];
+  msg.entities = [];
+  msg.mentions = [];
+  msg.mentionsAll = false;
+  msg.links = [];
+  msg.linkPreviews = [];
+  msg.set("poll", undefined);
   await msg.save();
+  await Conversation.updateOne({ _id: conv._id }, { $pull: { pinnedMessages: { message: msg._id } } }); // a deleted message can't stay pinned
 
   // best effort - never fail the delete because storage cleanup failed.
   // A forwarded copy may still point at the same file, so only remove it when nobody else uses it.
@@ -509,6 +714,7 @@ const forwardMessage = async (actor, messageId, conversationIds = []) => {
 
   const msg = await ChatMessage.findOne({ _id: messageId, organisation_id: actor.organisation_id });
   if (!msg || msg.deletedAt || msg.type === "system" || msg.type === "call") throw httpError("Message not found.", 404);
+  if (msg.type === "poll") throw httpError("Polls cannot be forwarded.");
   await loadConversation(actor, msg.conversation); // I must be able to see the original
 
   const sent = [];
@@ -532,13 +738,16 @@ const markDeliveredForActor = async (actor) => {
     conversation: { $in: convs.map((c) => c._id) },
     senderKey: { $nin: ["", actor.key] },
     deliveredTo: { $ne: actor.key },
-    type: { $in: ["text", "file", "sticker"] },
+    type: { $in: COUNTED_TYPES },
     deletedAt: null,
     createdAt: { $gt: new Date(Date.now() - 30 * 86400000) },
   }).select("_id conversation senderKey").limit(1000).lean();
   if (!pending.length) return;
 
-  await ChatMessage.updateMany({ _id: { $in: pending.map((p) => p._id) } }, { $addToSet: { deliveredTo: actor.key } });
+  await ChatMessage.updateMany(
+    { _id: { $in: pending.map((p) => p._id) }, deletedAt: null },
+    { $addToSet: { deliveredTo: actor.key }, $push: { deliveries: { key: actor.key, at: new Date() } } }
+  );
 
   const byConv = new Map();
   for (const p of pending) {
@@ -607,9 +816,17 @@ const syncKeys = (conv) => {
 
 const nameOf = (people, key) => people.get(key)?.name || "Someone";
 
+const isAdminOf = (conv, actor) => conv.participants.some((p) => p.key === actor.key && p.role === "admin");
+
 const updateGroup = async (actor, conversationId, { name, description, photo, settings }) => {
   const conv = await loadConversation(actor, conversationId);
-  requireGroupAdmin(conv, actor);
+  if (conv.type !== "group") throw httpError("Only group chats can be managed.", 400);
+  const admin = isAdminOf(conv, actor);
+  const editsInfo = name !== undefined || description !== undefined || photo !== undefined;
+  // group info may be opened up to everyone ("Edit group info"); rules themselves are always admin-only
+  if (editsInfo && !admin && !(conv.settings && conv.settings.onlyAdminsCanEditInfo === false)) throw httpError("Only group admins can edit the group info.", 403);
+  if (settings !== undefined && settings !== null && !admin) throw httpError("Only group admins can change group settings.", 403);
+
   const changes = [];
   if (name !== undefined) {
     const t = String(name).trim();
@@ -619,24 +836,22 @@ const updateGroup = async (actor, conversationId, { name, description, photo, se
   }
   if (description !== undefined) conv.description = String(description).trim().slice(0, 300);
   if (photo !== undefined) conv.photo = String(photo || "");
-  let onlyAdminsChanged = null;
-  if (settings && typeof settings.onlyAdminsCanSend === "boolean" && settings.onlyAdminsCanSend !== !!(conv.settings && conv.settings.onlyAdminsCanSend)) {
-    conv.set("settings.onlyAdminsCanSend", settings.onlyAdminsCanSend);
-    onlyAdminsChanged = settings.onlyAdminsCanSend;
+
+  const changedSettings = [];
+  const wanted = pickSettings(settings);
+  for (const k of SETTING_KEYS) {
+    if (wanted[k] === undefined) continue;
+    const current = k === "onlyAdminsCanEditInfo" || k === "onlyAdminsCanAddMembers" ? !(conv.settings && conv.settings[k] === false) : !!(conv.settings && conv.settings[k]);
+    if (wanted[k] !== current) { conv.set(`settings.${k}`, wanted[k]); changedSettings.push([k, wanted[k]]); }
   }
   await conv.save();
-  if (onlyAdminsChanged !== null) {
-    const who = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
-    await postSystemMessage(
-      conv,
-      actor,
-      { event: "settings" },
-      `${nameOf(who, actor.key)} ${onlyAdminsChanged ? "allowed only admins to send messages" : "allowed everyone to send messages"}`
-    );
+
+  const who = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
+  for (const [k, value] of changedSettings) {
+    await postSystemMessage(conv, actor, { event: "settings", setting: k, value }, `${nameOf(who, actor.key)} ${SETTING_LABEL[k][value ? 0 : 1][0]}`);
   }
   if (changes.includes("name")) {
-    const people = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
-    await postSystemMessage(conv, actor, { event: "renamed" }, `${nameOf(people, actor.key)} renamed the group to "${conv.name}"`);
+    await postSystemMessage(conv, actor, { event: "renamed" }, `${nameOf(who, actor.key)} renamed the group to "${conv.name}"`);
   }
   emitToKeys(conv.participantKeys, "chat:conversation:updated", { conversationId: String(conv._id) });
   return conv;
@@ -644,11 +859,13 @@ const updateGroup = async (actor, conversationId, { name, description, photo, se
 
 const addMembers = async (actor, conversationId, members) => {
   const conv = await loadConversation(actor, conversationId);
-  requireGroupAdmin(conv, actor);
+  if (conv.type !== "group") throw httpError("Only group chats can be managed.", 400);
+  if (!isAdminOf(conv, actor) && !(conv.settings && conv.settings.onlyAdminsCanAddMembers === false)) throw httpError("Only group admins can add members.", 403);
   const toAdd = await requirePeople(actor.organisation_id, members);
   const existing = new Set(conv.participantKeys);
   const fresh = [...toAdd.values()].filter((p) => !existing.has(p.key));
   if (!fresh.length) throw httpError("Those people are already in the group.");
+  await settingsService.assertCanBeAdded(actor, fresh);
   if (conv.participants.length + fresh.length > Conversation.MAX_GROUP_MEMBERS) {
     throw httpError(`A group can have at most ${Conversation.MAX_GROUP_MEMBERS} members.`);
   }
@@ -748,6 +965,13 @@ const totalUnread = async (actor) => {
 
 module.exports = {
   MAX_TEXT,
+  COUNTED_TYPES,
+  notExpired,
+  inviteUrl,
+  snippet,
+  shapePoll,
+  assertCanPost,
+  isAdminOf,
   toActor,
   emitToKeys,
   loadConversation,

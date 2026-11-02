@@ -20,6 +20,7 @@ require('../automatic/Featurelaunchnotify');
 require('../automatic/Hourlyleavesync');
 require('../automatic/Meetingreminders');
 require('../automatic/Meetingactionreminders');
+require('../automatic/Chatjobs'); // scheduled chat messages + disappearing messages
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
