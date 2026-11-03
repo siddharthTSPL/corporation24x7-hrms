@@ -240,7 +240,9 @@ export default function MessageBubble({
             ) : (
               <>
                 {m.autoReply && (
-                  <p className={`text-[11px] italic mb-1 ${mine && !bare ? "text-white/70" : "text-gray-400"}`}>Auto-reply</p>
+                  <span className={`mb-1 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${mine && !bare ? "bg-white/15 text-white/85" : "bg-[#F6E8EF] text-[#730042]"}`}>
+                    <FaReply className="text-[8px]" /> Auto-reply
+                  </span>
                 )}
 
                 {m.forwarded && (

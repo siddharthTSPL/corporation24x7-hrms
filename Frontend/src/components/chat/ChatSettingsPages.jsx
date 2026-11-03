@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FaCheck, FaTrash } from "react-icons/fa";
+import { FaCheck, FaTrash, FaReply, FaRegCalendarAlt } from "react-icons/fa";
 import Avatar from "./Avatar";
-import { Header, PageBody, Section, ToggleRow, Segmented, formatBytes } from "./settingsUi";
+import { Header, PageBody, Section, ToggleRow, Segmented, Switch, formatBytes } from "./settingsUi";
 import {
   useChatSettings, useUpdateChatSettings, useSetChatStatus, useChatAbout, useChatStorage,
   useClearAllChats, useChatReports, useReviewReport,
@@ -116,62 +116,159 @@ const toLocalInput = (iso) => {
   const d = new Date(iso);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
+const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+const REPLY_TEMPLATES = [
+  { label: "In a meeting", text: "I'm in a meeting right now and will get back to you shortly." },
+  { label: "Away from desk", text: "I'm away from my desk and will reply as soon as I'm back." },
+  { label: "On leave", text: "I'm on leave and will respond when I'm back. For anything urgent, please contact my manager." },
+  { label: "Focus time", text: "I'm focusing on a task right now and will reply to you soon." },
+];
+
+const atHour = (days, hour) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, 0, 0, 0);
+  return d;
+};
+
+const UNTIL_PRESETS = [
+  { label: "1 hour", at: () => new Date(Date.now() + 60 * 60 * 1000) },
+  { label: "Today 6 PM", at: () => atHour(0, 18) },
+  { label: "Tomorrow 9 AM", at: () => atHour(1, 9) },
+  { label: "Next Monday 9 AM", at: () => { const d = atHour(0, 9); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); return d; } },
+];
+
+const CHIP_ON = "border-[#730042] bg-[#730042] text-white shadow-sm";
+const CHIP_OFF = "border-gray-200 bg-white text-gray-700 hover:border-[#730042]/40 hover:bg-[#FBF3F7] hover:text-[#730042]";
+const FIELD = "rounded-2xl border border-gray-200 bg-gray-50 transition-all focus-within:border-[#730042]/40 focus-within:bg-white focus-within:ring-4 focus-within:ring-[#730042]/10";
 
 export function AutoReplyPage({ onBack }) {
   const { data: s } = useChatSettings();
   const update = useUpdateChatSettings();
   const [message, setMessage] = useState("");
   const [until, setUntil] = useState("");
+  const [untilPick, setUntilPick] = useState("");
 
   useEffect(() => {
     if (!s) return;
     setMessage(s.autoReply.message);
     setUntil(toLocalInput(s.autoReply.until));
+    setUntilPick("");
   }, [s]);
 
   if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Auto-reply" onBack={onBack} /><Loading /></div>;
 
   const ar = s.autoReply;
   const dirty = message.trim() !== ar.message || until !== toLocalInput(ar.until);
-  // one save: message, end time and switch always go together, so nothing typed is lost when you flip the switch
   const save = (enabled) => {
     const body = { enabled, message: message.trim(), until: until ? new Date(until).toISOString() : null };
     if (enabled && !body.message) return toast.error("Write your auto-reply message first.");
+    if (enabled && until && new Date(until).getTime() <= Date.now()) return toast.error("Pick an end time in the future.");
     return update.mutate({ autoReply: body }, { onSuccess: () => toast.success(enabled ? "Auto-reply is on" : "Auto-reply saved") });
   };
+  const presets = UNTIL_PRESETS.map((p) => ({ ...p, date: p.at() })).filter((p) => p.date.getTime() > Date.now() + 60 * 1000);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Auto-reply" onBack={onBack} />
       <PageBody>
-        <Section note="When someone messages you one-to-one, this message is sent to them automatically, at most once an hour per person. Group chats are not auto-replied.">
-          <ToggleRow title="Auto-reply" hint={ar.enabled ? "On: people who message you get your reply" : "Off"} on={ar.enabled} onChange={(v) => save(v)} disabled={update.isPending} />
-        </Section>
+        <div className="mx-4 mt-4 overflow-hidden rounded-2xl border border-[#730042]/15 bg-gradient-to-br from-[#FBF3F7] via-white to-white shadow-sm">
+          <div className="flex items-center gap-4 px-4 py-4">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-colors ${ar.enabled ? "bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white shadow-md shadow-[#730042]/25" : "bg-gray-100 text-gray-400"}`}>
+              <FaReply className="text-base" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold tracking-tight text-gray-900">Auto-reply</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ar.enabled ? "bg-emerald-500" : "bg-gray-300"}`} />
+                <span className="truncate">{ar.enabled ? (ar.until ? `Active until ${fmtDate(ar.until)}` : "Active until you turn it off") : "Off"}</span>
+              </p>
+            </div>
+            <Switch on={ar.enabled} onChange={(v) => save(v)} disabled={update.isPending} />
+          </div>
+          <p className="border-t border-[#730042]/10 bg-white/60 px-4 py-2.5 text-xs leading-relaxed text-gray-500">
+            When someone messages you one-to-one, this message is sent to them automatically, at most once an hour per person. Group chats are not auto-replied.
+          </p>
+        </div>
 
         <Section title="Your message">
-          <div className="px-5 py-3">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value.slice(0, 500))}
-              rows={4}
-              placeholder="I'm away right now and will reply as soon as I'm back."
-              className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#730042]"
-            />
-            <p className="mt-1 text-[11px] text-gray-400">{message.length}/500</p>
+          <div className="px-4 py-3.5">
+            <div className="flex flex-wrap gap-1.5">
+              {REPLY_TEMPLATES.map((t) => (
+                <button key={t.label} type="button" onClick={() => setMessage(t.text)} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${message.trim() === t.text ? CHIP_ON : CHIP_OFF}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className={`mt-3 ${FIELD}`}>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 500))}
+                rows={4}
+                placeholder="I'm away right now and will reply as soon as I'm back."
+                className="block w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+              />
+              <p className="px-3.5 pb-2 pt-1 text-right text-[11px] text-gray-400">{message.length}/500</p>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Preview">
+          <div className="bg-[#f5f6f8] px-4 py-4">
+            <div className="max-w-[85%]">
+              <div className="chat-message-bubble chat-message-bubble-theirs whitespace-pre-wrap rounded-2xl rounded-tl-md bg-white px-3.5 py-2 text-[13.5px] leading-[1.5] text-gray-800">
+                <span className="mb-1 flex w-fit items-center gap-1 rounded-full bg-[#F6E8EF] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#730042]">
+                  <FaReply className="text-[8px]" /> Auto-reply
+                </span>
+                {message.trim() || <span className="text-gray-400">Your message will appear here.</span>}
+              </div>
+              <p className="mt-1 pl-1 text-[11px] text-gray-400">How people see it in their chat</p>
+            </div>
           </div>
         </Section>
 
         <Section title="Turn off automatically" note="Optional. Leave empty to keep the auto-reply on until you switch it off.">
-          <div className="flex items-center gap-2 px-5 py-3">
-            <input type="datetime-local" value={until} min={toLocalInput(new Date().toISOString())} onChange={(e) => setUntil(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#730042]" />
-            {until && <button type="button" onClick={() => setUntil("")} className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">Clear</button>}
+          <div className="px-4 py-3.5">
+            {presets.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {presets.map((p) => (
+                  <button key={p.label} type="button" onClick={() => { setUntil(toLocalInput(p.date)); setUntilPick(p.label); }} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${untilPick === p.label ? CHIP_ON : CHIP_OFF}`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-all focus-within:border-[#730042]/40 focus-within:ring-4 focus-within:ring-[#730042]/10">
+                <FaRegCalendarAlt className="shrink-0 text-sm text-[#730042]" />
+                <input
+                  type="datetime-local"
+                  value={until}
+                  min={toLocalInput(new Date().toISOString())}
+                  onChange={(e) => { setUntil(e.target.value); setUntilPick(""); }}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
+                />
+              </div>
+              {until && (
+                <button type="button" onClick={() => { setUntil(""); setUntilPick(""); }} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50">
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
         </Section>
-
-        <div className="px-5 py-3">
-          <button type="button" disabled={!dirty || update.isPending} onClick={() => save(ar.enabled)} className="w-full rounded-full bg-[#730042] py-2.5 text-sm font-semibold text-white disabled:opacity-40">Save</button>
-        </div>
       </PageBody>
+      <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3">
+        <button
+          type="button"
+          disabled={!dirty || update.isPending}
+          onClick={() => save(ar.enabled)}
+          className="w-full rounded-xl bg-gradient-to-br from-[#8A0A52] to-[#68003B] py-2.5 text-sm font-semibold text-white shadow-md shadow-[#730042]/25 transition-opacity disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+        >
+          {update.isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
+        </button>
+      </div>
     </div>
   );
 }
