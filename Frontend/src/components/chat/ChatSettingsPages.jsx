@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FaCheck, FaTrash, FaReply, FaRegCalendarAlt } from "react-icons/fa";
+import { FaCheck, FaTrash, FaReply, FaRegCalendarAlt, FaVideo, FaCoffee, FaUmbrellaBeach, FaBullseye, FaUserFriends, FaHourglassHalf, FaUsers } from "react-icons/fa";
 import Avatar from "./Avatar";
-import { Header, PageBody, Section, ToggleRow, Segmented, Switch, formatBytes } from "./settingsUi";
+import { Header, PageBody, Section, ToggleRow, Segmented, formatBytes } from "./settingsUi";
 import {
   useChatSettings, useUpdateChatSettings, useSetChatStatus, useChatAbout, useChatStorage,
   useClearAllChats, useChatReports, useReviewReport,
@@ -119,10 +119,10 @@ const toLocalInput = (iso) => {
 const fmtDate = (iso) => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 const REPLY_TEMPLATES = [
-  { label: "In a meeting", text: "I'm in a meeting right now and will get back to you shortly." },
-  { label: "Away from desk", text: "I'm away from my desk and will reply as soon as I'm back." },
-  { label: "On leave", text: "I'm on leave and will respond when I'm back. For anything urgent, please contact my manager." },
-  { label: "Focus time", text: "I'm focusing on a task right now and will reply to you soon." },
+  { label: "In a meeting", icon: FaVideo, text: "I'm in a meeting right now and will get back to you shortly." },
+  { label: "Away from desk", icon: FaCoffee, text: "I'm away from my desk and will reply as soon as I'm back." },
+  { label: "On leave", icon: FaUmbrellaBeach, text: "I'm on leave and will respond when I'm back. For anything urgent, please contact my manager." },
+  { label: "Focus time", icon: FaBullseye, text: "I'm focusing on a task right now and will reply to you soon." },
 ];
 
 const atHour = (days, hour) => {
@@ -139,9 +139,41 @@ const UNTIL_PRESETS = [
   { label: "Next Monday 9 AM", at: () => { const d = atHour(0, 9); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); return d; } },
 ];
 
-const CHIP_ON = "border-[#730042] bg-[#730042] text-white shadow-sm";
+const CHIP_ON = "border-transparent bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white shadow-md shadow-[#730042]/20";
 const CHIP_OFF = "border-gray-200 bg-white text-gray-700 hover:border-[#730042]/40 hover:bg-[#FBF3F7] hover:text-[#730042]";
-const FIELD = "rounded-2xl border border-gray-200 bg-gray-50 transition-all focus-within:border-[#730042]/40 focus-within:bg-white focus-within:ring-4 focus-within:ring-[#730042]/10";
+
+function HeroSwitch({ on, onChange, disabled }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30 disabled:opacity-60 ${on ? "bg-white" : "bg-white/25"}`}
+    >
+      <span className={`absolute top-1 h-5 w-5 rounded-full shadow transition-all ${on ? "left-[26px] bg-[#730042]" : "left-1 bg-white"}`} />
+    </button>
+  );
+}
+
+function Card({ title, hint, children }) {
+  return (
+    <section className="mx-4 mt-4 rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3">
+        <p className="text-sm font-semibold tracking-tight text-gray-900">{title}</p>
+        {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const INFO = [
+  { icon: FaUserFriends, text: "One-to-one chats only" },
+  { icon: FaHourglassHalf, text: "Once an hour per person" },
+  { icon: FaUsers, text: "Groups are never replied" },
+];
 
 export function AutoReplyPage({ onBack }) {
   const { data: s } = useChatSettings();
@@ -173,101 +205,135 @@ export function AutoReplyPage({ onBack }) {
     <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
       <Header title="Auto-reply" onBack={onBack} />
       <PageBody>
-        <div className="mx-4 mt-4 overflow-hidden rounded-2xl border border-[#730042]/15 bg-gradient-to-br from-[#FBF3F7] via-white to-white shadow-sm">
-          <div className="flex items-center gap-4 px-4 py-4">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-colors ${ar.enabled ? "bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white shadow-md shadow-[#730042]/25" : "bg-gray-100 text-gray-400"}`}>
-              <FaReply className="text-base" />
+        <div className="chat-pop relative mx-4 mt-4 overflow-hidden rounded-3xl bg-gradient-to-br from-[#8A0A52] via-[#730042] to-[#4E002C] p-5 text-white shadow-lg shadow-[#730042]/25">
+          <span className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
+          <span className="pointer-events-none absolute -bottom-12 left-16 h-28 w-28 rounded-full bg-white/5" />
+          <div className="relative flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 backdrop-blur">
+              <FaReply className="text-lg" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold tracking-tight text-gray-900">Auto-reply</p>
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
-                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${ar.enabled ? "bg-emerald-500" : "bg-gray-300"}`} />
-                <span className="truncate">{ar.enabled ? (ar.until ? `Active until ${fmtDate(ar.until)}` : "Active until you turn it off") : "Off"}</span>
-              </p>
+              <p className="text-lg font-semibold tracking-tight">Auto-reply</p>
+              <p className="mt-0.5 text-xs text-white/70">Replies for you while you are away</p>
+              <span className={`mt-3 inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${ar.enabled ? "bg-emerald-400/20 text-emerald-100 ring-emerald-300/40" : "bg-white/10 text-white/70 ring-white/15"}`}>
+                <span className="relative flex h-2 w-2 shrink-0">
+                  {ar.enabled && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />}
+                  <span className={`relative inline-flex h-2 w-2 rounded-full ${ar.enabled ? "bg-emerald-300" : "bg-white/50"}`} />
+                </span>
+                <span className="truncate">{ar.enabled ? (ar.until ? `Live until ${fmtDate(ar.until)}` : "Live until you turn it off") : "Off"}</span>
+              </span>
             </div>
-            <Switch on={ar.enabled} onChange={(v) => save(v)} disabled={update.isPending} />
+            <HeroSwitch on={ar.enabled} onChange={(v) => save(v)} disabled={update.isPending} />
           </div>
-          <p className="border-t border-[#730042]/10 bg-white/60 px-4 py-2.5 text-xs leading-relaxed text-gray-500">
-            When someone messages you one-to-one, this message is sent to them automatically, at most once an hour per person. Group chats are not auto-replied.
-          </p>
+          <div className="relative mt-5 grid grid-cols-3 gap-2">
+            {INFO.map(({ icon: Icon, text }) => (
+              <div key={text} className="flex flex-col items-center gap-1.5 rounded-2xl bg-white/10 px-2 py-3 text-center ring-1 ring-white/10">
+                <Icon className="text-sm text-white/90" />
+                <span className="text-[10.5px] leading-tight text-white/80">{text}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <Section title="Your message">
-          <div className="px-4 py-3.5">
-            <div className="flex flex-wrap gap-1.5">
-              {REPLY_TEMPLATES.map((t) => (
-                <button key={t.label} type="button" onClick={() => setMessage(t.text)} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${message.trim() === t.text ? CHIP_ON : CHIP_OFF}`}>
-                  {t.label}
+        <Card title="Pick a template" hint="Tap one to fill your message, then edit it if you like">
+          <div className="grid grid-cols-2 gap-2">
+            {REPLY_TEMPLATES.map((t) => {
+              const active = message.trim() === t.text;
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => setMessage(t.text)}
+                  className={`flex flex-col items-start gap-1.5 rounded-2xl border p-3 text-left transition-all duration-200 ${active ? "border-transparent bg-gradient-to-br from-[#8A0A52] to-[#68003B] text-white shadow-lg shadow-[#730042]/25" : "border-gray-200 bg-white hover:-translate-y-0.5 hover:border-[#730042]/40 hover:shadow-md"}`}
+                >
+                  <span className="flex w-full items-center justify-between">
+                    <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs ${active ? "bg-white/20 text-white" : "bg-[#F6E8EF] text-[#730042]"}`}>
+                      <Icon />
+                    </span>
+                    {active && <FaCheck className="text-[10px] text-white" />}
+                  </span>
+                  <span className="text-[13px] font-semibold leading-tight">{t.label}</span>
+                  <span className={`line-clamp-2 text-[11px] leading-snug ${active ? "text-white/75" : "text-gray-500"}`}>{t.text}</span>
                 </button>
-              ))}
-            </div>
-            <div className={`mt-3 ${FIELD}`}>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value.slice(0, 500))}
-                rows={4}
-                placeholder="I'm away right now and will reply as soon as I'm back."
-                className="block w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
-              />
-              <p className="px-3.5 pb-2 pt-1 text-right text-[11px] text-gray-400">{message.length}/500</p>
-            </div>
+              );
+            })}
           </div>
-        </Section>
+        </Card>
 
-        <Section title="Preview">
-          <div className="bg-[#f5f6f8] px-4 py-4">
-            <div className="max-w-[85%]">
+        <Card title="Your message">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 transition-all focus-within:border-[#730042]/40 focus-within:bg-white focus-within:ring-4 focus-within:ring-[#730042]/10">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, 500))}
+              rows={4}
+              placeholder="I'm away right now and will reply as soon as I'm back."
+              className="block w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+            />
+            <p className="px-3.5 pb-2 pt-1 text-right text-[11px] text-gray-400">{message.length}/500</p>
+          </div>
+
+          <p className="mb-2 mt-4 text-[10.5px] font-semibold uppercase tracking-wider text-gray-500">Live preview</p>
+          <div className="rounded-2xl bg-[#efe6eb] bg-[radial-gradient(circle_at_20%_20%,rgba(115,0,66,0.06),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(115,0,66,0.05),transparent_40%)] p-4">
+            <div className="max-w-[88%]">
               <div className="chat-message-bubble chat-message-bubble-theirs whitespace-pre-wrap rounded-2xl rounded-tl-md bg-white px-3.5 py-2 text-[13.5px] leading-[1.5] text-gray-800">
                 <span className="mb-1 flex w-fit items-center gap-1 rounded-full bg-[#F6E8EF] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#730042]">
                   <FaReply className="text-[8px]" /> Auto-reply
                 </span>
                 {message.trim() || <span className="text-gray-400">Your message will appear here.</span>}
+                <span className="mt-1 block text-right text-[10px] text-gray-400">now</span>
               </div>
-              <p className="mt-1 pl-1 text-[11px] text-gray-400">How people see it in their chat</p>
             </div>
           </div>
-        </Section>
+        </Card>
 
-        <Section title="Turn off automatically" note="Optional. Leave empty to keep the auto-reply on until you switch it off.">
-          <div className="px-4 py-3.5">
-            {presets.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {presets.map((p) => (
-                  <button key={p.label} type="button" onClick={() => { setUntil(toLocalInput(p.date)); setUntilPick(p.label); }} className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${untilPick === p.label ? CHIP_ON : CHIP_OFF}`}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 transition-all focus-within:border-[#730042]/40 focus-within:ring-4 focus-within:ring-[#730042]/10">
-                <FaRegCalendarAlt className="shrink-0 text-sm text-[#730042]" />
-                <input
-                  type="datetime-local"
-                  value={until}
-                  min={toLocalInput(new Date().toISOString())}
-                  onChange={(e) => { setUntil(e.target.value); setUntilPick(""); }}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
-                />
-              </div>
-              {until && (
-                <button type="button" onClick={() => { setUntil(""); setUntilPick(""); }} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50">
-                  Clear
+        <Card title="Turn off automatically" hint="Optional. Leave empty to keep it on until you switch it off">
+          {presets.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {presets.map((p) => (
+                <button key={p.label} type="button" onClick={() => { setUntil(toLocalInput(p.date)); setUntilPick(p.label); }} className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all ${untilPick === p.label ? CHIP_ON : CHIP_OFF}`}>
+                  {p.label}
                 </button>
-              )}
+              ))}
             </div>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 transition-all focus-within:border-[#730042]/40 focus-within:ring-4 focus-within:ring-[#730042]/10">
+              <FaRegCalendarAlt className="shrink-0 text-sm text-[#730042]" />
+              <input
+                type="datetime-local"
+                value={until}
+                min={toLocalInput(new Date().toISOString())}
+                onChange={(e) => { setUntil(e.target.value); setUntilPick(""); }}
+                className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none"
+              />
+            </div>
+            {until && (
+              <button type="button" onClick={() => { setUntil(""); setUntilPick(""); }} className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50">
+                Clear
+              </button>
+            )}
           </div>
-        </Section>
+        </Card>
       </PageBody>
-      <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3">
-        <button
-          type="button"
-          disabled={!dirty || update.isPending}
-          onClick={() => save(ar.enabled)}
-          className="w-full rounded-xl bg-gradient-to-br from-[#8A0A52] to-[#68003B] py-2.5 text-sm font-semibold text-white shadow-md shadow-[#730042]/25 transition-opacity disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-        >
-          {update.isPending ? "Saving…" : dirty ? "Save changes" : "Saved"}
-        </button>
+      <div className="shrink-0 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <p className="min-w-0 flex-1 text-xs">
+            {dirty ? (
+              <span className="flex items-center gap-1.5 font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes</span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-gray-500"><FaCheck className="text-[10px] text-emerald-500" /> All changes saved</span>
+            )}
+          </p>
+          <button
+            type="button"
+            disabled={!dirty || update.isPending}
+            onClick={() => save(ar.enabled)}
+            className="rounded-xl bg-gradient-to-br from-[#8A0A52] to-[#68003B] px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#730042]/25 transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          >
+            {update.isPending ? "Saving…" : "Save changes"}
+          </button>
+        </div>
       </div>
     </div>
   );
