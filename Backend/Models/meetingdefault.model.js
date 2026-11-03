@@ -10,6 +10,7 @@ const meetingDefaultSchema = new mongoose.Schema(
       chatEnabled: { type: Boolean, default: true },
       reactionsEnabled: { type: Boolean, default: true },
       handRaiseEnabled: { type: Boolean, default: true },
+      transcript: { type: Boolean, default: true },
       screenShare: { type: String, enum: ["everyone", "host"], default: "everyone" },
     },
     allowJoinBeforeHost: { type: Boolean, default: false },

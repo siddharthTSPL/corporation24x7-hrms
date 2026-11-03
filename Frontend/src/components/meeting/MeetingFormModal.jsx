@@ -15,7 +15,20 @@ const QUICK_TIMES = [
   ["Tomorrow, 10 AM", () => { const d = addDays(startOfDay(), 1); d.setHours(10, 0, 0, 0); return d; }],
   ["Next Monday", () => { const d = startOfDay(); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7)); d.setHours(10, 0, 0, 0); return d; }],
 ];
-const FREQS = [["none", "Does not repeat"], ["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]];
+const FREQS = [["none", "Does not repeat"], ["daily", "Daily"], ["weekdays", "Weekdays (Mon–Fri)"], ["weekly", "Weekly"], ["monthly", "Monthly"]];
+const FREQ_LABEL = { daily: "daily", weekdays: "on weekdays", weekly: "weekly", monthly: "monthly" };
+const NOTIFY_OPTIONS = [
+  ["attendees", "Attendees only", "Everyone invited gets the notification and email"],
+  ["attendees_and_me", "Attendees & me", "Invitees, plus a copy for you"],
+  ["none", "No one", "Schedule quietly, nobody is notified"],
+];
+
+// Double-click on a calendar day: that day at 10:00, or the next free slot if the day is today.
+const slotForDay = (day) => {
+  const d = new Date(day);
+  d.setHours(10, 0, 0, 0);
+  return startOfDay(d).getTime() <= startOfDay().getTime() ? nextSlot() : d;
+};
 
 function Section({ icon: Icon, title, hint, children }) {
   return (
@@ -71,13 +84,14 @@ const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
  * mode: "create" | "edit" | "instant". Mount it only while open - state initialises from props.
  * onSaved(meeting, { instant })
  */
-export default function MeetingFormModal({ mode = "create", meeting, onClose, onSaved }) {
+export default function MeetingFormModal({ mode = "create", meeting, initialDate, onClose, onSaved }) {
   const dlgRef = useRef(null);
-  useEsc(true, onClose);
+  const [askNotify, setAskNotify] = useState(false);
+  useEsc(true, askNotify ? () => setAskNotify(false) : onClose);
   useDialogFocus(true, dlgRef);
   const edit = mode === "edit";
   const instant = mode === "instant";
-  const slot = nextSlot();
+  const slot = initialDate ? slotForDay(initialDate) : nextSlot();
 
   const originalPeople = (meeting?.attendees || []).filter((a) => !a.isHost);
   const [title, setTitle] = useState(meeting?.title || "");
@@ -95,14 +109,16 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
   const [reminderPick, setReminderPick] = useState(meeting?.reminderMinutes ?? null);
   const [joinBeforePick, setJoinBeforePick] = useState(meeting?.allowJoinBeforeHost ?? null);
   const [controlPicks, setControlPicks] = useState({});
-  const [sendEmail, setSendEmail] = useState(true);
+  const [skipWeekOffs, setSkipWeekOffs] = useState(false);
+  const [notifyMode, setNotifyMode] = useState("attendees");
   const [error, setError] = useState("");
 
   const defaultsQ = useMeetingDefaults(!edit);
   const orgDefaults = defaultsQ.data?.defaults;
   const reminder = reminderPick ?? orgDefaults?.reminderMinutes ?? 10;
   const joinBefore = joinBeforePick ?? orgDefaults?.allowJoinBeforeHost ?? false;
-  const controls = { ...(orgDefaults?.settings || {}), ...controlPicks };
+  const controls = { ...((edit ? meeting?.settings : orgDefaults?.settings) || {}), ...controlPicks };
+  const transcriptOn = controls.transcript !== false;
   const create = useCreateMeeting();
   const update = useUpdateMeeting();
   const quick = useCreateInstantMeeting();
@@ -134,12 +150,24 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, time, duration, peopleKey, everyone]);
 
-  const submit = async () => {
-    setError("");
-    if (!instant && !title.trim()) return setError("Add a meeting title.");
-    if (!edit && !people.length && !guestList.length && !(everyone && !instant)) return setError("Invite at least one person.");
-    if (!instant && canReschedule && (!start || start.getTime() < Date.now() - 5 * 60000)) return setError("Pick a start time that hasn't passed.");
+  const validate = () => {
+    if (!instant && !title.trim()) return "Add a meeting title.";
+    if (!edit && !people.length && !guestList.length && !(everyone && !instant)) return "Invite at least one person.";
+    if (!instant && canReschedule && (!start || start.getTime() < Date.now() - 5 * 60000)) return "Pick a start time that hasn't passed.";
+    return "";
+  };
 
+  // New meetings ask who should be notified before anything is sent; edits and instant meetings save straight away.
+  const submit = () => {
+    setError("");
+    const problem = validate();
+    if (problem) return setError(problem);
+    if (!edit && !instant) return setAskNotify(true);
+    return save();
+  };
+
+  const save = async () => {
+    setError("");
     try {
       if (instant) {
         const res = await quick.mutateAsync({ title: title.trim() || undefined, durationMin: duration, media, attendees: people.map(personRef) });
@@ -158,6 +186,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
           addAttendees: people.filter((p) => !before.has(p.key)).map(personRef),
           removeAttendees: [...before].filter((k) => !after.has(k)),
         };
+        if ("transcript" in controlPicks) body.settings = { transcript: controlPicks.transcript };
         if (canReschedule) Object.assign(body, { startTime: start.toISOString(), durationMin: duration });
         const res = await update.mutateAsync(body);
         toast.success("Meeting updated");
@@ -174,13 +203,17 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
           attendees: people.map(personRef),
           audience: everyone ? { everyone: true } : undefined,
           guests: guestList.length ? guestList : undefined,
-          recurrence: freq === "none" ? undefined : { freq, interval: 1, count: Number(count) || 4 },
+          recurrence: freq === "none" ? undefined : { freq, interval: 1, count: Number(count) || 4, skipWeekOffs },
           reminderMinutes: reminderPick ?? undefined,
           allowJoinBeforeHost: joinBeforePick ?? undefined,
           settings: Object.keys(controlPicks).length ? controlPicks : undefined,
-          sendEmail,
+          notifyMode,
+          sendEmail: notifyMode !== "none",
         });
         toast.success(res.occurrences > 1 ? `${res.occurrences} meetings scheduled` : "Meeting scheduled");
+        if (freq !== "none" && res.occurrences < (Number(count) || 4)) toast(`Only ${res.occurrences} session${res.occurrences > 1 ? "s" : ""} could be scheduled with these repeat settings`, { icon: "📅" });
+        if (res.recurrence?.skippedWeekOffs) toast(`${res.recurrence.skippedWeekOffs} session${res.recurrence.skippedWeekOffs > 1 ? "s" : ""} skipped because of your week-off`, { icon: "📅" });
+        if (res.recurrence?.firstOnWeekOff) toast("The first meeting falls on your week-off", { icon: "⚠️" });
         if (res.guests?.invited?.length) toast.success(`${res.guests.invited.length} outside guest${res.guests.invited.length > 1 ? "s" : ""} emailed a PIN`);
         (res.guests?.skipped || []).forEach((g) => toast(`${g.email}: ${GUEST_SKIP_REASON[g.reason] || g.reason}`, { icon: "⚠️" }));
         if (res.conflicts?.length) toast(`${res.conflicts.length} invitee${res.conflicts.length > 1 ? "s have" : " has"} a clash at this time`, { icon: "⚠️" });
@@ -188,6 +221,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
       }
       onClose();
     } catch (e) {
+      setAskNotify(false);
       setError(errMsg(e));
     }
   };
@@ -216,7 +250,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
     <div className="mtg-root fixed inset-0 z-[80] bg-gray-900/55 backdrop-blur-[2px]" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <style>{`@keyframes mtgDrawerIn{from{transform:translateX(48px);opacity:0}to{transform:none;opacity:1}}@media (prefers-reduced-motion:reduce){.mtg-drawer{animation:none!important}}`}</style>
       <div className="flex h-full justify-end">
-        <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={heading} style={{ animation: "mtgDrawerIn .28s ease-out" }} className="mtg-drawer flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl outline-none sm:rounded-l-2xl">
+        <div ref={dlgRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={heading} style={{ animation: "mtgDrawerIn .28s ease-out" }} className="mtg-drawer relative flex h-full w-full max-w-4xl flex-col overflow-hidden bg-white shadow-2xl outline-none sm:rounded-l-2xl">
           <header className="relative shrink-0 overflow-hidden bg-gradient-to-r from-[#3d0023] via-[#730042] to-[#CD166E] px-5 py-4 text-white sm:px-7 sm:py-5">
             <span aria-hidden="true" className="pointer-events-none absolute -right-10 -top-16 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
             <div className="relative flex items-center justify-between gap-3">
@@ -364,6 +398,11 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                             </label>
                           )}
                         </div>
+                        {freq !== "none" && (
+                          <div className="mt-2 rounded-lg border border-gray-200">
+                            <Switch checked={skipWeekOffs} onChange={setSkipWeekOffs} label="Skip week-offs" hint="A session that falls on your week-off is skipped and not counted" />
+                          </div>
+                        )}
                       </div>
                     )}
                     <div>
@@ -383,7 +422,7 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                           ["lobby", "Waiting room", "Admit people one by one"],
                           ["muteOnEntry", "Mute on entry", "Everyone except hosts joins muted"],
                         ].map(([key, label, hint]) => <Switch key={key} checked={!!controls[key]} onChange={(v) => setControlPicks((c) => ({ ...c, [key]: v }))} label={label} hint={hint} />)}
-                      {!edit && <Switch checked={sendEmail} onChange={setSendEmail} label="Email invitations" hint="Attendees get an email with the join link" />}
+                      <Switch checked={transcriptOn} onChange={(v) => setControlPicks((c) => ({ ...c, transcript: v }))} label="Meeting transcript" hint={transcriptOn ? "What is said is saved as a transcript the host can share" : "Nothing is saved, live captions still work"} />
                     </div>
                     {!edit && defaultsQ.isSuccess && <p className="text-xs text-gray-500">Your organisation's defaults are pre-selected.</p>}
                   </Section>
@@ -494,12 +533,12 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
                   <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Settings</h4>
                   <ul className="space-y-2">
                     <SumRow on={reminder > 0}>{reminder > 0 ? `Reminder ${reminder} min before` : "No reminder"}</SumRow>
-                    {!edit && <SumRow on={freq !== "none"}>{freq !== "none" ? `Repeats ${freq}, ${Number(count) || 4} times` : "Does not repeat"}</SumRow>}
+                    {!edit && <SumRow on={freq !== "none"}>{freq !== "none" ? `Repeats ${FREQ_LABEL[freq]}, ${Number(count) || 4} times${skipWeekOffs ? ", skips week-offs" : ""}` : "Does not repeat"}</SumRow>}
                     {!edit && <SumRow on={!!controls.lobby}>Waiting room</SumRow>}
                     {!edit && <SumRow on={!!controls.muteOnEntry}>Mute on entry</SumRow>}
                     <SumRow on={joinBefore}>Join before host</SumRow>
                     <SumRow on={agendaCount > 0}>{agendaCount > 0 ? `${agendaCount} agenda topic${agendaCount > 1 ? "s" : ""}` : "No agenda"}</SumRow>
-                    {!edit && <SumRow on={sendEmail}>Email invitations</SumRow>}
+                    <SumRow on={transcriptOn}>{transcriptOn ? "Transcript on" : "Transcript off"}</SumRow>
                   </ul>
                 </div>
               )}
@@ -534,6 +573,39 @@ export default function MeetingFormModal({ mode = "create", meeting, onClose, on
               </Btn>
             </div>
           </footer>
+
+          {askNotify && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900/50 p-4" onMouseDown={(e) => e.target === e.currentTarget && !saving && setAskNotify(false)}>
+              <div role="alertdialog" aria-modal="true" aria-labelledby="mtg-notify-title" className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+                <h3 id="mtg-notify-title" className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <Bell size={18} className="text-[#730042]" aria-hidden="true" /> Send notification to?
+                </h3>
+                <p className="mt-1 text-xs text-gray-500">Choose who is told about this meeting.</p>
+                <div role="radiogroup" aria-label="Notify" className="mt-4 space-y-2">
+                  {NOTIFY_OPTIONS.map(([v, label, hint]) => (
+                    <button key={v} type="button" role="radio" aria-checked={notifyMode === v} onClick={() => setNotifyMode(v)} className={cx("flex w-full items-start gap-3 rounded-xl border p-3 text-left transition", notifyMode === v ? "border-[#730042] bg-[#730042]/[0.05] ring-1 ring-[#730042]/30" : "border-gray-200 hover:border-[#730042]/40")}>
+                      <span className={cx("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border", notifyMode === v ? "border-[#730042] bg-[#730042]" : "border-gray-300")}>
+                        {notifyMode === v && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </span>
+                      <span>
+                        <span className="block text-sm font-semibold text-gray-900">{label}</span>
+                        <span className="block text-xs text-gray-500">{hint}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {notifyMode === "none" && guestList.length > 0 && <p className="mt-3 text-xs text-amber-700">Outside guests still receive their join PIN, they cannot enter without it.</p>}
+                <div className="mt-5 flex justify-end gap-2">
+                  <Btn variant="ghost" onClick={() => setAskNotify(false)}>
+                    Back
+                  </Btn>
+                  <Btn loading={saving} onClick={save}>
+                    Schedule
+                  </Btn>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

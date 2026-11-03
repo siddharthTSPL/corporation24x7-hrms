@@ -506,7 +506,7 @@ export default function MeetingsPage() {
           </TabPanel>
 
           <TabPanel id="calendar" idPrefix="mt" active={tab === "calendar"}>
-            <MeetingCalendar onOpen={open} focus={calFocus} />
+            <MeetingCalendar onOpen={open} focus={calFocus} onSchedule={(date) => setForm({ mode: "create", date })} />
           </TabPanel>
           <TabPanel id="discover" idPrefix="mt" active={tab === "discover"}>
             <DiscoverTab onOpen={open} />
@@ -523,7 +523,7 @@ export default function MeetingsPage() {
       <BottomNav value={tab} onChange={changeTab} badges={badges} />
 
       <MeetingDrawer id={openId} onClose={close} onEdit={(meeting) => setForm({ mode: "edit", meeting })} />
-      {form && <MeetingFormModal mode={form.mode} meeting={form.meeting} onClose={() => setForm(null)} onSaved={onSaved} />}
+      {form && <MeetingFormModal mode={form.mode} meeting={form.meeting} initialDate={form.date} onClose={() => setForm(null)} onSaved={onSaved} />}
       {adminOpen && <MeetingAdminSettings onClose={() => setAdminOpen(false)} />}
     </div>
   );
