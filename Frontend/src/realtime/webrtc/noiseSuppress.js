@@ -20,6 +20,8 @@ const loadWasm = () => {
   return wasmPromise;
 };
 
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
+
 const safe = (fn) => {
   try {
     fn();
@@ -43,7 +45,8 @@ export const enhanceMicTrack = async (rawTrack) => {
       ctx.audioWorklet.addModule(rnnoiseWorkletPath),
       ctx.audioWorklet.addModule(noiseGateWorkletPath),
     ]);
-    if (ctx.state === "suspended") await ctx.resume().catch(() => {});
+    if (ctx.state !== "running") await withTimeout(ctx.resume().catch(() => {}), 1500);
+    if (ctx.state !== "running") throw new Error("audio context is not running");
 
     const source = ctx.createMediaStreamSource(new MediaStream([rawTrack]));
     const highpass = ctx.createBiquadFilter();
@@ -63,9 +66,18 @@ export const enhanceMicTrack = async (rawTrack) => {
     try { clean.contentHint = "speech"; } catch { /* optional hint */ }
 
     let closed = false;
+    const keepAlive = () => {
+      if (!closed && ctx.state !== "running" && ctx.state !== "closed") ctx.resume().catch(() => {});
+    };
+    ctx.addEventListener("statechange", keepAlive);
+    document.addEventListener("visibilitychange", keepAlive);
+    window.addEventListener("pointerdown", keepAlive);
     const teardown = () => {
       if (closed) return;
       closed = true;
+      ctx.removeEventListener("statechange", keepAlive);
+      document.removeEventListener("visibilitychange", keepAlive);
+      window.removeEventListener("pointerdown", keepAlive);
       safe(() => rnnoise.destroy());
       safe(() => source.disconnect());
       safe(() => rawTrack.stop());
