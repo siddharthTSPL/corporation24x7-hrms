@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Video, CalendarClock, CalendarDays, Compass, History, ListChecks, BarChart3, Settings2, ChevronLeft, ChevronRight, Radio, Search, Sun, CalendarRange, MessageSquareReply, CheckCircle2, XCircle, Timer, Crown } from "lucide-react";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
@@ -120,7 +121,7 @@ function BottomNav({ value, onChange, badges }) {
 }
 
 /* ---------- Mini month calendar (sidebar) ---------- */
-function MiniCalendar({ onPick }) {
+function MiniCalendar({ onPick, onSchedule }) {
   const [cursor, setCursor] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const q = useMeetingCalendar(monthKeyOf(cursor));
   const todayKey = dayKeyOf(new Date());
@@ -166,6 +167,7 @@ function MiniCalendar({ onPick }) {
               key={key}
               type="button"
               onClick={() => onPick(d)}
+              onDoubleClick={() => onSchedule?.(d)}
               aria-label={`${d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}${n ? `, ${n} meeting${n > 1 ? "s" : ""}` : ""}`}
               className={cx("relative mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs transition-colors", isToday ? "bg-[#730042] font-semibold text-white" : "text-gray-800 hover:bg-gray-100")}
             >
@@ -313,6 +315,11 @@ export default function MeetingsPage() {
   const [pastFilter, setPastFilter] = useState("all");
   const [form, setForm] = useState(null);
   const [calFocus, setCalFocus] = useState(null);
+  // Double-click on a date in either calendar (sidebar or main) opens the schedule form for that day.
+  const scheduleOn = (date) => {
+    if (startOfDay(date).getTime() < startOfDay(new Date()).getTime()) return toast("You can't schedule a meeting on a past date", { icon: "⚠️" });
+    return setForm({ mode: "create", date });
+  };
   const [adminOpen, setAdminOpen] = useState(false);
 
   const changeTab = (next) => {
@@ -377,7 +384,7 @@ export default function MeetingsPage() {
               </Btn>
             </div>
             <SideNav value={tab} onChange={changeTab} badges={badges} />
-            <MiniCalendar onPick={goDay} />
+            <MiniCalendar onPick={goDay} onSchedule={scheduleOn} />
           </div>
         </aside>
 
@@ -506,7 +513,7 @@ export default function MeetingsPage() {
           </TabPanel>
 
           <TabPanel id="calendar" idPrefix="mt" active={tab === "calendar"}>
-            <MeetingCalendar onOpen={open} focus={calFocus} onSchedule={(date) => setForm({ mode: "create", date })} />
+            <MeetingCalendar onOpen={open} focus={calFocus} onSchedule={scheduleOn} />
           </TabPanel>
           <TabPanel id="discover" idPrefix="mt" active={tab === "discover"}>
             <DiscoverTab onOpen={open} />

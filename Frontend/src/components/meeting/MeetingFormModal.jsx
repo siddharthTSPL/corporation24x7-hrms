@@ -170,7 +170,7 @@ export default function MeetingFormModal({ mode = "create", meeting, initialDate
     setError("");
     try {
       if (instant) {
-        const res = await quick.mutateAsync({ title: title.trim() || undefined, durationMin: duration, media, attendees: people.map(personRef) });
+        const res = await quick.mutateAsync({ title: title.trim() || undefined, durationMin: duration, media, attendees: people.map(personRef), settings: "transcript" in controlPicks ? { transcript: controlPicks.transcript } : undefined });
         onSaved?.(res.meeting, { instant: true });
       } else if (edit) {
         const before = new Set(originalPeople.map((p) => p.key));
@@ -375,6 +375,14 @@ export default function MeetingFormModal({ mode = "create", meeting, initialDate
                   ))}
                 </div>
               </Section>
+
+              {instant && (
+                <Section icon={SlidersHorizontal} title="Options">
+                  <div className="rounded-lg border border-gray-200">
+                    <Switch checked={transcriptOn} onChange={(v) => setControlPicks((c) => ({ ...c, transcript: v }))} label="Meeting transcript" hint={transcriptOn ? "What is said is saved as a transcript the host can share" : "Nothing is saved, live captions still work"} />
+                  </div>
+                </Section>
+              )}
 
               {!instant && (
                 <>

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { FaBell, FaPhoneAlt, FaCommentDots, FaUserCircle, FaLock, FaPalette, FaMoon, FaDatabase, FaFlag, FaQuestionCircle } from "react-icons/fa";
+import { FaReply, FaBell, FaPhoneAlt, FaCommentDots, FaUserCircle, FaLock, FaPalette, FaMoon, FaDatabase, FaFlag, FaQuestionCircle } from "react-icons/fa";
 import Avatar from "./Avatar";
 import CallSoundSettings from "./Callsoundsettings";
 import { Header, NavRow, Section, ToggleRow, PageBody } from "./settingsUi";
-import { ProfilePage, PrivacyPage, AppearancePage, NotificationRulesPage, StoragePage, ReportsPage, AboutPage } from "./ChatSettingsPages";
+import { ProfilePage, AutoReplyPage, PrivacyPage, AppearancePage, NotificationRulesPage, StoragePage, ReportsPage, AboutPage } from "./ChatSettingsPages";
 import { useConversations } from "../../auth/server-state/chat/chat.hook";
 import { useChatSettings, useChatReports } from "../../auth/server-state/chat/chatSettings.hook";
 import { useChatStore } from "../../auth/store/chat/chatStore";
@@ -45,6 +45,7 @@ export default function ChatSettingsSheet({ onClose }) {
   const back = () => setPage(null);
 
   if (page === "profile") return <ProfilePage onBack={back} self={self ? { ...self, key: myKey } : { key: myKey }} />;
+  if (page === "autoreply") return <AutoReplyPage onBack={back} />;
   if (page === "privacy") return <PrivacyPage onBack={back} />;
   if (page === "appearance") return <AppearancePage onBack={back} />;
   if (page === "dnd") return <NotificationRulesPage onBack={back} />;
@@ -76,6 +77,7 @@ export default function ChatSettingsSheet({ onClose }) {
 
         <Section>
           <NavRow icon={FaUserCircle} title="Profile & status" hint="About, availability status" onClick={() => setPage("profile")} />
+          <NavRow icon={FaReply} title="Auto-reply" hint={s?.autoReply?.enabled ? "On" : "Reply automatically when someone messages you"} onClick={() => setPage("autoreply")} />
           <NavRow icon={FaLock} title="Privacy" hint="Online status, typing, who can add you" onClick={() => setPage("privacy")} />
           <NavRow icon={FaPalette} title="Appearance" hint="Theme, font size, accent colour" onClick={() => setPage("appearance")} />
           <NavRow icon={FaCommentDots} title="Chats" hint="Enter key behaviour" onClick={() => setPage("chats")} />

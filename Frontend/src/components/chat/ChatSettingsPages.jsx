@@ -109,6 +109,73 @@ export function ProfilePage({ onBack, self }) {
   );
 }
 
+// ---------------------------------------------------------------- Auto-reply
+const pad2 = (n) => String(n).padStart(2, "0");
+const toLocalInput = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
+export function AutoReplyPage({ onBack }) {
+  const { data: s } = useChatSettings();
+  const update = useUpdateChatSettings();
+  const [message, setMessage] = useState("");
+  const [until, setUntil] = useState("");
+
+  useEffect(() => {
+    if (!s) return;
+    setMessage(s.autoReply.message);
+    setUntil(toLocalInput(s.autoReply.until));
+  }, [s]);
+
+  if (!s) return <div className="flex h-full flex-col bg-[#f5f6f8]"><Header title="Auto-reply" onBack={onBack} /><Loading /></div>;
+
+  const ar = s.autoReply;
+  const dirty = message.trim() !== ar.message || until !== toLocalInput(ar.until);
+  // one save: message, end time and switch always go together, so nothing typed is lost when you flip the switch
+  const save = (enabled) => {
+    const body = { enabled, message: message.trim(), until: until ? new Date(until).toISOString() : null };
+    if (enabled && !body.message) return toast.error("Write your auto-reply message first.");
+    return update.mutate({ autoReply: body }, { onSuccess: () => toast.success(enabled ? "Auto-reply is on" : "Auto-reply saved") });
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f6f8]">
+      <Header title="Auto-reply" onBack={onBack} />
+      <PageBody>
+        <Section note="When someone messages you one-to-one, this message is sent to them automatically, at most once an hour per person. Group chats are not auto-replied.">
+          <ToggleRow title="Auto-reply" hint={ar.enabled ? "On: people who message you get your reply" : "Off"} on={ar.enabled} onChange={(v) => save(v)} disabled={update.isPending} />
+        </Section>
+
+        <Section title="Your message">
+          <div className="px-5 py-3">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, 500))}
+              rows={4}
+              placeholder="I'm away right now and will reply as soon as I'm back."
+              className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#730042]"
+            />
+            <p className="mt-1 text-[11px] text-gray-400">{message.length}/500</p>
+          </div>
+        </Section>
+
+        <Section title="Turn off automatically" note="Optional. Leave empty to keep the auto-reply on until you switch it off.">
+          <div className="flex items-center gap-2 px-5 py-3">
+            <input type="datetime-local" value={until} min={toLocalInput(new Date().toISOString())} onChange={(e) => setUntil(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#730042]" />
+            {until && <button type="button" onClick={() => setUntil("")} className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">Clear</button>}
+          </div>
+        </Section>
+
+        <div className="px-5 py-3">
+          <button type="button" disabled={!dirty || update.isPending} onClick={() => save(ar.enabled)} className="w-full rounded-full bg-[#730042] py-2.5 text-sm font-semibold text-white disabled:opacity-40">Save</button>
+        </div>
+      </PageBody>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Privacy
 export function PrivacyPage({ onBack }) {
   const { data: s } = useChatSettings();

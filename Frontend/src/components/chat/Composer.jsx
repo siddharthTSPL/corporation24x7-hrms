@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaReply, FaPen, FaRegSmile, FaMicrophone, FaTrash, FaLock } from "react-icons/fa";
+import { FaPaperPlane, FaPaperclip, FaTimes, FaFileAlt, FaReply, FaPen, FaRegSmile, FaMicrophone, FaTrash, FaLock, FaClock } from "react-icons/fa";
 import { useTypingEmitter } from "../../auth/server-state/chat/chat.hook";
 import EmojiStickerPicker from "./EmojiStickerPicker";
+import ScheduleMessage from "./ScheduleMessage";
+import { useScheduledMessages } from "../../auth/server-state/chat/chatExtras.hook";
 import { getChatPrefs } from "./chatPrefs";
 import { ACCEPT_ATTR, ALLOWED_MIME, MAX_FILES, MAX_FILE_BYTES, formatSize } from "./chatUtils";
 
@@ -16,12 +18,14 @@ export default function Composer({ conversationId, replyTo, editing, initialText
   const [text, setText] = useState(initialText);
   const [files, setFiles] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [secs, setSecs] = useState(0);
   const recRef = useRef({ mr: null, stream: null, chunks: [], timer: null, cancelled: false });
   const areaRef = useRef(null);
   const fileRef = useRef(null);
   const { onType, stopTyping } = useTypingEmitter(conversationId);
+  const { data: waiting = [] } = useScheduledMessages({ conversationId, enabled: !!conversationId && !disabledReason });
 
   const previews = useMemo(
     () => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)),
@@ -271,6 +275,22 @@ export default function Composer({ conversationId, replyTo, editing, initialText
         </div>
       )}
 
+      {scheduleOpen && !editing && (
+        <ScheduleMessage
+          conversationId={conversationId}
+          initialText={text}
+          replyTo={replyTo}
+          hasFiles={files.length > 0}
+          onClose={() => setScheduleOpen(false)}
+          onScheduled={() => {
+            setText("");
+            setFiles([]);
+            stopTyping();
+            requestAnimationFrame(resize);
+          }}
+        />
+      )}
+
       <div className="flex items-end gap-2.5 px-3 py-3">
         <div className="flex min-w-0 flex-1 items-end gap-0.5 rounded-2xl bg-gray-50 border border-gray-200 px-1.5 py-1 transition-all focus-within:bg-white focus-within:border-[#730042]/40 focus-within:ring-4 focus-within:ring-[#730042]/10">
           {!editing && (
@@ -299,12 +319,30 @@ export default function Composer({ conversationId, replyTo, editing, initialText
 
         <button
           type="button"
-          onClick={() => setPickerOpen((v) => !v)}
+          onClick={() => {
+            setPickerOpen((v) => !v);
+            setScheduleOpen(false);
+          }}
           title="Emoji & stickers"
           className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${pickerOpen ? "bg-[#F6E8EF] text-[#730042]" : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-800"}`}
         >
           <FaRegSmile className="text-lg" />
         </button>
+
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleOpen((v) => !v);
+              setPickerOpen(false);
+            }}
+            title="Schedule message"
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${scheduleOpen ? "bg-[#F6E8EF] text-[#730042]" : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-800"}`}
+          >
+            <FaClock className="text-base" />
+            {waiting.length > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 rounded-full bg-[#CD166E] px-1 text-[9px] font-bold leading-4 text-white text-center">{waiting.length}</span>}
+          </button>
+        )}
 
         <textarea
           ref={areaRef}

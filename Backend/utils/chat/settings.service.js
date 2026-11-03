@@ -31,6 +31,14 @@ const effectiveStatus = (s, now = new Date()) => {
   return { preset: s.preset, text: s.text || STATUS_LABELS[s.preset] || "", expiresAt: s.expiresAt || null };
 };
 
+// Auto-reply that is on right now ({ enabled, message, until }); an expired one counts as off.
+const effectiveAutoReply = (a, now = new Date()) => {
+  const message = String(a?.message || "");
+  const until = a?.until || null;
+  const live = !!a?.enabled && !!message.trim() && !(until && new Date(until) <= now);
+  return { enabled: live, message, until };
+};
+
 const shape = (doc) => ({
   privacy: {
     hideOnline: !!doc.privacy?.hideOnline,
@@ -38,6 +46,7 @@ const shape = (doc) => ({
     whoCanAddToGroups: doc.privacy?.whoCanAddToGroups || "everyone",
   },
   profile: { about: doc.profile?.about || "" },
+  autoReply: effectiveAutoReply(doc.autoReply),
   status: effectiveStatus(doc.status),
   appearance: {
     theme: doc.appearance?.theme || "system",
@@ -122,6 +131,24 @@ const buildPatch = (body = {}) => {
     if (about.length > 140) throw httpError("About can be at most 140 characters.");
     set["profile.about"] = about;
   }
+  const ar = body.autoReply;
+  if (ar && typeof ar === "object") {
+    if ("enabled" in ar) set["autoReply.enabled"] = bool(ar.enabled, "autoReply.enabled");
+    if ("message" in ar) {
+      const message = String(ar.message ?? "").replace(/\u0000/g, "").trim();
+      if (message.length > 500) throw httpError("Auto-reply can be at most 500 characters.");
+      set["autoReply.message"] = message;
+    }
+    if ("until" in ar) {
+      if (ar.until === null || ar.until === "") set["autoReply.until"] = null;
+      else {
+        const d = new Date(ar.until);
+        if (isNaN(d)) throw httpError("Choose a valid date and time for the auto-reply to end.");
+        if (d.getTime() <= Date.now()) throw httpError("The auto-reply end time must be in the future.");
+        set["autoReply.until"] = d;
+      }
+    }
+  }
   const a = body.appearance;
   if (a && typeof a === "object") {
     if ("theme" in a) set["appearance.theme"] = oneOf(a.theme, ["light", "dark", "system"], "theme");
@@ -168,6 +195,10 @@ const updateSettings = async (actor, body, { emitToKeys, emitToOrganisation }) =
   const set = buildPatch(body);
   if (!Object.keys(set).length) throw httpError("Nothing to update.");
   const before = await load(actor);
+  if (set["autoReply.enabled"] === true) {
+    const finalMessage = "autoReply.message" in set ? set["autoReply.message"] : before.autoReply?.message || "";
+    if (!String(finalMessage).trim()) throw httpError("Write the auto-reply message first.");
+  }
   const doc = await ChatSettings.findOneAndUpdate({ key: actor.key }, { $set: set }, { new: true }).lean();
 
   presence.setPrivacy(actor.key, doc.privacy || {});
@@ -230,6 +261,13 @@ const decoratePeople = async (people) => {
   }
 };
 
+// The text to send for this person right now, or "" when their auto-reply is off / expired.
+const getAutoReply = async (key) => {
+  const row = await ChatSettings.findOne({ key }).select("autoReply").lean();
+  const a = effectiveAutoReply(row && row.autoReply);
+  return a.enabled ? a.message.trim() : "";
+};
+
 // "Who can add me to groups" - throws a friendly error naming whoever said no.
 const assertCanBeAdded = async (actor, people) => {
   const keys = [...people].map((p) => p.key).filter((k) => k !== actor.key);
@@ -244,5 +282,5 @@ const assertCanBeAdded = async (actor, people) => {
 module.exports = {
   STATUS_LABELS, DURATIONS,
   getSettings, updateSettings, setStatus,
-  effectiveStatus, decoratePeople, assertCanBeAdded, isInDnd, load,
+  effectiveStatus, decoratePeople, assertCanBeAdded, isInDnd, load, getAutoReply,
 };
