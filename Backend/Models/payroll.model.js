@@ -41,6 +41,10 @@ const payrollSchema = new mongoose.Schema(
     // later. Sourced from SuperAdmin.organisation_name automatically.
     organisationSnapshot: {
       name: { type: String, default: "" },
+      address: { type: String, default: "" },
+      email: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      logoUrl: { type: String, default: "" },
     },
 
     ctc: { type: Number, required: true },

@@ -73,6 +73,15 @@ const payrollPolicySchema = new mongoose.Schema(
       index: true,
     },
 
+    // Payslip branding is independent of salary structure and payroll math.
+    payslipSettings: {
+      companyName: { type: String, trim: true, maxlength: 160, default: "" },
+      address: { type: String, trim: true, maxlength: 500, default: "" },
+      email: { type: String, trim: true, lowercase: true, maxlength: 254, default: "" },
+      phone: { type: String, trim: true, maxlength: 40, default: "" },
+      logoUrl: { type: String, trim: true, maxlength: 2048, default: "" },
+    },
+
     basic: {
       percentOfGross: { type: Number, default: 40, min: 1, max: 100 },
     },

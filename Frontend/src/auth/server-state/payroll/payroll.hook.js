@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPayrollPolicy,
   setPayrollPolicy,
+  uploadPayslipLogo,
   resetPayrollPolicy,
   addPayrollAllowance,
   updatePayrollAllowance,
@@ -51,9 +52,14 @@ export const useSetPayrollPolicy = () => {
     mutationFn: setPayrollPolicy,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-policy"] });
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payslip"] });
+      queryClient.invalidateQueries({ queryKey: ["my-payslips"] });
     },
   });
 };
+
+export const useUploadPayslipLogo = () => useMutation({ mutationFn: uploadPayslipLogo });
 
 export const useResetPayrollPolicy = () => {
   const queryClient = useQueryClient();
