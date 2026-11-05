@@ -31,6 +31,13 @@ export const setPayrollPolicy = async (data) => {
   return res.data;
 };
 
+export const uploadPayslipLogo = async (file) => {
+  const form = new FormData();
+  form.append("logo", file);
+  const res = await api.post("admin/payroll/policy/payslip-logo", form);
+  return res.data;
+};
+
 export const resetPayrollPolicy = async () => {
   const res = await api.post("admin/payroll/policy/reset");
   return res.data;

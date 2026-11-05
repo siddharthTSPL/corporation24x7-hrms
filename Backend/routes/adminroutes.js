@@ -305,6 +305,11 @@ adminrouter.put(
   leaveDocumentUpload.single("supportingDocument"),
   asyncHandler(editleaveadmin)
 );
+adminrouter.delete(
+  "/deleteleave/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteleaveadmin),
+);
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,

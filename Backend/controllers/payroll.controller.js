@@ -62,8 +62,25 @@ const formatMonthYear = (month, year) => `${MONTH_NAMES[Number(month) - 1] || "U
 
 
 const getOrganisationSnapshot = async (organisation_id) => {
-  const org = await SuperAdmin.findById(organisation_id).select("organisation_name").lean();
-  return { name: org?.organisation_name || "" };
+  const [org, policy] = await Promise.all([
+    SuperAdmin.findById(organisation_id).select("organisation_name company_address email phone").lean(),
+    getOrCreatePolicy(organisation_id),
+  ]);
+  const settings = policy?.payslipSettings || {};
+  return {
+    name: settings.companyName || org?.organisation_name || "",
+    address: settings.address || org?.company_address || "",
+    email: settings.email || org?.email || "",
+    phone: settings.phone || org?.phone || "",
+    logoUrl: settings.logoUrl || "",
+  };
+};
+
+const applyOrganisationSnapshot = (payroll, snapshot) => {
+  payroll.organisationSnapshot = {
+    ...(payroll.organisationSnapshot || {}),
+    ...snapshot,
+  };
 };
 
 
@@ -1113,12 +1130,8 @@ const listPayrolls = async (req, res) => {
   const payrolls = await Payroll.find(filter).sort({ year: -1, month: -1 }).lean();
 
 
-  if (payrolls.some((p) => !p.organisationSnapshot?.name)) {
-    const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
-    for (const p of payrolls) {
-      if (!p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
-    }
-  }
+  const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
+  for (const p of payrolls) applyOrganisationSnapshot(p, organisationSnapshot);
 
   // Older payrolls (generated before bank details were added to the
   // snapshot) won't have bankName/accountNumber saved — backfill from each
@@ -1156,9 +1169,7 @@ const getPayslip = async (req, res) => {
   if (!payslip) return res.status(404).json({ success: false, message: "Payslip not found for this period" });
 
 
-  if (!payslip.organisationSnapshot?.name) {
-    payslip.organisationSnapshot = await getOrganisationSnapshot(organisation_id);
-  }
+  applyOrganisationSnapshot(payslip, await getOrganisationSnapshot(organisation_id));
 
   // Older payslips (generated before bank details were added to the
   // snapshot) won't have bankName/accountNumber saved — backfill from the
@@ -1220,14 +1231,12 @@ const getMyPayslips = async (req, res, next) => {
       .lean();
 
     if (payslips.length) {
-      const organisationSnapshot = payslips[0].organisationSnapshot?.name
-        ? null
-        : await getOrganisationSnapshot(organisation_id);
+      const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
       const needsEmployeeSnapshot = !payslips[0].employeeSnapshot?.bankName && !payslips[0].employeeSnapshot?.accountNumber;
       const employeeSnapshot = needsEmployeeSnapshot ? await getEmployeeSnapshot(employeeModel, actor._id) : null;
 
       for (const p of payslips) {
-        if (organisationSnapshot && !p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
+        if (organisationSnapshot) applyOrganisationSnapshot(p, organisationSnapshot);
         if (employeeSnapshot && !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber) {
           p.employeeSnapshot = { ...p.employeeSnapshot, ...employeeSnapshot };
         }

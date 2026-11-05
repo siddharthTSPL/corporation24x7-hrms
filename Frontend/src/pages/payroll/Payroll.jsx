@@ -3,6 +3,7 @@ import { FaFileExcel } from "react-icons/fa";
 import {
   useGetPayrollPolicy,
   useSetPayrollPolicy,
+  useUploadPayslipLogo,
   useResetPayrollPolicy,
   useAddPayrollAllowance,
   useUpdatePayrollAllowance,
@@ -55,6 +56,7 @@ const C = {
 };
 
 const TABS = [
+  { key: "payslipSetup", label: "Setup Payslip" },
   { key: "schedule", label: "Pay Schedule" },
   { key: "statutory", label: "Statutory Components" },
   { key: "components", label: "Salary Components" },
@@ -489,6 +491,120 @@ function downloadCTCTemplate(directory, structures) {
   URL.revokeObjectURL(link.href);
 }
 
+
+function PayslipSetupTab({ notify }) {
+  const { data, isLoading } = useGetPayrollPolicy();
+  const { mutate: savePolicy, isPending: saving } = useSetPayrollPolicy();
+  const { mutate: uploadLogo, isPending: uploading } = useUploadPayslipLogo();
+  const [form, setForm] = useState(null);
+
+  useEffect(() => {
+    if (!data?.policy) return;
+    const settings = data.policy.payslipSettings || {};
+    setForm({
+      companyName: settings.companyName || "",
+      address: settings.address || "",
+      email: settings.email || "",
+      phone: settings.phone || "",
+      logoUrl: settings.logoUrl || "",
+    });
+  }, [data]);
+
+  const set = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const handleSave = () => {
+    const companyName = form?.companyName.trim();
+    if (!companyName) {
+      notify("Company name is required for the payslip", "error");
+      return;
+    }
+    savePolicy({ payslipSettings: { ...form, companyName } }, {
+      onSuccess: () => notify("Payslip company details saved", "success"),
+      onError: (error) => notify(getErrorMessage(error), "error"),
+    });
+  };
+
+  const handleLogo = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      notify("Choose a PNG, JPG or WebP logo up to 5 MB", "error");
+      return;
+    }
+    uploadLogo(file, {
+      onSuccess: (result) => {
+        set("logoUrl", result.logoUrl || "");
+        notify("Logo uploaded. Save setup to apply it to payslips.", "success");
+      },
+      onError: (error) => notify(getErrorMessage(error), "error"),
+    });
+  };
+
+  if (isLoading || !form) {
+    return <Card title="Payslip Company Details"><div className="flex items-center gap-2" style={{ color: C.muted, fontSize: 13 }}><Spinner size={14} color={C.brand} /> Loading payslip setup…</div></Card>;
+  }
+
+  const previewName = form.companyName.trim() || "Your Company Name";
+  const initials = previewName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "C";
+
+  return (
+    <Card title="Payslip Company Details" subtitle="Set the company name, address, contact details and logo shown on every payslip and PDF.">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.85fr)]">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Company name *">
+            <TextInput value={form.companyName} onChange={(e) => set("companyName", e.target.value)} placeholder="Company or organisation name" maxLength={160} />
+          </Field>
+          <Field label="Company email">
+            <TextInput type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="payroll@company.com" maxLength={254} />
+          </Field>
+          <Field label="Phone number">
+            <TextInput type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Company contact number" maxLength={40} />
+          </Field>
+          <Field label="Company address" hint="Printed below the company name on the payslip.">
+            <textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={3} maxLength={500} placeholder="Street, area, city, state, PIN code" style={{ ...inputStyle, resize: "vertical" }} />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Company logo" hint="PNG, JPG or WebP · Maximum 5 MB">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-xl border bg-white p-2" style={{ borderColor: C.border }}>
+                  {form.logoUrl ? <img src={form.logoUrl} alt="Payslip logo preview" className="h-full w-full object-contain" /> : <span style={{ fontSize: 24, fontWeight: 800, color: C.brand }}>{initials}</span>}
+                </div>
+                <label className="inline-flex cursor-pointer items-center rounded-lg border px-3 py-2 text-sm font-semibold" style={{ borderColor: C.border, color: C.text }}>
+                  {uploading ? "Uploading…" : form.logoUrl ? "Replace logo" : "Upload logo"}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogo} disabled={uploading} className="sr-only" />
+                </label>
+                {form.logoUrl && <GhostButton type="button" onClick={() => set("logoUrl", "")}>Remove</GhostButton>}
+              </div>
+            </Field>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: C.muted, marginBottom: 8 }}>Payslip header preview</div>
+          <div style={{ minHeight: 204, borderRadius: 14, padding: 18, color: "#fff", background: `linear-gradient(125deg, ${C.brand} 0%, ${C.brandDark} 100%)`, boxShadow: `0 12px 28px -18px ${C.brandDark}aa`, overflow: "hidden" }}>
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-[72px] w-[94px] shrink-0 items-center justify-center rounded-xl bg-white p-2.5 shadow-sm">
+                {form.logoUrl ? <img src={form.logoUrl} alt="Company logo" className="h-full w-full object-contain" /> : <span style={{ color: C.brand, fontSize: 26, fontWeight: 850 }}>{initials}</span>}
+              </div>
+              <div className="min-w-0">
+                <div className="break-words" style={{ fontSize: 19, lineHeight: 1.2, fontWeight: 800 }}>{previewName}</div>
+                {form.address && <div className="mt-1 break-words" style={{ fontSize: 11.5, lineHeight: 1.45, color: "#f6dcea" }}>{form.address}</div>}
+              </div>
+            </div>
+            {(form.email || form.phone) && <div className="mt-4 flex flex-wrap gap-2">
+              {form.email && <span className="max-w-full break-all rounded-full border px-3 py-1.5" style={{ background: "#ffffff1a", borderColor: "#ffffff55", fontSize: 11.5 }}>✉ {form.email}</span>}
+              {form.phone && <span className="max-w-full break-all rounded-full border px-3 py-1.5" style={{ background: "#ffffff1a", borderColor: "#ffffff55", fontSize: 11.5 }}>☎ {form.phone}</span>}
+            </div>}
+          </div>
+          <p style={{ margin: "9px 0 0", fontSize: 11.5, color: C.muted, lineHeight: 1.5 }}>This header appears on screen and in the downloaded PDF. It does not change salary structures or payroll calculations.</p>
+        </div>
+      </div>
+      <div className="mt-5 flex justify-end">
+        <PrimaryButton type="button" onClick={handleSave} loading={saving || uploading}>Save payslip details</PrimaryButton>
+      </div>
+    </Card>
+  );
+}
 
 function PayScheduleTab({ notify }) {
   const { data, isLoading } = useGetPaySchedule();
@@ -1888,9 +2004,13 @@ function getOrgDetailLines(org) {
     o.pan && `PAN: ${o.pan}`,
   ].filter(Boolean);
   if (ids.length) lines.push(ids.join("  |  "));
-  const contact = [o.email, o.phone].filter(Boolean);
-  if (contact.length) lines.push(contact.join("  |  "));
   return lines;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character]);
 }
 
 /* ---------- HTML -> PDF (direct file download, no print dialog) ----------
@@ -1921,6 +2041,14 @@ async function htmlToPdfDownload(html, filename) {
     // let layout / fonts settle
     await new Promise((r) => setTimeout(r, 350));
     if (doc.fonts?.ready) await doc.fonts.ready;
+    await Promise.all(Array.from(doc.images).map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.onload = resolve;
+        image.onerror = resolve;
+        setTimeout(resolve, 3000);
+      });
+    }));
     iframe.style.height = `${doc.body.scrollHeight}px`;
 
     const canvas = await html2canvas(doc.body, {
@@ -1962,15 +2090,13 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
   const hasDeductions = deductions.length > 0;
   const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
   const orgDetails = getOrgDetailLines(payroll.organisationSnapshot);
-  const statusText = payroll.status ? payroll.status.toUpperCase().replace("_", " ") : "";
+  const orgLogoUrl = payroll.organisationSnapshot?.logoUrl || "";
+  const orgEmail = payroll.organisationSnapshot?.email || "";
+  const orgPhone = payroll.organisationSnapshot?.phone || "";
+  const statusText = payroll.status ? payroll.status.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") : "";
 
-  // Status pill as inline SVG: the browser rasterises SVG exactly, so the text
-  // stays dead-centre inside the rounded border in the PDF (plain HTML text
-  // gets drawn a few px low by html2canvas).
-  const pillW = Math.round(statusText.length * 7.6 + 26);
-  const statusPill = statusText
-    ? `<div class="s"><svg xmlns="http://www.w3.org/2000/svg" width="${pillW}" height="22" viewBox="0 0 ${pillW} 22"><rect x="0.5" y="0.5" width="${pillW - 1}" height="21" rx="10.5" ry="10.5" fill="none" stroke="${BEETROOT}" stroke-width="1"/><text x="${pillW / 2}" y="11" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.6" fill="${BEETROOT}">${statusText}</text></svg></div>`
-    : "";
+  const statusClass = ({ paid: "paid", approved: "approved", generated: "generated", on_hold: "on-hold" })[payroll.status] || "generated";
+  const statusPill = statusText ? `<span class="status-pill ${statusClass}">${escapeHtml(statusText)}</span>` : "";
 
   const rowsHtml = (items) =>
     items.length
@@ -1983,23 +2109,40 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
 <html>
 <head>
 <meta charset="utf-8" />
-<title>${orgName ? orgName + " - " : ""}Payslip - ${name} - ${period}</title>
+<title>${orgName ? escapeHtml(orgName) + " - " : ""}Payslip - ${escapeHtml(name)} - ${escapeHtml(period)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #2a1a16; margin: 0; padding: 20px; background: #fff; }
-  .sheet { max-width: 780px; margin: 0 auto; border: 1px solid #e3d6dd; border-top: 6px solid ${BEETROOT}; border-radius: 6px; padding: 26px 28px; }
+  .sheet { max-width: 780px; margin: 0 auto; border: 1px solid #e3d6dd; border-top: 6px solid ${BEETROOT}; border-radius: 14px; padding: 24px; }
 
-  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid ${BEETROOT}; }
-  .org { font-size: 22px; font-weight: 800; color: ${BEETROOT}; margin: 0; letter-spacing: 0.2px; line-height: 1.2; }
-  .org-line { font-size: 11.5px; color: #6b5a54; margin: 4px 0 0; line-height: 1.5; }
-  .title { text-align: right; flex-shrink: 0; }
-  .title .t { font-size: 20px; font-weight: 800; color: #2a1a16; letter-spacing: 2px; }
-  .title .p { font-size: 12.5px; color: #6b5a54; margin-top: 4px; }
-  .title .s { margin-top: 8px; line-height: 0; }
-  .title .s svg { display: inline-block; vertical-align: top; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 145px; padding: 18px 20px; border-radius: 12px; color: #fff; background: linear-gradient(125deg, #CD166E 0%, ${BEETROOT} 100%); }
+  .head-main { flex: 1 1 auto; min-width: 0; }
+  .org-brand { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
+  .org-logo-frame { width: 82px; height: 78px; flex: 0 0 82px; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 12px; background: #fff; }
+  .org-logo { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .org-copy { min-width: 0; padding-left: 12px; border-left: 2px solid #ffffff88; }
+  .org-copy.no-logo { padding-left: 0; border-left: 0; }
+  .org { font-size: 21px; font-weight: 800; color: #fff; margin: 0; line-height: 1.2; }
+  .org-line { font-size: 11.5px; color: #f6dcea; margin: 5px 0 0; line-height: 1.5; }
+  .org-contact { display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 7px; margin-top: 9px; }
+  .org-contact > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; white-space: nowrap; border: 1px solid #ffffff99; background: #ffffff26; border-radius: 999px; padding: 5px 8px; font-size: 9.5px; line-height: 1.3; }
+  .org-contact .contact-label { color: #ffd9ec; font-weight: 800; letter-spacing: 0.25px; white-space: nowrap; }
+  .payslip-meta { flex: 0 0 190px; width: 190px; text-align: right; }
+  .slip-title-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .slip-title { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: 1.7px; line-height: 1.1; }
+  .period-card { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 9px; padding: 8px 9px; border: 1px solid #ffffff66; border-radius: 10px; background: #ffffff1c; text-align: left; }
+  .period-icon { width: 22px; height: 22px; flex: 0 0 22px; }
+  .period-copy { color: #f6dcea; font-size: 10.5px; line-height: 1.25; }
+  .period-copy strong { display: block; color: #fff; font-size: 12.5px; margin-top: 2px; }
+  .status-pill { display: inline-flex; align-items: center; justify-content: center; min-height: 22px; border-radius: 999px; padding: 3px 8px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.2px; white-space: nowrap; }
+  .status-pill.paid { color: #16764b; background: #e8f5e9; }
+  .status-pill.approved { color: #8a5a00; background: #faeeda; }
+  .status-pill.generated { color: #27689d; background: #e6f1fb; }
+  .status-pill.on-hold { color: #a42d2d; background: #fcebeb; }
 
-  .box { border: 1px solid #e3d6dd; border-radius: 6px; margin-top: 16px; }
-  .box-title { background: #f7eef2; color: ${BEETROOT}; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 7px 14px; border-bottom: 1px solid #e3d6dd; border-radius: 6px 6px 0 0; }
+  .box { border: 1px solid #e3d6dd; border-radius: 10px; margin-top: 16px; overflow: hidden; }
+  .box.attendance-box, .box.contribution-box { margin-top: 14px; }
+  .box-title { background: #f7eef2; color: ${BEETROOT}; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; padding: 7px 14px; border-bottom: 1px solid #e3d6dd; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; }
   .d { display: flex; gap: 8px; padding: 7px 14px; font-size: 12.5px; border-bottom: 1px solid #f3eaee; }
   .d .lbl { color: #8a7a74; min-width: 112px; }
@@ -2010,8 +2153,8 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
   .att .lbl { font-size: 10.5px; color: #8a7a74; text-transform: uppercase; letter-spacing: 0.4px; }
   .att .val { font-size: 15px; font-weight: 800; margin-top: 2px; }
 
-  .cols { display: flex; gap: 16px; margin-top: 16px; align-items: stretch; }
-  .col { flex: 1; border: 1px solid #e3d6dd; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+  .cols { display: flex; gap: 16px; margin-top: 14px; align-items: stretch; }
+  .col { flex: 1; border: 1px solid #e3d6dd; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
   table { width: 100%; border-collapse: collapse; }
   th { background: ${BEETROOT}; color: #fff; text-align: left; font-size: 11px; letter-spacing: 0.7px; text-transform: uppercase; padding: 8px 12px; }
   th.amt, td.amt { text-align: right; }
@@ -2020,26 +2163,33 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
   .grow { flex: 1; }
   .total td { background: #f7eef2; font-weight: 800; color: ${BEETROOT}; border-top: 2px solid ${BEETROOT}; border-bottom: none; }
 
-  .net { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 16px; padding: 14px 18px; background: #f7eef2; border: 1px solid ${BEETROOT}; border-radius: 6px; }
+  .net { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 14px; padding: 14px 18px; background: #f7eef2; border: 1px solid ${BEETROOT}; border-radius: 10px; }
   .net .lbl { font-size: 12px; font-weight: 800; letter-spacing: 1px; color: ${BEETROOT}; }
   .net .words { font-size: 11.5px; color: #6b5a54; margin-top: 4px; }
   .net .val { font-size: 24px; font-weight: 800; color: ${BEETROOT}; white-space: nowrap; }
 
   .note { font-size: 11.5px; color: #6b5a54; margin-top: 12px; }
-  .foot { margin-top: 22px; padding-top: 10px; border-top: 1px dashed #d9c9d1; text-align: center; font-size: 10.5px; color: #8a7a74; }
+  .foot { margin-top: 18px; padding-top: 10px; border-top: 1px dashed #d9c9d1; text-align: center; font-size: 10.5px; color: #8a7a74; }
 </style>
 </head>
 <body>
   <div class="sheet">
     <div class="head">
-      <div>
-        <p class="org">${orgName || "Company"}</p>
-        ${orgDetails.map((l) => `<p class="org-line">${l}</p>`).join("")}
+      <div class="head-main">
+        <div class="org-brand">
+          ${orgLogoUrl ? `<div class="org-logo-frame"><img class="org-logo" src="${escapeHtml(orgLogoUrl)}" alt="Company logo"/></div>` : ""}
+          <div class="org-copy ${orgLogoUrl ? "" : "no-logo"}"><p class="org">${escapeHtml(orgName || "Company")}</p>
+            ${orgDetails.map((l) => `<p class="org-line">${escapeHtml(l)}</p>`).join("")}
+            ${(orgEmail || orgPhone) ? `<div class="org-contact">${orgEmail ? `<span><b class="contact-label">Email</b>${escapeHtml(orgEmail)}</span>` : ""}${orgPhone ? `<span><b class="contact-label">Phone</b>${escapeHtml(orgPhone)}</span>` : ""}</div>` : ""}
+          </div>
+        </div>
       </div>
-      <div class="title">
-        <div class="t">PAYSLIP</div>
-        <div class="p">For the month of <strong>${period}</strong></div>
-        ${statusPill}
+      <div class="payslip-meta">
+        <div class="slip-title-row"><div class="slip-title">PAYSLIP</div>${statusPill}</div>
+        <div class="period-card">
+          <svg class="period-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          <div class="period-copy">For the month of<strong>${escapeHtml(period)}</strong></div>
+        </div>
       </div>
     </div>
 
@@ -2055,7 +2205,7 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
       </div>
     </div>
 
-    <div class="box">
+    <div class="box attendance-box">
       <div class="box-title">Attendance Summary</div>
       <div class="att">
         <div><div class="lbl">Calendar Days</div><div class="val">${att.calendarDays ?? att.daysInMonth ?? "—"}</div></div>
@@ -2096,7 +2246,7 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
     </div>
 
     ${employerContribution.length ? `
-    <div class="box">
+    <div class="box contribution-box">
       <div class="box-title">Employer Contributions (not deducted from salary)</div>
       <table>
         <tbody>${rowsHtml(employerContribution)}</tbody>
@@ -2152,6 +2302,9 @@ function PayslipTable({ title, rows, totalLabel, total }) {
 function PayslipModal({ payroll, directory, onClose }) {
   if (!payroll) return null;
   const orgName = payroll.organisationSnapshot?.name || "";
+  const orgLogoUrl = payroll.organisationSnapshot?.logoUrl || "";
+  const orgEmail = payroll.organisationSnapshot?.email || "";
+  const orgPhone = payroll.organisationSnapshot?.phone || "";
   const orgDetails = getOrgDetailLines(payroll.organisationSnapshot);
   const snap = payroll.employeeSnapshot || {};
   const person = directory.byId.get(String(payroll.employee));
@@ -2165,6 +2318,7 @@ function PayslipModal({ payroll, directory, onClose }) {
   const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
   const hasDeductions = deductions.length > 0;
   const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+  const orgInitials = orgName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "C";
 
   const employeeDetails = [
     ["Employee Name", name],
@@ -2196,31 +2350,39 @@ function PayslipModal({ payroll, directory, onClose }) {
       >
         <div className="p-4 sm:p-6">
           {/* Company header */}
-          <div className="pb-3" style={{ borderBottom: `2px solid ${BEETROOT}` }}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <h2 className="break-words" style={{ margin: 0, fontSize: 21, fontWeight: 800, color: BEETROOT, lineHeight: 1.2 }}>
-                  {orgName || "Company"}
-                </h2>
-                {orgDetails.map((line, i) => (
-                  <p key={i} className="break-words" style={{ margin: "4px 0 0", fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{line}</p>
-                ))}
+          <div style={{ borderRadius: 12, padding: 18, color: "#fff", background: `linear-gradient(125deg, ${C.brand} 0%, ${BEETROOT} 100%)`, boxShadow: "0 8px 22px rgba(115,0,66,.14)" }}>
+            <div className="grid grid-cols-1 items-center gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-[78px] w-[82px] shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm">
+                  {orgLogoUrl ? <img src={orgLogoUrl} alt="Company logo" className="h-full w-full object-contain" /> : <span style={{ color: BEETROOT, fontSize: 25, fontWeight: 850 }}>{orgInitials}</span>}
+                </div>
+                <div className="min-w-0 border-l-2 border-white/50 pl-3">
+                  <h2 className="break-words" style={{ margin: 0, fontSize: 19, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>{orgName || "Company"}</h2>
+                  {orgDetails.map((line, i) => <p key={i} className="break-words" style={{ margin: "5px 0 0", fontSize: 11.5, color: "#f6dcea", lineHeight: 1.45 }}>{line}</p>)}
+                  {(orgEmail || orgPhone) && <div className="mt-2 flex flex-wrap gap-2">
+                    {orgEmail && <span className="inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1" style={{ background: "#ffffff26", borderColor: "#ffffff88", fontSize: 9.5, lineHeight: 1.3, whiteSpace: "nowrap" }}><b style={{ color: "#ffd9ec" }}>Email</b>{orgEmail}</span>}
+                    {orgPhone && <span className="inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1" style={{ background: "#ffffff26", borderColor: "#ffffff88", fontSize: 9.5, lineHeight: 1.3, whiteSpace: "nowrap" }}><b style={{ color: "#ffd9ec" }}>Phone</b>{orgPhone}</span>}
+                  </div>}
+                </div>
               </div>
-              <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
-                {payroll.status === "paid" && (
-                  <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
-                    Download PDF
-                  </GhostButton>
-                )}
-                <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, cursor: "pointer", color: C.muted }}>×</button>
+              <div className="min-w-0">
+                <div className="flex items-center justify-end gap-2">
+                  {payroll.status === "paid" && (
+                    <GhostButton onClick={() => downloadPayslip({ payroll, name, employeeId, department, designation, bankName, accountNumber, orgName })}>
+                      Download PDF
+                    </GhostButton>
+                  )}
+                  <button onClick={onClose} aria-label="Close payslip" style={{ width: 34, height: 34, borderRadius: 9, border: "1px solid #ffffff66", background: "#ffffff1c", fontSize: 21, lineHeight: 1, cursor: "pointer", color: "#fff" }}>×</button>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: 1.7, color: "#fff" }}>PAYSLIP</span>
+                  {statusBadge(payroll.status)}
+                </div>
+                <div className="mt-2 flex items-center justify-center gap-2 rounded-lg border px-2.5 py-2" style={{ borderColor: "#ffffff66", background: "#ffffff1c" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                  <span className="text-left" style={{ fontSize: 10.5, lineHeight: 1.25, color: "#f6dcea" }}>For the month of<strong className="block" style={{ marginTop: 2, fontSize: 12.5, color: "#fff" }}>{period}</strong></span>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between gap-2 flex-wrap" style={{ marginTop: 10 }}>
-              <div className="flex items-baseline gap-3 flex-wrap">
-                <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: 2, color: C.text }}>PAYSLIP</span>
-                <span style={{ fontSize: 12.5, color: C.muted }}>For the month of <strong style={{ color: C.text }}>{period}</strong></span>
-              </div>
-              {statusBadge(payroll.status)}
             </div>
           </div>
 
@@ -3384,6 +3546,9 @@ function FnFTab({ notify }) {
 
 
 const TAB_ICONS = {
+  payslipSetup: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/><path d="M8 8h8M8 12h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  ),
   schedule: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
   ),
@@ -3488,6 +3653,7 @@ export default function Payroll() {
         </div>
 
         <div key={tab} style={{ animation: "payroll-fadeUp .22s ease" }}>
+        {tab === "payslipSetup" && <PayslipSetupTab notify={notify} />}
         {tab === "schedule" && <PayScheduleTab notify={notify} />}
         {tab === "statutory" && <StatutoryTab notify={notify} />}
         {tab === "components" && <ComponentsTab notify={notify} />}
