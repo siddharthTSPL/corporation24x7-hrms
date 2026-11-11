@@ -340,4 +340,5 @@ ticketSchema.statics.getDashboardStats = async function (organisation_id) {
   };
 };
 
+ticketSchema.plugin(require("../utils/gamification/hooks").ticketPlugin); // gamification
 module.exports = mongoose.model("Ticket", ticketSchema);

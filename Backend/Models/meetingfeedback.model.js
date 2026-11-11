@@ -15,4 +15,5 @@ const meetingFeedbackSchema = new mongoose.Schema(
 
 meetingFeedbackSchema.index({ meeting: 1, key: 1 }, { unique: true });
 
+meetingFeedbackSchema.plugin(require("../utils/gamification/hooks").meetingFeedbackPlugin); // gamification
 module.exports = mongoose.models.MeetingFeedback || mongoose.model("MeetingFeedback", meetingFeedbackSchema);

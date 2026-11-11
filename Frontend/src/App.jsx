@@ -106,6 +106,8 @@ const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
 const MeetingsPage = lazy(() => import("./pages/meetings/MeetingsPage"));
+const GamificationHub = lazy(() => import("./pages/gamification/GamificationHub"));
+const GamificationAdmin = lazy(() => import("./pages/gamification/GamificationAdmin"));
 const GuestJoinPage = lazy(() => import("./pages/meetings/GuestJoinPage"));
 
 function PageSkeleton() {
@@ -517,6 +519,9 @@ function App() {
             <Route path="/overtime"       element={<Overtime />} />
             <Route path="/meetings"       element={<MeetingsPage />} />
             <Route path="/meetings/:id"   element={<MeetingsPage />} />
+            {/* Rewards & Gamification (all roles; SuperAdmin only sees the admin console) */}
+            <Route path="/gamification"       element={<GamificationHub />} />
+            <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><GamificationAdmin /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

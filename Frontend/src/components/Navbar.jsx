@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaBars, FaSearch } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import NotificationBell from "./notifications/NotificationBell";
+import XpChip from "./gamification/XpChip";
 import ChatLauncher from "./chat/ChatLauncher";
 
 function Navbar({ collapsed, setCollapsed, data = [] }) {
@@ -107,6 +108,8 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
         <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
           {dateTime}
         </div>
+
+        <XpChip />
 
         <ChatLauncher />
 

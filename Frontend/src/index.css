@@ -35,3 +35,8 @@ body,
     
  
 }
+/* ── Rewards & Gamification ── */
+@keyframes gam-spin { to { transform: rotate(360deg); } }
+.gam-spin-ring { animation: gam-spin 6s linear infinite; }
+.gam-spin-ring > div { animation: gam-spin 6s linear infinite reverse; }
+@media (prefers-reduced-motion: reduce) { .gam-spin-ring, .gam-spin-ring > div { animation: none; } }

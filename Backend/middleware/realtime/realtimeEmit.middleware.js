@@ -28,7 +28,7 @@ const RULES = [
 ];
 
 // High-frequency / non-business endpoints we never broadcast for.
-const SKIP = /^\/(auth|notifications|kiosk|faceattendance|field-operations|single-sign-in|chat|meetings)(\/|$)/;
+const SKIP = /^\/(auth|notifications|kiosk|faceattendance|field-operations|single-sign-in|chat|meetings|gamification)(\/|$)/;
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
