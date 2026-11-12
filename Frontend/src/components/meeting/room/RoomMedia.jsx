@@ -22,6 +22,37 @@ export function MediaView({ stream, muted = false, mirror = false, hidden = fals
   );
 }
 
+export function PeerAudio({ stream }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const next = stream || null;
+    if (el.srcObject !== next) el.srcObject = next;
+    if (!next) return undefined;
+    let cancelled = false;
+    const retry = () => {
+      el.play().then(detach).catch(() => {});
+    };
+    function detach() {
+      window.removeEventListener("pointerdown", retry);
+      window.removeEventListener("keydown", retry);
+    }
+    el.play().catch(() => {
+      if (cancelled) return;
+      window.addEventListener("pointerdown", retry);
+      window.addEventListener("keydown", retry);
+    });
+    return () => {
+      cancelled = true;
+      detach();
+    };
+  }, [stream]);
+
+  return <audio ref={ref} autoPlay />;
+}
+
 export function RoomButton({ onClick, active = false, danger = false, disabled = false, title, badge, badgeTone = "brand", children, className = "", wide = false }) {
   const tone = danger
     ? "bg-red-600 text-white hover:bg-red-700"

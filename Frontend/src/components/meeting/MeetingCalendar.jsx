@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarX2, CalendarDays, Clock, Radio, Sparkles, Video } from "lucide-react";
+import toast from "react-hot-toast";
+import { ChevronLeft, ChevronRight, CalendarX2, CalendarDays, Clock, Plus, Radio, Sparkles, Video } from "lucide-react";
 import { useMeetingCalendar } from "../../auth/server-state/meeting/meeting.hook";
 import MeetingCard from "./MeetingCard";
 import JoinButton from "./JoinButton";
@@ -57,7 +58,7 @@ function StatCard({ icon: Icon, value, label, tone = "glass" }) {
   );
 }
 
-export default function MeetingCalendar({ onOpen, focus }) {
+export default function MeetingCalendar({ onOpen, focus, onSchedule }) {
   const [cursor, setCursor] = useState(() => {
     const d = focus?.date ? new Date(focus.date) : new Date();
     return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -101,6 +102,13 @@ export default function MeetingCalendar({ onOpen, focus }) {
   const pickOutside = (date) => {
     setCursor(new Date(date.getFullYear(), date.getMonth(), 1));
     setSelected(dayKeyOf(date));
+  };
+
+  // Double-click a date (or the Schedule button) opens the schedule form for that day.
+  const scheduleOn = (date) => {
+    if (!onSchedule) return;
+    if (startOfDay(date).getTime() < startOfDay(new Date()).getTime()) return toast("You can't schedule a meeting on a past date", { icon: "⚠️" });
+    onSchedule(date);
   };
 
   const selectedList = dayMeetings(selected);
@@ -213,6 +221,7 @@ export default function MeetingCalendar({ onOpen, focus }) {
                 <div
                   key={`${key}-${i}`}
                   onClick={() => (inMonth ? setSelected(key) : pickOutside(date))}
+                  onDoubleClick={inMonth ? () => scheduleOn(date) : undefined}
                   style={isToday && !isSel ? { animation: "torchx-cal-glow 2.8s ease-in-out infinite" } : undefined}
                   className={cx(
                     "group relative min-h-[62px] cursor-pointer rounded-xl border p-1.5 transition-all duration-200 sm:min-h-[108px] sm:rounded-2xl sm:p-2",
@@ -251,6 +260,7 @@ export default function MeetingCalendar({ onOpen, focus }) {
                           e.stopPropagation();
                           onOpen(m.id);
                         }}
+                        onDoubleClick={(e) => e.stopPropagation()}
                         className={cx(
                           "block w-full truncate rounded-lg border-l-[3px] px-1.5 py-1 text-left text-[11px] leading-tight transition hover:brightness-95",
                           isSel ? "border-white bg-white/20 text-white" : CHIP[m.status] || CHIP.scheduled,
@@ -281,6 +291,7 @@ export default function MeetingCalendar({ onOpen, focus }) {
                 <span className={cx("h-2 w-2 rounded-full", DOT[status])} /> {label}
               </span>
             ))}
+            {onSchedule && <span className="text-[11px] text-gray-400">Tip: double-click a date to schedule</span>}
             <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-gray-400">
               <span className="h-2 w-6 rounded-full bg-gradient-to-r from-[#730042]/[0.03] to-[#730042]/[0.18]" /> busier day
             </span>
@@ -322,7 +333,7 @@ export default function MeetingCalendar({ onOpen, focus }) {
                 <span className="text-[10px] font-semibold uppercase leading-none tracking-wider text-white/80">{selectedDate.toLocaleDateString([], { month: "short" })}</span>
                 <span className="mt-0.5 text-2xl font-bold leading-none">{selectedDate.getDate()}</span>
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h3 className="flex flex-wrap items-center gap-2 text-base font-semibold text-gray-900">
                   {selectedDate.toLocaleDateString([], { weekday: "long" })}
                   {selected === todayKey && <span className="rounded-full bg-[#730042] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Today</span>}
@@ -332,6 +343,11 @@ export default function MeetingCalendar({ onOpen, focus }) {
                   {selectedList.length === 0 ? "Nothing scheduled" : `${selectedList.length} meeting${selectedList.length > 1 ? "s" : ""}`}
                 </p>
               </div>
+              {onSchedule && (
+                <button type="button" onClick={() => scheduleOn(selectedDate)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-r from-[#730042] to-[#CD166E] px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-[#730042]/25 transition hover:brightness-110">
+                  <Plus size={14} aria-hidden="true" /> Schedule
+                </button>
+              )}
             </div>
 
             <div className="p-5">

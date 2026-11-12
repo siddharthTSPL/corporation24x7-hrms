@@ -13,12 +13,16 @@ const { getIceServers } = require("../utils/chat/ice.utils");
 const controls = require("../utils/chat/meetingControls.service");
 const { getOrgDefaults } = require("../utils/chat/meetingDefaults");
 const guestSvc = require("../utils/chat/guest.service");
+const { getWeekOffMapForRange } = require("../automatic/weekoffcalendar");
+const { toISTKey } = require("../utils/Istdate.utils");
 const { httpError, parseKey, personKey, requirePeople, resolvePeople, listAllPeople, shapePerson } = require("../utils/chat/people.utils");
 
 const MAX_ATTENDEES = 500;
 const MAX_DURATION_MS = 12 * 60 * 60 * 1000;
 const MAX_OCCURRENCES = 52;
 const DEFAULT_TZ = "Asia/Kolkata";
+const REPEAT_FREQS = ["daily", "weekdays", "weekly", "monthly"];
+const NOTIFY_MODES = ["attendees", "attendees_and_me", "none"];
 
 const actorOf = (req) => chat.toActor(req.actor);
 const ok = (res, data = {}, status = 200) => res.status(status).json({ success: true, ...data });
@@ -121,25 +125,50 @@ const findConflicts = async (actor, keys, start, end, excludeIds = []) => {
 
 // ---------- recurrence ----------
 
-const buildOccurrences = (start, end, rec) => {
+const WEEKDAY_IDX = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const weekdayIn = (date, tz) => WEEKDAY_IDX[new Intl.DateTimeFormat("en-US", { timeZone: validTz(tz), weekday: "short" }).format(date)];
+
+// Returns { list, skippedWeekOffs, firstOnWeekOff }. `count` = number of sessions wanted (the first one included).
+//   daily    -> every `interval` days          weekdays -> Monday to Friday (in the meeting's timezone)
+//   weekly   -> same weekday every `interval` weeks      monthly -> same date every `interval` months
+// skipWeekOffs: a session that lands on the HOST's week-off is dropped and does not use up the count,
+// so "weekly x 4" still gives 4 sessions. The first session is always kept (the host picked that date).
+const buildOccurrences = async (start, end, rec, { tz, organisation_id, host }) => {
   const out = [{ start, end }];
-  if (!rec || rec.freq === "none") return out;
+  const freq = rec && REPEAT_FREQS.includes(rec.freq) ? rec.freq : "none";
+  const result = { list: out, skippedWeekOffs: 0, firstOnWeekOff: false };
+  if (freq === "none") return result;
+
   const interval = Math.min(Math.max(parseInt(rec.interval, 10) || 1, 1), 12);
   const count = Math.min(Math.max(parseInt(rec.count, 10) || 10, 1), MAX_OCCURRENCES);
   const until = rec.until ? parseDate(rec.until, "recurrence.until") : null;
   const hardStop = new Date(start.getTime() + 366 * 24 * 3600 * 1000);
   const dur = end.getTime() - start.getTime();
 
+  let isOff = () => false;
+  if (rec.skipWeekOffs === true) {
+    // SuperAdmin has no employee-level week-off, so it follows the organisation policy
+    const personal = host && host.model !== "SuperAdmin";
+    const map = await getWeekOffMapForRange(start, hardStop, organisation_id, personal ? host.id : null, personal ? host.model : null);
+    isOff = (d) => !!map.get(toISTKey(d))?.isOff;
+    result.firstOnWeekOff = isOff(start);
+  }
+
   for (let i = 1; out.length < count; i++) {
     const s = new Date(start);
-    if (rec.freq === "daily") s.setUTCDate(s.getUTCDate() + i * interval);
-    else if (rec.freq === "weekly") s.setUTCDate(s.getUTCDate() + i * interval * 7);
-    else if (rec.freq === "monthly") s.setUTCMonth(s.getUTCMonth() + i * interval);
-    else break;
+    if (freq === "daily") s.setUTCDate(s.getUTCDate() + i * interval);
+    else if (freq === "weekdays") s.setUTCDate(s.getUTCDate() + i); // walks day by day, weekends are passed over below
+    else if (freq === "weekly") s.setUTCDate(s.getUTCDate() + i * interval * 7);
+    else s.setUTCMonth(s.getUTCMonth() + i * interval);
     if (s > hardStop || (until && s > until)) break;
+    if (freq === "weekdays") {
+      const wd = weekdayIn(s, tz);
+      if (wd === 0 || wd === 6) continue;
+    }
+    if (isOff(s)) { result.skippedWeekOffs += 1; continue; }
     out.push({ start: s, end: new Date(s.getTime() + dur) });
   }
-  return out;
+  return result;
 };
 
 // ---------- notifications / email ----------
@@ -148,7 +177,8 @@ const toRecipients = (keys) => keys.map((k) => { const p = parseKey(k); return {
 
 const notify = (actor, keys, meeting, { title, message, priority = "medium" }) => {
   if (!keys.length) return;
-  createBulkNotifications({
+  // "none" = no in-app notification; the realtime refresh below still runs so calendars stay current
+  if (meeting.notifyMode !== "none") createBulkNotifications({
     recipients: toRecipients(keys),
     organisation_id: actor.organisation_id,
     type: "meeting",
@@ -164,8 +194,9 @@ const notify = (actor, keys, meeting, { title, message, priority = "medium" }) =
 };
 
 // Fire-and-forget invites (with .ics). Never blocks or fails the API call.
-const emailAttendees = (meeting, host, recipients, method, allPeople) => {
-  const list = recipients.filter((p) => p.email && p.key !== host.key).slice(0, 200);
+const emailAttendees = (meeting, host, recipients, method, allPeople, opts = {}) => {
+  if (meeting.notifyMode === "none") return;
+  const list = recipients.filter((p) => p.email && (opts.includeHost || p.key !== host.key)).slice(0, 200);
   if (!list.length) return;
   const url = joinUrl(meeting._id);
   const when = `${fmtWhen(meeting.startTime, meeting.timezone)} – ${fmtWhen(meeting.endTime, meeting.timezone).split(", ").pop()} (${meeting.timezone})`;
@@ -177,7 +208,7 @@ const emailAttendees = (meeting, host, recipients, method, allPeople) => {
   );
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto">
     <h2 style="color:#730042;margin-bottom:4px">${escapeHtml(meeting.title)}</h2>
-    <p style="color:#555;margin-top:0">${cancelled ? "This meeting has been cancelled." : `${escapeHtml(host.name)} invited you to a ${meeting.media} meeting.`}</p>
+    <p style="color:#555;margin-top:0">${cancelled ? "This meeting has been cancelled." : opts.selfCopy ? `You scheduled a ${meeting.media} meeting. This is your copy.` : `${escapeHtml(host.name)} invited you to a ${meeting.media} meeting.`}</p>
     <p><b>When:</b> ${escapeHtml(when)}</p>
     ${meeting.description ? `<p>${escapeHtml(meeting.description)}</p>` : ""}
     ${meeting.agenda ? `<p><b>Agenda:</b><br>${escapeHtml(meeting.agenda).replace(/\n/g, "<br>")}</p>` : ""}
@@ -233,6 +264,7 @@ const shapeMeeting = (m, actor, people, { detail = false } = {}) => {
     allowJoinBeforeHost: o.allowJoinBeforeHost,
     settings: controls.plainSettings(o.settings),
     reminderMinutes: o.reminderMinutes,
+    notifyMode: o.notifyMode || "attendees",
     opensAt,
     live: room ? { participants: [...rooms.distinctPeople(room)].length } : null,
     startedAt: o.startedAt,
@@ -302,7 +334,9 @@ const createMeeting = async (req, res) => {
     if (coHostKeys.some((k) => !people.has(k))) throw httpError("Co-hosts must be among the invited people.");
   }
 
-  const occ = buildOccurrences(start, end, b.recurrence);
+  const plan = await buildOccurrences(start, end, b.recurrence, { tz, organisation_id: actor.organisation_id, host });
+  const occ = plan.list;
+  const notifyMode = NOTIFY_MODES.includes(b.notifyMode) ? b.notifyMode : "attendees";
   const seriesId = occ.length > 1 ? new mongoose.Types.ObjectId().toString() : undefined;
 
   // one in-meeting chat shared by the whole series
@@ -335,7 +369,13 @@ const createMeeting = async (req, res) => {
       attendees, attendeeKeys: attendeeList.map((p) => p.key),
       guests: guestPlan.entries.map((e) => e.doc), // same guestId + PIN for every session of a series
       audience,
-      recurrence: { freq: b.recurrence?.freq && occ.length > 1 ? b.recurrence.freq : "none", interval: Math.min(Math.max(parseInt(b.recurrence?.interval, 10) || 1, 1), 12), until: occ.length > 1 ? occ[occ.length - 1].start : null },
+      recurrence: {
+        freq: occ.length > 1 && REPEAT_FREQS.includes(b.recurrence?.freq) ? b.recurrence.freq : "none",
+        interval: Math.min(Math.max(parseInt(b.recurrence?.interval, 10) || 1, 1), 12),
+        until: occ.length > 1 ? occ[occ.length - 1].start : null,
+        skipWeekOffs: occ.length > 1 && b.recurrence?.skipWeekOffs === true,
+      },
+      notifyMode,
       seriesId,
       conversation: conv._id,
       roomKey: rooms.meetingRoomKey(_id),
@@ -359,6 +399,10 @@ const createMeeting = async (req, res) => {
     priority: "high",
   });
   if (b.sendEmail !== false) emailAttendees(first, host, invitees, "REQUEST", attendeeList);
+  if (notifyMode === "attendees_and_me") {
+    notify(actor, [host.key], first, { title: "Meeting scheduled", message: `You scheduled "${title}" on ${when}${occ.length > 1 ? ` (repeats, ${occ.length} sessions)` : ""}.` });
+    if (b.sendEmail !== false) emailAttendees(first, host, [host], "REQUEST", attendeeList, { includeHost: true, selfCopy: true });
+  }
   if (guestPlan.entries.length && b.sendEmail !== false) guestSvc.emailGuests(created, host, guestPlan.entries.map((e) => ({ guest: e.doc, pin: e.pin })));
 
   const people2 = new Map(attendeeList.map((p) => [p.key, p]));
@@ -366,6 +410,8 @@ const createMeeting = async (req, res) => {
   ok(res, {
     meeting: shapeMeeting(first, actor, people2, { detail: false }),
     occurrences: created.length,
+    recurrence: { skippedWeekOffs: plan.skippedWeekOffs, firstOnWeekOff: plan.firstOnWeekOff },
+    notifyMode,
     conflicts: resolvedConflicts,
     guests: { invited: guestPlan.entries.map((e) => e.doc.email), skipped: guestPlan.skipped },
   }, 201);

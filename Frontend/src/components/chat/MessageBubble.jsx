@@ -182,7 +182,7 @@ export default function MessageBubble({
   const isSticker = m.type === "sticker" && !deleted;
   const bigEmoji = !deleted && m.type === "text" && !m.attachments?.length && !m.replyTo && isEmojiOnly(m.text);
   const bare = isSticker || bigEmoji; // no coloured bubble around it
-  const inlineFooter = !deleted && !bare && m.type === "text" && !m.attachments?.length && !m.replyTo && !m.forwarded;
+  const inlineFooter = !deleted && !bare && m.type === "text" && !m.attachments?.length && !m.replyTo && !m.forwarded && !m.autoReply;
   const reactions = groupReactions(m.reactions, myKey);
 
   const radius = mine
@@ -239,6 +239,12 @@ export default function MessageBubble({
               </span>
             ) : (
               <>
+                {m.autoReply && (
+                  <span className={`mb-1 flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${mine && !bare ? "bg-white/15 text-white/85" : "bg-[#F6E8EF] text-[#730042]"}`}>
+                    <FaReply className="text-[8px]" /> Auto-reply
+                  </span>
+                )}
+
                 {m.forwarded && (
                   <p className={`flex items-center gap-1 text-[11px] italic mb-1 ${mine && !bare ? "text-white/70" : "text-gray-400"}`}>
                     <FaShare className="text-[9px]" /> Forwarded

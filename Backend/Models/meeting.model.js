@@ -81,9 +81,11 @@ const meetingSchema = new mongoose.Schema(
 
     // Repeat. Each occurrence is its own Meeting document (series = same seriesId).
     recurrence: {
-      freq: { type: String, enum: ["none", "daily", "weekly", "monthly"], default: "none" },
+      freq: { type: String, enum: ["none", "daily", "weekdays", "weekly", "monthly"], default: "none" }, // weekdays = Mon-Fri
       interval: { type: Number, default: 1, min: 1, max: 12 },
       until: { type: Date, default: null },
+      // true = a session that lands on the host's week-off (HolidayPolicy / override / rotational schedule) is skipped
+      skipWeekOffs: { type: Boolean, default: false },
     },
     seriesId: { type: String, default: undefined, index: true },
 
@@ -99,7 +101,15 @@ const meetingSchema = new mongoose.Schema(
       reactionsEnabled: { type: Boolean, default: true },
       handRaiseEnabled: { type: Boolean, default: true },
       screenShare: { type: String, enum: ["everyone", "host"], default: "everyone" },
+      // false = what people say is NOT saved as a transcript (live captions still work). Old meetings keep saving.
+      transcript: { type: Boolean, default: true },
     },
+
+    // Who gets the in-app notification / email about this meeting (invite, reschedule, cancel).
+    //   attendees        -> everyone invited except the host
+    //   attendees_and_me -> invitees + a copy for the host
+    //   none             -> nobody (outside guests still get their join PIN, they cannot enter without it)
+    notifyMode: { type: String, enum: ["attendees", "attendees_and_me", "none"], default: "attendees" },
 
     visibility: { type: String, enum: ["invite_only", "organisation"], default: "invite_only", index: true },
     capacity: { type: Number, default: 0, min: 0, max: 5000 },

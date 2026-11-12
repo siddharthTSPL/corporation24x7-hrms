@@ -889,7 +889,7 @@ const caption = wrap(async (room, socket, actor, p) => {
   const now = Date.now();
   emitRoom(room, "meeting:caption", { key: actor.key, name: peer.name, text, final, lang, at: now });
   rememberName(L, actor.key, peer.name);
-  if (final && room.meetingId) {
+  if (final && room.meetingId && room.settings.transcript !== false) {
     L.transcriptBuf.push({ k: actor.key, n: peer.name, t: text, at: new Date(now), lang });
     if (L.transcriptBuf.length > MAX_TRANSCRIPT) L.transcriptBuf.shift();
   }

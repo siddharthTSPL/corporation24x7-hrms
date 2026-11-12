@@ -271,6 +271,7 @@ const hydrateMessages = async (organisation_id, messages, viewerKey = null) => {
       reactions: m.deletedAt ? [] : (m.reactions || []).map((r) => ({ key: r.key, emoji: r.emoji })),
       deliveredTo: m.deliveredTo || [],
       forwarded: !!m.forwarded,
+      autoReply: !!m.autoReply,
       createdAt: m.createdAt,
     };
   });
@@ -403,7 +404,7 @@ const normalizePoll = (poll) => {
   return { question, multiple: !!poll.multiple, anonymous: !!poll.anonymous, options };
 };
 
-const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false, mentions: mentionInput = null, poll = null } = {}) => {
+const sendMessage = async (actor, conversationId, { text, attachments = [], replyTo = null, clientId = null, sticker = null, forwarded = false, mentions: mentionInput = null, poll = null, autoReply = false } = {}) => {
   const conv = await loadConversation(actor, conversationId);
 
   const liveRoom = callRooms.byConversation(conv._id);
@@ -451,6 +452,7 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
       attachments: stickerId ? [] : attachments,
       replyTo: replyTo || undefined,
       forwarded: !!forwarded,
+      autoReply: !!autoReply,
       poll: pollDoc || undefined,
       entities: plainText ? parseFormatting(body) : [],
       mentions,
@@ -492,7 +494,35 @@ const sendMessage = async (actor, conversationId, { text, attachments = [], repl
 
   // link cards are fetched in the background so sending is never slowed down
   if (links.length) attachLinkPreviews(conv, msg).catch(() => {});
+
+  // the person I wrote to may have an auto-reply on (never answer an auto-reply with another one)
+  if (!autoReply) maybeAutoReply(conv, actor).catch((err) => console.error("[chat] auto-reply failed:", err.message));
   return { message: hydrated, conversation: conv, duplicate: false };
+};
+
+// ---------- auto-reply ----------
+const AUTO_REPLY_COOLDOWN_MS = 60 * 60 * 1000; // one auto-reply per chat per hour, so a chatty sender is not answered every time
+const autoReplying = new Set();
+
+// Direct chats only. Sends the other person's saved auto-reply message, as them, a moment after the message arrived.
+const maybeAutoReply = async (conv, sender) => {
+  if (conv.type !== "direct") return;
+  const toKey = conv.participantKeys.find((k) => k !== sender.key);
+  if (!toKey) return;
+  const id = String(conv._id);
+  if (autoReplying.has(id)) return;
+  autoReplying.add(id);
+  try {
+    const text = await settingsService.getAutoReply(toKey);
+    if (!text) return;
+    const recent = await ChatMessage.exists({ conversation: conv._id, senderKey: toKey, autoReply: true, createdAt: { $gt: new Date(Date.now() - AUTO_REPLY_COOLDOWN_MS) } });
+    if (recent) return;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const p = parseKey(toKey);
+    await sendMessage(toActor({ id: p.id, recipientModel: p.model, organisation_id: sender.organisation_id }), conv._id, { text, autoReply: true });
+  } finally {
+    autoReplying.delete(id);
+  }
 };
 
 // Fetches cards for the first few links, stores them on the message and tells everyone.

@@ -99,6 +99,7 @@ const chatMessageSchema = new mongoose.Schema(
     // "delete for me": the message disappears only for these people
     deletedFor: { type: [String], default: [] },
     forwarded: { type: Boolean, default: false },
+    autoReply: { type: Boolean, default: false }, // sent automatically by the receiver's auto-reply
 
     clientId: { type: String, default: undefined }, // lets the sender de-dupe its optimistic message
     editedAt: { type: Date, default: null },

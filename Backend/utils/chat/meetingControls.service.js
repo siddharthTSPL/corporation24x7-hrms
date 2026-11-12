@@ -5,7 +5,7 @@ const { httpError } = require("./people.utils");
 
 const REACTIONS = ["👍", "👏", "❤️", "😂", "😮", "🎉", "🙏", "👎", "🔥", "💯", "🚀", "💡", "🤔", "😢"];
 const SCREEN_SHARE_MODES = ["everyone", "host"];
-const BOOLEAN_SETTINGS = ["lobby", "muteOnEntry", "allowUnmute", "chatEnabled", "reactionsEnabled", "handRaiseEnabled"];
+const BOOLEAN_SETTINGS = ["lobby", "muteOnEntry", "allowUnmute", "chatEnabled", "reactionsEnabled", "handRaiseEnabled", "transcript"];
 
 const withCode = (message, code, statusCode = 409) => Object.assign(httpError(message, statusCode), { code });
 const roomOf = (roomKey) => `call:${roomKey}`;
@@ -20,6 +20,7 @@ const normalizeSettings = (input, base = {}) => {
     reactionsEnabled: true,
     handRaiseEnabled: true,
     screenShare: "everyone",
+    transcript: true,
     ...base,
   };
   for (const k of BOOLEAN_SETTINGS) {

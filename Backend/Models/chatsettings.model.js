@@ -44,6 +44,14 @@ const chatSettingsSchema = new mongoose.Schema(
       preview: { type: Boolean, default: true }, // show message text in notifications
     },
 
+    // Auto-reply: when someone starts / continues a direct chat with me, this message is sent to them
+    // automatically (at most once an hour per chat). `until` (optional) switches it off by itself.
+    autoReply: {
+      enabled: { type: Boolean, default: false },
+      message: { type: String, default: "", maxlength: 500 },
+      until: { type: Date, default: null },
+    },
+
     storage: {
       autoDownload: {
         photos: { ...AUTO, default: "wifi" },

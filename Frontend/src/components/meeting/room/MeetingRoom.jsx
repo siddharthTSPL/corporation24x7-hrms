@@ -39,7 +39,7 @@ import ChatPanel from "./ChatPanel";
 import PeoplePanel from "./PeoplePanel";
 import EffectsPanel, { useRestoreEffect } from "./EffectsPanel";
 import HostPanel from "./HostPanel";
-import { MediaView, RoomButton } from "./RoomMedia";
+import { MediaView, PeerAudio, RoomButton } from "./RoomMedia";
 import { emitAck } from "../../../realtime/chatSocket";
 import useLiveBridge from "./live/useLiveBridge";
 import useCaptions from "./live/useCaptions";
@@ -255,6 +255,8 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   if (!active) return null;
 
   const presenter = peers.find((p) => p.screenStream);
+  const stageScreen = isPresenting ? active.screenStream || null : presenter?.screenStream || null;
+  const stageScreenLabel = isPresenting ? "You are presenting" : `${presenter?.name || "Someone"} is presenting`;
   const hasCameraTrack = !!active.localStream?.getVideoTracks().length;
   const orderOf = (key) => {
     const idx = handKeys.indexOf(key);
@@ -286,7 +288,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     photo: p.photo || "",
     seed: p.key || p.socketId,
     stream: p.stream,
-    muted: false,
+    muted: true,
     audioOn: p.audio !== false,
     videoOn: !!p.video && !!p.stream,
     mirror: false,
@@ -301,7 +303,6 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
 
   // "Change view" filters. People hidden from the screen are still heard (their audio keeps playing).
   const shownPeerTiles = hideNoVideo ? peerTiles.filter((t) => t.videoOn || t.spotlighted || t.id === pinnedId) : peerTiles;
-  const hiddenPeerTiles = peerTiles.filter((t) => !shownPeerTiles.includes(t));
   const showSelf = !hideSelf || shownPeerTiles.length === 0;
   const allTiles = [...(showSelf ? [selfTile] : []), ...shownPeerTiles];
   const pinned = pinnedId ? allTiles.find((t) => t.id === pinnedId) : null;
@@ -338,15 +339,15 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   };
 
   const renderStage = () => {
-    if (presenter || focus) {
-      const rest = focus ? allTiles.filter((t) => t.id !== focus.id) : allTiles;
+    if (stageScreen || focus) {
+      const rest = focus && !stageScreen ? allTiles.filter((t) => t.id !== focus.id) : allTiles;
       return (
         <div className="flex h-full min-h-0 flex-col gap-2 lg:flex-row">
           <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl bg-black ring-1 ring-white/5">
-            {presenter ? (
+            {stageScreen ? (
               <>
-                <MediaView stream={presenter.screenStream} contain />
-                <div className="absolute left-3 top-3 rounded-full bg-black/65 px-3 py-1.5 text-xs backdrop-blur-sm">{presenter.name || "Someone"} is presenting</div>
+                <MediaView stream={stageScreen} muted={isPresenting} contain />
+                <div className="absolute left-3 top-3 rounded-full bg-black/65 px-3 py-1.5 text-xs backdrop-blur-sm">{stageScreenLabel}</div>
               </>
             ) : (
               <RoomTile tile={focus} large pinned={focus === pinned} onPin={focus.spotlighted ? undefined : () => togglePin(focus.id)} onSpotlight={isHost ? () => toggleSpotlight(focus) : undefined} />
@@ -468,11 +469,9 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       <main className="mtg-safe-x relative flex min-h-0 flex-1 gap-3 pb-2">
         <div className="relative min-h-0 min-w-0 flex-1">
           {renderStage()}
-          {hiddenPeerTiles.length > 0 && (
-            <div aria-hidden="true" className="absolute h-0 w-0 overflow-hidden">
-              {hiddenPeerTiles.map((t) => <MediaView key={t.id} stream={t.stream} hidden />)}
-            </div>
-          )}
+          <div aria-hidden="true" className="absolute h-0 w-0 overflow-hidden">
+            {peers.map((p) => <PeerAudio key={p.socketId} stream={p.stream} />)}
+          </div>
           <ReactionLayer />
           {boardOpen && <WhiteboardOverlay guest={guest} onClose={() => setBoardOpen(false)} />}
           <BoardNudge open={boardOpen} onOpen={() => setBoardOpen(true)} />
