@@ -53,7 +53,7 @@ import {
 
 const superAdminMenu = [
   { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
-  { name: "Rewards Admin", path: "/gamification-admin", icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
+  { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
 
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
@@ -80,8 +80,8 @@ const superAdminMenu = [
 
 const adminMenu = [
   { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
-  { name: "Rewards", path: "/gamification", icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
-  { name: "Rewards Admin", path: "/gamification-admin", icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
+  { name: "Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
+  { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
   
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
   
@@ -116,7 +116,7 @@ const adminMenu = [
 
 const managerMenu = [
   { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
-  { name: "Rewards", path: "/gamification", icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
+  { name: "Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
  
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
   
@@ -143,7 +143,7 @@ const managerMenu = [
 
 const employeeMenu = [
   { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
-  { name: "Rewards", path: "/gamification", icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
+  { name: "Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Earn XP, level up, collect badges, complete quests and redeem rewards." },
   { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates.", permissionGroup: ["navigation.can_view_dashboard"] },
  
@@ -287,7 +287,11 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // no fieldGate, so it stays visible even when Field Operations is off),
   // so hiding this menu item when disabled does not cause a lockout.
 
+  // Rewards & Gamification is an org-level opt-in switched on by the SuperAdmin
+  // (Settings → Rewards). Until then the Rewards menu items are hidden for every role.
+  // Fail closed: hidden until plan-features has loaded.
   const passesFieldGate = (item) => {
+    if (item.gamificationGate && planFeatures?.features?.gamification !== true) return false;
     if (!item.fieldGate) return true;
     if (!planFeatures?.features?.fieldOperations) return false;
     if (item.fieldGate === "admin") return true;

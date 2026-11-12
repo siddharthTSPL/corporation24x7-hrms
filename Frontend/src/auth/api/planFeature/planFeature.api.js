@@ -29,6 +29,7 @@ const LOCKED_FALLBACK = {
     asset: false,
     tickets: false,
     fieldOperations: false,
+    gamification: false,
     single_sign_in: false,
   },
   fieldAssignment: { isMember: false, isManager: false },

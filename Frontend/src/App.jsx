@@ -520,8 +520,8 @@ function App() {
             <Route path="/meetings"       element={<MeetingsPage />} />
             <Route path="/meetings/:id"   element={<MeetingsPage />} />
             {/* Rewards & Gamification (all roles; SuperAdmin only sees the admin console) */}
-            <Route path="/gamification"       element={<GamificationHub />} />
-            <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]}><GamificationAdmin /></ProtectedRoute>} />
+            <Route path="/gamification"       element={<ProtectedRoute planFeature="gamification"><GamificationHub /></ProtectedRoute>} />
+            <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]} planFeature="gamification"><GamificationAdmin /></ProtectedRoute>} />
           </Route>
 
           <Route path="*" element={<Pagenotfound />} />

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 import ExternalSsoSettingsCard from "./ExternalSsoSettingsCard";
+import GamificationToggleCard from "./GamificationToggleCard";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -562,6 +563,17 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             strokeWidth="1.4"
             strokeLinecap="round"
           />
+        </svg>
+      ),
+    },
+    {
+      key: "rewards",
+      label: "Rewards",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path d="M5 2h6v4a3 3 0 01-6 0V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M5 3.5H2.5V5a2 2 0 002 2M11 3.5h2.5V5a2 2 0 01-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M8 9v3M5.5 14h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       ),
     },
@@ -2153,6 +2165,9 @@ export default function SuperAdminSettingsPage() {
             />
           )}
           {tab === "storage" && <StorageTab />}
+          {tab === "rewards" && (
+            <GamificationToggleCard onSuccess={showSuccess} onError={showError} />
+          )}
           {tab === "banking" && (
             <BankingTab
               superAdmin={superAdmin}
