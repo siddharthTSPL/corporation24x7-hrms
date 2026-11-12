@@ -2095,8 +2095,35 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
   const orgPhone = payroll.organisationSnapshot?.phone || "";
   const statusText = payroll.status ? payroll.status.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") : "";
 
-  const statusClass = ({ paid: "paid", approved: "approved", generated: "generated", on_hold: "on-hold" })[payroll.status] || "generated";
-  const statusPill = statusText ? `<span class="status-pill ${statusClass}">${escapeHtml(statusText)}</span>` : "";
+  // html2canvas small pills/chips ke andar text neeche shift kar deta hai (line-height/vertical-align
+  // se fix nahi hota). Isliye status badge aur contact chips inline SVG hain: text ki position
+  // coordinates se fixed hoti hai, aur browser SVG ko khud rasterise karta hai.
+  const measureCtx = document.createElement("canvas").getContext("2d");
+  const textWidth = (text, weight) => {
+    const value = String(text ?? "");
+    if (!measureCtx) return value.length * 5.6;
+    measureCtx.font = `${weight} 9.5px Arial, Helvetica, sans-serif`;
+    return measureCtx.measureText(value).width;
+  };
+  const SVG_FONT = 'font-family="Arial, Helvetica, sans-serif" font-size="9.5"';
+  const statusColors = ({
+    paid: ["#e8f5e9", "#16764b"],
+    approved: ["#faeeda", "#8a5a00"],
+    generated: ["#e6f1fb", "#27689d"],
+    on_hold: ["#fcebeb", "#a42d2d"],
+  })[payroll.status] || ["#e6f1fb", "#27689d"];
+  const statusPill = statusText
+    ? (() => {
+        const width = Math.ceil(textWidth(statusText, 700)) + 22;
+        return `<svg class="slip-pill" width="${width}" height="22" viewBox="0 0 ${width} 22" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${width}" height="22" rx="11" fill="${statusColors[0]}"/><text x="${width / 2}" y="14.4" text-anchor="middle" ${SVG_FONT} font-weight="700" fill="${statusColors[1]}">${escapeHtml(statusText)}</text></svg>`;
+      })()
+    : "";
+  const contactChip = (label, value) => {
+    const labelWidth = Math.ceil(textWidth(label, 700));
+    const valueWidth = Math.ceil(textWidth(value, 400));
+    const width = 12 + labelWidth + 8 + valueWidth + 12;
+    return `<svg class="org-chip" width="${width}" height="26" viewBox="0 0 ${width} 26" xmlns="http://www.w3.org/2000/svg"><rect x="0.5" y="0.5" width="${width - 1}" height="25" rx="12.5" fill="#ffffff" fill-opacity="0.15" stroke="#ffffff" stroke-opacity="0.6"/><text x="12" y="16.4" ${SVG_FONT} font-weight="700" fill="#ffd9ec">${escapeHtml(label)}</text><text x="${12 + labelWidth + 8}" y="16.4" ${SVG_FONT} fill="#ffffff">${escapeHtml(value)}</text></svg>`;
+  };
 
   const rowsHtml = (items) =>
     items.length
@@ -2124,21 +2151,18 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
   .org-copy.no-logo { padding-left: 0; border-left: 0; }
   .org { font-size: 21px; font-weight: 800; color: #fff; margin: 0; line-height: 1.2; }
   .org-line { font-size: 11.5px; color: #f6dcea; margin: 5px 0 0; line-height: 1.5; }
-  .org-contact { display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 7px; margin-top: 9px; }
-  .org-contact > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; white-space: nowrap; border: 1px solid #ffffff99; background: #ffffff26; border-radius: 999px; padding: 5px 8px; font-size: 9.5px; line-height: 1.3; }
-  .org-contact .contact-label { color: #ffd9ec; font-weight: 800; letter-spacing: 0.25px; white-space: nowrap; }
+  .org-contact { display: block; margin-top: 9px; font-size: 0; line-height: 0; }
+  .org-chip { display: inline-block; vertical-align: top; max-width: 100%; height: auto; margin: 0 8px 6px 0; }
   .payslip-meta { flex: 0 0 190px; width: 190px; text-align: right; }
-  .slip-title-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-  .slip-title { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: 1.7px; line-height: 1.1; }
+  .slip-title-row { width: auto; margin-left: auto; border-collapse: collapse; }
+  .slip-title-row td { padding: 0; border: 0; height: 26px; vertical-align: middle; white-space: nowrap; }
+  .slip-title-row .slip-title { padding-right: 10px; text-align: right; color: #fff; font-size: 20px; font-weight: 800; letter-spacing: 1.7px; line-height: 26px; }
+  .slip-title-row .slip-status { text-align: right; }
+  .slip-pill { display: block; margin-left: auto; }
   .period-card { display: flex; align-items: center; justify-content: center; gap: 9px; margin-top: 9px; padding: 8px 9px; border: 1px solid #ffffff66; border-radius: 10px; background: #ffffff1c; text-align: left; }
   .period-icon { width: 22px; height: 22px; flex: 0 0 22px; }
   .period-copy { color: #f6dcea; font-size: 10.5px; line-height: 1.25; }
   .period-copy strong { display: block; color: #fff; font-size: 12.5px; margin-top: 2px; }
-  .status-pill { display: inline-flex; align-items: center; justify-content: center; min-height: 22px; border-radius: 999px; padding: 3px 8px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.2px; white-space: nowrap; }
-  .status-pill.paid { color: #16764b; background: #e8f5e9; }
-  .status-pill.approved { color: #8a5a00; background: #faeeda; }
-  .status-pill.generated { color: #27689d; background: #e6f1fb; }
-  .status-pill.on-hold { color: #a42d2d; background: #fcebeb; }
 
   .box { border: 1px solid #e3d6dd; border-radius: 10px; margin-top: 16px; overflow: hidden; }
   .box.attendance-box, .box.contribution-box { margin-top: 14px; }
@@ -2180,12 +2204,12 @@ async function downloadPayslip({ payroll, name, employeeId, department, designat
           ${orgLogoUrl ? `<div class="org-logo-frame"><img class="org-logo" src="${escapeHtml(orgLogoUrl)}" alt="Company logo"/></div>` : ""}
           <div class="org-copy ${orgLogoUrl ? "" : "no-logo"}"><p class="org">${escapeHtml(orgName || "Company")}</p>
             ${orgDetails.map((l) => `<p class="org-line">${escapeHtml(l)}</p>`).join("")}
-            ${(orgEmail || orgPhone) ? `<div class="org-contact">${orgEmail ? `<span><b class="contact-label">Email</b>${escapeHtml(orgEmail)}</span>` : ""}${orgPhone ? `<span><b class="contact-label">Phone</b>${escapeHtml(orgPhone)}</span>` : ""}</div>` : ""}
+            ${(orgEmail || orgPhone) ? `<div class="org-contact">${orgEmail ? contactChip("Email", orgEmail) : ""}${orgPhone ? contactChip("Phone", orgPhone) : ""}</div>` : ""}
           </div>
         </div>
       </div>
       <div class="payslip-meta">
-        <div class="slip-title-row"><div class="slip-title">PAYSLIP</div>${statusPill}</div>
+        <table class="slip-title-row"><tbody><tr><td class="slip-title">PAYSLIP</td><td class="slip-status">${statusPill}</td></tr></tbody></table>
         <div class="period-card">
           <svg class="period-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
           <div class="period-copy">For the month of<strong>${escapeHtml(period)}</strong></div>
