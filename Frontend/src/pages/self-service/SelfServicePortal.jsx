@@ -14,7 +14,7 @@ import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { useSelfServiceSummary } from "../../auth/server-state/selfService/selfService.hook";
 import { useMyPayslips } from "../../auth/server-state/payroll/payroll.hook";
-import { downloadPayslip, getPayslipLineItems, MONTH_NAMES } from "../utils/Payslip";
+import { departmentLabel, downloadPayslip, fmtINR, getPayslipLineItems, MONTH_NAMES } from "../utils/Payslip";
 
 const BRAND = "#730042";
 const PALETTE = ["#730042", "#CD166E", "#F5A623", "#2FB4A0", "#4A6FDC", "#9B59B6", "#EB5757", "#27AE60"];
@@ -189,6 +189,53 @@ function AssetDetailModal({ asset, isOrgScope, onClose }) {
 
 // "My Payslip" — available on every plan, including Basic. Shows once
 // payroll has been marked "paid"; nothing to show before that.
+function SelfServicePayslipModal({ payroll, onClose, onDownload }) {
+  const snapshot = payroll.employeeSnapshot || {};
+  const org = payroll.organisationSnapshot || {};
+  const att = payroll.attendance || {};
+  const { earnings, deductions, employerContribution } = getPayslipLineItems(payroll);
+  const period = `${MONTH_NAMES[payroll.month - 1]} ${payroll.year}`;
+  const orgDetails = [org.address, [org.cin && `CIN: ${org.cin}`, org.gstin && `GSTIN: ${org.gstin}`, org.pan && `PAN: ${org.pan}`].filter(Boolean).join("  |  ")].filter(Boolean);
+  const orgInitials = (org.name || "Company").split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "C";
+  const details = [["Employee Name", snapshot.name], ["Employee ID", snapshot.employeeId], ["Department", departmentLabel(snapshot.department)], ["Designation", snapshot.designation], ["Bank Name", snapshot.bankName], ["Account Number", snapshot.accountNumber]];
+  const attendance = [["Calendar Days", att.calendarDays ?? att.daysInMonth], ["Working Days", att.workingDays], ["Paid Days", att.paidDays], ["LOP Days", att.lopDays]];
+  const sectionTitle = (title) => <div className="border-b border-[#e3d6dd] bg-[#f7eef2] px-3.5 py-2 text-[11px] font-extrabold uppercase tracking-[.08em] text-[#730042]">{title}</div>;
+  const renderTable = (title, items, totalLabel, total) => <div className="overflow-hidden rounded-[10px] border border-[#e3d6dd]"><div className="flex justify-between bg-[#730042] px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white"><span>{title}</span><span>Amount</span></div><div>{items.length === 0 ? <div className="px-3 py-2 text-center text-xs text-gray-400">—</div> : items.map((item, index) => <div key={`${item.label}-${index}`} className="flex justify-between gap-3 border-b border-[#f3eaee] px-3 py-2 text-xs last:border-0"><span className="break-words">{item.label}</span><span className="whitespace-nowrap font-semibold">{fmtINR(item.amount)}</span></div>)}</div><div className="flex justify-between gap-3 border-t-2 border-[#730042] bg-[#f7eef2] px-3 py-2 text-xs font-extrabold text-[#730042]"><span>{totalLabel}</span><span>{fmtINR(total)}</span></div></div>;
+
+  return (
+    <div className="fixed inset-0 z-[998] flex items-center justify-center overscroll-contain bg-black/45 p-3 sm:p-4" onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Payslip details" className="max-h-[92vh] w-full max-w-[780px] overflow-y-auto rounded-[14px] border-t-[6px] border-[#730042] bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="p-4 sm:p-6">
+          <div className="rounded-xl p-4 text-white shadow-[0_8px_22px_rgba(115,0,66,.14)] sm:p-[18px]" style={{ background: "linear-gradient(125deg, #CD166E 0%, #730042 100%)" }}>
+            <div className="grid grid-cols-1 items-center gap-x-4 gap-y-3 sm:grid-cols-[minmax(0,1fr)_190px]">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-[72px] w-[76px] shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-sm">{org.logoUrl ? <img src={org.logoUrl} alt="Company logo" className="h-full w-full object-contain" /> : <span className="text-2xl font-extrabold text-[#730042]">{orgInitials}</span>}</div>
+                <div className="min-w-0 border-l-2 border-white/50 pl-3">
+                  <h2 className="break-words text-lg font-extrabold leading-tight text-white">{org.name || "Company"}</h2>
+                  {orgDetails.map((line, index) => <p key={index} className="mt-1 break-words text-[11px] leading-snug text-pink-100">{line}</p>)}
+                  {(org.email || org.phone) && <div className="mt-2 flex flex-wrap gap-1.5">{org.email && <span className="rounded-full border border-white/50 bg-white/15 px-2 py-1 text-[10px]"><b className="mr-1 text-pink-100">Email</b>{org.email}</span>}{org.phone && <span className="rounded-full border border-white/50 bg-white/15 px-2 py-1 text-[10px]"><b className="mr-1 text-pink-100">Phone</b>{org.phone}</span>}</div>}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center justify-end gap-2"><button type="button" onClick={onDownload} className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-pink-50"><FaDownload className="mr-1 inline" size={11} /> Download</button><button type="button" onClick={onClose} aria-label="Close payslip" className="rounded-lg border border-white/40 bg-white/10 px-2.5 py-1.5 text-xl leading-none text-white hover:bg-white/20"><FaTimes size={15} /></button></div>
+                <div className="mt-3 flex items-center justify-end gap-2"><span className="text-xl font-extrabold tracking-[.1em]">PAYSLIP</span><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800">{(payroll.status || "paid").replace(/_/g, " ").toUpperCase()}</span></div>
+                <div className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-white/40 bg-white/10 px-2.5 py-2"><FaCalendarAlt size={17} /><span className="text-[10px] leading-tight text-pink-100">For the month of<strong className="mt-0.5 block text-xs text-white">{period}</strong></span></div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-[10px] border border-[#e3d6dd]">{sectionTitle("Employee Details")}<div className="grid grid-cols-1 sm:grid-cols-2">{details.map(([label, value]) => <div key={label} className="flex gap-2 border-b border-[#f3eaee] px-3.5 py-2 text-xs"><span className="min-w-[108px] shrink-0 text-[#8a7a74]">{label}</span><span className="break-words font-bold text-[#2a1a16]">{value || "—"}</span></div>)}</div></div>
+          <div className="mt-3.5 overflow-hidden rounded-[10px] border border-[#e3d6dd]">{sectionTitle("Attendance Summary")}<div className="grid grid-cols-2 sm:grid-cols-4">{attendance.map(([label, value]) => <div key={label} className="border-r border-[#f3eaee] px-3.5 py-2.5 last:border-r-0"><div className="text-[10px] uppercase tracking-wide text-[#8a7a74]">{label}</div><div className="mt-0.5 text-[15px] font-extrabold text-[#2a1a16]">{value ?? "—"}</div></div>)}</div></div>
+          <div className={`mt-3.5 grid grid-cols-1 gap-4 ${deductions.length ? "sm:grid-cols-2" : ""}`}>{renderTable("Earnings", earnings, "Gross earnings", payroll.earnings?.totalEarnings)}{deductions.length > 0 && renderTable("Deductions", deductions, "Total deductions", payroll.deductions?.totalDeductions)}</div>
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-[#730042] bg-[#f7eef2] px-4 py-3.5"><span className="text-xs font-extrabold tracking-wider text-[#730042]">NET PAY</span><span className="whitespace-nowrap text-2xl font-extrabold text-[#730042]">{fmtINR(payroll.netSalary)}</span></div>
+          {employerContribution.length > 0 && <div className="mt-3.5 overflow-hidden rounded-[10px] border border-[#e3d6dd]">{sectionTitle("Employer Contributions (not deducted from salary)")}{employerContribution.map((item, index) => <div key={`${item.label}-${index}`} className="flex justify-between gap-3 border-b border-[#f3eaee] px-3.5 py-2 text-xs"><span>{item.label}</span><span className="font-semibold">{fmtINR(item.amount)}</span></div>)}</div>}
+          {att.manualEntry && <p className="mt-3 text-xs text-gray-500">Paid Days entered manually for this pay run.</p>}{payroll.remarks && <p className="mt-2 break-words text-xs text-gray-500"><strong>Remarks:</strong> {payroll.remarks}</p>}
+          <p className="mt-4 border-t border-dashed border-[#d9c9d1] pt-3 text-center text-[10px] text-[#8a7a74]">This is a system-generated payslip and does not require a signature.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MyPayslipsCard({ enabled, role }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
@@ -212,23 +259,6 @@ function MyPayslipsCard({ enabled, role }) {
       orgName: payroll.organisationSnapshot?.name || "",
     });
   };
-
-  const renderLineItems = (title, items, totalLabel, total) => (
-    <div className="mb-4">
-      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">{title}</h3>
-      <div className="overflow-hidden rounded-lg border border-gray-100">
-        {items.map((item, index) => (
-          <div key={`${item.label}-${index}`} className="flex justify-between gap-3 border-b border-gray-100 px-3 py-2 text-sm last:border-0">
-            <span className="text-gray-600">{item.label}</span>
-            <span className="font-medium text-gray-700">{fmtCurrency(item.amount)}</span>
-          </div>
-        ))}
-        <div className="flex justify-between gap-3 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">
-          <span>{totalLabel}</span><span>{fmtCurrency(total)}</span>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <SectionCard title="My Payslip">
@@ -290,41 +320,7 @@ function MyPayslipsCard({ enabled, role }) {
         </div>
         </>
       )}
-      {selectedPayslip && (() => {
-        const snapshot = selectedPayslip.employeeSnapshot || {};
-        const { earnings, deductions } = getPayslipLineItems(selectedPayslip);
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSelectedPayslip(null)}>
-            <div role="dialog" aria-modal="true" aria-label="Payslip details" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
-                <div>
-                  <p className="text-base font-bold text-gray-800">Payslip</p>
-                  <p className="text-xs text-gray-500">{MONTH_NAMES[selectedPayslip.month - 1]} {selectedPayslip.year}</p>
-                </div>
-                <button type="button" onClick={() => setSelectedPayslip(null)} aria-label="Close payslip" className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><FaTimes /></button>
-              </div>
-              <div className="p-5">
-                <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl bg-[#730042]/[0.04] p-4 text-sm sm:grid-cols-2">
-                  <p><span className="text-gray-500">Employee:</span> <span className="font-medium text-gray-800">{snapshot.name || "—"}</span></p>
-                  <p><span className="text-gray-500">Employee ID:</span> <span className="font-medium text-gray-800">{snapshot.employeeId || "—"}</span></p>
-                  <p><span className="text-gray-500">Department:</span> <span className="font-medium text-gray-800">{snapshot.department || "—"}</span></p>
-                  <p><span className="text-gray-500">Designation:</span> <span className="font-medium text-gray-800">{snapshot.designation || "—"}</span></p>
-                  <p><span className="text-gray-500">Paid days:</span> <span className="font-medium text-gray-800">{selectedPayslip.attendance?.paidDays ?? "—"} / {selectedPayslip.attendance?.workingDays ?? "—"}</span></p>
-                  <p><span className="text-gray-500">LOP days:</span> <span className="font-medium text-gray-800">{selectedPayslip.attendance?.lopDays ?? "—"}</span></p>
-                </div>
-                {renderLineItems("Earnings", earnings, "Gross earnings", selectedPayslip.earnings?.totalEarnings)}
-                {renderLineItems("Deductions", deductions, "Total deductions", selectedPayslip.deductions?.totalDeductions)}
-                <div className="flex items-center justify-between rounded-xl bg-[#730042] px-4 py-3 text-white">
-                  <span className="text-sm font-bold">Net Pay</span><span className="text-lg font-bold">{fmtCurrency(selectedPayslip.netSalary)}</span>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <button type="button" onClick={() => handleDownload(selectedPayslip)} className="flex items-center gap-2 rounded-lg bg-[#730042]/[0.06] px-3 py-2 text-sm font-semibold text-[#730042] hover:bg-[#730042]/10"><FaDownload size={12} /> Download</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {selectedPayslip && <SelfServicePayslipModal payroll={selectedPayslip} onClose={() => setSelectedPayslip(null)} onDownload={() => handleDownload(selectedPayslip)} />}
     </SectionCard>
   );
 }
