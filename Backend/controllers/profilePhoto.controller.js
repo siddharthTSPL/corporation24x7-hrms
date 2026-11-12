@@ -61,6 +61,11 @@ const uploadProfilePhoto = async (req, res, next) => {
     actor.profile_image = uploaded.url;
     await actor.save();
     invalidateUserCache(actor._id);
+    try {
+      const { modelFromRole } = require("../utils/gamification/engine");
+      const gamModel = modelFromRole(actor.role) || (actor.constructor && actor.constructor.modelName);
+      if (["User", "Manager", "Admin"].includes(gamModel)) require("../utils/gamification/hooks").profilePhotoAdded(organisationId, gamModel, actor._id, actor); // gamification
+    } catch (_) { /* never block the upload */ }
 
     return res.status(200).json({
       success: true,

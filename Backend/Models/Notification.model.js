@@ -27,6 +27,7 @@ const NOTIFICATION_TYPES = [
   "general",
   "chat",
   "meeting",
+  "gamification",
 ];
 
 const notificationSchema = new mongoose.Schema(

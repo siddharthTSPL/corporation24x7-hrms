@@ -62,6 +62,8 @@ const {
   getAttendanceOverview,
   getAttendanceHistory,
   getOrgInfo,
+  getGamificationToggle,
+  setGamificationToggle,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
@@ -128,6 +130,9 @@ superAdminRouter.get(
   asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
+// Rewards & Gamification on/off (SuperAdmin only, default OFF)
+superAdminRouter.get("/gamification-toggle", superAdminAuth, asyncHandler(getGamificationToggle));
+superAdminRouter.put("/gamification-toggle", superAdminAuth, asyncHandler(setGamificationToggle));
 superAdminRouter.get("/storage-usage", superAdminAuth, asyncHandler(getStorageUsage));
 superAdminRouter.get("/storage-usage/files", superAdminAuth, asyncHandler(getStorageFiles));
 

@@ -10,6 +10,7 @@ const MAX_ESCALATION_LEVEL = 3;
 const PENDING_STATUSES = [
   "pending_manager",
   "pending_reporting_manager",
+  "pending_coadmin",
   "pending_admin",
   "pending_superadmin",
 ];

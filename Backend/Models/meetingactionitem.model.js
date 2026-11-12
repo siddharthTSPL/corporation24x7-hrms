@@ -20,4 +20,5 @@ const meetingActionItemSchema = new mongoose.Schema(
 
 meetingActionItemSchema.index({ organisation_id: 1, assigneeKey: 1, status: 1, dueDate: 1 });
 
+meetingActionItemSchema.plugin(require("../utils/gamification/hooks").actionItemPlugin); // gamification
 module.exports = mongoose.models.MeetingActionItem || mongoose.model("MeetingActionItem", meetingActionItemSchema);

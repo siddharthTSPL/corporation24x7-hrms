@@ -64,6 +64,41 @@ const getManagerNextHandler = async (managerId, organisation_id) => {
   };
 };
 
+const PENDING_TIMESHEET_STATUSES = [
+  "pending_manager",
+  "pending_reporting_manager",
+  "pending_coadmin",
+  "pending_admin",
+  "pending_superadmin",
+];
+
+// Who may act on a pending timesheet: the current handler, an admin in the
+// custom approver pool, or the SuperAdmin (org owner) as a safety net so a
+// timesheet can never be stranded in a queue nobody can see.
+const canActOnTimesheet = async (timesheet, actor) => {
+  if (
+    timesheet.currentHandler?.toString() === actor.id.toString() &&
+    timesheet.currentHandlerModel === actor.model
+  ) return true;
+  if (actor.model === "Admin" && isInPool(timesheet, actor.id)) return true;
+  if (actor.model === "SuperAdmin" && PENDING_TIMESHEET_STATUSES.includes(timesheet.status)) return true;
+  // The main Admin (e.g. the manager's real reporting manager) can also act on
+  // timesheets that were routed to one of their Co-Admins.
+  if (
+    actor.model === "Admin" &&
+    timesheet.currentHandlerModel === "Admin" &&
+    timesheet.currentHandler &&
+    PENDING_TIMESHEET_STATUSES.includes(timesheet.status)
+  ) {
+    return !!(await Admin.exists({
+      _id: timesheet.currentHandler,
+      reporting_manager: actor.id,
+      reporting_manager_model: "Admin",
+    }));
+  }
+  return false;
+};
+
 const isTimesheetOwner = (timesheet, actor) =>
   timesheet.owner?.toString() === actor.id.toString() &&
   timesheet.owner_model === actor.model;
@@ -176,12 +211,6 @@ const submitTimesheet = async (req, res, next) => {
     return next(httpError("No draft time logs found for this week", 400));
   }
 
-  const totalMinutes = logs.reduce((s, l) => s + l.duration_minutes, 0);
-  const workingMinutes = logs.reduce((s, l) => s + (l.regular_minutes ?? l.duration_minutes), 0);
-  const overtimeMinutes = logs.reduce((s, l) => s + (l.overtime_minutes || 0), 0);
-  const billableMinutes = logs.filter((l) => l.billable).reduce((s, l) => s + l.duration_minutes, 0);
-  const totalBilledAmount = logs.reduce((s, l) => s + (l.billed_amount || 0), 0);
-
   const routing = await resolveFirstHandler({ actor, organisation_id });
 
   let timesheet = await Timesheet.findOne({
@@ -190,12 +219,21 @@ const submitTimesheet = async (req, res, next) => {
     week_start: start,
   });
 
+  // FIX (false LOP): extra entries logged for a week whose timesheet is already
+  // pending/approved used to hit a 409 and stay "draft" forever, so those days
+  // counted as LOP in payroll even though the employee had filled them.
+  // They are now merged into the existing week's timesheet.
+  let mergeIntoExisting = false;
+  let wasApproved = false;
   if (timesheet) {
-    if (!["draft", "rejected"].includes(timesheet.status)) {
+    if (["draft", "rejected"].includes(timesheet.status)) {
+      timesheet.handlerChain = [];
+    } else if (PENDING_TIMESHEET_STATUSES.includes(timesheet.status) || timesheet.status === "approved") {
+      mergeIntoExisting = true;
+      wasApproved = timesheet.status === "approved";
+    } else {
       return next(httpError(`Timesheet is already ${timesheet.status} and cannot be re-submitted`, 409));
     }
-    // Reset routing chain on re-submission
-    timesheet.handlerChain = [];
   } else {
     timesheet = new Timesheet({
       organisation_id,
@@ -206,25 +244,43 @@ const submitTimesheet = async (req, res, next) => {
     });
   }
 
-  timesheet.time_logs = logs.map((l) => l._id);
+  const existingLogs = mergeIntoExisting && timesheet.time_logs?.length
+    ? await TimeLog.find({ _id: { $in: timesheet.time_logs } })
+    : [];
+  const allLogs = [...existingLogs, ...logs];
+
+  const totalMinutes = allLogs.reduce((s, l) => s + l.duration_minutes, 0);
+  const workingMinutes = allLogs.reduce((s, l) => s + (l.regular_minutes ?? l.duration_minutes), 0);
+  const overtimeMinutes = allLogs.reduce((s, l) => s + (l.overtime_minutes || 0), 0);
+  const billableMinutes = allLogs.filter((l) => l.billable).reduce((s, l) => s + l.duration_minutes, 0);
+  const totalBilledAmount = allLogs.reduce((s, l) => s + (l.billed_amount || 0), 0);
+
+  timesheet.time_logs = allLogs.map((l) => l._id);
   timesheet.total_minutes = totalMinutes;
   timesheet.working_minutes = workingMinutes;
   timesheet.overtime_minutes = overtimeMinutes;
   timesheet.billable_minutes = billableMinutes;
   timesheet.total_billed_amount = Math.round(totalBilledAmount * 100) / 100;
-  timesheet.currentHandler = routing?.handler || null;
-  timesheet.currentHandlerModel = routing?.handlerModel || null;
-  timesheet.approverPool = routing?.pool || [];
-  timesheet.status = routing ? routing.status : "approved";
+
+  // Still pending: keep it in the same approver's queue, only totals change.
+  // Fresh / rejected / previously-approved: route again for approval.
+  if (!(mergeIntoExisting && !wasApproved)) {
+    timesheet.currentHandler = routing?.handler || null;
+    timesheet.currentHandlerModel = routing?.handlerModel || null;
+    timesheet.approverPool = routing?.pool || [];
+    timesheet.status = routing ? routing.status : "approved";
+    if (routing) timesheet.approved_by = null;
+    timesheet.escalation_level = 0;
+    timesheet.last_escalated_at = null;
+    if (wasApproved) timesheet.handlerChain = [];
+  }
   timesheet.submitted_at = new Date();
-  timesheet.escalation_level = 0;
-  timesheet.last_escalated_at = null;
 
   await timesheet.save();
 
   await TimeLog.updateMany(
     { _id: { $in: logs.map((l) => l._id) } },
-    { $set: { status: "submitted", timesheet: timesheet._id } }
+    { $set: { status: timesheet.status === "approved" ? "approved" : "submitted", timesheet: timesheet._id } }
   );
 
   if (timesheet.status === "approved") {
@@ -260,6 +316,16 @@ const getPendingApprovals = async (req, res, next) => {
   const actor = resolveActor(req);
   const organisation_id = resolveOrgId(req);
 
+  let coAdminIds = [];
+  if (actor.model === "Admin") {
+    const coAdmins = await Admin.find({
+      organisation_id,
+      reporting_manager: actor.id,
+      reporting_manager_model: "Admin",
+    }).select("_id").lean();
+    coAdminIds = coAdmins.map((a) => a._id);
+  }
+
   const timesheets = await Timesheet.find({
     organisation_id,
     ...(actor.model === "Admin"
@@ -267,9 +333,12 @@ const getPendingApprovals = async (req, res, next) => {
           $or: [
             { currentHandler: actor.id, currentHandlerModel: "Admin" },
             { approverPool: actor.id },
+            ...(coAdminIds.length ? [{ currentHandler: { $in: coAdminIds }, currentHandlerModel: "Admin" }] : []),
           ],
         }
-      : { currentHandler: actor.id, currentHandlerModel: actor.model }),
+      : actor.model === "SuperAdmin"
+        ? {}
+        : { currentHandler: actor.id, currentHandlerModel: actor.model }),
     $nor: [{ owner: actor.id, owner_model: actor.model }],
     status: {
       $in: ["pending_manager", "pending_reporting_manager", "pending_coadmin", "pending_admin", "pending_superadmin"],
@@ -298,11 +367,7 @@ const approveTimesheet = async (req, res, next) => {
     return next(httpError("You cannot approve your own timesheet", 403));
   }
 
-  const isHandler =
-    (timesheet.currentHandler?.toString() === actor.id.toString() &&
-      timesheet.currentHandlerModel === actor.model) ||
-    (actor.model === "Admin" && isInPool(timesheet, actor.id));
-  if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
+  if (!(await canActOnTimesheet(timesheet, actor))) return next(httpError("This timesheet is not in your queue", 403));
 
   const isCustomAdminApproval = actor.model === "Admin" && timesheet.approverPool?.length > 0;
   let nextHandler = null;
@@ -358,11 +423,7 @@ const rejectTimesheet = async (req, res, next) => {
     return next(httpError("You cannot reject your own timesheet", 403));
   }
 
-  const isHandler =
-    (timesheet.currentHandler?.toString() === actor.id.toString() &&
-      timesheet.currentHandlerModel === actor.model) ||
-    (actor.model === "Admin" && isInPool(timesheet, actor.id));
-  if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
+  if (!(await canActOnTimesheet(timesheet, actor))) return next(httpError("This timesheet is not in your queue", 403));
 
   timesheet.status = "rejected";
   timesheet.rejected_by = actor.id;
@@ -404,11 +465,7 @@ const forwardTimesheet = async (req, res, next) => {
     return next(httpError("You cannot forward your own timesheet", 403));
   }
 
-  const isHandler =
-    (timesheet.currentHandler?.toString() === actor.id.toString() &&
-      timesheet.currentHandlerModel === actor.model) ||
-    (actor.model === "Admin" && isInPool(timesheet, actor.id));
-  if (!isHandler) return next(httpError("This timesheet is not in your queue", 403));
+  if (!(await canActOnTimesheet(timesheet, actor))) return next(httpError("This timesheet is not in your queue", 403));
 
   let nextHandler = null;
   let nextHandlerModel = null;
@@ -793,4 +850,5 @@ module.exports = {
   getAllTimesheets,
   getTimesheetDetailedReport,
   getWeekBounds,
+  resolveFirstHandler,
 };

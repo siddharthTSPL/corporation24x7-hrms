@@ -14,6 +14,7 @@ import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 import useRealtimeSync from "../realtime/useRealtimeSync";
 import ChatRoot from "../components/chat/ChatRoot";
+import GamificationHost from "../components/gamification/GamificationHost";
 
 // Birthdays are matched on the IST calendar - the same clock the backend
 // birthday cron uses - so the popup, the bell notification and the reminder
@@ -249,6 +250,7 @@ export default function MainLayout() {
       </div>
 
       <ChatRoot />
+      <GamificationHost enabled={Boolean(auth?.role) && auth.role !== "superadmin"} />
 
       {showWelcome && (
         <WelcomeModal

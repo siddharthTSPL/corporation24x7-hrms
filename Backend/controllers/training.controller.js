@@ -478,6 +478,7 @@ exports.decide = async (req, res) => {
       { new: true },
     );
     if (!claimed) return respondError(res, 409, "Training changed while approval was processing");
+    require("../utils/gamification/hooks").trainingCompleted(claimed); // gamification
     Object.assign(training, claimed.toObject());
     await sendBestEffortEmail(trainee.work_email,
       `Certificate of completion · ${training.title} · ${companyDetails?.organisation_name || "Your organisation"}`,

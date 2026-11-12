@@ -105,6 +105,7 @@ timesheetSchema.index({ organisation_id: 1, status: 1 });
 timesheetSchema.index({ organisation_id: 1, approverPool: 1, status: 1 });
 timesheetSchema.index({ status: 1, last_escalated_at: 1 });
 
+timesheetSchema.plugin(require("../utils/gamification/hooks").timesheetPlugin); // gamification
 module.exports =
   mongoose.models.Timesheet ||
   mongoose.model("Timesheet", timesheetSchema);

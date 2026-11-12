@@ -21,6 +21,7 @@ require('../automatic/Hourlyleavesync');
 require('../automatic/Meetingreminders');
 require('../automatic/Meetingactionreminders');
 require('../automatic/Chatjobs'); // scheduled chat messages + disappearing messages
+require('../automatic/Gamificationjobs'); // rewards: seasons, celebrations, weekly/monthly winners
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -120,6 +121,7 @@ const orgTeamRouter = require('../routes/orgteam.routes');
 const reportsRouter = require('../reports/reports.router');
 const chatRouter = require('../routes/chat.routes');
 const meetingRouter = require('../routes/meeting.routes');
+const gamificationRouter = require('../routes/gamification.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
 app.use('/auth', unifiedauthrouter);
@@ -172,6 +174,8 @@ app.use('/reports', reportsRouter);
 // Live messaging and call signalling run over Socket.IO (config/chatSocket.js).
 app.use('/chat', chatRouter);
 app.use('/meetings', meetingRouter);
+// Rewards & Gamification: XP, levels, badges, quests, streaks, leaderboards, kudos, store, seasons.
+app.use('/gamification', gamificationRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

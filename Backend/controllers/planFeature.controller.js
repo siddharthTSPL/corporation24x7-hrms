@@ -54,7 +54,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
     const organisation = req.superAdmin
       ? req.superAdmin
       : await SuperAdminModel.findById(organisationId).select(
-          "licenses is_trial_active trial_expires_at field_operations storage_used_bytes storage_checked_at organisation_id organisation_name",
+          "licenses is_trial_active trial_expires_at field_operations gamification storage_used_bytes storage_checked_at organisation_id organisation_name",
         );
 
     if (!organisation)
@@ -81,6 +81,8 @@ const getPlanFeatureAccess = async (req, res, next) => {
       return acc;
     }, {});
     features.fieldOperations = organisation.field_operations?.enabled === true;
+    // Rewards & Gamification: org-level opt-in, switched on by the SuperAdmin only.
+    features.gamification = organisation.gamification?.enabled === true;
 
     // Even when the org has Field Operations on, the "Field Duty" nav item
     // should only appear for the employees an admin actually assigned to a

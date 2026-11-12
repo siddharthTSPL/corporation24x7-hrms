@@ -230,6 +230,16 @@ const superAdminSchema = new mongoose.Schema(
 
     },
 
+    // Rewards & Gamification master switch. OFF by default: only the
+    // SuperAdmin of the organisation can turn it on. While off, nothing
+    // is awarded, no jobs run for the org, and every /gamification route
+    // (except /me, which just reports enabled:false) is blocked.
+    gamification: {
+      enabled: { type: Boolean, default: false },
+      enabled_at: { type: Date, default: null },
+      enabled_by: { type: String, default: "" },
+    },
+
     licenses: [licenseSchema],
 
 

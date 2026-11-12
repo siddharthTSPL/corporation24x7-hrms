@@ -3265,6 +3265,33 @@ const getStorageFiles = async (req, res, next) => {
   }
 };
 
+// ── Rewards & Gamification master switch (SuperAdmin only) ────────────────
+const getGamificationToggle = async (req, res) => {
+  const org = await SuperAdminModel.findById(req.superAdmin._id).select("gamification").lean();
+  return res.json({
+    success: true,
+    enabled: org?.gamification?.enabled === true,
+    enabled_at: org?.gamification?.enabled_at || null,
+  });
+};
+
+const setGamificationToggle = async (req, res) => {
+  if (typeof req.body?.enabled !== "boolean") {
+    return res.status(400).json({ success: false, message: "`enabled` must be true or false." });
+  }
+  const enabled = req.body.enabled;
+  await SuperAdminModel.updateOne(
+    { _id: req.superAdmin._id },
+    { $set: { "gamification.enabled": enabled, "gamification.enabled_at": enabled ? new Date() : null, "gamification.enabled_by": String(req.superAdmin._id) } }
+  );
+  require("../utils/gamification/settings").invalidateSettings(req.superAdmin._id);
+  return res.json({
+    success: true,
+    enabled,
+    message: enabled ? "Rewards & Gamification is now ON for your organisation." : "Rewards & Gamification is now OFF. Existing points and badges are kept.",
+  });
+};
+
 module.exports = {
   registerSuperAdmin,
   verifySuperAdmin,
@@ -3310,6 +3337,8 @@ module.exports = {
   getAttendanceOverview,
   getAttendanceHistory,
   getOrgInfo,
+  getGamificationToggle,
+  setGamificationToggle,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
