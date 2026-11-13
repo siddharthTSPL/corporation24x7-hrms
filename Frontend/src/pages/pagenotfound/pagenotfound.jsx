@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Helmet } from "react-helmet-async";
 
 const styles = {
   wrapper: {
@@ -215,6 +216,10 @@ export default function NotFound404({ onLogin, onContact }) {
 
   return (
     <>
+      <Helmet>
+        <title>Page not found — TorchX Talent</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Righteous&display=swap');
         @keyframes shimmer { from { opacity: 0.1; } to { opacity: 0.8; } }

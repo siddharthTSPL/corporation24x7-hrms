@@ -4,160 +4,80 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Primary SEO -->
-    <title>TorchX Talent – HRMS Software for Modern Teams</title>
+    <!--
+      Per-page tags (title, description, canonical, og:title/description/url/image,
+      twitter:title/description/image, robots) are NOT written here on purpose.
+      - In the browser they come from <RouteSeo /> (src/components/RouteSeo.jsx).
+      - In the built site, scripts/seo-build.mjs writes them into each page's HTML.
+      Putting them here too would create duplicate / conflicting tags.
+    -->
+    <title>TorchX Talent — HRMS Software</title>
 
-    <meta
-      name="description"
-      content="TorchX Talent is a full-featured HRMS platform for employee management, attendance, payroll, and leave tracking for modern teams."
-    />
-
-    <meta
-      name="keywords"
-      content="HRMS software, HR management system, employee management, attendance tracking, payroll software, TorchX Talent, TorchX Suite"
-    />
-
-    <meta
-      name="author"
-      content="TechTorch Solutions Private Limited"
-    />
-
-    <meta name="robots" content="index, follow" />
+    <meta name="author" content="TechTorch Solutions Private Limited" />
     <meta name="theme-color" content="#ffffff" />
 
-    <!-- Canonical -->
-    <link
-      rel="canonical"
-      href="https://torchxsuite.com/talent/"
-    />
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website" />
+    <!-- Site-wide Open Graph / Twitter defaults -->
     <meta property="og:site_name" content="TorchX Suite" />
-
-    <meta
-      property="og:title"
-      content="TorchX Talent – HRMS Software for Modern Teams"
-    />
-
-    <meta
-      property="og:description"
-      content="Manage employees, attendance, payroll, and org structure in one place with TorchX Talent."
-    />
-
-    <meta
-      property="og:url"
-      content="https://torchxsuite.com/talent/"
-    />
-
-    <meta
-      property="og:image"
-      content="https://torchxsuite.com/talent/og-image.png"
-    />
-
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="en_US" />
-
-    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
 
-    <meta
-      name="twitter:title"
-      content="TorchX Talent – HRMS Software for Modern Teams"
-    />
-
-    <meta
-      name="twitter:description"
-      content="Manage employees, attendance, payroll, and org structure in one place with TorchX Talent."
-    />
-
-    <meta
-      name="twitter:image"
-      content="https://torchxsuite.com/talent/og-image.png"
-    />
-
     <!-- Favicons -->
-    <link
-      rel="icon"
-      type="image/png"
-      href="./src/assets/TorchX Favicon.png"
-    />
-
-    <link
-      rel="apple-touch-icon"
-      href="./src/assets/TorchX Favicon.png"
-    />
+    <link rel="icon" href="/talent/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/talent/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/talent/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/talent/apple-touch-icon.png" />
+    
 
     <!-- Performance -->
-    <link
-      rel="preconnect"
-      href="https://fonts.googleapis.com"
-    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://api.torchxsuite.com" />
 
-    <link
-      rel="dns-prefetch"
-      href="https://api.torchxsuite.com"
-    />
-
-    <!-- Structured Data -->
+    <!-- Structured data: Organization + product (site-wide) -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "TorchX Talent",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "description": "TorchX Talent is an HRMS platform for employee management, attendance, payroll, and organizational chart tracking.",
-        "url": "https://torchxsuite.com/talent/",
-        "publisher": {
-          "@type": "Organization",
-          "name": "TechTorch Solutions Private Limited",
-          "url": "https://torchxsuite.com"
-        }
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://torchxsuite.com/#org",
+            "name": "TechTorch Solutions Private Limited",
+            "url": "https://torchxsuite.com",
+            "logo": "https://torchxsuite.com/talent/og-image.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://torchxsuite.com/talent/#app",
+            "name": "TorchX Talent",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://torchxsuite.com/talent/",
+            "description": "TorchX Talent is an HRMS platform for employee management, attendance, leave, timesheets, payroll and recruitment.",
+            "publisher": { "@id": "https://torchxsuite.com/#org" }
+          }
+        ]
       }
     </script>
 
-
     <!-- Global Styles -->
     <style>
-      html {
-        scroll-behavior: smooth;
-      }
-
+      html { scroll-behavior: smooth; }
       body {
         margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          sans-serif;
-
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         text-rendering: optimizeLegibility;
-
         -webkit-font-smoothing: antialiased;
-
         -moz-osx-font-smoothing: grayscale;
-
         background: #ffffff;
-
         color: #111827;
       }
-
-      #root {
-        min-height: 100vh;
-      }
+      #root { min-height: 100vh; }
     </style>
   </head>
 
   <body>
     <div id="root"></div>
-
-    <!-- React Entry Point -->
-    <script
-      type="module"
-      src="/src/main.jsx"
-    ></script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

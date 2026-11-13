@@ -2056,6 +2056,10 @@ const FOOTER_COLS = [
     links: [
       { label: 'Features', href: '#features' },
       { label: 'Pricing', href: '#pricing' },
+      { label: 'All Solutions', to: '/solutions' },
+      { label: 'HRMS Software', to: '/hrms-software' },
+      { label: 'Attendance Software', to: '/attendance-management-software' },
+      { label: 'Payroll Software', to: '/payroll-software' },
     ],
   },
   {
@@ -2063,6 +2067,7 @@ const FOOTER_COLS = [
     links: [
       { label: 'Documentation', to: '/documentation' },
       { label: 'Guide', to: '/guide' },
+      { label: 'HR Guides', to: '/guides' },
       { label: 'Blog', to: '/blog' },
     ],
   },
@@ -2182,65 +2187,6 @@ export function Footer() {
 }
 
 /* ==========================================================================
-   SEO
-========================================================================== */
-
-function useSEO() {
-  useEffect(() => {
-    document.title = 'TorchX Talent — HRMS Software for Attendance, Payroll & Recruitment'
-
-    const setMeta = (attr, key, content) => {
-      let el = document.querySelector(`meta[${attr}="${key}"]`)
-      if (!el) {
-        el = document.createElement('meta')
-        el.setAttribute(attr, key)
-        document.head.appendChild(el)
-      }
-      el.setAttribute('content', content)
-    }
-
-    const description =
-      'TorchX Talent is an all-in-one HRMS for attendance, leave, payroll and recruitment. Free forever plan, GPS and face attendance, and plans that scale with your team.'
-
-    setMeta('name', 'description', description)
-    setMeta('name', 'robots', 'index, follow')
-    setMeta('property', 'og:type', 'website')
-    setMeta('property', 'og:title', 'TorchX Talent — HRMS Software for Modern Teams')
-    setMeta('property', 'og:description', description)
-    setMeta('property', 'og:url', 'https://torchxsuite.com/talent/')
-    setMeta('name', 'twitter:card', 'summary_large_image')
-    setMeta('name', 'twitter:title', 'TorchX Talent — HRMS Software for Modern Teams')
-    setMeta('name', 'twitter:description', description)
-
-    let canonical = document.querySelector('link[rel="canonical"]')
-    if (!canonical) {
-      canonical = document.createElement('link')
-      canonical.setAttribute('rel', 'canonical')
-      document.head.appendChild(canonical)
-    }
-    canonical.setAttribute('href', 'https://torchxsuite.com/talent/')
-
-    let jsonLd = document.getElementById('torchx-talent-jsonld')
-    if (!jsonLd) {
-      jsonLd = document.createElement('script')
-      jsonLd.type = 'application/ld+json'
-      jsonLd.id = 'torchx-talent-jsonld'
-      document.head.appendChild(jsonLd)
-    }
-    jsonLd.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'SoftwareApplication',
-      name: 'TorchX Talent',
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web',
-      description,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
-      aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', reviewCount: '100' },
-    })
-  }, [])
-}
-
-/* ==========================================================================
    PAGE
 ========================================================================== */
 
@@ -2253,7 +2199,6 @@ export default function LandingPage() {
   const isAuthenticated = !!auth
   const scrollContainerRef = useRef(null)
 
-  useSEO()
   useScrollRoot(scrollContainerRef)
 
   // Arriving from another page (or with #hash): scroll to the requested section

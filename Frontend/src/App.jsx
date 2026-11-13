@@ -1,14 +1,22 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
 import Guide from './components/Guide';
+import RouteSeo from "./components/RouteSeo";
+import { landingPages } from "./seo/landingPages";
 
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
+
+// SEO pages (content lives in src/seo/*.js)
+const SEOLandingPage = lazy(() => import("./components/seo/SEOLandingPage"));
+const SolutionsHub = lazy(() => import("./components/seo/SolutionsHub"));
+const GuidesIndex = lazy(() => import("./components/seo/GuidesIndex"));
+const ArticlePage = lazy(() => import("./components/seo/ArticlePage"));
 
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/signup"));
@@ -175,6 +183,12 @@ function PageSkeleton() {
   );
 }
 
+// The 404 page needs working buttons; this wrapper gives it router access.
+function NotFoundRoute() {
+  const navigate = useNavigate();
+  return <Pagenotfound onLogin={() => navigate("/login")} onContact={() => navigate("/about")} />;
+}
+
 function RoleBasedRedirect() {
   const { data: auth, isLoading } = useAuth();
 
@@ -189,6 +203,7 @@ function RoleBasedRedirect() {
 function App() {
   return (
     <BrowserRouter basename="/talent">
+      <RouteSeo />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -204,6 +219,14 @@ function App() {
           <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+
+          {/* SEO pages */}
+          <Route path="/solutions" element={<SolutionsHub />} />
+          <Route path="/guides" element={<GuidesIndex />} />
+          <Route path="/guides/:slug" element={<ArticlePage />} />
+          {landingPages.map((p) => (
+            <Route key={p.slug} path={`/${p.slug}`} element={<SEOLandingPage slug={p.slug} />} />
+          ))}
           <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
           {/* Public: outsiders invited to a meeting by email + PIN (no account) */}
@@ -524,7 +547,7 @@ function App() {
             <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]} planFeature="gamification"><GamificationAdmin /></ProtectedRoute>} />
           </Route>
 
-          <Route path="*" element={<Pagenotfound />} />
+          <Route path="*" element={<NotFoundRoute />} />
         </Routes>
       </Suspense>
     </BrowserRouter>
