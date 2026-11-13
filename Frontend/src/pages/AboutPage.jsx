@@ -11,8 +11,8 @@ import { FiStar, FiUsers } from 'react-icons/fi'
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
 import { fadeUp, stagger, cardVariant } from "./announcement/animations";
-import slideWhiteOffice from '../assets/Office-meeting.png'
-import slideTeam from '../assets/Team-work.jpg'
+import slideWhiteOffice from '../assets/Office-meeting.webp'
+import slideTeam from '../assets/Team-work.webp'
 
 /* ------------------------------------------------------------------ */
 /* StaticImage: no fade-in or opacity hiding.                          */

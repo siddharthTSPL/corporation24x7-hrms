@@ -1,12 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useState, useEffect } from "react";
-import { Player } from "@lottiefiles/react-lottie-player";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
-import Guide from './components/Guide';
 import RouteSeo from "./components/RouteSeo";
 import { landingPages } from "./seo/landingPages";
 
+const Guide = lazy(() => import("./components/Guide"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
@@ -120,12 +119,22 @@ const GuestJoinPage = lazy(() => import("./pages/meetings/GuestJoinPage"));
 
 function PageSkeleton() {
   const [animationData, setAnimationData] = useState(null);
+  const [Player, setPlayer] = useState(null);
 
+  // The Lottie player loads on demand so it is not part of the first-load JS.
   useEffect(() => {
-    fetch("/talent/loader.json")
-      .then((r) => r.json())
-      .then(setAnimationData)
-      .catch(() => setAnimationData(null));
+    let alive = true;
+    Promise.all([
+      fetch("/talent/loader.json").then((r) => r.json()),
+      import("@lottiefiles/react-lottie-player"),
+    ])
+      .then(([data, mod]) => {
+        if (!alive) return;
+        setAnimationData(data);
+        setPlayer(() => mod.Player);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   return (
@@ -140,7 +149,7 @@ function PageSkeleton() {
         zIndex: 9999,
       }}
     >
-      {animationData ? (
+      {animationData && Player ? (
         <Player
           autoplay
           loop

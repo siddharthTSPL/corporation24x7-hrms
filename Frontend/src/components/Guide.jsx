@@ -8,7 +8,7 @@ import {
 
 import logo from '../assets/Vector.png'
 
-const guideShots = import.meta.glob('../assets/**/*.{png,jpg,jpeg,webp}', { eager: true, import: 'default' })
+const guideShots = import.meta.glob('../assets/guide/*.webp', { eager: true, import: 'default' })
 const findShot = (...names) => {
   for (const [path, mod] of Object.entries(guideShots)) {
     const file = path.split('/').pop().toLowerCase()
@@ -20,9 +20,9 @@ const findShot = (...names) => {
 
 const shots = {
 
-  saSearch: findShot('start.png'),
-  saSearchResult: findShot('search.png'),
-  saLanding: findShot('search-result', 'landing.png'),
+  saSearch: findShot('start.webp'),
+  saSearchResult: findShot('search.webp'),
+  saLanding: findShot('search-result', 'landing.webp'),
   signin: findShot('sign-in', 'signin'),
 
   // SuperAdmin
@@ -61,7 +61,7 @@ const shots = {
   adPayroll: findShot('ad-payroll'),
   adReimbursement: findShot('ad-reimbursement'),
   adManagement: findShot('ad-management'),
-  adDocument: findShot('ad-document.png'),
+  adDocument: findShot('ad-document.webp'),
   adTeamDocument: findShot('ad-documents', 'ad-team-document'),
   adSettings: findShot('ad-settings'),
   adPolicy: findShot('ad-policy-management', 'ad-policy'),
