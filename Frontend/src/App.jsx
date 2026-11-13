@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
 import RouteSeo from "./components/RouteSeo";
 import { landingPages } from "./seo/landingPages";
 
+// Guide is ~57 KB and only used on /guide, so it is split out of the entry bundle.
 const Guide = lazy(() => import("./components/Guide"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
@@ -117,28 +118,13 @@ const GamificationHub = lazy(() => import("./pages/gamification/GamificationHub"
 const GamificationAdmin = lazy(() => import("./pages/gamification/GamificationAdmin"));
 const GuestJoinPage = lazy(() => import("./pages/meetings/GuestJoinPage"));
 
+// Pure-CSS fallback: no Lottie player, no loader.json request, no state/effects.
+// The keyframes live in a single <style> so nothing extra is shipped in JS.
 function PageSkeleton() {
-  const [animationData, setAnimationData] = useState(null);
-  const [Player, setPlayer] = useState(null);
-
-  // The Lottie player loads on demand so it is not part of the first-load JS.
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      fetch("/talent/loader.json").then((r) => r.json()),
-      import("@lottiefiles/react-lottie-player"),
-    ])
-      .then(([data, mod]) => {
-        if (!alive) return;
-        setAnimationData(data);
-        setPlayer(() => mod.Player);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         position: "fixed",
         inset: 0,
@@ -149,45 +135,36 @@ function PageSkeleton() {
         zIndex: 9999,
       }}
     >
-      {animationData && Player ? (
-        <Player
-          autoplay
-          loop
-          src={animationData}
-          style={{ height: "140px", width: "140px" }}
-        />
-      ) : (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
+            width: 40,
+            height: 40,
+            border: "3px solid rgba(255,255,255,.2)",
+            borderTop: "3px solid #CD166E",
+            borderRadius: "50%",
+            animation: "_spin 0.7s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: 13,
+            color: "rgba(255,255,255,.7)",
+            fontFamily: "sans-serif",
+            letterSpacing: "0.05em",
           }}
         >
-          <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "3px solid rgba(255,255,255,.2)",
-              borderTop: "3px solid #CD166E",
-              borderRadius: "50%",
-              animation: "_spin 0.7s linear infinite",
-            }}
-          />
-          <span
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,.7)",
-              fontFamily: "sans-serif",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Loading…
-          </span>
-        </div>
-      )}
+          Loading…
+        </span>
+      </div>
     </div>
   );
 }

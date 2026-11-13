@@ -38,6 +38,12 @@ export default defineConfig(({ mode }) => ({
 
     rollupOptions: {
       output: {
+        // Only React itself gets a pinned chunk (long-term cacheable, tiny).
+        // Everything else is left to the bundler's automatic splitting so that
+        // lazy routes keep their heavy libs (firebase, xlsx, jspdf, recharts,
+        // country-state-city, leaflet...) OUT of the first page load.
+        // The old catch-all "vendor-misc" bucket was ~11 MB and got
+        // modulepreloaded by index.html on every page.
         manualChunks(id) {
           if (
             id.includes("node_modules/react/") ||
@@ -45,45 +51,6 @@ export default defineConfig(({ mode }) => ({
             id.includes("node_modules/scheduler/")
           ) {
             return "react-core";
-          }
-          if (
-            id.includes("node_modules/react-router") ||
-            id.includes("node_modules/@remix-run")
-          ) {
-            return "router";
-          }
-          if (
-            id.includes("node_modules/@tanstack") ||
-            id.includes("node_modules/axios") ||
-            id.includes("node_modules/swr")
-          ) {
-            return "data-fetching";
-          }
-          if (
-            id.includes("node_modules/framer-motion") ||
-            id.includes("node_modules/@headlessui") ||
-            id.includes("node_modules/@radix-ui") ||
-            id.includes("node_modules/lucide-react") ||
-            id.includes("node_modules/react-icons")
-          ) {
-            return "ui-libs";
-          }
-          if (
-            id.includes("node_modules/date-fns") ||
-            id.includes("node_modules/dayjs") ||
-            id.includes("node_modules/lodash")
-          ) {
-            return "vendor-misc";
-          }
-          if (
-            id.includes("node_modules/recharts") ||
-            id.includes("node_modules/chart.js") ||
-            id.includes("node_modules/d3")
-          ) {
-            return "charts";
-          }
-          if (id.includes("node_modules")) {
-            return "vendor-misc";
           }
         },
 

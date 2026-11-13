@@ -988,8 +988,22 @@ function AnimatedBackdrop({ pointerRef }) {
       return r
     }
 
-    renderer = createWorkerRenderer() || createMainRenderer()
-    attach()
+    // Start the canvas/worker only after the first paint (idle). Creating the
+    // Blob worker + OffscreenCanvas during hydration competes with LCP and
+    // adds to Total Blocking Time; the backdrop is decorative so a short delay is invisible.
+    const startRenderer = () => {
+      if (disposed) return
+      renderer = createWorkerRenderer() || createMainRenderer()
+      attach()
+    }
+    let idleHandle = 0
+    let idleIsTimeout = false
+    if (typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(startRenderer, { timeout: 1500 })
+    } else {
+      idleIsTimeout = true
+      idleHandle = window.setTimeout(startRenderer, 600)
+    }
 
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -1022,6 +1036,8 @@ function AnimatedBackdrop({ pointerRef }) {
 
     return () => {
       disposed = true
+      if (idleIsTimeout) window.clearTimeout(idleHandle)
+      else if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle)
       window.clearTimeout(scrollTimer)
       document.removeEventListener('scroll', onScrollActivity, { capture: true })
       stopPointer()
@@ -1223,9 +1239,7 @@ function Hero({ onOpenCalculator }) {
           {/* LEFT: copy */}
           <div className="relative z-10 flex flex-col items-center text-center lg:items-start lg:text-left mt-0 lg:mt-4">
             <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              initial={false}
               className="mb-4"
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-[#EAC7D7] bg-[#FDF4F8] px-4 py-2 shadow-[0_8px_30px_rgba(122,0,75,0.08)]">
@@ -1239,9 +1253,7 @@ function Hero({ onOpenCalculator }) {
             </motion.div>
 
             <motion.h1
-              initial={{ opacity: 0, y: 22 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              initial={false}
               className="relative max-w-[560px] font-hero font-medium leading-[1.15] tracking-[-1.5px] text-[#2A1120] text-[clamp(2rem,5vw,3.4rem)]"
             >
               Manage Your Workforce With
@@ -1251,18 +1263,14 @@ function Hero({ onOpenCalculator }) {
             </motion.h1>
 
             <motion.p
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              initial={false}
               className="mt-6 max-w-[500px] font-hero text-[15px] leading-[1.75] text-[#5C5C5C] sm:text-[16px] lg:text-[17px]"
             >
               TorchX Talent is a complete Human Resource Management System (HRMS) that helps you optimize every stage of the employee lifecycle — from hiring to performance to payroll — with a robust and reliable platform.
             </motion.p>
 
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              initial={false}
               className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start"
             >
               <a

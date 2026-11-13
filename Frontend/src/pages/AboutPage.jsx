@@ -173,7 +173,7 @@ function OriginStory({ scrollContainerRef }) {
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
               <StaticImage
                 src={slideTeam}
-                alt="TorchX Talent engineering lab"
+                alt="TorchX Talent engineering lab" loading="lazy" decoding="async"
                 priority
               />
             </div>
