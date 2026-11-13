@@ -1,33 +1,62 @@
-import { Card, Avatar, LevelChip, XpBar, Pill, Skeleton, SectionTitle, ProgressBar, timeAgo, timeLeft, fmt } from "../../components/gamification/ui";
-import { DailyReward, SpinWheel, QuizCard, StreakStrip } from "./DailyPanel";
+import { Card, SectionTitle, Avatar, LevelChip, XpBar, Pill, Skeleton, ProgressBar, IconTile, Icon, Empty, Button, timeAgo, timeLeft, fmt, TIER_COLORS } from "../../components/gamification/ui";
+import { useGamFeed, useClaimQuest } from "../../auth/server-state/gamification/gamification.hook";
 import { ChallengeCard } from "./ChallengesTab";
-import { useGamFeed } from "../../auth/server-state/gamification/gamification.hook";
 
-function Hero({ me, season }) {
+const Metric = ({ label, value, sub }) => (
+  <div className="min-w-[110px]">
+    <p className="text-[11px] font-medium text-[#7a6a64]">{label}</p>
+    <p className="mt-0.5 text-xl font-semibold tracking-tight text-[#2a1a16]">{value}</p>
+    {sub && <p className="text-[11px] text-[#9c8880]">{sub}</p>}
+  </div>
+);
+
+function Summary({ me, season }) {
   const capPct = me.today.cap ? Math.min(100, Math.round((me.today.xp / me.today.cap) * 100)) : 0;
   return (
-    <Card className="overflow-hidden">
-      <div className="relative p-5 text-white" style={{ background: me.equipped.theme.css }}>
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={me.name} photo={me.photo} frame={me.equipped.frame} size={76} />
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+        <div className="flex min-w-[240px] flex-1 items-center gap-4">
+          <Avatar name={me.name} photo={me.photo} size={56} />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider opacity-80">{me.rank.label} rank</p>
-            <h2 className="flex flex-wrap items-center gap-2 text-2xl font-extrabold">{me.name}<span className="rounded-full bg-white/25 px-2.5 py-0.5 text-sm">Lv {me.level.level}</span></h2>
-            <p className="text-sm opacity-90">{me.equipped.title}{me.department ? ` · ${me.department}` : ""}</p>
-          </div>
-          <div className="flex gap-3 text-center">
-            <div className="rounded-2xl bg-white/20 px-4 py-2 backdrop-blur"><p className="text-xl font-extrabold">{fmt(me.xp)}</p><p className="text-[10px] font-semibold uppercase opacity-80">Total XP</p></div>
-            <div className="rounded-2xl bg-white/20 px-4 py-2 backdrop-blur"><p className="text-xl font-extrabold">🪙 {fmt(me.coins)}</p><p className="text-[10px] font-semibold uppercase opacity-80">Coins</p></div>
-            <div className="hidden rounded-2xl bg-white/20 px-4 py-2 backdrop-blur sm:block"><p className="text-xl font-extrabold">🏅 {me.badgeCount}</p><p className="text-[10px] font-semibold uppercase opacity-80">Badges</p></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-base font-semibold text-[#2a1a16]">{me.name}</h2>
+              <LevelChip level={me.level.level} rank={me.rank.key} />
+            </div>
+            <p className="text-xs text-[#7a6a64]">{me.title} - {me.rank.label} tier{me.department ? ` - ${me.department}` : ""}</p>
+            <div className="mt-2.5 max-w-sm"><XpBar level={me.level} /></div>
           </div>
         </div>
-        <div className="mt-4 rounded-xl bg-black/20 p-3 [&_*]:!text-white/90 [&>div>div]:!bg-white/25"><XpBar level={me.level} height={12} /></div>
+        <div className="flex flex-wrap gap-x-8 gap-y-3 border-l-0 border-[#ede5e0] lg:border-l lg:pl-8">
+          <Metric label="Total XP" value={fmt(me.xp)} />
+          <Metric label="Reward points" value={fmt(me.coins)} sub="Redeemable in Rewards" />
+          <Metric label="Achievements" value={fmt(me.badgeCount)} />
+          <Metric label="Attendance streak" value={`${me.streak.current} day${me.streak.current === 1 ? "" : "s"}`} sub={me.streak.atRisk ? "Check in today to keep it" : `Best: ${me.streak.longest}`} />
+        </div>
       </div>
-      <div className="grid gap-3 p-4 sm:grid-cols-2">
-        <div><div className="mb-1 flex justify-between text-xs"><span className="font-semibold text-gray-600">Today's XP</span><span className="text-gray-500">{fmt(me.today.xp)} / {fmt(me.today.cap)}</span></div><ProgressBar value={me.today.xp} max={me.today.cap || 1} color={capPct >= 100 ? "#f59e0b" : "#cd166e"} />{capPct >= 100 && <p className="mt-1 text-[11px] text-amber-600">Daily XP limit reached — quizzes, spins & quest rewards still count!</p>}</div>
-        {season && <div className="rounded-xl bg-gradient-to-r from-indigo-50 to-pink-50 p-3"><p className="text-xs font-bold text-indigo-700">{season.theme} {season.name}</p><p className="text-[11px] text-gray-500">{timeLeft(season.endsAt)} · Top prize: {fmt(season.prizes?.[0]?.xp)} XP + {fmt(season.prizes?.[0]?.coins)} 🪙</p></div>}
+      <div className="mt-4 grid gap-4 border-t border-[#f3efec] pt-4 sm:grid-cols-2">
+        <div>
+          <div className="mb-1 flex justify-between text-[11px] text-[#7a6a64]"><span>XP earned today</span><span>{fmt(me.today.xp)} / {fmt(me.today.cap)}</span></div>
+          <ProgressBar value={me.today.xp} max={me.today.cap || 1} color={capPct >= 100 ? "#c99700" : "#730042"} height={5} />
+          {capPct >= 100 && <p className="mt-1 text-[11px] text-[#9a6700]">Daily XP limit reached. Goal and challenge rewards still count.</p>}
+        </div>
+        {season && <div className="flex items-center gap-3 rounded-lg bg-[#faf7f5] px-3 py-2"><IconTile name="trophy" size={30} /><div className="min-w-0"><p className="truncate text-xs font-semibold text-[#2a1a16]">{season.name}</p><p className="text-[11px] text-[#7a6a64]">{timeLeft(season.endsAt)} - top prize {fmt(season.prizes?.[0]?.xp)} XP</p></div></div>}
       </div>
     </Card>
+  );
+}
+
+function GoalRow({ q }) {
+  const claim = useClaimQuest();
+  const done = q.status !== "active";
+  return (
+    <div className="flex items-center gap-3 py-2.5">
+      <IconTile name={q.icon} size={32} color={done ? "#12794a" : "#730042"} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2"><p className="truncate text-[13px] font-medium text-[#2a1a16]">{q.title}</p><span className="shrink-0 text-[11px] text-[#7a6a64]">{q.progress}/{q.target}</span></div>
+        <div className="mt-1.5"><ProgressBar value={q.progress} max={q.target} color={done ? "#12794a" : "#730042"} height={5} /></div>
+      </div>
+      {q.status === "completed" ? <Button size="sm" loading={claim.isPending} onClick={() => claim.mutate(q.id)}>Claim</Button> : q.status === "claimed" ? <Pill tone="success">Claimed</Pill> : <span className="w-14 text-right text-[11px] font-medium text-[#7a6a64]">+{q.xp} XP</span>}
+    </div>
   );
 }
 
@@ -36,44 +65,38 @@ function Feed() {
   if (!data?.items?.length) return null;
   return (
     <Card className="p-4">
-      <SectionTitle icon="📣" title="Around the company" />
-      <div className="max-h-72 space-y-2.5 overflow-y-auto pr-1">{data.items.map((i) => (
-        <div key={i.id} className="flex items-center gap-2.5"><Avatar name={i.name} photo={i.photo} size={30} ring={false} /><p className="min-w-0 flex-1 text-xs text-gray-700"><b>{i.mine ? "You" : i.name}</b> {i.text} <span className="text-base">{i.icon}</span></p><span className="shrink-0 text-[10px] text-gray-400">{timeAgo(i.at)}</span></div>))}</div>
+      <SectionTitle icon="users" title="Company activity" />
+      <div className="max-h-72 space-y-3 overflow-y-auto pr-1">{data.items.map((i) => (
+        <div key={i.id} className="flex items-start gap-2.5"><Avatar name={i.name} photo={i.photo} size={28} /><p className="min-w-0 flex-1 text-xs leading-relaxed text-[#5b4b45]"><b className="font-semibold text-[#2a1a16]">{i.mine ? "You" : i.name}</b> {i.text}</p><span className="shrink-0 text-[10px] text-[#9c8880]">{timeAgo(i.at)}</span></div>))}</div>
     </Card>
   );
 }
 
 export default function OverviewTab({ hub, loading, goTo }) {
-  if (loading || !hub) return <div className="space-y-4"><Skeleton className="h-48" /><Skeleton className="h-40" /></div>;
-  const { me, quests, daily, spin, quiz, weekBoard, challenges, recentBadges, season, modules } = hub;
-  const todays = quests.quests.daily;
-  const doneN = todays.filter((q) => q.status !== "active").length;
+  if (loading || !hub) return <div className="space-y-4"><Skeleton className="h-44" /><Skeleton className="h-60" /></div>;
+  const { me, quests, weekBoard, challenges, recentBadges, season } = hub;
+  const goals = [...quests.quests.weekly, ...quests.quests.monthly, ...quests.quests.special, ...quests.quests.daily].filter((q) => q.status !== "claimed").slice(0, 6);
+  const rows = weekBoard?.rows || [];
   return (
     <div className="space-y-4">
-      <Hero me={me} season={season} />
+      <Summary me={me} season={season} />
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card className="p-4">
-            <SectionTitle icon="☀️" title="Today's quests" sub={`${doneN}/${todays.length} done${quests.claimable ? ` · ${quests.claimable} to claim` : ""}`} right={<button onClick={() => goTo("quests")} className="text-xs font-semibold text-[#730042] hover:underline">All quests →</button>} />
-            <div className="space-y-2">{todays.map((q) => (
-              <div key={q.id} className="flex items-center gap-3 rounded-xl border border-gray-200 p-2.5"><span className="text-xl">{q.icon}</span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-gray-800">{q.title}</p><ProgressBar value={q.progress} max={q.target} color={q.status !== "active" ? "#10b981" : "#cd166e"} height={6} /></div><span className="text-xs font-bold text-[#730042]">+{q.xp}</span>{q.status === "completed" && <Pill color="#059669">claim</Pill>}{q.status === "claimed" && <span>✅</span>}</div>))}</div>
+            <SectionTitle icon="target" title="Your goals" sub={quests.claimable ? `${quests.claimable} reward${quests.claimable > 1 ? "s" : ""} ready to claim` : "Weekly and monthly goals"} right={<Button variant="ghost" size="sm" onClick={() => goTo("goals")}>View all</Button>} />
+            {goals.length ? <div className="divide-y divide-[#f3efec]">{goals.map((q) => <GoalRow key={q.id} q={q} />)}</div> : <Empty icon="target" title="No active goals" hint="New goals appear every week and month." />}
           </Card>
-          <StreakStrip me={me} />
-          <div className="grid gap-4 md:grid-cols-2">
-            <DailyReward daily={daily} />
-            {modules.spin !== false && <SpinWheel spin={spin} />}
-          </div>
-          {modules.quiz !== false && <QuizCard quiz={quiz} />}
+          {challenges?.length > 0 && <div><h3 className="mb-2 text-sm font-semibold text-[#2a1a16]">Live challenges</h3><div className="grid gap-3 md:grid-cols-2">{challenges.map((c) => <ChallengeCard key={c.id} c={c} onBoard={() => goTo("challenges")} />)}</div></div>}
         </div>
         <div className="space-y-4">
           <Card className="p-4">
-            <SectionTitle icon="🏆" title="This week's top 5" right={<button onClick={() => goTo("leaderboard")} className="text-xs font-semibold text-[#730042] hover:underline">Full board →</button>} />
-            {weekBoard?.rows?.length ? <div className="space-y-2">{weekBoard.rows.map((r) => (
-              <div key={r.personKey} className="flex items-center gap-2.5"><span className="w-5 text-center text-sm">{["🥇", "🥈", "🥉"][r.position - 1] || r.position}</span><Avatar name={r.name} photo={r.photo} frame={r.frame} size={30} /><p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">{r.name}</p><span className="text-xs font-bold text-[#730042]">{fmt(r.xp)}</span></div>))}
-              {weekBoard.me && <p className="border-t pt-2 text-center text-xs text-gray-500">You're #{weekBoard.me.position} · {fmt(weekBoard.me.xp)} XP</p>}</div> : <p className="py-4 text-center text-xs text-gray-400">No activity yet this week.</p>}
+            <SectionTitle icon="trophy" title="Top contributors this week" right={<Button variant="ghost" size="sm" onClick={() => goTo("leaderboard")}>Leaderboard</Button>} />
+            {rows.length ? <div className="space-y-2.5">{rows.map((r) => (
+              <div key={r.personKey} className="flex items-center gap-2.5"><span className={`w-5 text-center text-xs font-semibold ${r.position <= 3 ? "text-[#730042]" : "text-[#9c8880]"}`}>{r.position}</span><Avatar name={r.name} photo={r.photo} size={28} /><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-medium text-[#2a1a16]">{r.name}</p><p className="truncate text-[11px] text-[#9c8880]">{r.department || r.title}</p></div><span className="text-xs font-semibold text-[#2a1a16]">{fmt(r.xp)}</span></div>))}
+              {weekBoard.me && <p className="border-t border-[#f3efec] pt-2.5 text-center text-xs text-[#7a6a64]">You are ranked <b className="text-[#2a1a16]">#{weekBoard.me.position}</b> of {weekBoard.me.of} with {fmt(weekBoard.me.xp)} XP</p>}</div> : <Empty icon="trophy" title="No activity yet this week" />}
           </Card>
-          {recentBadges?.length > 0 && <Card className="p-4"><SectionTitle icon="🏅" title="Latest badges" right={<button onClick={() => goTo("badges")} className="text-xs font-semibold text-[#730042] hover:underline">All →</button>} /><div className="flex flex-wrap gap-2">{recentBadges.map((b) => <div key={b.key} title={b.name} className="flex h-12 w-12 items-center justify-center rounded-full bg-pink-50 text-2xl ring-2 ring-pink-100">{b.icon || "🏅"}</div>)}</div></Card>}
-          {challenges?.length > 0 && <div className="space-y-3">{challenges.map((c) => <ChallengeCard key={c.id} c={c} onBoard={() => goTo("challenges")} />)}</div>}
+          {recentBadges?.length > 0 && <Card className="p-4"><SectionTitle icon="award" title="Recent achievements" right={<Button variant="ghost" size="sm" onClick={() => goTo("achievements")}>All</Button>} />
+            <div className="space-y-2.5">{recentBadges.slice(0, 4).map((b) => <div key={b.key} className="flex items-center gap-2.5"><IconTile name={b.icon} color={TIER_COLORS[b.tier] || "#730042"} size={32} round /><div className="min-w-0"><p className="truncate text-[13px] font-medium text-[#2a1a16]">{b.name}</p><p className="truncate text-[11px] text-[#9c8880]">{timeAgo(b.earnedAt)}</p></div></div>)}</div></Card>}
           <Feed />
         </div>
       </div>

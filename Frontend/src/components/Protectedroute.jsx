@@ -89,7 +89,7 @@ const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup, p
         return (
           <FeatureNotEnabled
             title="Rewards is not enabled"
-            message="Rewards & Gamification is switched off for your organisation. The owner account can enable it from Settings → Rewards."
+            message="Recognition & Rewards is switched off for your organisation. The owner account can enable it from Settings."
           />
         );
       return <UpgradeRequired />;

@@ -1,8 +1,7 @@
 const GamProfile = require("../../Models/gamification/gamprofile.model");
 const PointTx = require("../../Models/gamification/pointtransaction.model");
 const GamSeason = require("../../Models/gamification/season.model");
-const { levelFromXp, rankForLevel } = require("./catalog/levels");
-const { resolveEquipped } = require("./engine");
+const { levelFromXp, rankForLevel, titleForLevel } = require("./catalog/levels");
 const { weekRange, monthRange } = require("./periods");
 const { startOfISTDay } = require("../Istdate.utils");
 
@@ -26,10 +25,9 @@ const rangeFor = async (organisation_id, period) => {
 
 const shapeRow = (p, xp, settings, extra = {}) => {
   const lv = levelFromXp(p.xp, settings.levelBase);
-  const eq = resolveEquipped(p);
   return {
     personKey: p.personKey, name: p.name, department: p.department, designation: p.designation, photo: p.photo,
-    level: lv.level, rank: rankForLevel(lv.level).key, xp, title: eq.title, frame: eq.frame, badgeCount: (p.badgeKeys || []).length, ...extra,
+    level: lv.level, rank: rankForLevel(lv.level).key, xp, title: titleForLevel(lv.level), badgeCount: (p.badgeKeys || []).length, ...extra,
   };
 };
 

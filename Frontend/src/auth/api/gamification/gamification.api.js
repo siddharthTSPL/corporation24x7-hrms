@@ -26,7 +26,6 @@ export const getHub = () => get("hub");
 export const getMeta = () => get("meta");
 export const getHistory = (params) => get("history", params);
 export const updatePrefs = (body) => patch("prefs", body);
-export const getCosmetics = () => get("cosmetics");
 export const getBadges = () => get("badges");
 export const markBadgesSeen = () => post("badges/seen");
 export const getLeaderboard = (params) => get("leaderboard", params);
@@ -36,15 +35,6 @@ export const getSeasons = () => get("seasons");
 export const getQuests = () => get("quests");
 export const claimQuest = (id) => post(`quests/${id}/claim`);
 export const claimAllQuests = () => post("quests/claim-all");
-export const rerollQuest = (id) => post(`quests/${id}/reroll`);
-
-export const getDaily = () => get("daily");
-export const claimDaily = () => post("daily/claim");
-export const getSpin = () => get("spin");
-export const doSpin = (extra = false) => post("spin", { extra });
-export const getQuiz = () => get("quiz");
-export const answerQuiz = (choice) => post("quiz/answer", { choice });
-export const buyFreeze = () => post("streak-freeze");
 
 export const getChallenges = () => get("challenges");
 export const getChallengeBoard = (id) => get(`challenges/${id}/board`);
@@ -105,10 +95,5 @@ export const getAdminSeasons = () => get("admin/seasons");
 export const createAdminSeason = (b) => post("admin/seasons", b);
 export const finaliseAdminSeason = (id) => post(`admin/seasons/${id}/finalise`);
 export const deleteAdminSeason = (id) => del(`admin/seasons/${id}`);
-
-export const getAdminQuiz = () => get("admin/quiz");
-export const createAdminQuiz = (b) => post("admin/quiz", b);
-export const updateAdminQuiz = ({ id, ...b }) => put(`admin/quiz/${id}`, b);
-export const deleteAdminQuiz = (id) => del(`admin/quiz/${id}`);
 
 export const moderateKudos = ({ id, ...b }) => patch(`admin/kudos/${id}`, b);

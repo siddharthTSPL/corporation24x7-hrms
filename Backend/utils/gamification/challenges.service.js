@@ -113,7 +113,7 @@ const finalise = async (c) => {
     const p = await GamProfile.findOne({ personKey: w.personKey }).lean();
     if (!p) continue;
     await engine.award({ organisation_id: locked.organisation_id, model, id, event: "challenge_reward", xp, coins, dedupeKey: `chp:${locked._id}:${w.personKey}`, reason: `Challenge podium #${i + 1}: ${locked.title}`, force: true });
-    await engine.notifyPerson(p, { title: `🏆 You placed #${i + 1} in "${locked.title}"`, message: `Prize: ${xp} XP and ${coins} coins.`, priority: "medium" });
+    await engine.notifyPerson(p, { title: `You placed #${i + 1} in "${locked.title}"`, message: `Prize: ${xp} XP and ${coins} reward points.`, priority: "medium" });
   }
   await GamChallenge.updateOne({ _id: locked._id }, { $set: { winners } });
   return winners;

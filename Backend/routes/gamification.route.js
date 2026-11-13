@@ -30,7 +30,6 @@ router.get("/hub", u.hub);
 router.get("/meta", u.meta);
 router.get("/history", u.history);
 router.patch("/prefs", u.updatePrefs);
-router.get("/cosmetics", u.cosmeticsList);
 
 router.get("/badges", u.badges);
 router.post("/badges/seen", u.badgesSeen);
@@ -42,15 +41,7 @@ router.get("/seasons", u.seasons);
 router.get("/quests", u.quests);
 router.post("/quests/claim-all", u.questClaimAll);
 router.post("/quests/:id/claim", u.questClaim);
-router.post("/quests/:id/reroll", u.questReroll);
 
-router.get("/daily", u.dailyState);
-router.post("/daily/claim", u.dailyClaim);
-router.get("/spin", u.spinState);
-router.post("/spin", u.spin);
-router.get("/quiz", u.quiz);
-router.post("/quiz/answer", u.quizAnswer);
-router.post("/streak-freeze", u.freezeBuy);
 
 router.get("/challenges", u.challenges);
 router.get("/challenges/:id/board", u.challengeBoard);
@@ -115,10 +106,6 @@ router.post("/admin/seasons", adminOnly, a.createSeason);
 router.post("/admin/seasons/:id/finalise", adminOnly, a.finaliseSeason);
 router.delete("/admin/seasons/:id", adminOnly, a.deleteSeason);
 
-router.get("/admin/quiz", adminOnly, a.listQuiz);
-router.post("/admin/quiz", adminOnly, a.createQuiz);
-router.put("/admin/quiz/:id", adminOnly, a.updateQuiz);
-router.delete("/admin/quiz/:id", adminOnly, a.deleteQuiz);
 
 router.patch("/admin/kudos/:id", adminOnly, a.moderateKudos);
 

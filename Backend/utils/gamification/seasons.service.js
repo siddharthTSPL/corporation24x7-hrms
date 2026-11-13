@@ -22,7 +22,7 @@ const finaliseSeason = async (season) => {
     if (!prize) continue;
     await engine.award({ organisation_id: s.organisation_id, model: p.personModel, id: p.person, event: "season_reward", xp: prize.xp, coins: prize.coins, dedupeKey: `season:${s._id}:${g._id}`, reason: `${s.name}: ${prize.label || `#${i + 1}`}`, force: true });
     if (i === 0) await engine.award({ organisation_id: s.organisation_id, model: p.personModel, id: p.person, event: "season_win", dedupeKey: `seasonwin:${s._id}`, silent: true, force: true, meta: { countOnly: true } });
-    await engine.notifyPerson(p, { title: `${s.theme || "🏟️"} ${s.name} finished`, message: `You placed #${i + 1}! +${prize.xp} XP, +${prize.coins} coins.`, priority: "medium" });
+    await engine.notifyPerson(p, { title: `${s.name} has ended`, message: `You finished #${i + 1}. Prize: +${prize.xp} XP and +${prize.coins} reward points.`, priority: "medium" });
   }
   const depts = await PointTx.aggregate([{ $match: { ...match, department: { $ne: "" } } }, { $group: { _id: "$department", xp: { $sum: "$xp" } } }, { $sort: { xp: -1 } }, { $limit: 3 }]);
   await GamSeason.updateOne({ _id: s._id }, { $set: { winners, departmentWinners: depts.map((d, i) => ({ rank: i + 1, department: d._id, xp: d.xp })) } });

@@ -6,7 +6,7 @@ const schema = new mongoose.Schema(
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: 80 },
     desc: { type: String, default: "", trim: true, maxlength: 240 },
-    icon: { type: String, default: "🎯", maxlength: 8 },
+    icon: { type: String, default: "target", maxlength: 24 },
     event: { type: String, required: true }, // any key from catalog/events
     target: { type: Number, required: true, min: 1, max: 1000 },
     period: { type: String, enum: ["daily", "weekly", "monthly", "oneoff"], default: "weekly" },

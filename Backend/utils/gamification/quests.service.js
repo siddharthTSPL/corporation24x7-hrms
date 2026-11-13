@@ -3,7 +3,7 @@
 const QuestProgress = require("../../Models/gamification/questprogress.model");
 const QuestDef = require("../../Models/gamification/questdef.model");
 const GamProfile = require("../../Models/gamification/gamprofile.model");
-const { pickQuests, ONBOARDING, DAILY } = require("./catalog/quests");
+const { pickQuests, ONBOARDING } = require("./catalog/quests");
 const { periodKeys } = require("./periods");
 const { startOfISTDay } = require("../Istdate.utils");
 const engine = require("./engine");
@@ -36,7 +36,7 @@ const instanceFromTemplate = (profile, period, t, keys) => ({
 const desiredQuests = async (profile) => {
   const keys = periodKeys();
   const out = [];
-  for (const period of ["daily", "weekly", "monthly"]) {
+  for (const period of ["weekly", "monthly"]) {
     const seed = `${profile.personKey}:${periodKeyFor(period, keys)}`;
     pickQuests(period, seed).forEach((t) => out.push(instanceFromTemplate(profile, period, t, keys)));
   }
@@ -59,11 +59,10 @@ const desiredQuests = async (profile) => {
 
 const ensureQuests = async (profile) => {
   const desired = await desiredQuests(profile);
-  const rerolled = (profile.questKeys && profile.questKeys.rerolled) || {};
   const sig = desired.map((d) => `${d.questKey}@${d.periodKey}`).sort().join("|");
   if (profile.questKeys && profile.questKeys.sig === sig) return;
   // Skip any slot the user already rerolled away from today.
-  const toInsert = desired.filter((d) => !(rerolled[d.periodKey] || []).includes(d.questKey));
+  const toInsert = desired;
   try {
     await QuestProgress.insertMany(toInsert, { ordered: false });
   } catch (e) {
@@ -93,18 +92,7 @@ const onEvent = async (profile, event, amount = 1) => {
       }
     }
   }
-  if (completed.some((c) => c.period === "daily")) await maybeDailySweep(profile, keys.day);
   return completed;
-};
-
-const maybeDailySweep = async (profile, dayKey) => {
-  const all = await QuestProgress.find({ personKey: profile.personKey, period: "daily", periodKey: dayKey }).select("status").lean();
-  if (all.length && all.every((q) => q.status !== "active")) {
-    await engine.award({
-      organisation_id: profile.organisation_id, model: profile.personModel, id: profile.person,
-      event: "daily_sweep", dedupeKey: `sweep:${profile.personKey}:${dayKey}`, force: true,
-    });
-  }
 };
 
 const shape = (q) => ({
@@ -130,8 +118,7 @@ const listQuests = async (profile) => {
   const groups = { daily: [], weekly: [], monthly: [], onboarding: [], special: [] };
   for (const r of rows) (r.period === "oneoff" ? groups.special : groups[r.period]).push(shape(r));
   const claimable = rows.filter((r) => r.status === "completed").length;
-  const rerolled = (profile.questKeys && profile.questKeys.rerolled) || {};
-  return { quests: groups, claimable, dailyResetsAt: tomorrow, canReroll: !(rerolled[keys.day] && rerolled[keys.day].length >= 1) };
+  return { quests: groups, claimable, dailyResetsAt: tomorrow };
 };
 
 const claimQuest = async (profile, questId) => {
@@ -143,7 +130,7 @@ const claimQuest = async (profile, questId) => {
   if (!q) return null;
   const res = await engine.award({
     organisation_id: profile.organisation_id, model: profile.personModel, id: profile.person,
-    event: "quest_reward", xp: q.xp, coins: q.coins, dedupeKey: `qr:${q._id}`, meta: { quest: q.questKey, title: q.title }, reason: `Quest: ${q.title}`, force: true,
+    event: "quest_reward", xp: q.xp, coins: q.coins, dedupeKey: `qr:${q._id}`, meta: { quest: q.questKey, title: q.title }, reason: `Goal: ${q.title}`, force: true,
   });
   return { quest: shape(q), award: res };
 };
@@ -155,23 +142,4 @@ const claimAll = async (profile) => {
   return out;
 };
 
-// Swap one not-yet-started daily quest for a different one (once a day).
-const rerollDaily = async (profile, questId) => {
-  const keys = periodKeys();
-  const rerolled = (profile.questKeys && profile.questKeys.rerolled) || {};
-  if ((rerolled[keys.day] || []).length >= 1) return { error: "You've already used today's reroll." };
-  const q = await QuestProgress.findOne({ _id: questId, personKey: profile.personKey, period: "daily", periodKey: keys.day, status: "active" });
-  if (!q || q.custom) return { error: "That quest can't be rerolled." };
-  if (q.progress > 0) return { error: "You can only reroll a quest you haven't started." };
-  const current = await QuestProgress.find({ personKey: profile.personKey, period: "daily", periodKey: keys.day }).select("questKey").lean();
-  const have = new Set(current.map((c) => c.questKey));
-  const pool = DAILY.filter((t) => !have.has(t.key));
-  if (!pool.length) return { error: "No other quests are available to swap in." };
-  const t = pool[Math.floor(Math.random() * pool.length)];
-  await QuestProgress.deleteOne({ _id: q._id });
-  await QuestProgress.create(instanceFromTemplate(profile, "daily", t, keys));
-  await GamProfile.updateOne({ _id: profile._id }, { $set: { [`questKeys.rerolled.${keys.day}`]: [q.questKey] } });
-  return { ok: true };
-};
-
-module.exports = { ensureQuests, onEvent, listQuests, claimQuest, claimAll, rerollDaily, invalidateQuestDefs };
+module.exports = { ensureQuests, onEvent, listQuests, claimQuest, claimAll, invalidateQuestDefs };

@@ -4,7 +4,7 @@ const schema = new mongoose.Schema(
   {
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
     name: { type: String, required: true, trim: true, maxlength: 80 },
-    theme: { type: String, default: "🏟️", maxlength: 8 },
+    theme: { type: String, default: "trophy", maxlength: 24 },
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     status: { type: String, enum: ["upcoming", "active", "finalised"], default: "active" },

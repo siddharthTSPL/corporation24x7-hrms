@@ -1,6 +1,6 @@
 // Scheduled gamification work (all times IST):
 //  * 00:20 daily  - finalise ended seasons / open auto seasons / finalise ended challenges
-//  * 08:00 daily  - birthday + work-anniversary bonuses
+//  * 08:00 daily  - work-anniversary recognition
 //  * Mon 09:00    - weekly leaderboard winners
 //  * 1st 09:30    - Star of the Month + perfect-attendance month
 const cron = require("node-cron");
@@ -32,13 +32,12 @@ const dailyHousekeeping = guard("housekeeping", async () => {
 
 const celebrations = guard("celebrations", async () => {
   const today = getISTDateParts();
-  const cursor = GamProfile.find({ $or: [{ dob: { $ne: null } }, { joinedAt: { $ne: null } }] }).select("organisation_id personModel person personKey dob joinedAt optedOut").cursor();
+  const cursor = GamProfile.find({ joinedAt: { $ne: null } }).select("organisation_id personModel person personKey joinedAt optedOut").cursor();
   const same = (d) => { if (!d) return false; const p = getISTDateParts(new Date(d)); return p.month === today.month && p.day === today.day; };
   for await (const p of cursor) {
     if (p.optedOut) continue;
     if (!(await getSettings(p.organisation_id)).enabled) continue; // org has gamification OFF
     const base = { organisation_id: p.organisation_id, model: p.personModel, id: p.person, force: false };
-    if (same(p.dob)) await engine.safeAward({ ...base, event: "birthday_bonus", dedupeKey: `bday:${p.personKey}:${today.year}`, meta: { year: today.year } });
     if (same(p.joinedAt)) {
       const years = today.year - getISTDateParts(new Date(p.joinedAt)).year;
       if (years >= 1) await engine.safeAward({ ...base, event: "anniversary_bonus", xp: Math.min(1000, years * 100), coins: Math.min(500, years * 50), dedupeKey: `anniv:${p.personKey}:${today.year}`, meta: { years } });
@@ -67,7 +66,7 @@ const weeklyWinners = guard("weekly", async () => {
       if (!p || rank >= 3 || t.xp < 20) continue;
       const pr = prizes[rank++];
       await engine.safeAward({ organisation_id: o, model: p.personModel, id: p.person, event: "weekly_win", xp: pr.xp, coins: pr.coins, dedupeKey: `ww:${label}:${p.personKey}`, force: true, reason: `Weekly leaderboard #${rank}` });
-      await engine.notifyPerson(p, { title: `🥇 #${rank} on last week's leaderboard`, message: `${t.xp} XP earned. Bonus: +${pr.xp} XP, +${pr.coins} coins.`, priority: "medium" });
+      await engine.notifyPerson(p, { title: `You were #${rank} on last week's leaderboard`, message: `${t.xp} XP earned. Bonus: +${pr.xp} XP and +${pr.coins} reward points.`, priority: "medium" });
     }
   }
 });
@@ -86,8 +85,8 @@ const monthlyStar = guard("monthly", async () => {
     for (const t of top) {
       const p = await GamProfile.findOne({ personKey: t._id, optedOut: { $ne: true }, showOnLeaderboard: { $ne: false } }).lean();
       if (!p || t.xp < 100) continue;
-      await engine.safeAward({ organisation_id: o, model: p.personModel, id: p.person, event: "monthly_star", xp: 300, coins: 100, dedupeKey: `ms:${label}:${o}`, force: true, reason: "Star of the Month" });
-      await engine.notifyPerson(p, { title: "⭐ You're Star of the Month!", message: `Top performer for ${label} with ${t.xp} XP. +300 XP, +100 coins.`, priority: "high" });
+      await engine.safeAward({ organisation_id: o, model: p.personModel, id: p.person, event: "monthly_star", xp: 300, coins: 100, dedupeKey: `ms:${label}:${o}`, force: true, reason: "Top performer of the month" });
+      await engine.notifyPerson(p, { title: "You are this month's top performer", message: `Top performer for ${label} with ${t.xp} XP. Bonus: +300 XP and +100 reward points.`, priority: "high" });
       break;
     }
     // Perfect attendance: nobody absent / half-day / late during the month.

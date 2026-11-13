@@ -12,13 +12,11 @@ const GamReward = require("../Models/gamification/reward.model");
 const GamRedemption = require("../Models/gamification/redemption.model");
 const GamKudos = require("../Models/gamification/kudos.model");
 const GamSeason = require("../Models/gamification/season.model");
-const { GamQuizQuestion } = require("../Models/gamification/quizquestion.model");
 const engine = require("../utils/gamification/engine");
 const { getSettings, invalidateSettings, sanitiseUpdate, DEFAULTS } = require("../utils/gamification/settings");
 const { EVENTS, TUNABLE_EVENTS } = require("../utils/gamification/catalog/events");
 const { BADGES, BADGE_MAP } = require("../utils/gamification/catalog/badges");
 const { levelFromXp } = require("../utils/gamification/catalog/levels");
-const cosmetics = require("../utils/gamification/catalog/cosmetics");
 const quests = require("../utils/gamification/quests.service");
 const challenges = require("../utils/gamification/challenges.service");
 const seasons = require("../utils/gamification/seasons.service");
@@ -130,7 +128,7 @@ exports.adjust = asyncHandler(async (req, res) => {
   const xp = num(b.xp, 0, 100000);
   const coins = num(b.coins, 0, 100000);
   const reason = String(b.reason || "").trim().slice(0, 200);
-  if (!xp && !coins) throw fail("Enter XP and/or coins.");
+  if (!xp && !coins) throw fail("Enter XP and/or reward points.");
   if (reason.length < 5) throw fail("A reason is required for the audit trail.");
   const [model, id] = b.targetKey.split(":");
   const target = await engine.getOrCreateProfile(org(req), model, id);
@@ -145,7 +143,7 @@ exports.adjust = asyncHandler(async (req, res) => {
     return ok(res, { xp: newXp, coins: newCoins });
   }
   const r = await engine.award({ organisation_id: org(req), model, id, event: "manual_award", xp, coins, reason, actorKey: actorKey(req), dedupeKey: `adm:${actorKey(req)}:${target.personKey}:${Date.now()}`, force: true });
-  await engine.notifyPerson(target, { title: "🎖️ You received a bonus", message: `${reason} (+${xp} XP, +${coins} coins)`, priority: "medium" });
+  await engine.notifyPerson(target, { title: "You received a bonus", message: `${reason} (+${xp} XP, +${coins} reward points)`, priority: "medium" });
   ok(res, { award: r });
 });
 
@@ -245,7 +243,7 @@ exports.createChallenge = asyncHandler(async (req, res) => {
   try {
     const GamProf = await GamProfile.find({ organisation_id: org(req), optedOut: { $ne: true } }).select("personModel person organisation_id").lean();
     const { createBulkNotifications } = require("../utils/Notification.utils");
-    createBulkNotifications({ recipients: GamProf.map((p) => ({ recipientModel: p.personModel, recipientId: p.person })), organisation_id: org(req), type: "gamification", title: `${doc.icon} New challenge: ${doc.title}`, message: doc.description || "A new challenge just started — jump in!", link: "/gamification" });
+    createBulkNotifications({ recipients: GamProf.map((p) => ({ recipientModel: p.personModel, recipientId: p.person })), organisation_id: org(req), type: "gamification", title: `New challenge: ${doc.title}`, message: doc.description || "A new challenge has started.", link: "/gamification" });
   } catch (_) { /* best effort */ }
 });
 exports.updateChallenge = asyncHandler(async (req, res) => {
@@ -266,43 +264,33 @@ exports.cancelChallenge = asyncHandler(async (req, res) => {
 // ── rewards store ───────────────────────────────────────────────────────
 const rewardFields = (b) => {
   if (!String(b.name || "").trim()) throw fail("Give the reward a name.");
-  const eff = b.effect || {};
-  const type = ["none", "cosmetic", "freeze", "mystery"].includes(eff.type) ? eff.type : "none";
-  if (type === "cosmetic" && !cosmetics.find(eff.cosmeticType, eff.cosmeticId)) throw fail("Choose a valid cosmetic.");
   return {
-    ...pick(b, ["name", "description", "icon"]), category: ["perk", "voucher", "time", "swag", "charity", "cosmetic", "boost", "other"].includes(b.category) ? b.category : "perk",
+    ...pick(b, ["name", "description"]), icon: String(b.icon || "gift").slice(0, 24),
+    category: ["perk", "voucher", "time", "swag", "charity", "other"].includes(b.category) ? b.category : "perk",
     cost: num(b.cost, 1, 1000000, 100), stock: b.stock === -1 || b.stock === "" || b.stock === null || b.stock === undefined ? -1 : num(b.stock, -1, 100000, -1),
     perUserLimit: num(b.perUserLimit, 0, 1000, 0), minLevel: num(b.minLevel, 1, 100, 1), requiresApproval: b.requiresApproval !== false, active: b.active !== false,
-    effect: { type, cosmeticType: eff.cosmeticType || "", cosmeticId: eff.cosmeticId || "", freezes: num(eff.freezes, 0, 10, 1), mysteryMin: num(eff.mysteryMin, 0, 100000, 0), mysteryMax: num(eff.mysteryMax, 0, 100000, 0) },
   };
 };
-exports.listRewards = asyncHandler(async (req, res) => ok(res, { rewards: await GamReward.find({ organisation_id: org(req) }).sort({ createdAt: -1 }).lean(), cosmetics: { frame: cosmetics.FRAMES.filter((c) => c.unlock.type === "store"), title: cosmetics.TITLES.filter((c) => c.unlock.type === "store"), theme: cosmetics.THEMES.filter((c) => c.unlock.type === "store") } }));
+exports.listRewards = asyncHandler(async (req, res) => ok(res, { rewards: await GamReward.find({ organisation_id: org(req) }).sort({ createdAt: -1 }).lean() }));
 exports.createReward = asyncHandler(async (req, res) => ok(res, { reward: await GamReward.create({ organisation_id: org(req), ...rewardFields(req.body || {}), createdBy: actorKey(req) }) }));
 exports.updateReward = asyncHandler(async (req, res) => { const d = await GamReward.findOneAndUpdate({ _id: oid(req.params.id), organisation_id: org(req) }, { $set: rewardFields(req.body || {}) }, { returnDocument: "after" }); if (!d) throw fail("Not found.", 404); ok(res, { reward: d }); });
 exports.deleteReward = asyncHandler(async (req, res) => { await GamReward.updateOne({ _id: oid(req.params.id), organisation_id: org(req) }, { $set: { active: false } }); ok(res); });
 
-// A starter catalogue so a new org has something to spend coins on.
+// A starter catalogue so a new organisation has something to redeem points for.
 exports.seedRewards = asyncHandler(async (req, res) => {
   if (await GamReward.exists({ organisation_id: org(req) })) throw fail("Your store already has rewards.");
-  const base = { organisation_id: org(req), createdBy: actorKey(req) };
+  const base = { organisation_id: org(req), createdBy: actorKey(req), stock: -1, requiresApproval: true };
   const items = [
-    { name: "Coffee on the house", icon: "☕", category: "perk", cost: 150, description: "A free coffee or tea from the office pantry/cafe.", requiresApproval: true },
-    { name: "Wear-what-you-like day", icon: "👟", category: "perk", cost: 300, description: "Dress casually for a day.", requiresApproval: true },
-    { name: "Team lunch for 4", icon: "🍕", category: "perk", cost: 1500, description: "Lunch with your team, on the company.", requiresApproval: true, perUserLimit: 2 },
-    { name: "Extended lunch break", icon: "🥗", category: "time", cost: 400, description: "An extra 30 minutes at lunch (manager approval).", requiresApproval: true },
-    { name: "Half-day off", icon: "🌴", category: "time", cost: 2500, description: "Take a half day, no leave balance used.", requiresApproval: true, minLevel: 10, perUserLimit: 2 },
-    { name: "Gift voucher ₹500", icon: "🎟️", category: "voucher", cost: 3000, description: "A ₹500 voucher.", requiresApproval: true, minLevel: 8, stock: 20 },
-    { name: "Company swag", icon: "👕", category: "swag", cost: 2000, description: "T-shirt, mug or notebook of your choice.", requiresApproval: true },
-    { name: "Donate to charity", icon: "💚", category: "charity", cost: 500, description: "The company donates ₹250 in your name.", requiresApproval: true },
-    { name: "Streak freeze", icon: "🧊", category: "boost", cost: 100, description: "Protect a streak for one missed day.", requiresApproval: false, effect: { type: "freeze", freezes: 1 } },
-    { name: "Mystery box", icon: "📦", category: "boost", cost: 120, description: "Open it for 50–300 bonus coins. Feeling lucky?", requiresApproval: false, effect: { type: "mystery", mysteryMin: 50, mysteryMax: 300 } },
-    { name: "Neon avatar frame", icon: "🟢", category: "cosmetic", cost: 400, description: "An animated neon ring for your avatar.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "frame", cosmeticId: "neon" } },
-    { name: "Rose Gold frame", icon: "🌸", category: "cosmetic", cost: 350, description: "A soft rose-gold avatar ring.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "frame", cosmeticId: "rose_gold" } },
-    { name: "Ocean profile theme", icon: "🌊", category: "cosmetic", cost: 300, description: "Cool ocean colours for your profile card.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "theme", cosmeticId: "ocean" } },
-    { name: "Neon City theme", icon: "🌃", category: "cosmetic", cost: 450, description: "A vivid neon-city profile card.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "theme", cosmeticId: "neon_city" } },
-    { name: "Title: Office Legend", icon: "🏆", category: "cosmetic", cost: 600, description: "Show off a legendary title.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "title", cosmeticId: "office_legend" } },
-    { name: "Title: Lucky Charm", icon: "🍀", category: "cosmetic", cost: 350, description: "A lucky title for your profile.", requiresApproval: false, effect: { type: "cosmetic", cosmeticType: "title", cosmeticId: "lucky_charm" } },
-  ].map((i) => ({ ...base, stock: -1, ...i }));
+    { name: "Coffee or tea voucher", icon: "coffee", category: "perk", cost: 150, description: "A complimentary coffee or tea from the office pantry or cafe." },
+    { name: "Casual dress day", icon: "shirt", category: "perk", cost: 300, description: "Dress casually for a day." },
+    { name: "Team lunch for four", icon: "users", category: "perk", cost: 1500, description: "Lunch with your team, covered by the company.", perUserLimit: 2 },
+    { name: "Extended lunch break", icon: "clock", category: "time", cost: 400, description: "An extra 30 minutes at lunch, subject to manager approval." },
+    { name: "Half-day off", icon: "plane", category: "time", cost: 2500, description: "Take a half day without using your leave balance.", minLevel: 10, perUserLimit: 2 },
+    { name: "Gift voucher (INR 500)", icon: "ticket", category: "voucher", cost: 3000, description: "A voucher worth INR 500.", minLevel: 8, stock: 20 },
+    { name: "Company merchandise", icon: "shirt", category: "swag", cost: 2000, description: "A T-shirt, mug or notebook of your choice." },
+    { name: "Charity donation", icon: "heart", category: "charity", cost: 500, description: "The company donates INR 250 to a cause in your name." },
+    { name: "Learning budget top-up", icon: "book", category: "other", cost: 3500, description: "Add INR 1,000 towards a course or book of your choice.", minLevel: 12 },
+  ].map((i) => ({ ...base, ...i }));
   await GamReward.insertMany(items);
   ok(res, { created: items.length });
 });
@@ -323,7 +311,7 @@ exports.decideRedemption = asyncHandler(async (req, res) => {
   const profile = await GamProfile.findOne({ personKey: r.personKey }).lean();
   if (profile) {
     if (next === "rejected") await store.refund(r, profile);
-    await engine.notifyPerson(profile, { title: `${r.rewardIcon || "🎁"} ${r.rewardName}: ${next}`, message: next === "rejected" ? `Your coins were refunded.${adminNote ? " Note: " + adminNote : ""}` : `Your reward request was ${next}.${adminNote ? " Note: " + adminNote : ""}`, priority: "medium" });
+    await engine.notifyPerson(profile, { title: `${r.rewardName}: ${next}`, message: next === "rejected" ? `Your reward points were refunded.${adminNote ? " Note: " + adminNote : ""}` : `Your reward request was ${next}.${adminNote ? " Note: " + adminNote : ""}`, priority: "medium" });
   }
   ok(res);
 });
@@ -336,7 +324,7 @@ exports.createSeason = asyncHandler(async (req, res) => {
   if (endsAt <= startsAt) throw fail("The end must be after the start.");
   if (!String(b.name || "").trim()) throw fail("Give the season a name.");
   const prizes = Array.isArray(b.prizes) ? b.prizes.slice(0, 10).map((p, i) => ({ rank: i + 1, xp: num(p.xp, 0, 50000), coins: num(p.coins, 0, 50000), label: String(p.label || "").slice(0, 40) })) : undefined;
-  const doc = await GamSeason.create({ organisation_id: org(req), name: b.name, theme: b.theme || "🏟️", startsAt, endsAt, status: startsAt > new Date() ? "upcoming" : "active", ...(prizes ? { prizes } : {}), createdBy: actorKey(req) });
+  const doc = await GamSeason.create({ organisation_id: org(req), name: b.name, theme: String(b.theme || "trophy").slice(0, 24), startsAt, endsAt, status: startsAt > new Date() ? "upcoming" : "active", ...(prizes ? { prizes } : {}), createdBy: actorKey(req) });
   ok(res, { season: doc });
 });
 exports.finaliseSeason = asyncHandler(async (req, res) => {
@@ -345,19 +333,6 @@ exports.finaliseSeason = asyncHandler(async (req, res) => {
   ok(res, { winners: await seasons.finaliseSeason(s) });
 });
 exports.deleteSeason = asyncHandler(async (req, res) => { await GamSeason.deleteOne({ _id: oid(req.params.id), organisation_id: org(req), status: { $ne: "finalised" } }); ok(res); });
-
-// ── quiz questions ──────────────────────────────────────────────────────
-const quizFields = (b) => {
-  const options = (Array.isArray(b.options) ? b.options : []).map((o) => String(o).trim()).filter(Boolean).slice(0, 5);
-  if (!String(b.question || "").trim() || options.length < 2) throw fail("A question needs text and at least 2 options.");
-  const answer = num(b.answer, 0, options.length - 1, -1);
-  if (answer < 0) throw fail("Mark the correct option.");
-  return { question: String(b.question).trim(), options, answer, category: String(b.category || "Company").slice(0, 30), explanation: String(b.explanation || "").slice(0, 300), active: b.active !== false };
-};
-exports.listQuiz = asyncHandler(async (req, res) => ok(res, { questions: await GamQuizQuestion.find({ organisation_id: org(req) }).sort({ createdAt: -1 }).lean() }));
-exports.createQuiz = asyncHandler(async (req, res) => ok(res, { question: await GamQuizQuestion.create({ organisation_id: org(req), ...quizFields(req.body || {}), createdBy: actorKey(req) }) }));
-exports.updateQuiz = asyncHandler(async (req, res) => { const d = await GamQuizQuestion.findOneAndUpdate({ _id: oid(req.params.id), organisation_id: org(req) }, { $set: quizFields(req.body || {}) }, { returnDocument: "after" }); if (!d) throw fail("Not found.", 404); ok(res, { question: d }); });
-exports.deleteQuiz = asyncHandler(async (req, res) => { await GamQuizQuestion.deleteOne({ _id: oid(req.params.id), organisation_id: org(req) }); ok(res); });
 
 // ── kudos moderation ────────────────────────────────────────────────────
 exports.moderateKudos = asyncHandler(async (req, res) => {

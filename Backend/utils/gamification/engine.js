@@ -15,7 +15,6 @@ const { getSettings } = require("./settings");
 const { EVENTS, resolveRule } = require("./catalog/events");
 const { levelFromXp, levelUpCoins, rankForLevel, titleForLevel } = require("./catalog/levels");
 const { BADGE_MAP, candidatesFor, meets } = require("./catalog/badges");
-const cosmetics = require("./catalog/cosmetics");
 const { STREAK_EVENTS, advanceStreak, viewStreak } = require("./streaks");
 const { toISTKey, periodKeys } = require("./periods");
 
@@ -161,8 +160,8 @@ const awardBadge = async (profile, badge, { grantedBy = "", note = "", depth = 0
     });
   }
   await notifyPerson(profile, {
-    title: `${badge.icon || "🏅"} New badge: ${badge.name}`,
-    message: badge.description || "You earned a new badge!",
+    title: `New achievement: ${badge.name}`,
+    message: badge.description || "You earned a new achievement.",
     meta: { badge: badge.key },
   });
   return { key: badge.key, name: badge.name, icon: badge.icon, tier: badge.tier, description: badge.description, color: badge.color, xp: reward.xp, coins: reward.coins };
@@ -302,7 +301,6 @@ async function award(opts) {
   const set = { lastActiveAt: new Date() };
   if (streakResult && streakResult.changed) {
     set[`streaks.${streakName}`] = streakResult.streak;
-    if (streakResult.freezesUsed) inc.freezes = -streakResult.freezesUsed;
   }
   if (event === "anniversary_bonus" && meta.years) set["stats.anniversary_years"] = meta.years;
 
@@ -323,7 +321,7 @@ async function award(opts) {
       levelUps.push({ level: l, coins: coinsBonus, title: titleForLevel(l), rank: rankForLevel(l).label });
     }
     const top = levelUps[levelUps.length - 1];
-    await notifyPerson(fresh, { title: `⬆️ Level ${top.level} reached!`, message: `You are now a ${top.title} (${top.rank}). +${top.coins} coins bonus.`, meta: { level: top.level } });
+    await notifyPerson(fresh, { title: `You reached level ${top.level}`, message: `New title: ${top.title} (${top.rank} tier). Bonus: +${top.coins} reward points.`, meta: { level: top.level } });
     fresh = (await GamProfile.findById(profile._id).lean()) || fresh;
   }
 
@@ -337,7 +335,7 @@ async function award(opts) {
       dedupeKey: `streak:${profile.personKey}:${streakName}:${streakResult.streak.startKey}:${m.days}`,
       meta: { streak: streakName, days: m.days }, silent: true, _depth: _depth + 1, force: true,
     });
-    await notifyPerson(fresh, { title: `🔥 ${m.days}-day ${streakName} streak!`, message: `Milestone bonus: +${m.xp} XP, +${m.coins} coins.`, meta: { streak: streakName, days: m.days } });
+    await notifyPerson(fresh, { title: `${m.days}-day attendance consistency milestone`, message: `Bonus: +${m.xp} XP and +${m.coins} reward points.`, meta: { streak: streakName, days: m.days } });
     fresh = (await GamProfile.findById(profile._id).lean()) || fresh;
   }
 
@@ -360,7 +358,7 @@ async function award(opts) {
   const result = {
     ok: true, event, xp: gainXp, coins: gainCoins, capped,
     level: lv.level, levelUps, badges, milestone, quests: questsDone,
-    streak: streakResult && streakResult.changed ? { name: streakName, current: streakResult.streak.current, freezesUsed: streakResult.freezesUsed } : null,
+    streak: streakResult && streakResult.changed ? { name: streakName, current: streakResult.streak.current } : null,
   };
 
   if (!silent && (gainXp > 0 || gainCoins > 0 || levelUps.length || badges.length || questsDone.length)) {
@@ -385,27 +383,11 @@ const safeAward = async (opts) => {
 };
 
 // ── read model: everything the UI needs about one person ────────────────
-const resolveEquipped = (profile) => {
-  const eq = profile.equipped || {};
-  const frameId = cosmetics.isUnlocked("frame", eq.frame || "none", profile) ? eq.frame || "none" : "none";
-  const themeId = cosmetics.isUnlocked("theme", eq.theme || "default", profile) ? eq.theme || "default" : "default";
-  let titleText = titleForLevel(profile.level || 1);
-  if (eq.title && eq.title !== "level" && cosmetics.isUnlocked("title", eq.title, profile)) titleText = cosmetics.find("title", eq.title).name;
-  return {
-    frame: { id: frameId, css: (cosmetics.find("frame", frameId) || {}).css || "", animated: !!(cosmetics.find("frame", frameId) || {}).animated },
-    theme: { id: themeId, css: (cosmetics.find("theme", themeId) || {}).css || "" },
-    title: titleText,
-    titleId: eq.title || "level",
-  };
-};
-
 const buildSummary = async (profile, settings) => {
   const lv = levelFromXp(profile.xp, settings.levelBase);
   const rank = rankForLevel(lv.level);
   const todayKey = toISTKey();
   const daily = profile.daily && profile.daily.key === todayKey ? profile.daily : { xp: 0, counts: {} };
-  const streaks = {};
-  for (const name of ["attendance", "login", "quiz", "kudos"]) streaks[name] = await viewStreak(profile, name, todayKey);
   return {
     personKey: profile.personKey,
     name: profile.name,
@@ -418,15 +400,13 @@ const buildSummary = async (profile, settings) => {
     spentCoins: profile.spentCoins,
     level: lv,
     rank: { key: rank.key, label: rank.label, color: rank.color },
-    equipped: resolveEquipped(profile),
-    streaks,
-    freezes: profile.freezes || 0,
+    title: titleForLevel(lv.level),
+    streak: await viewStreak(profile, "attendance", todayKey),
     badgeCount: (profile.badgeKeys || []).length,
     stats: profile.stats || {},
     today: { xp: daily.xp || 0, cap: settings.dailyXpCap, counts: daily.counts || {} },
     optedOut: !!profile.optedOut,
     showOnLeaderboard: profile.showOnLeaderboard !== false,
-    unlockedCosmetics: profile.unlockedCosmetics || [],
     periods: periodKeys(),
   };
 };
@@ -434,5 +414,5 @@ const buildSummary = async (profile, settings) => {
 module.exports = {
   award, safeAward, awardBadge, grantCustomBadge, evaluateBadges,
   getOrCreateProfile, loadIdentity, refreshIdentity,
-  buildSummary, resolveEquipped, personKeyOf, modelFromRole, notifyPerson, pushLive, ELIGIBLE,
+  buildSummary, personKeyOf, modelFromRole, notifyPerson, pushLive, ELIGIBLE,
 };

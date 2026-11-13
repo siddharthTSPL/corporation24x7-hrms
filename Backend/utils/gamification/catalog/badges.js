@@ -26,40 +26,35 @@ const TIER_COLOR = {
 
 // [familyKey, name, icon, category, criteriaFactory, thresholds[], descriptionTemplate]
 const FAMILIES = [
-  ["attendance_days", "Regular", "🕘", "attendance", (n) => ({ type: "stat", stat: "attendance_checkin", min: n }), [1, 25, 100, 250, 500], (n) => `Check in on ${n} day${n > 1 ? "s" : ""}`],
-  ["on_time", "Clockwork", "⏰", "attendance", (n) => ({ type: "stat", stat: "attendance_ontime", min: n }), [10, 50, 150, 300, 600], (n) => `Be on time ${n} times`],
-  ["full_days", "Finisher", "🏁", "attendance", (n) => ({ type: "stat", stat: "attendance_checkout", min: n }), [5, 30, 100, 250, 500], (n) => `Complete ${n} full working days`],
-  ["att_streak", "Attendance Streak", "🔥", "attendance", (n) => ({ type: "streak", name: "attendance", min: n }), [3, 7, 14, 30, 60], (n) => `Reach a ${n}-day attendance streak`],
-  ["perfect_week", "Perfect Week", "📅", "attendance", (n) => ({ type: "stat", stat: "attendance_perfect_week", min: n }), [1, 4, 12, 26, 52], (n) => `${n} perfect attendance week${n > 1 ? "s" : ""}`],
-  ["perfect_month", "Perfect Month", "🗓️", "attendance", (n) => ({ type: "stat", stat: "attendance_perfect_month", min: n }), [1, 3, 6, 9, 12], (n) => `${n} perfect attendance month${n > 1 ? "s" : ""}`],
+  ["attendance_days", "Regular", "clock", "attendance", (n) => ({ type: "stat", stat: "attendance_checkin", min: n }), [1, 25, 100, 250, 500], (n) => `Check in on ${n} day${n > 1 ? "s" : ""}`],
+  ["on_time", "Punctual", "timer", "attendance", (n) => ({ type: "stat", stat: "attendance_ontime", min: n }), [10, 50, 150, 300, 600], (n) => `Be on time ${n} times`],
+  ["full_days", "Day Closer", "check", "attendance", (n) => ({ type: "stat", stat: "attendance_checkout", min: n }), [5, 30, 100, 250, 500], (n) => `Complete ${n} full working days`],
+  ["att_streak", "Consistency", "flame", "attendance", (n) => ({ type: "streak", name: "attendance", min: n }), [3, 7, 14, 30, 60], (n) => `Maintain a ${n}-day attendance streak`],
+  ["perfect_week", "Perfect Week", "calendar", "attendance", (n) => ({ type: "stat", stat: "attendance_perfect_week", min: n }), [1, 4, 12, 26, 52], (n) => `${n} perfect attendance week${n > 1 ? "s" : ""}`],
+  ["perfect_month", "Perfect Month", "calendar", "attendance", (n) => ({ type: "stat", stat: "attendance_perfect_month", min: n }), [1, 3, 6, 9, 12], (n) => `${n} perfect attendance month${n > 1 ? "s" : ""}`],
 
-  ["login_streak", "Daily Devotee", "🎁", "engagement", (n) => ({ type: "streak", name: "login", min: n }), [3, 7, 21, 60, 180], (n) => `Claim your daily reward ${n} days in a row`],
-  ["quiz_whiz", "Quiz Whiz", "🧠", "engagement", (n) => ({ type: "stat", stat: "quiz_correct", min: n }), [3, 15, 50, 120, 250], (n) => `Answer ${n} daily quizzes correctly`],
-  ["quiz_streak", "Brainiac Streak", "🎯", "engagement", (n) => ({ type: "streak", name: "quiz", min: n }), [3, 7, 14, 30, 60], (n) => `Play the quiz ${n} days running`],
-  ["lucky", "Lucky Spinner", "🎡", "engagement", (n) => ({ type: "stat", stat: "spin_played", min: n }), [1, 10, 40, 100, 250], (n) => `Spin the wheel ${n} time${n > 1 ? "s" : ""}`],
+  ["learner", "Continuous Learner", "graduation", "learning", (n) => ({ type: "stat", stat: "training_completed", min: n }), [1, 3, 6, 12, 25], (n) => `Complete ${n} training${n > 1 ? "s" : ""}`],
+  ["policy_pro", "Policy Compliant", "shield", "growth", (n) => ({ type: "stat", stat: "policy_acknowledged", min: n }), [1, 5, 12, 25, 50], (n) => `Acknowledge ${n} polic${n > 1 ? "ies" : "y"}`],
+  ["reviewer", "Reviewer", "clipboard", "growth", (n) => ({ type: "stat", stat: "review_submitted", min: n }), [1, 5, 15, 40, 100], (n) => `Submit ${n} performance review${n > 1 ? "s" : ""}`],
+  ["open_minded", "Growth Mindset", "handshake", "growth", (n) => ({ type: "stat", stat: "review_accepted", min: n }), [1, 3, 8, 16, 32], (n) => `Acknowledge ${n} of your own reviews`],
+  ["idea_machine", "Innovator", "bulb", "growth", (n) => ({ type: "stat", stat: "suggestion_submitted", min: n }), [1, 5, 15, 40, 100], (n) => `Share ${n} idea${n > 1 ? "s" : ""}`],
 
-  ["learner", "Lifelong Learner", "🎓", "learning", (n) => ({ type: "stat", stat: "training_completed", min: n }), [1, 3, 6, 12, 25], (n) => `Complete ${n} training${n > 1 ? "s" : ""}`],
-  ["policy_pro", "Policy Pro", "📜", "growth", (n) => ({ type: "stat", stat: "policy_acknowledged", min: n }), [1, 5, 12, 25, 50], (n) => `Acknowledge ${n} polic${n > 1 ? "ies" : "y"}`],
-  ["reviewer", "Fair Reviewer", "📝", "growth", (n) => ({ type: "stat", stat: "review_submitted", min: n }), [1, 5, 15, 40, 100], (n) => `Submit ${n} performance review${n > 1 ? "s" : ""}`],
-  ["open_minded", "Open Minded", "🤝", "growth", (n) => ({ type: "stat", stat: "review_accepted", min: n }), [1, 3, 8, 16, 32], (n) => `Acknowledge ${n} of your own reviews`],
-  ["idea_machine", "Idea Machine", "💡", "growth", (n) => ({ type: "stat", stat: "suggestion_submitted", min: n }), [1, 5, 15, 40, 100], (n) => `Share ${n} idea${n > 1 ? "s" : ""}`],
+  ["sheet_hero", "Timesheet Champion", "file", "productivity", (n) => ({ type: "stat", stat: "timesheet_submitted", min: n }), [1, 10, 40, 100, 250], (n) => `Submit ${n} timesheet${n > 1 ? "s" : ""}`],
+  ["closer", "Closer", "check", "productivity", (n) => ({ type: "stat", stat: "meeting_action_done", min: n }), [1, 10, 40, 100, 250], (n) => `Close ${n} meeting action item${n > 1 ? "s" : ""}`],
+  ["voice", "Constructive Voice", "message", "productivity", (n) => ({ type: "stat", stat: "meeting_feedback_given", min: n }), [1, 10, 30, 80, 200], (n) => `Share feedback on ${n} meeting${n > 1 ? "s" : ""}`],
 
-  ["sheet_hero", "Timesheet Hero", "🧾", "productivity", (n) => ({ type: "stat", stat: "timesheet_submitted", min: n }), [1, 10, 40, 100, 250], (n) => `Submit ${n} timesheet${n > 1 ? "s" : ""}`],
-  ["closer", "The Closer", "☑️", "productivity", (n) => ({ type: "stat", stat: "meeting_action_done", min: n }), [1, 10, 40, 100, 250], (n) => `Close ${n} meeting action item${n > 1 ? "s" : ""}`],
-  ["voice", "Constructive Voice", "🗣️", "productivity", (n) => ({ type: "stat", stat: "meeting_feedback_given", min: n }), [1, 10, 30, 80, 200], (n) => `Share feedback on ${n} meeting${n > 1 ? "s" : ""}`],
+  ["cheerleader", "Recognition Giver", "thumbs", "culture", (n) => ({ type: "stat", stat: "kudos_given", min: n }), [1, 10, 40, 100, 250], (n) => `Recognise colleagues ${n} time${n > 1 ? "s" : ""}`],
+  ["beloved", "Valued Teammate", "star", "culture", (n) => ({ type: "stat", stat: "kudos_received", min: n }), [1, 10, 30, 75, 150], (n) => `Receive recognition ${n} time${n > 1 ? "s" : ""}`],
 
-  ["cheerleader", "Cheerleader", "👏", "culture", (n) => ({ type: "stat", stat: "kudos_given", min: n }), [1, 10, 40, 100, 250], (n) => `Give kudos ${n} time${n > 1 ? "s" : ""}`],
-  ["beloved", "Team Favourite", "🌟", "culture", (n) => ({ type: "stat", stat: "kudos_received", min: n }), [1, 10, 30, 75, 150], (n) => `Receive kudos ${n} time${n > 1 ? "s" : ""}`],
+  ["quest_runner", "Goal Getter", "target", "engagement", (n) => ({ type: "stat", stat: "quest_completed", min: n }), [1, 10, 40, 120, 300], (n) => `Complete ${n} goal${n > 1 ? "s" : ""}`],
+  ["challenger", "Challenger", "trophy", "engagement", (n) => ({ type: "stat", stat: "challenge_completed", min: n }), [1, 3, 8, 16, 30], (n) => `Complete ${n} challenge${n > 1 ? "s" : ""}`],
+  ["shopper", "Rewards Redeemer", "gift", "engagement", (n) => ({ type: "stat", stat: "store_redeem", min: n }), [1, 3, 8, 16, 30], (n) => `Redeem ${n} reward${n > 1 ? "s" : ""}`],
+  ["weekly_champ", "Weekly Top Contributor", "medal", "engagement", (n) => ({ type: "stat", stat: "weekly_win", min: n }), [1, 3, 8, 16, 32], (n) => `Be a top contributor of the week ${n} time${n > 1 ? "s" : ""}`],
+  ["monthly_star", "Top Performer", "crown", "engagement", (n) => ({ type: "stat", stat: "monthly_star", min: n }), [1, 2, 4, 8, 12], (n) => `Be top performer of the month ${n} time${n > 1 ? "s" : ""}`],
 
-  ["quest_runner", "Quest Runner", "🗺️", "engagement", (n) => ({ type: "stat", stat: "quest_completed", min: n }), [1, 10, 40, 120, 300], (n) => `Complete ${n} quest${n > 1 ? "s" : ""}`],
-  ["challenger", "Challenger", "🏆", "engagement", (n) => ({ type: "stat", stat: "challenge_completed", min: n }), [1, 3, 8, 16, 30], (n) => `Complete ${n} challenge${n > 1 ? "s" : ""}`],
-  ["shopper", "Smart Shopper", "🛒", "engagement", (n) => ({ type: "stat", stat: "store_redeem", min: n }), [1, 3, 8, 16, 30], (n) => `Redeem ${n} reward${n > 1 ? "s" : ""}`],
-  ["weekly_champ", "Weekly Champion", "🥇", "engagement", (n) => ({ type: "stat", stat: "weekly_win", min: n }), [1, 3, 8, 16, 32], (n) => `Win the weekly leaderboard ${n} time${n > 1 ? "s" : ""}`],
-  ["monthly_star", "Star of the Month", "⭐", "engagement", (n) => ({ type: "stat", stat: "monthly_star", min: n }), [1, 2, 4, 8, 12], (n) => `Be Star of the Month ${n} time${n > 1 ? "s" : ""}`],
-
-  ["leveller", "Level Up", "⬆️", "progress", (n) => ({ type: "level", min: n }), [5, 10, 20, 35, 50], (n) => `Reach level ${n}`],
-  ["xp_collector", "XP Collector", "✨", "progress", (n) => ({ type: "xp", min: n }), [1000, 5000, 15000, 40000, 100000], (n) => `Earn ${n.toLocaleString("en-IN")} lifetime XP`],
-  ["loyal", "Loyalty", "🎉", "progress", (n) => ({ type: "stat", stat: "anniversary_bonus", min: n }), [1, 2, 3, 5, 10], (n) => `Celebrate ${n} work anniversar${n > 1 ? "ies" : "y"} here`],
+  ["leveller", "Level", "trend", "progress", (n) => ({ type: "level", min: n }), [5, 10, 20, 35, 50], (n) => `Reach level ${n}`],
+  ["xp_collector", "XP Milestone", "sparkles", "progress", (n) => ({ type: "xp", min: n }), [1000, 5000, 15000, 40000, 100000], (n) => `Earn ${n.toLocaleString("en-IN")} lifetime XP`],
+  ["loyal", "Tenure", "gift", "progress", (n) => ({ type: "stat", stat: "anniversary_bonus", min: n }), [1, 2, 3, 5, 10], (n) => `Reach ${n} work anniversar${n > 1 ? "ies" : "y"} with the company`],
 ];
 
 const BADGES = [];
@@ -69,8 +64,8 @@ for (const [family, name, icon, category, criteria, thresholds, desc] of FAMILIE
     BADGES.push({
       key: `${family}_${tier}`,
       family,
-      name: i === 0 && ["attendance_days", "learner", "cheerleader", "beloved", "lucky", "policy_pro"].includes(family)
-        ? { attendance_days: "First Day", learner: "First Lesson", cheerleader: "First Cheer", beloved: "First Kudos", lucky: "First Spin", policy_pro: "Read the Rules" }[family]
+      name: i === 0 && ["attendance_days", "learner", "cheerleader", "beloved", "policy_pro"].includes(family)
+        ? { attendance_days: "First Day", learner: "First Lesson", cheerleader: "First Recognition", beloved: "First Appreciation", policy_pro: "Read the Rules" }[family]
         : `${name} ${["I", "II", "III", "IV", "V"][i]}`,
       description: desc(n),
       icon,
@@ -84,22 +79,20 @@ for (const [family, name, icon, category, criteria, thresholds, desc] of FAMILIE
   });
 }
 
-// One-off / special badges.
+// One-off / special achievements.
 const SPECIAL = [
-  { key: "welcome_aboard", name: "Welcome Aboard", description: "Join the rewards programme", icon: "🚀", category: "profile", criteria: { type: "stat", stat: "welcome", min: 1 } },
-  { key: "say_cheese", name: "Say Cheese", description: "Add a profile photo", icon: "📸", category: "profile", criteria: { type: "stat", stat: "profile_photo", min: 1 } },
-  { key: "profile_pro", name: "Profile Pro", description: "Complete your profile", icon: "🧩", category: "profile", criteria: { type: "stat", stat: "profile_complete", min: 1 } },
-  { key: "window_shopper", name: "Window Shopper", description: "Visit the Rewards Store", icon: "🛍️", category: "engagement", criteria: { type: "stat", stat: "store_visit", min: 1 } },
-  { key: "season_champion", name: "Season Champion", description: "Finish a season at #1", icon: "👑", category: "engagement", criteria: { type: "stat", stat: "season_win", min: 1 } },
-  { key: "all_rounder", name: "Renaissance Employee", description: "Check in, learn, recognise, acknowledge a policy, submit a timesheet and ace a quiz", icon: "🌈", category: "progress", criteria: { type: "all", stats: ["attendance_checkin", "training_completed", "kudos_given", "policy_acknowledged", "timesheet_submitted", "quiz_correct"] } },
-  { key: "culture_carrier", name: "Culture Carrier", description: "Give 25 and receive 25 kudos", icon: "💖", category: "culture", criteria: { type: "all", stats: [] }, manual: true },
-  { key: "century_club", name: "Century Club", description: "Reach level 100", icon: "💯", category: "progress", criteria: { type: "level", min: 100 } },
-  { key: "hall_of_famer", name: "Hall of Famer", description: "Inducted into the Hall of Fame", icon: "🏛️", category: "engagement", criteria: { type: "manual" }, manual: true },
-  { key: "mentor", name: "Mentor", description: "Recognised by your manager as a mentor", icon: "🧭", category: "culture", criteria: { type: "manual" }, manual: true },
-  { key: "innovator", name: "Innovator", description: "Awarded for an outstanding idea", icon: "🔬", category: "growth", criteria: { type: "manual" }, manual: true },
-  { key: "customer_champion", name: "Customer Champion", description: "Awarded for going above and beyond for a customer", icon: "🛡️", category: "culture", criteria: { type: "manual" }, manual: true },
-  { key: "problem_solver", name: "Problem Solver", description: "Awarded for solving a hard problem", icon: "🧩", category: "productivity", criteria: { type: "manual" }, manual: true },
-  { key: "team_player", name: "Team Player", description: "Awarded for exceptional collaboration", icon: "🤲", category: "culture", criteria: { type: "manual" }, manual: true },
+  { key: "welcome_aboard", name: "Welcome Aboard", description: "Join the rewards programme", icon: "rocket", category: "profile", criteria: { type: "stat", stat: "welcome", min: 1 } },
+  { key: "say_cheese", name: "Profile Photo", description: "Add a profile photo", icon: "camera", category: "profile", criteria: { type: "stat", stat: "profile_photo", min: 1 } },
+  { key: "profile_pro", name: "Complete Profile", description: "Complete your profile", icon: "user", category: "profile", criteria: { type: "stat", stat: "profile_complete", min: 1 } },
+  { key: "season_champion", name: "Season Champion", description: "Finish a season ranked #1", icon: "crown", category: "engagement", criteria: { type: "stat", stat: "season_win", min: 1 } },
+  { key: "all_rounder", name: "All-Rounder", description: "Check in, complete training, recognise a colleague, acknowledge a policy and submit a timesheet", icon: "layers", category: "progress", criteria: { type: "all", stats: ["attendance_checkin", "training_completed", "kudos_given", "policy_acknowledged", "timesheet_submitted"] } },
+  { key: "century_club", name: "Level 100", description: "Reach level 100", icon: "medal", category: "progress", criteria: { type: "level", min: 100 } },
+  { key: "hall_of_famer", name: "Hall of Fame", description: "Inducted into the Hall of Fame", icon: "trophy", category: "engagement", criteria: { type: "manual" }, manual: true },
+  { key: "mentor", name: "Mentor", description: "Recognised by your manager as a mentor", icon: "compass", category: "culture", criteria: { type: "manual" }, manual: true },
+  { key: "innovator", name: "Innovation Award", description: "Awarded for an outstanding idea", icon: "bulb", category: "growth", criteria: { type: "manual" }, manual: true },
+  { key: "customer_champion", name: "Customer Champion", description: "Awarded for going above and beyond for a customer", icon: "shield", category: "culture", criteria: { type: "manual" }, manual: true },
+  { key: "problem_solver", name: "Problem Solver", description: "Awarded for solving a hard problem", icon: "puzzle", category: "productivity", criteria: { type: "manual" }, manual: true },
+  { key: "team_player", name: "Team Player", description: "Awarded for exceptional collaboration", icon: "users", category: "culture", criteria: { type: "manual" }, manual: true },
 ];
 for (const s of SPECIAL) {
   if (s.manual && s.criteria.type === "all") s.criteria = { type: "manual" };

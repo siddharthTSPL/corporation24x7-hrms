@@ -26,19 +26,9 @@ const schema = new mongoose.Schema(
     stats: { type: mongoose.Schema.Types.Mixed, default: {} },
     // { attendance:{current,longest,lastKey,startKey}, login:{...}, quiz:{...}, ... }
     streaks: { type: mongoose.Schema.Types.Mixed, default: {} },
-    freezes: { type: Number, default: 0 },
 
     badgeKeys: { type: [String], default: [] },
-    unlockedCosmetics: { type: [String], default: [] }, // "frame:neon"
-    equipped: {
-      frame: { type: String, default: "none" },
-      title: { type: String, default: "level" },
-      theme: { type: String, default: "default" },
-    },
-
     daily: { type: mongoose.Schema.Types.Mixed, default: {} }, // {key, xp, counts:{event:n}}
-    spin: { type: mongoose.Schema.Types.Mixed, default: {} }, // {key, count, extra}
-    dailyClaim: { type: mongoose.Schema.Types.Mixed, default: {} }, // {lastKey, day}
     questKeys: { type: mongoose.Schema.Types.Mixed, default: {} }, // {daily, weekly, monthly, onboarding}
     kudosBudget: { type: mongoose.Schema.Types.Mixed, default: {} }, // {monthKey, used}
     awardBudget: { type: mongoose.Schema.Types.Mixed, default: {} }, // {monthKey, xp, coins} for managers/admins awarding

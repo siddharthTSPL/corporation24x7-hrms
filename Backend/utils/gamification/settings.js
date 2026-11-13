@@ -4,7 +4,7 @@ const DEFAULTS = {
   enabled: true,
   modules: {
     attendance: true, timesheet: true, training: true, review: true, policy: true,
-    meetings: true, tickets: true, kudos: true, quiz: true, spin: true, store: true,
+    meetings: true, tickets: true, kudos: true, store: true,
     streaks: true, quests: true, challenges: true, seasons: true, badges: true, leaderboard: true,
   },
   rules: {},
@@ -12,8 +12,6 @@ const DEFAULTS = {
   levelBase: 80,
   leaderboard: { showDepartments: true, showCoins: false, topN: 50 },
   kudos: { monthlyAllowance: 100, maxCoinsPerKudos: 25, maxPerDayPerPerson: 2, dailyLimit: 5, minMessageLength: 10 },
-  streaks: { freezeCost: 100, maxFreezes: 3 },
-  spin: { extraSpinCost: 50, maxExtraPerDay: 2 },
   manager: { monthlyXpLimit: 300, monthlyCoinLimit: 100 },
   seasons: { auto: "none" }, // none | monthly | quarterly
 };
@@ -95,14 +93,6 @@ const sanitiseUpdate = (body = {}) => {
     maxPerDayPerPerson: clampInt(body.kudos.maxPerDayPerPerson, 1, 10, 2),
     dailyLimit: clampInt(body.kudos.dailyLimit, 1, 50, 5),
     minMessageLength: clampInt(body.kudos.minMessageLength, 0, 200, 10),
-  };
-  if (body.streaks) out.streaks = {
-    freezeCost: clampInt(body.streaks.freezeCost, 0, 5000, 100),
-    maxFreezes: clampInt(body.streaks.maxFreezes, 0, 10, 3),
-  };
-  if (body.spin) out.spin = {
-    extraSpinCost: clampInt(body.spin.extraSpinCost, 0, 1000, 50),
-    maxExtraPerDay: clampInt(body.spin.maxExtraPerDay, 0, 10, 2),
   };
   if (body.manager) out.manager = {
     monthlyXpLimit: clampInt(body.manager.monthlyXpLimit, 0, 100000, 300),

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TrendingUp, Award, Target, ThumbsUp, Trophy, Gift } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getGamificationToggle,
@@ -27,11 +28,12 @@ function ToggleSwitch({ checked, onChange, disabled }) {
 }
 
 const PERKS = [
-  ["⚡", "XP & levels", "Employees earn XP for attendance, timesheets, training, reviews and more."],
-  ["🏅", "Badges & streaks", "Milestones, daily streaks and collectible badges."],
-  ["🗺️", "Quests & challenges", "Daily/weekly quests and team challenges with seasons."],
-  ["🎁", "Rewards store & kudos", "Redeem coins for rewards and send peer-to-peer kudos."],
-  ["🏆", "Leaderboards", "Individual and department rankings."],
+  [TrendingUp, "XP and levels", "Employees earn XP for attendance, timesheets, training, reviews and policy acknowledgements."],
+  [Award, "Achievements", "132 milestone achievements, plus custom company achievements."],
+  [Target, "Goals and challenges", "Weekly and monthly goals, team challenges and seasons."],
+  [ThumbsUp, "Peer recognition", "Colleagues recognise each other against company values."],
+  [Trophy, "Leaderboards", "Individual and department rankings, with privacy controls."],
+  [Gift, "Rewards store", "Employees redeem reward points for perks, time off and vouchers, with an approval workflow."],
 ];
 
 // SuperAdmin: turn the Rewards & Gamification module on/off for the whole organisation.
@@ -53,11 +55,11 @@ export default function GamificationToggleCard({ onSuccess, onError }) {
       qc.invalidateQueries({ queryKey: ["plan-features"] });
       qc.invalidateQueries({ queryKey: ["gam"] });
       setConfirmOff(false);
-      onSuccess?.(res.message || (res.enabled ? "Rewards & Gamification enabled" : "Rewards & Gamification disabled"));
+      onSuccess?.(res.message || (res.enabled ? "Recognition & Rewards enabled" : "Recognition & Rewards disabled"));
     },
     onError: (err) => {
       setConfirmOff(false);
-      onError?.(err.message || "Could not update Rewards & Gamification");
+      onError?.(err.message || "Could not update Recognition & Rewards");
     },
   });
 
@@ -72,10 +74,10 @@ export default function GamificationToggleCard({ onSuccess, onError }) {
     <div className="bg-white rounded-xl border border-[#e8dcd6] p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-[#2a1a16] mb-1">Rewards &amp; Gamification</h3>
+          <h3 className="text-base font-semibold text-[#2a1a16] mb-1">Recognition &amp; Rewards</h3>
           <p className="text-sm text-[#8a7a75] max-w-xl">
-            Turn the rewards programme on for your whole organisation. When it is off, the Rewards menu is hidden
-            for admins, managers and employees, and nobody earns XP or coins.
+            Turn the recognition and rewards programme on for your whole organisation. It is off by default. While off,
+            the menu is hidden for admins, managers and employees, and nobody earns XP or reward points.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -90,9 +92,9 @@ export default function GamificationToggleCard({ onSuccess, onError }) {
 
       {confirmOff && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">Switch off Rewards &amp; Gamification?</p>
+          <p className="text-sm font-medium text-amber-800">Switch off Recognition &amp; Rewards?</p>
           <p className="text-xs text-amber-700 mt-1">
-            The Rewards menu will disappear and no new XP will be awarded. Existing points, badges and redemptions
+            The menu will disappear and no new XP will be awarded. Existing points, achievements and redemptions
             are kept, and come back if you switch it on again.
           </p>
           <div className="flex gap-2 mt-3">
@@ -117,9 +119,9 @@ export default function GamificationToggleCard({ onSuccess, onError }) {
       )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {PERKS.map(([icon, title, text]) => (
+        {PERKS.map(([Icon, title, text]) => (
           <div key={title} className="flex gap-3 rounded-lg border border-[#f1e8e3] p-3">
-            <span className="text-xl">{icon}</span>
+            <span className="mt-0.5 text-[#730042]"><Icon size={18} /></span>
             <div>
               <p className="text-sm font-medium text-[#2a1a16]">{title}</p>
               <p className="text-xs text-[#8a7a75] mt-0.5">{text}</p>

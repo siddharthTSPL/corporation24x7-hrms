@@ -1,17 +1,16 @@
-import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Settings } from "lucide-react";
-import { Tabs, Empty, Card, Skeleton } from "../../components/gamification/ui";
+import { Tabs, Empty, Card, Skeleton, PageHeader, Button } from "../../components/gamification/ui";
 import { useGamHub } from "../../auth/server-state/gamification/gamification.hook";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import OverviewTab from "./OverviewTab";
-import QuestsTab from "./QuestsTab";
-import BadgesTab from "./BadgesTab";
+import GoalsTab from "./GoalsTab";
+import AchievementsTab from "./AchievementsTab";
 import LeaderboardTab from "./LeaderboardTab";
-import KudosTab from "./KudosTab";
-import StoreTab from "./StoreTab";
+import RecognitionTab from "./RecognitionTab";
+import RewardsTab from "./RewardsTab";
 import ChallengesTab from "./ChallengesTab";
-import ProfileTab from "./ProfileTab";
+import MyActivityTab from "./MyActivityTab";
 
 export default function GamificationHub() {
   const [params, setParams] = useSearchParams();
@@ -22,46 +21,42 @@ export default function GamificationHub() {
   const isAdmin = ["admin", "senior_admin", "superadmin", "super_admin"].includes(role);
   const goTo = (t) => setParams({ tab: t });
 
-  if (error && /owner account|switched off/i.test(error.message)) {
+  if (error && /owner account|switched off|not enabled/i.test(error.message)) {
     return (
       <div className="mx-auto max-w-xl p-6">
-        <Card><Empty icon={/off/.test(error.message) ? "😴" : "👑"} title={error.message} hint={isAdmin ? "You can manage the programme from the Rewards Admin console." : undefined} />
-          {isAdmin && <div className="pb-6 text-center"><Link to="/gamification-admin" className="rounded-xl bg-[#730042] px-4 py-2 text-sm font-semibold text-white">Open Rewards Admin</Link></div>}</Card>
+        <Card><Empty icon="shield" title={/owner account/i.test(error.message) ? "Owner accounts don't take part" : "Recognition & Rewards is turned off"} hint={error.message}
+          action={isAdmin ? <Link to="/gamification-admin"><Button>Open Rewards administration</Button></Link> : null} /></Card>
       </div>
     );
   }
 
+  const m = hub?.modules || {};
   const tabs = [
-    { id: "overview", icon: "🏠", label: "Overview" },
-    { id: "quests", icon: "🗺️", label: "Quests", badge: hub?.quests?.claimable || 0 },
-    { id: "leaderboard", icon: "🏆", label: "Leaderboard" },
-    { id: "challenges", icon: "⚔️", label: "Challenges" },
-    { id: "kudos", icon: "👏", label: "Kudos" },
-    { id: "badges", icon: "🏅", label: "Badges" },
-    { id: "store", icon: "🛍️", label: "Store" },
-    { id: "profile", icon: "🎨", label: "Me" },
-  ].filter((t) => {
-    const m = hub?.modules || {};
-    return !((t.id === "quests" && m.quests === false) || (t.id === "leaderboard" && m.leaderboard === false) || (t.id === "challenges" && m.challenges === false) || (t.id === "kudos" && m.kudos === false) || (t.id === "badges" && m.badges === false) || (t.id === "store" && m.store === false));
-  });
+    { id: "overview", icon: "layers", label: "Overview" },
+    { id: "goals", icon: "target", label: "Goals", badge: hub?.quests?.claimable || 0, hide: m.quests === false },
+    { id: "recognition", icon: "thumbs", label: "Recognition", hide: m.kudos === false },
+    { id: "leaderboard", icon: "trophy", label: "Leaderboard", hide: m.leaderboard === false },
+    { id: "challenges", icon: "flag", label: "Challenges", hide: m.challenges === false },
+    { id: "achievements", icon: "award", label: "Achievements", hide: m.badges === false },
+    { id: "rewards", icon: "gift", label: "Rewards", hide: m.store === false },
+    { id: "activity", icon: "user", label: "My activity" },
+  ].filter((t) => !t.hide);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-3 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><h1 className="text-2xl font-extrabold text-gray-800">Rewards <span className="text-[#cd166e]">&</span> Recognition</h1><p className="text-sm text-gray-500">Earn XP, level up, collect badges and treat yourself.</p></div>
-        {isAdmin && <Link to="/gamification-admin" className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[#730042] shadow-sm ring-1 ring-gray-200 hover:bg-pink-50"><Settings size={15} /> Admin console</Link>}
-      </div>
+    <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
+      <PageHeader title="Recognition & Rewards" subtitle="Track your progress, recognise colleagues and redeem rewards."
+        actions={isAdmin ? <Link to="/gamification-admin"><Button variant="secondary" size="sm"><Settings size={14} />Administration</Button></Link> : null} />
       <Tabs tabs={tabs} value={tab} onChange={goTo} />
-      {isLoading ? <div className="space-y-4"><Skeleton className="h-48" /><Skeleton className="h-40" /></div> : error ? <Card><Empty icon="⚠️" title={error.message} /></Card> : (
+      {isLoading ? <div className="space-y-4"><Skeleton className="h-44" /><Skeleton className="h-60" /></div> : error ? <Card><Empty icon="shield" title={error.message} /></Card> : (
         <>
           {tab === "overview" && <OverviewTab hub={hub} loading={isLoading} goTo={goTo} />}
-          {tab === "quests" && <QuestsTab />}
+          {tab === "goals" && <GoalsTab />}
+          {tab === "recognition" && <RecognitionTab />}
           {tab === "leaderboard" && <LeaderboardTab me={hub.me} />}
           {tab === "challenges" && <ChallengesTab />}
-          {tab === "kudos" && <KudosTab />}
-          {tab === "badges" && <BadgesTab />}
-          {tab === "store" && <StoreTab />}
-          {tab === "profile" && <ProfileTab me={hub.me} role={role} />}
+          {tab === "achievements" && <AchievementsTab />}
+          {tab === "rewards" && <RewardsTab />}
+          {tab === "activity" && <MyActivityTab me={hub.me} role={role} />}
         </>
       )}
     </div>

@@ -7,7 +7,7 @@ const schema = new mongoose.Schema(
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: 80 },
     description: { type: String, default: "", trim: true, maxlength: 400 },
-    icon: { type: String, default: "🏆", maxlength: 8 },
+    icon: { type: String, default: "trophy", maxlength: 24 },
     scope: { type: String, enum: ["individual", "department"], default: "individual" },
     // What to measure: number of times an event happened, or XP earned (optionally from certain events)
     metric: { type: String, enum: ["count", "xp"], default: "count" },

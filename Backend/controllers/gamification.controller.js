@@ -13,10 +13,8 @@ const engine = require("../utils/gamification/engine");
 const { getSettings } = require("../utils/gamification/settings");
 const { EVENTS, CATEGORIES } = require("../utils/gamification/catalog/events");
 const { BADGES, progressOf, TIER_COLOR } = require("../utils/gamification/catalog/badges");
-const cosmetics = require("../utils/gamification/catalog/cosmetics");
 const { RANKS, TITLES, threshold } = require("../utils/gamification/catalog/levels");
 const quests = require("../utils/gamification/quests.service");
-const daily = require("../utils/gamification/daily.service");
 const board = require("../utils/gamification/leaderboard");
 const store = require("../utils/gamification/store.service");
 const kudos = require("../utils/gamification/kudos.service");
@@ -34,6 +32,8 @@ const who = async (req, { requireProfile = true } = {}) => {
     if (requireProfile) throw fail("The organisation owner account doesn't take part in the rewards programme.", 403);
     return { actor: a, model, profile: null, settings, key: null };
   }
+  // While the module is OFF, never create profiles as a side effect of a status check.
+  if (!requireProfile && !settings.enabled) return { actor: a, model, profile: null, settings, key: null };
   const profile = await engine.getOrCreateProfile(a.organisation_id, model, a.id);
   if (!profile) throw fail("Your rewards profile isn't available.", 403);
   return { actor: a, model, profile, settings, key: profile.personKey };
@@ -61,20 +61,17 @@ exports.history = asyncHandler(async (req, res) => {
   ]);
   ok(res, {
     page, total, pages: Math.ceil(total / limit),
-    items: rows.map((r) => ({ id: String(r._id), event: r.event, label: (EVENTS[r.event] || {}).label || r.event, icon: (EVENTS[r.event] || {}).icon || "✨", xp: r.xp, coins: r.coins, reason: r.reason, at: r.createdAt })),
+    items: rows.map((r) => ({ id: String(r._id), event: r.event, label: (EVENTS[r.event] || {}).label || r.event, icon: (EVENTS[r.event] || {}).icon || "award", xp: r.xp, coins: r.coins, reason: r.reason, at: r.createdAt })),
   });
 });
 
-// One call for the hub landing tab.
+// One call for the Overview tab.
 exports.hub = asyncHandler(async (req, res) => {
   const { profile, settings } = await who(req);
   guardEnabled(settings);
-  const [me, q, d, spin, quiz, lbWeek, challengeList, recentBadges, seasonRow] = await Promise.all([
+  const [me, q, lbWeek, challengeList, recentBadges, seasonRow] = await Promise.all([
     engine.buildSummary(profile, settings),
     quests.listQuests(profile),
-    daily.dailyState(profile),
-    Promise.resolve(daily.spinState(profile, settings)),
-    daily.quizState(profile),
     board.individualBoard({ organisation_id: profile.organisation_id, period: "week", settings, viewerKey: profile.personKey, limit: 5 }),
     challenges.listFor(profile),
     UserBadge.find({ personKey: profile.personKey }).sort({ earnedAt: -1 }).limit(6).lean(),
@@ -82,10 +79,9 @@ exports.hub = asyncHandler(async (req, res) => {
   ]);
   const badgeMap = Object.fromEntries(BADGES.map((b) => [b.key, b]));
   ok(res, {
-    me, quests: q, daily: d, spin, quiz, modules: settings.modules,
-    weekBoard: lbWeek,
+    me, quests: q, modules: settings.modules, weekBoard: lbWeek,
     challenges: challengeList.filter((c) => c.phase === "live").slice(0, 3),
-    recentBadges: recentBadges.map((b) => ({ key: b.badgeKey, earnedAt: b.earnedAt, ...(badgeMap[b.badgeKey] ? { name: badgeMap[b.badgeKey].name, icon: badgeMap[b.badgeKey].icon, tier: badgeMap[b.badgeKey].tier } : {}) })),
+    recentBadges: recentBadges.map((b) => ({ key: b.badgeKey, earnedAt: b.earnedAt, ...(badgeMap[b.badgeKey] ? { name: badgeMap[b.badgeKey].name, icon: badgeMap[b.badgeKey].icon, tier: badgeMap[b.badgeKey].tier, description: badgeMap[b.badgeKey].description } : {}) })),
     season: seasonRow ? { id: String(seasonRow._id), name: seasonRow.name, theme: seasonRow.theme, startsAt: seasonRow.startsAt, endsAt: seasonRow.endsAt, prizes: seasonRow.prizes } : null,
   });
 });
@@ -96,20 +92,8 @@ exports.updatePrefs = asyncHandler(async (req, res) => {
   const set = {};
   if (typeof b.optedOut === "boolean") set.optedOut = b.optedOut;
   if (typeof b.showOnLeaderboard === "boolean") set.showOnLeaderboard = b.showOnLeaderboard;
-  for (const type of ["frame", "title", "theme"]) {
-    if (b[type] !== undefined) {
-      if (!cosmetics.isUnlocked(type, b[type], profile)) throw fail(`That ${type} isn't unlocked yet.`);
-      set[`equipped.${type}`] = b[type];
-    }
-  }
   const fresh = await GamProfile.findByIdAndUpdate(profile._id, { $set: set }, { returnDocument: "after" }).lean();
-  ok(res, { equipped: engine.resolveEquipped(fresh), optedOut: fresh.optedOut, showOnLeaderboard: fresh.showOnLeaderboard });
-});
-
-exports.cosmeticsList = asyncHandler(async (req, res) => {
-  const { profile } = await who(req);
-  const shape = (type) => cosmetics.CATALOG[type].map((c) => ({ ...c, type, unlocked: cosmetics.isUnlocked(type, c.id, profile) }));
-  ok(res, { frames: shape("frame"), titles: shape("title"), themes: shape("theme"), equipped: engine.resolveEquipped(profile) });
+  ok(res, { optedOut: fresh.optedOut, showOnLeaderboard: fresh.showOnLeaderboard });
 });
 
 // ── badges ──────────────────────────────────────────────────────────────
@@ -150,7 +134,7 @@ exports.leaderboard = asyncHandler(async (req, res) => {
   ok(res, { scope: "individual", period, ...(await board.individualBoard({ organisation_id: profile.organisation_id, period, department, settings, viewerKey: profile.personKey, limit })) });
 });
 
-const FEED_EVENTS = ["badge_reward", "level_up", "streak_bonus", "challenge_reward", "season_reward", "weekly_win", "monthly_star", "anniversary_bonus", "birthday_bonus"];
+const FEED_EVENTS = ["badge_reward", "level_up", "streak_bonus", "challenge_reward", "season_reward", "weekly_win", "monthly_star", "anniversary_bonus"];
 exports.feed = asyncHandler(async (req, res) => {
   const { profile } = await who(req);
   const rows = await PointTx.find({ organisation_id: profile.organisation_id, event: { $in: FEED_EVENTS } }).sort({ createdAt: -1 }).limit(40).lean();
@@ -161,12 +145,11 @@ exports.feed = asyncHandler(async (req, res) => {
     const p = map.get(r.personKey);
     const m = r.meta || {};
     let text = (EVENTS[r.event] || {}).label || r.event;
-    if (r.event === "badge_reward" && badgeMap[m.badge]) text = `earned the ${badgeMap[m.badge].name} badge`;
+    if (r.event === "badge_reward" && badgeMap[m.badge]) text = `earned the ${badgeMap[m.badge].name} achievement`;
     else if (r.event === "level_up") text = `reached level ${m.level}`;
-    else if (r.event === "streak_bonus") text = `hit a ${m.days}-day ${m.streak} streak`;
-    else if (r.event === "anniversary_bonus") text = `celebrates ${m.years} year${m.years > 1 ? "s" : ""} with us`;
-    else if (r.event === "birthday_bonus") text = "is celebrating a birthday today";
-    return { id: String(r._id), name: p.name, photo: p.photo, department: p.department, icon: (EVENTS[r.event] || {}).icon, text, at: r.createdAt, mine: r.personKey === profile.personKey };
+    else if (r.event === "streak_bonus") text = `reached a ${m.days}-day attendance streak`;
+    else if (r.event === "anniversary_bonus") text = `completed ${m.years} year${m.years > 1 ? "s" : ""} with the company`;
+    return { id: String(r._id), name: p.name, photo: p.photo, department: p.department, icon: (EVENTS[r.event] || {}).icon || "award", text, at: r.createdAt, mine: r.personKey === profile.personKey };
   });
   ok(res, { items });
 });
@@ -193,43 +176,6 @@ exports.questClaimAll = asyncHandler(async (req, res) => {
   const { profile } = await who(req);
   ok(res, { claimed: await quests.claimAll(profile) });
 });
-exports.questReroll = asyncHandler(async (req, res) => {
-  const { profile } = await who(req);
-  const r = await quests.rerollDaily(profile, req.params.id);
-  if (r.error) throw fail(r.error);
-  ok(res, await quests.listQuests(await GamProfile.findById(profile._id).lean()));
-});
-
-// ── daily reward / spin / quiz / freeze ─────────────────────────────────
-exports.dailyState = asyncHandler(async (req, res) => { const { profile } = await who(req); ok(res, await daily.dailyState(profile)); });
-exports.dailyClaim = asyncHandler(async (req, res) => {
-  const { profile, settings } = await who(req); guardEnabled(settings);
-  const r = await daily.claimDaily(profile);
-  if (r.error) throw fail(r.error);
-  ok(res, r);
-});
-exports.spinState = asyncHandler(async (req, res) => { const { profile, settings } = await who(req); ok(res, daily.spinState(profile, settings)); });
-exports.spin = asyncHandler(async (req, res) => {
-  const { profile, settings } = await who(req); guardEnabled(settings);
-  if (settings.modules.spin === false) throw fail("The lucky wheel is turned off.", 403);
-  const r = await daily.doSpin(profile, settings, { extra: !!(req.body && req.body.extra) });
-  if (r.error) throw fail(r.error);
-  ok(res, r);
-});
-exports.quiz = asyncHandler(async (req, res) => { const { profile, settings } = await who(req); if (settings.modules.quiz === false) throw fail("The daily quiz is turned off.", 403); ok(res, await daily.quizState(profile)); });
-exports.quizAnswer = asyncHandler(async (req, res) => {
-  const { profile, settings } = await who(req); guardEnabled(settings);
-  if (settings.modules.quiz === false) throw fail("The daily quiz is turned off.", 403);
-  const r = await daily.answerQuiz(profile, req.body && req.body.choice);
-  if (r.error) throw fail(r.error);
-  ok(res, r);
-});
-exports.freezeBuy = asyncHandler(async (req, res) => {
-  const { profile, settings } = await who(req);
-  const r = await daily.buyFreeze(profile, settings);
-  if (r.error) throw fail(r.error);
-  ok(res, r);
-});
 
 // ── challenges ──────────────────────────────────────────────────────────
 exports.challenges = asyncHandler(async (req, res) => { const { profile, settings } = await who(req); guardEnabled(settings); ok(res, { challenges: await challenges.listFor(profile) }); });
@@ -252,28 +198,26 @@ exports.store = asyncHandler(async (req, res) => {
   const items = await GamReward.find({ organisation_id: profile.organisation_id, active: true }).sort({ cost: 1 }).lean();
   const mine = await GamRedemption.aggregate([{ $match: { personKey: profile.personKey, status: { $nin: ["rejected", "cancelled"] } } }, { $group: { _id: "$reward", n: { $sum: 1 } } }]);
   const used = new Map(mine.map((m) => [String(m._id), m.n]));
-  engine.safeAward({ organisation_id: profile.organisation_id, model: profile.personModel, id: profile.person, event: "store_visit", dedupeKey: `sv:${profile.personKey}` });
   ok(res, {
     coins: profile.coins,
     items: items.map((r) => ({
       id: String(r._id), name: r.name, description: r.description, icon: r.icon, category: r.category, cost: r.cost, stock: r.stock, minLevel: r.minLevel, perUserLimit: r.perUserLimit,
-      requiresApproval: r.requiresApproval, effect: r.effect && r.effect.type !== "none" ? { type: r.effect.type, cosmeticType: r.effect.cosmeticType, cosmeticId: r.effect.cosmeticId } : null,
+      requiresApproval: r.requiresApproval,
       usedByMe: used.get(String(r._id)) || 0, outOfStock: r.stock === 0, locked: (profile.level || 1) < r.minLevel,
     })),
-    freeze: { cost: settings.streaks.freezeCost, have: profile.freezes || 0, max: settings.streaks.maxFreezes },
   });
 });
 exports.redeem = asyncHandler(async (req, res) => {
   const { profile, settings } = await who(req);
   guardEnabled(settings);
-  const r = await store.redeem(profile, req.params.id, req.body && req.body.note, settings);
+  const r = await store.redeem(profile, req.params.id, req.body && req.body.note);
   if (r.error) throw fail(r.error);
-  ok(res, { redemption: { id: String(r.redemption._id), status: r.redemption.status, result: r.redemption.result }, message: r.redemption.status === "fulfilled" ? "Redeemed — enjoy!" : "Request sent for approval." });
+  ok(res, { redemption: { id: String(r.redemption._id), status: r.redemption.status }, message: r.redemption.status === "fulfilled" ? "Reward redeemed." : "Request submitted for approval." });
 });
 exports.myRedemptions = asyncHandler(async (req, res) => {
   const { key } = await who(req);
   const rows = await GamRedemption.find({ personKey: key }).sort({ createdAt: -1 }).limit(50).lean();
-  ok(res, { items: rows.map((r) => ({ id: String(r._id), name: r.rewardName, icon: r.rewardIcon, cost: r.cost, status: r.status, adminNote: r.adminNote, result: r.result, at: r.createdAt, decidedAt: r.decidedAt })) });
+  ok(res, { items: rows.map((r) => ({ id: String(r._id), name: r.rewardName, icon: r.rewardIcon, cost: r.cost, status: r.status, adminNote: r.adminNote, at: r.createdAt, decidedAt: r.decidedAt })) });
 });
 exports.cancelRedemption = asyncHandler(async (req, res) => {
   const { profile } = await who(req);
@@ -291,7 +235,7 @@ exports.kudosMeta = asyncHandler(async (req, res) => {
 });
 exports.kudosFeed = asyncHandler(async (req, res) => {
   const { profile, settings } = await who(req);
-  if (settings.modules.kudos === false) throw fail("Kudos is turned off.", 403);
+  if (settings.modules.kudos === false) throw fail("Recognition is turned off.", 403);
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = 15;
   const filter = { organisation_id: profile.organisation_id, hidden: false };
@@ -362,7 +306,7 @@ exports.manualAward = asyncHandler(async (req, res) => {
   const xp = Math.max(0, Math.min(Math.round(Number(b.xp) || 0), 1000));
   const coins = Math.max(0, Math.min(Math.round(Number(b.coins) || 0), 1000));
   const reason = String(b.reason || "").trim().slice(0, 200);
-  if (!xp && !coins) throw fail("Enter some XP or coins to award.");
+  if (!xp && !coins) throw fail("Enter some XP or reward points to award.");
   if (reason.length < 5) throw fail("Add a short reason so the person knows what it's for.");
   const target = await engine.getOrCreateProfile(profile.organisation_id, b.targetKey.split(":")[0], b.targetKey.split(":")[1]);
   if (!target || String(target.organisation_id) !== String(profile.organisation_id)) throw fail("Person not found.", 404);
@@ -372,14 +316,14 @@ exports.manualAward = asyncHandler(async (req, res) => {
     const month = require("../utils/gamification/periods").periodKeys().month;
     const ab = profile.awardBudget && profile.awardBudget.monthKey === month ? profile.awardBudget : { monthKey: month, xp: 0, coins: 0 };
     if (ab.xp + xp > settings.manager.monthlyXpLimit || ab.coins + coins > settings.manager.monthlyCoinLimit)
-      throw fail(`Monthly award budget reached (${settings.manager.monthlyXpLimit} XP / ${settings.manager.monthlyCoinLimit} coins). Remaining: ${Math.max(0, settings.manager.monthlyXpLimit - ab.xp)} XP / ${Math.max(0, settings.manager.monthlyCoinLimit - ab.coins)} coins.`);
+      throw fail(`Monthly award budget reached (${settings.manager.monthlyXpLimit} XP / ${settings.manager.monthlyCoinLimit} points). Remaining: ${Math.max(0, settings.manager.monthlyXpLimit - ab.xp)} XP / ${Math.max(0, settings.manager.monthlyCoinLimit - ab.coins)} points.`);
     await GamProfile.updateOne({ _id: profile._id }, { $set: { "awardBudget.monthKey": month }, $inc: { "awardBudget.xp": xp, "awardBudget.coins": coins } });
   }
   const r = await engine.award({
     organisation_id: profile.organisation_id, model: target.personModel, id: target.person, event: "manual_award", xp, coins,
     dedupeKey: `manual:${profile.personKey}:${target.personKey}:${Date.now()}`, actorKey: profile.personKey, reason, force: true,
   });
-  await engine.notifyPerson(target, { title: "🎖️ You were awarded by " + profile.name, message: `${reason} (+${xp} XP, +${coins} coins)`, priority: "medium" });
+  await engine.notifyPerson(target, { title: "Recognition from " + profile.name, message: `${reason} (+${xp} XP, +${coins} reward points)`, priority: "medium" });
   ok(res, { award: r });
 });
 

@@ -13,7 +13,6 @@ const schema = new mongoose.Schema(
     leaderboard: { type: mongoose.Schema.Types.Mixed, default: {} },
     kudos: { type: mongoose.Schema.Types.Mixed, default: {} },
     streaks: { type: mongoose.Schema.Types.Mixed, default: {} },
-    spin: { type: mongoose.Schema.Types.Mixed, default: {} },
     manager: { type: mongoose.Schema.Types.Mixed, default: {} },
     seasons: { type: mongoose.Schema.Types.Mixed, default: {} },
     updatedBy: { type: String, default: "" },

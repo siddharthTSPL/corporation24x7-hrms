@@ -12,7 +12,6 @@ export const useGamHub = () => useQuery({ queryKey: [KEY, "hub"], queryFn: api.g
 export const useGamMeta = () => useQuery({ queryKey: [KEY, "meta"], queryFn: api.getMeta, staleTime: 3600000 });
 export const useGamHistory = (params) => useQuery({ queryKey: [KEY, "history", params], queryFn: () => api.getHistory(params), keepPreviousData: true });
 export const useGamBadges = () => useQuery({ queryKey: [KEY, "badges"], queryFn: api.getBadges });
-export const useGamCosmetics = () => useQuery({ queryKey: [KEY, "cosmetics"], queryFn: api.getCosmetics });
 export const useGamLeaderboard = (params) => useQuery({ queryKey: [KEY, "leaderboard", params], queryFn: () => api.getLeaderboard(params), staleTime: 20000 });
 export const useGamFeed = () => useQuery({ queryKey: [KEY, "feed"], queryFn: api.getFeed, staleTime: 30000 });
 export const useGamSeasons = () => useQuery({ queryKey: [KEY, "seasons"], queryFn: api.getSeasons });
@@ -40,21 +39,16 @@ const useGamMutation = (fn, { success, silent } = {}) => {
 };
 
 export const useClaimQuest = () => useGamMutation(api.claimQuest);
-export const useClaimAllQuests = () => useGamMutation(api.claimAllQuests, { success: (d) => `Claimed ${d.claimed.length} quest${d.claimed.length === 1 ? "" : "s"}!` });
-export const useRerollQuest = () => useGamMutation(api.rerollQuest, { success: "Fresh quest swapped in" });
-export const useClaimDaily = () => useGamMutation(api.claimDaily);
-export const useSpin = () => useGamMutation(api.doSpin, { silent: true });
-export const useAnswerQuiz = () => useGamMutation(api.answerQuiz, { silent: true });
-export const useBuyFreeze = () => useGamMutation(api.buyFreeze, { success: "Streak freeze added 🧊" });
-export const useJoinChallenge = () => useGamMutation(api.joinChallenge, { success: "You're in! Good luck 🏁" });
+export const useClaimAllQuests = () => useGamMutation(api.claimAllQuests, { success: (d) => `Claimed ${d.claimed.length} goal${d.claimed.length === 1 ? "" : "s"}` });
+export const useJoinChallenge = () => useGamMutation(api.joinChallenge, { success: "You've joined the challenge" });
 export const useClaimChallenge = () => useGamMutation(api.claimChallenge);
 export const useRedeem = () => useGamMutation(api.redeemReward);
-export const useCancelRedemption = () => useGamMutation(api.cancelRedemption, { success: "Request cancelled and coins refunded" });
-export const useGiveKudos = () => useGamMutation(api.giveKudos, { success: "Kudos sent 🎉" });
+export const useCancelRedemption = () => useGamMutation(api.cancelRedemption, { success: "Request cancelled and points refunded" });
+export const useGiveKudos = () => useGamMutation(api.giveKudos, { success: "Recognition sent" });
 export const useReactKudos = () => useGamMutation(api.reactKudos, { silent: true });
 export const useCommentKudos = () => useGamMutation(api.commentKudos, { silent: true });
 export const useUpdatePrefs = () => useGamMutation(api.updatePrefs, { success: "Saved" });
-export const useManualAward = () => useGamMutation(api.manualAward, { success: "Award sent 🎖️" });
+export const useManualAward = () => useGamMutation(api.manualAward, { success: "Award sent" });
 export const useMarkBadgesSeen = () => useGamMutation(api.markBadgesSeen, { silent: true });
 
 // ── admin ──
@@ -67,20 +61,19 @@ export const useAdminChallenges = () => useQuery({ queryKey: [KEY, "adminChallen
 export const useAdminRewards = () => useQuery({ queryKey: [KEY, "adminRewards"], queryFn: api.getAdminRewards });
 export const useAdminRedemptions = (status) => useQuery({ queryKey: [KEY, "adminRedemptions", status], queryFn: () => api.getAdminRedemptions(status) });
 export const useAdminSeasons = () => useQuery({ queryKey: [KEY, "adminSeasons"], queryFn: api.getAdminSeasons });
-export const useAdminQuiz = () => useQuery({ queryKey: [KEY, "adminQuiz"], queryFn: api.getAdminQuiz });
 
 export const useSaveSettings = () => useGamMutation(api.saveAdminSettings, { success: "Settings saved" });
 export const useResetRules = () => useGamMutation(api.resetAdminRules, { success: "Rules reset to defaults" });
 export const useUpdateParticipant = () => useGamMutation(api.updateAdminParticipant, { success: "Updated" });
 export const useAdjust = () => useGamMutation(api.adminAdjust, { success: "Adjustment applied" });
-export const useCreateBadge = () => useGamMutation(api.createAdminBadge, { success: "Badge created" });
-export const useUpdateBadge = () => useGamMutation(api.updateAdminBadge, { success: "Badge updated" });
-export const useDeleteBadge = () => useGamMutation(api.deleteAdminBadge, { success: "Badge deleted" });
-export const useGrantBadge = () => useGamMutation(api.grantAdminBadge, { success: "Badge granted 🏅" });
-export const useCreateQuest = () => useGamMutation(api.createAdminQuest, { success: "Quest created" });
-export const useUpdateQuest = () => useGamMutation(api.updateAdminQuest, { success: "Quest updated" });
-export const useDeleteQuest = () => useGamMutation(api.deleteAdminQuest, { success: "Quest deleted" });
-export const useCreateChallenge = () => useGamMutation(api.createAdminChallenge, { success: "Challenge launched 🚀" });
+export const useCreateBadge = () => useGamMutation(api.createAdminBadge, { success: "Achievement created" });
+export const useUpdateBadge = () => useGamMutation(api.updateAdminBadge, { success: "Achievement updated" });
+export const useDeleteBadge = () => useGamMutation(api.deleteAdminBadge, { success: "Achievement deleted" });
+export const useGrantBadge = () => useGamMutation(api.grantAdminBadge, { success: "Achievement granted" });
+export const useCreateQuest = () => useGamMutation(api.createAdminQuest, { success: "Goal created" });
+export const useUpdateQuest = () => useGamMutation(api.updateAdminQuest, { success: "Goal updated" });
+export const useDeleteQuest = () => useGamMutation(api.deleteAdminQuest, { success: "Goal deleted" });
+export const useCreateChallenge = () => useGamMutation(api.createAdminChallenge, { success: "Challenge launched" });
 export const useUpdateChallenge = () => useGamMutation(api.updateAdminChallenge, { success: "Challenge updated" });
 export const useFinaliseChallenge = () => useGamMutation(api.finaliseAdminChallenge, { success: "Challenge finalised" });
 export const useCancelChallenge = () => useGamMutation(api.cancelAdminChallenge, { success: "Challenge cancelled" });
@@ -90,9 +83,6 @@ export const useUpdateReward = () => useGamMutation(api.updateAdminReward, { suc
 export const useDeleteReward = () => useGamMutation(api.deleteAdminReward, { success: "Reward removed" });
 export const useDecideRedemption = () => useGamMutation(api.decideAdminRedemption, { success: "Updated" });
 export const useCreateSeason = () => useGamMutation(api.createAdminSeason, { success: "Season created" });
-export const useFinaliseSeason = () => useGamMutation(api.finaliseAdminSeason, { success: "Season finalised — prizes paid 🏆" });
+export const useFinaliseSeason = () => useGamMutation(api.finaliseAdminSeason, { success: "Season finalised and prizes paid" });
 export const useDeleteSeason = () => useGamMutation(api.deleteAdminSeason, { success: "Season deleted" });
-export const useCreateQuiz = () => useGamMutation(api.createAdminQuiz, { success: "Question added" });
-export const useUpdateQuiz = () => useGamMutation(api.updateAdminQuiz, { success: "Question updated" });
-export const useDeleteQuiz = () => useGamMutation(api.deleteAdminQuiz, { success: "Question deleted" });
 export const useModerateKudos = () => useGamMutation(api.moderateKudos, { success: "Updated" });

@@ -6,7 +6,7 @@ const { periodKeys, toISTKey } = require("./periods");
 const { startOfISTDay } = require("../Istdate.utils");
 
 const ref = (p) => ({ organisation_id: p.organisation_id, model: p.personModel, id: p.person });
-const REACTIONS = ["👏", "🎉", "❤️", "🔥", "🙌", "💯"];
+const REACTIONS = ["appreciate", "celebrate", "support", "insightful"];
 
 const monthBudget = (profile, settings) => {
   const month = periodKeys().month;
@@ -15,10 +15,10 @@ const monthBudget = (profile, settings) => {
 };
 
 const give = async (from, toKey, { category, message, coins }, settings) => {
-  if (settings.modules.kudos === false) return { error: "Kudos is turned off for your organisation." };
-  if (toKey === from.personKey) return { error: "You can't give kudos to yourself - ask a teammate to do it!" };
+  if (settings.modules.kudos === false) return { error: "Recognition is turned off for your organisation." };
+  if (toKey === from.personKey) return { error: "You can't recognise yourself." };
   const text = String(message || "").trim();
-  if (text.length < settings.kudos.minMessageLength) return { error: `Please write at least ${settings.kudos.minMessageLength} characters so it feels personal.` };
+  if (text.length < settings.kudos.minMessageLength) return { error: `Please write at least ${settings.kudos.minMessageLength} characters so the recognition is specific.` };
   const to = await GamProfile.findOne({ personKey: toKey, organisation_id: from.organisation_id }).lean()
     || (await (async () => {
       const [model, id] = [toKey.split(":")[0], toKey.split(":")[1]];
@@ -31,12 +31,12 @@ const give = async (from, toKey, { category, message, coins }, settings) => {
     GamKudos.countDocuments({ fromKey: from.personKey, createdAt: { $gte: since } }),
     GamKudos.countDocuments({ fromKey: from.personKey, toKey, createdAt: { $gte: since } }),
   ]);
-  if (today >= settings.kudos.dailyLimit) return { error: `You can give up to ${settings.kudos.dailyLimit} kudos a day.` };
-  if (todayToPerson >= settings.kudos.maxPerDayPerPerson) return { error: "You've already recognised them today. Spread the love!" };
+  if (today >= settings.kudos.dailyLimit) return { error: `You can send up to ${settings.kudos.dailyLimit} recognitions a day.` };
+  if (todayToPerson >= settings.kudos.maxPerDayPerPerson) return { error: "You've already recognised this person today." };
 
   let gift = Math.max(0, Math.min(Math.round(Number(coins) || 0), settings.kudos.maxCoinsPerKudos));
   const budget = monthBudget(from, settings);
-  if (gift > budget.left) return { error: `You only have ${budget.left} gift coins left this month.` };
+  if (gift > budget.left) return { error: `You only have ${budget.left} gift points left this month.` };
 
   const cat = GamKudos.CATEGORIES.find((c) => c.key === category) ? category : "teamwork";
   const doc = await GamKudos.create({
@@ -48,9 +48,9 @@ const give = async (from, toKey, { category, message, coins }, settings) => {
   }
   const mine = await engine.award({ ...ref(from), event: "kudos_given", dedupeKey: `kg:${doc._id}`, meta: { to: to.personKey } });
   const catLabel = GamKudos.CATEGORIES.find((c) => c.key === cat).label;
-  await engine.award({ ...ref(to), event: "kudos_received", coins: undefined, dedupeKey: `kr:${doc._id}`, meta: { from: from.personKey, gift }, reason: `Kudos from ${from.name}` });
-  if (gift > 0) await engine.award({ ...ref(to), event: "kudos_gift", coins: gift, dedupeKey: `kgift:${doc._id}`, reason: `Gift from ${from.name}`, force: true, silent: true });
-  await engine.notifyPerson(to, { title: `🌟 ${from.name} recognised you`, message: `${catLabel}: "${text.slice(0, 120)}"${gift ? ` (+${gift} gift coins)` : ""}`, priority: "medium", meta: { kudos: String(doc._id) } });
+  await engine.award({ ...ref(to), event: "kudos_received", coins: undefined, dedupeKey: `kr:${doc._id}`, meta: { from: from.personKey, gift }, reason: `Recognition from ${from.name}` });
+  if (gift > 0) await engine.award({ ...ref(to), event: "kudos_gift", coins: gift, dedupeKey: `kgift:${doc._id}`, reason: `Points gifted by ${from.name}`, force: true, silent: true });
+  await engine.notifyPerson(to, { title: `${from.name} recognised you`, message: `${catLabel}: "${text.slice(0, 120)}"${gift ? ` (+${gift} reward points)` : ""}`, priority: "medium", meta: { kudos: String(doc._id) } });
   return { kudos: doc.toObject(), award: mine, budget: monthBudget({ ...from, kudosBudget: { monthKey: budget.monthKey, used: budget.used + gift } }, settings) };
 };
 
@@ -63,7 +63,6 @@ const toggleReaction = async (profile, kudosId, emoji) => {
   const has = list.includes(profile.personKey);
   const path = `reactions.${emoji}`;
   await GamKudos.updateOne({ _id: k._id }, has ? { $pull: { [path]: profile.personKey } } : { $addToSet: { [path]: profile.personKey } });
-  if (!has) await engine.award({ ...ref(profile), event: "kudos_reacted", dedupeKey: `kre:${k._id}:${profile.personKey}` });
   const fresh = await GamKudos.findById(k._id).lean();
   return { reactions: fresh.reactions };
 };

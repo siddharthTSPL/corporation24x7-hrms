@@ -1,14 +1,14 @@
 const mongoose = require("mongoose");
 
 const CATEGORIES = [
-  { key: "teamwork", label: "Teamwork", icon: "🤝" },
-  { key: "ownership", label: "Ownership", icon: "🛡️" },
-  { key: "innovation", label: "Innovation", icon: "💡" },
-  { key: "customer", label: "Customer first", icon: "💙" },
-  { key: "mentor", label: "Mentoring", icon: "🧭" },
-  { key: "above_beyond", label: "Above & beyond", icon: "🚀" },
-  { key: "positivity", label: "Positivity", icon: "☀️" },
-  { key: "learning", label: "Always learning", icon: "📚" },
+  { key: "teamwork", label: "Teamwork", icon: "handshake" },
+  { key: "ownership", label: "Ownership", icon: "shield" },
+  { key: "innovation", label: "Innovation", icon: "bulb" },
+  { key: "customer", label: "Customer focus", icon: "heart" },
+  { key: "mentor", label: "Mentoring", icon: "compass" },
+  { key: "above_beyond", label: "Going above & beyond", icon: "rocket" },
+  { key: "positivity", label: "Positivity", icon: "sun" },
+  { key: "learning", label: "Continuous learning", icon: "book" },
 ];
 
 const schema = new mongoose.Schema(
