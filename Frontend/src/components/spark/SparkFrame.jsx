@@ -75,7 +75,7 @@ export default function SparkFrame() {
       role="dialog"
       aria-label="TorchX Spark"
       aria-hidden={!open}
-      className={`fixed z-[60] flex flex-col overflow-hidden bg-white shadow-2xl border border-gray-200
+      className={`fixed z-[1000] flex flex-col overflow-hidden bg-white shadow-2xl border border-gray-200
         inset-0 md:inset-auto md:right-4 md:bottom-4 md:rounded-2xl ${size}
         transition-[opacity,transform,width,height] duration-200 origin-bottom-right
         ${open ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95 pointer-events-none invisible"}`}
