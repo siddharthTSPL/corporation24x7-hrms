@@ -119,6 +119,9 @@ const serializeConversation = (conv, actor, people) => {
       onlyAdminsCanAddMembers: !(o.settings && o.settings.onlyAdminsCanAddMembers === false),
       onlyAdminsCanPin: !!(o.settings && o.settings.onlyAdminsCanPin),
     },
+    channel: o.channel && o.channel.enabled
+      ? { enabled: true, visibility: o.channel.visibility || "public", topic: o.channel.topic || "", kind: o.channel.kind || "custom", community: o.channel.community ? String(o.channel.community) : null }
+      : null,
     disappearingSeconds: o.disappearingSeconds || 0,
     // the code itself is only shown to admins; everyone just learns whether a link exists
     invite: o.type === "group"

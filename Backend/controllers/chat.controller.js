@@ -60,8 +60,9 @@ const listConversations = async (req, res) => {
   else if (filter === "favourites") and.push(mine({ favourite: true }));
   else if (filter === "mentions") and.push(mine({ mentionUnread: { $gt: 0 } }));
   else if (filter === "groups") q.type = "group";
+  else if (filter === "channels") { q.type = "group"; q["channel.enabled"] = true; }
   else if (filter === "direct") q.type = "direct";
-  else if (filter !== "all") throw httpError("filter must be all, unread, groups, direct, favourites or mentions.");
+  else if (filter !== "all") throw httpError("filter must be all, unread, groups, channels, direct, favourites or mentions.");
   q.$and = and;
   if (req.query.type && ["direct", "group", "meeting"].includes(req.query.type)) q.type = req.query.type;
   if (req.query.before) {

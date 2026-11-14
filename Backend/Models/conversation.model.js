@@ -51,6 +51,16 @@ const conversationSchema = new mongoose.Schema(
       onlyAdminsCanPin: { type: Boolean, default: false }, // pinning messages to the top of the chat
     },
 
+    // channel (Slack/Teams style): a group that people can browse and join on their own.
+    // Kept as type "group" so sending, mentions, polls, invites and calls all work unchanged.
+    channel: {
+      enabled: { type: Boolean, default: false },
+      visibility: { type: String, enum: ["public", "private"], default: "public" },
+      topic: { type: String, trim: true, maxlength: 200, default: "" },
+      community: { type: mongoose.Schema.Types.ObjectId, ref: "Community", default: undefined },
+      kind: { type: String, enum: ["general", "announcements", "custom"], default: "custom" },
+    },
+
     // disappearing messages: new messages vanish this many seconds after they are sent (0 = off)
     disappearingSeconds: { type: Number, enum: [0, 86400, 604800, 7776000], default: 0 },
 
@@ -99,6 +109,7 @@ const conversationSchema = new mongoose.Schema(
 );
 
 conversationSchema.index({ organisation_id: 1, participantKeys: 1, lastMessageAt: -1 });
+conversationSchema.index({ organisation_id: 1, "channel.enabled": 1, "channel.visibility": 1, "channel.community": 1 });
 conversationSchema.index(
   { organisation_id: 1, directKey: 1 },
   { unique: true, partialFilterExpression: { directKey: { $type: "string" } } }

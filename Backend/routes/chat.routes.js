@@ -8,6 +8,8 @@ const c = require("../controllers/chat.controller");
 const r = require("../controllers/chatReceipt.controller");
 const s = require("../controllers/chatSettings.controller");
 const x = require("../controllers/chatExtras.controller");
+const cc = require("../controllers/chatChannels.controller");
+const ai = require("../controllers/chatAi.controller");
 
 // Every role (employee / manager / admin / super admin) uses the same endpoints.
 chatRouter.use(anyRoleAuth);
@@ -44,6 +46,31 @@ chatRouter.delete("/scheduled/:id", asyncHandler(x.cancelScheduled));
 chatRouter.post("/scheduled/:id/send-now", asyncHandler(x.sendScheduledNow));
 chatRouter.get("/invite/:code", asyncHandler(x.previewInvite));
 chatRouter.post("/invite/:code/join", asyncHandler(x.joinInvite));
+
+// channels + communities (static paths first)
+chatRouter.get("/channels/browse", asyncHandler(cc.browseChannels));
+chatRouter.post("/channels", asyncHandler(cc.createChannel));
+chatRouter.post("/channels/:id/join", asyncHandler(cc.joinChannel));
+chatRouter.get("/communities", asyncHandler(cc.listCommunities));
+chatRouter.post("/communities", asyncHandler(cc.createCommunity));
+chatRouter.post("/communities/:id/join", asyncHandler(cc.joinCommunity));
+chatRouter.post("/communities/:id/leave", asyncHandler(cc.leaveCommunity));
+chatRouter.patch("/communities/:id/admin", asyncHandler(cc.setCommunityAdmin));
+
+// my follow-ups (to-dos from chats, calls and meetings)
+chatRouter.get("/followups", asyncHandler(cc.listFollowups));
+chatRouter.post("/followups", asyncHandler(cc.createFollowups));
+chatRouter.patch("/followups/:id", asyncHandler(cc.updateFollowup));
+chatRouter.delete("/followups/:id", asyncHandler(cc.deleteFollowup));
+
+// AI helpers: translate, rewrite, catch-up, smart replies, call notes
+chatRouter.get("/ai/status", asyncHandler(ai.status));
+chatRouter.post("/ai/translate", asyncHandler(ai.translate));
+chatRouter.post("/ai/rewrite", asyncHandler(ai.rewrite));
+chatRouter.post("/conversations/:id/ai/catchup", asyncHandler(ai.catchup));
+chatRouter.post("/conversations/:id/ai/replies", asyncHandler(ai.replies));
+chatRouter.post("/calls/:callId/transcript", asyncHandler(ai.uploadCallLines));
+chatRouter.post("/calls/:callId/notes", asyncHandler(ai.callNotes));
 
 // conversations
 chatRouter.get("/conversations", asyncHandler(c.listConversations));

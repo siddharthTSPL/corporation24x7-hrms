@@ -47,7 +47,7 @@ module.exports = {
   period: () => `Current balance as of ${fmtDate(new Date())}`,
   remaining,
   async *rows(ctx, f) {
-    const people = (await loadPeople(ctx, { department: f.department, employeeIds: f.employees, includeSuperAdmin: false }));
+    const people = (await loadPeople(ctx, { department: f.department, employeeIds: f.employees, includeSuperAdmin: false, status: "working" })); // current balances: resigned / fired / terminated are not listed
     for (const group of batches(people, 400)) {
       const docs = await LeaveBalance.find({ organisation_id: ctx.orgId, employee: { $in: group.map((p) => OID(p.id)) } }).lean();
       const byEmp = new Map(docs.map((d) => [String(d.employee), d]));

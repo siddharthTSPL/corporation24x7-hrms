@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Meeting = require("../Models/meeting.model");
 const Conversation = require("../Models/conversation.model");
+const CallSession = require("../Models/callsession.model");
 const OrgTeam = require("../Models/orgteam.model");
 const AdminModel = require("../Models/Admin.model");
 const { createBulkNotifications } = require("../utils/Notification.utils");
@@ -272,6 +273,7 @@ const shapeMeeting = (m, actor, people, { detail = false } = {}) => {
     cancelReason: o.cancelReason || "",
     guestCount: (o.guests || []).filter((g) => !g.revoked).length,
     visibility: o.visibility || "invite_only",
+    linkAccess: o.linkAccess || "invited",
     capacity: o.capacity || 0,
     interestedCount: (o.interestedKeys || []).length,
   };
@@ -381,6 +383,7 @@ const createMeeting = async (req, res) => {
       roomKey: rooms.meetingRoomKey(_id),
       allowJoinBeforeHost: b.allowJoinBeforeHost === undefined ? orgDefaults.allowJoinBeforeHost : !!b.allowJoinBeforeHost,
       visibility: b.visibility === "organisation" ? "organisation" : "invite_only",
+      linkAccess: b.linkAccess === "organisation" ? "organisation" : "invited",
       capacity: Math.min(Math.max(parseInt(b.capacity, 10) || 0, 0), 5000),
       settings: controls.normalizeSettings(b.settings, orgDefaults.settings),
       reminderMinutes: Math.min(Math.max(Number.isFinite(reminderInput) ? reminderInput : orgDefaults.reminderMinutes, 0), 1440),
@@ -698,6 +701,134 @@ const availability = async (req, res) => {
   });
 };
 
+// ---------- share link / add people (live room) ----------
+
+const FINISHED = ["ended", "cancelled"];
+
+// Loads a meeting of MY organisation even when I'm not on the invite list (used by the share link).
+const loadInOrg = async (actor, id) => {
+  if (!mongoose.isValidObjectId(id)) throw httpError("Meeting not found.", 404);
+  const m = await Meeting.findOne({ _id: id, organisation_id: actor.organisation_id });
+  if (!m) throw httpError("Meeting not found.", 404);
+  return m;
+};
+
+// Adds people to ONE meeting (atomic per person), keeps the in-meeting chat + the live room in step,
+// rings them (live event) and drops a bell notification. Returns the people that were really added.
+const attachPeople = async (actor, m, people, { byName = "", live = true } = {}) => {
+  const added = [];
+  for (const p of people) {
+    const r = await Meeting.updateOne(
+      { _id: m._id, attendeeKeys: { $ne: p.key } },
+      { $push: { attendees: { key: p.key, person: p.id, personModel: p.model, rsvp: "invited" } }, $addToSet: { attendeeKeys: p.key } }
+    );
+    if (r.modifiedCount) added.push(p);
+  }
+  if (!added.length) return added;
+
+  const fresh = await Meeting.findById(m._id).select("attendees conversation hostKey roomKey title media status notifyMode");
+  if (fresh && fresh.conversation) {
+    await chat.syncMeetingConversation(fresh.conversation, actor.organisation_id, fresh.attendees.map((a) => ({ model: a.personModel, id: a.person })), fresh.hostKey).catch(() => {});
+  }
+
+  const keys = added.map((p) => p.key);
+  const room = rooms.get(m.roomKey);
+  if (room) {
+    keys.forEach((k) => room.invitedKeys.add(k));
+    CallSession.updateOne({ _id: room.callId }, { $addToSet: { invitedKeys: { $each: keys } } }).catch(() => {});
+  }
+  if (live) {
+    notify(actor, keys, m, {
+      title: "You were added to a meeting",
+      message: `${byName || "Someone"} added you to "${m.title}"${room ? " - it is happening now, tap to join." : "."}`,
+      priority: "high",
+    });
+    chat.emitToKeys(keys, "meeting:invited", { meetingId: String(m._id), title: m.title, media: m.media, live: !!room, by: byName });
+  }
+  return added;
+};
+
+// GET /meetings/:id/preview   -> what a person sees when they open the link
+const previewMeeting = async (req, res) => {
+  const actor = actorOf(req);
+  const m = await loadInOrg(actor, req.params.id);
+  const hostMap = await resolvePeople(actor.organisation_id, [{ model: m.hostModel, id: m.host }]);
+  const host = hostMap.get(m.hostKey) || { name: "Former member", photo: "" };
+  const isAttendee = m.attendeeKeys.includes(actor.key);
+  const finished = FINISHED.includes(m.status);
+  ok(res, {
+    preview: {
+      id: String(m._id),
+      title: m.title,
+      host: { name: host.name, photo: host.photo || "" },
+      startTime: m.startTime,
+      endTime: m.endTime,
+      media: m.media,
+      status: m.status,
+      attendeeCount: m.attendees.length,
+      linkAccess: m.linkAccess || "invited",
+      isAttendee,
+      canJoinViaLink: !isAttendee && !finished && m.linkAccess === "organisation",
+    },
+  });
+};
+
+// POST /meetings/:id/join-via-link   -> a member of the organisation who got the link adds themself
+const joinViaLink = async (req, res) => {
+  const actor = actorOf(req);
+  const m = await loadInOrg(actor, req.params.id);
+  if (m.attendeeKeys.includes(actor.key)) return ok(res, { joined: false, alreadyMember: true, meetingId: String(m._id) });
+  if (FINISHED.includes(m.status)) throw httpError(m.status === "ended" ? "This meeting has ended." : "This meeting was cancelled.", 410);
+  if ((m.linkAccess || "invited") !== "organisation") throw httpError("You are not on the invite list for this meeting. Ask the host to add you.", 403);
+  if (m.attendees.length >= MAX_ATTENDEES) throw httpError("This meeting is full.", 409);
+  const [me] = [...(await requirePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }])).values()];
+  // no bell/ping for the joiner themself; the host sees them arrive in the room
+  await attachPeople(actor, m, [me], { live: false });
+  ok(res, { joined: true, meetingId: String(m._id) });
+};
+
+// POST /meetings/:id/people  { people: [{ model, id }], sendEmail? }   -> add colleagues (any attendee can)
+const addPeople = async (req, res) => {
+  const actor = actorOf(req);
+  const m = await loadMeeting(actor, req.params.id);
+  if (FINISHED.includes(m.status)) throw httpError(`A ${m.status} meeting cannot be edited.`);
+  const raw = Array.isArray(req.body?.people) ? req.body.people : [];
+  if (!raw.length) throw httpError("Choose at least one person.");
+  if (raw.length > 100) throw httpError("Add at most 100 people at a time.");
+
+  const found = await requirePeople(actor.organisation_id, raw.map((p) => ({ model: p && p.model, id: p && (p.id || p._id) })));
+  const people = [...found.values()];
+  const already = people.filter((p) => m.attendeeKeys.includes(p.key));
+  const toAdd = people.filter((p) => !m.attendeeKeys.includes(p.key));
+  if (m.attendeeKeys.length + toAdd.length > MAX_ATTENDEES) throw httpError(`A meeting can have at most ${MAX_ATTENDEES} attendees.`);
+
+  const [me] = [...(await requirePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }])).values()];
+  const added = await attachPeople(actor, m, toAdd, { byName: me.name });
+
+  if (added.length && req.body?.sendEmail !== false) {
+    const hostMap = await resolvePeople(actor.organisation_id, [{ model: m.hostModel, id: m.host }]);
+    const host = hostMap.get(m.hostKey);
+    const latest = await Meeting.findById(m._id);
+    const everyone = await resolvePeople(actor.organisation_id, latest.attendees.map((a) => ({ model: a.personModel, id: a.person })));
+    if (host) emailAttendees(latest, host, added, "REQUEST", [...everyone.values()]);
+  }
+  ok(res, {
+    added: added.map((p) => ({ key: p.key, name: p.name })),
+    already: already.map((p) => ({ key: p.key, name: p.name })),
+    meeting: await shapeOne(await Meeting.findById(m._id), actor, true),
+  });
+};
+
+// PATCH /meetings/:id/link-access  { linkAccess: "invited" | "organisation" }   (host / co-host)
+const setLinkAccess = async (req, res) => {
+  const actor = actorOf(req);
+  const m = await loadMeeting(actor, req.params.id);
+  requireModerator(m, actor);
+  const linkAccess = req.body?.linkAccess === "organisation" ? "organisation" : "invited";
+  await Meeting.updateOne({ _id: m._id }, { $set: { linkAccess } });
+  ok(res, { linkAccess });
+};
+
 module.exports = {
   helpers: { notify, emailAttendees, shapeMeeting, peopleFor, joinUrl, fmtWhen, escapeHtml, validTz, isModerator, loadMeeting },
   createMeeting,
@@ -711,4 +842,8 @@ module.exports = {
   downloadIcs,
   availability,
   calendar,
+  previewMeeting,
+  joinViaLink,
+  addPeople,
+  setLinkAccess,
 };

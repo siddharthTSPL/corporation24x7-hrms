@@ -89,6 +89,8 @@ module.exports = {
       throw err;
     }
     for await (const { person, days } of dayRowsByPerson(ctx, people, startOfISTDay(first), startOfISTDay(last))) {
+      // Resigned / fired / terminated: no attendance exists after the exit month, so do not list an empty row.
+      if (!days.length && person.workingStatus !== "working") continue;
       yield [{ uid: person.uid, name: person.name, department: person.department, ...summarizeDays(days) }];
     }
   },

@@ -6,6 +6,7 @@ const AdminLeave = require("../Models/adleave.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const Fnf = require("../Models/Fnf.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { toISTKey } = require("./Istdate.utils");
 const TimeLog = require("../Models/Timelog.model");
@@ -99,6 +100,25 @@ const fetchLeaveMapForDate = async ({ organisation_id, people, date = new Date()
 };
 
 /**
+ * Last day (IST start-of-day) of the month in which a leaver's exit falls.
+ * Attendance is shown up to and including that month and never after it.
+ * Returns null while the person is still working, or when the exit date is
+ * unknown (no notice-period last working day and no Full & Final record) -
+ * we cannot place them in a month, so nothing is hidden for them.
+ */
+const exitMonthCutoff = async ({ organisation_id, personId, emp }) => {
+  if (!emp || !emp.working_status || emp.working_status === "working") return null;
+  let exitDate = emp.noticePeriod && emp.noticePeriod.lastWorkingDay ? emp.noticePeriod.lastWorkingDay : null;
+  if (!exitDate) {
+    const fnf = await Fnf.findOne({ organisation_id, employee: personId }).select("dateOfLeaving").lean();
+    exitDate = fnf && fnf.dateOfLeaving ? fnf.dateOfLeaving : null;
+  }
+  if (!exitDate) return null;
+  const [y, m] = toISTKey(exitDate).split("-").map(Number); // m is 1-12
+  return startOfDay(new Date(y, m, 0)); // day 0 of next month = last day of exit month
+};
+
+/**
  * The admin/superadmin "Attendance History" only listed days that have an
  * Attendance record, so week-offs, holidays, approved-leave days and no-show
  * days were simply missing. This adds one row per missing calendar day in the
@@ -108,11 +128,12 @@ const fetchLeaveMapForDate = async ({ organisation_id, people, date = new Date()
  * Today is only filled when it is already a known week-off/holiday/leave
  * (the person may still check in later, so it is never marked absent).
  */
-const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, rangeStart, rangeEnd, standardMinutes }) => {
+const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows: inputRows, rangeStart, rangeEnd, standardMinutes }) => {
+  let rows = inputRows;
   const cfg = ROLE_CONFIG[roleKey] || ROLE_CONFIG.employee;
 
   const [emp, leaves] = await Promise.all([
-    cfg.Model.findById(personId).select("date_of_joining createdAt").lean(),
+    cfg.Model.findById(personId).select("date_of_joining createdAt working_status noticePeriod.lastWorkingDay").lean(),
     cfg.LeaveModel.find({
       [cfg.leaveField]: personId,
       status: { $in: cfg.approved },
@@ -122,6 +143,9 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
   ]);
 
   const joinDate = emp ? startOfDay(emp.date_of_joining || emp.createdAt || 0) : null;
+  // Resigned / fired / terminated: nothing after the exit month (see exitMonthCutoff).
+  const cutoff = await exitMonthCutoff({ organisation_id, personId, emp });
+  if (cutoff) rows = rows.filter((r) => startOfDay(r.date) <= cutoff);
   const leaveFor = (date) =>
     leaves.find((l) => date >= startOfDay(l.startDate) && date <= startOfDay(l.endDate)) || null;
 
@@ -135,7 +159,8 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
   });
 
   const today = startOfDay(new Date());
-  const last = startOfDay(rangeEnd) < today ? startOfDay(rangeEnd) : today;
+  let last = startOfDay(rangeEnd) < today ? startOfDay(rangeEnd) : today;
+  if (cutoff && cutoff < last) last = cutoff;
 
   for (let cursor = startOfDay(rangeStart); cursor <= last; cursor = new Date(cursor.getTime() + DAY)) {
     const key = toISTKey(cursor);
@@ -344,4 +369,4 @@ const computeMonthPaidDays = async ({ organisation_id, people, month, year }) =>
   return result;
 };
 
-module.exports = { fillHistoryGaps, computeMonthPaidDays, dayPaidValue, fetchLeaveMapForDate, applyLeaveToRow };
+module.exports = { exitMonthCutoff, fillHistoryGaps, computeMonthPaidDays, dayPaidValue, fetchLeaveMapForDate, applyLeaveToRow };
