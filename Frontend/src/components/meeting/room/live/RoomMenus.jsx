@@ -20,7 +20,7 @@ function Popup({ onClose, children, className = "" }) {
     };
   }, [onClose]);
   return (
-    <div ref={ref} className={`absolute bottom-full z-50 mb-3 w-72 overflow-hidden rounded-2xl border border-[#2E2E35] bg-[#1B1B20] p-1.5 text-sm shadow-2xl ${className}`}>
+    <div ref={ref} className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] z-50 max-h-[70vh] overflow-y-auto overscroll-contain rounded-2xl border border-[#2E2E35] bg-[#1B1B20] p-1.5 text-sm shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-full sm:mb-3 sm:max-h-[60vh] sm:w-72 ${className}`}>
       {children}
     </div>
   );
@@ -38,7 +38,7 @@ const Item = ({ icon, label, hint, onClick, badge }) => (
 export function ActivitiesMenu({ onPick, onClose, boardOpen }) {
   const pick = (id) => { onClose(); onPick(id); };
   return (
-    <Popup onClose={onClose} className="left-1/2 -translate-x-1/2">
+    <Popup onClose={onClose} className="sm:left-1/2 sm:-translate-x-1/2">
       <Item icon={<FaQuestionCircle />} label="Q&A" hint="Ask and upvote questions" onClick={() => pick("qa")} />
       <Item icon={<FaPoll />} label="Polls" hint="Vote on quick questions" onClick={() => pick("polls")} />
       <Item icon={<FaChalkboard />} label={boardOpen ? "Close whiteboard" : "Whiteboard"} hint="Draw together" onClick={() => pick("board")} />
@@ -82,7 +82,7 @@ export function ViewMenu({ onClose, layout, onLayout, hideNoVideo, onHideNoVideo
     ["speaker", "Speaker", "Active speaker big, others below"],
   ];
   return (
-    <Popup onClose={onClose} className="left-1/2 w-[19rem] -translate-x-1/2">
+    <Popup onClose={onClose} className="sm:left-1/2 sm:w-[19rem] sm:-translate-x-1/2">
       <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Change view</p>
       <div className="grid grid-cols-2 gap-2 px-2 pb-2">
         {options.map(([id, label, hint]) => (
@@ -120,7 +120,7 @@ function Row({ label, on, onChange }) {
   );
 }
 
-export function MoreMenu({ onClose, layout, onLayout, sounds, onSounds, shareAudio, onShareAudio, onShortcuts }) {
+export function MoreMenu({ onClose, layout, onLayout, sounds, onSounds, shareAudio, onShareAudio, onShortcuts, quickActions = [] }) {
   const { switchDevice } = useCall();
   const devices = useDevices(0);
   const [prefs, setPrefs] = useState(getMediaPrefs);
@@ -133,7 +133,18 @@ export function MoreMenu({ onClose, layout, onLayout, sounds, onSounds, shareAud
     }
   };
   return (
-    <Popup onClose={onClose} className="right-0 w-80">
+    <Popup onClose={onClose} className="sm:right-0 sm:w-80">
+      {quickActions.length > 0 && (
+        <div className="grid grid-cols-4 gap-1.5 p-2 sm:hidden">
+          {quickActions.map((a) => (
+            <button key={a.id} type="button" disabled={a.disabled} onClick={() => { onClose(); a.onClick(); }} className={`flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl px-1 py-2 text-[11px] font-medium disabled:opacity-40 ${a.active ? "bg-white text-gray-900" : "bg-white/10 text-gray-100"}`}>
+              <span className="text-base">{a.icon}</span>
+              <span className="w-full truncate text-center">{a.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {quickActions.length > 0 && <div className="my-1 h-px bg-white/10 sm:hidden" />}
       <div className="space-y-3 p-2">
         <DeviceSelect label="Microphone" devices={devices.mics} value={prefs.audioDeviceId} onChange={(v) => change("audio", v)} fallback="Microphone" />
         <DeviceSelect label="Camera" devices={devices.cams} value={prefs.videoDeviceId} onChange={(v) => change("video", v)} fallback="Camera" />

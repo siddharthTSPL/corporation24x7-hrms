@@ -309,7 +309,7 @@ export default function MeetingFormModal({ mode = "create", meeting, initialDate
                           </Chipbtn>
                         ))}
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <label className="block">
                           <Label>Date</Label>
                           <input type="date" className={inputCls} min={toDateInput(new Date())} value={date} onChange={(e) => setDate(e.target.value)} />

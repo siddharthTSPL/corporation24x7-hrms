@@ -109,8 +109,8 @@ export default function MyPolicies() {
           <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-600 mb-3">
             <FaHistory /> My Acknowledgement History
           </h2>
-          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                 <tr>
                   <th className="text-left px-4 py-2">Policy</th>
