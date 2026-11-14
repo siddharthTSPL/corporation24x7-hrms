@@ -32,7 +32,6 @@ import {
   FaUserCheck,      // NEW: Face Attendance icon
   FaRegFolderOpen,  // NEW: Team Documents icon
   FaBookOpen,       // NEW: My Policies icon
-  FaVideo,          // Meetings icon
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -52,7 +51,6 @@ import {
 } from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
-  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
 
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
@@ -79,7 +77,6 @@ const superAdminMenu = [
 ];
 
 const adminMenu = [
-  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
   { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
   
@@ -115,7 +112,6 @@ const adminMenu = [
 ];
 
 const managerMenu = [
-  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
  
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
@@ -142,7 +138,6 @@ const managerMenu = [
 ];
 
 const employeeMenu = [
-  { name: "Meetings", path: "/meetings", icon: <FaVideo />, blurb: "Schedule, join and manage video or audio meetings." },
   { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
   { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates.", permissionGroup: ["navigation.can_view_dashboard"] },
@@ -194,7 +189,6 @@ const SIDEBAR_ORDER = [
   "announcement",
   "review",
   "torchx management",
-  "meetings",
   "organisation",
   "settings",
 ];

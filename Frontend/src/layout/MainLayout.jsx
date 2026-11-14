@@ -13,7 +13,7 @@ import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 import useRealtimeSync from "../realtime/useRealtimeSync";
-import ChatRoot from "../components/chat/ChatRoot";
+import SparkFrame from "../components/spark/SparkFrame";
 import GamificationHost from "../components/gamification/GamificationHost";
 
 // Birthdays are matched on the IST calendar - the same clock the backend
@@ -249,7 +249,7 @@ export default function MainLayout() {
 </div>
       </div>
 
-      <ChatRoot />
+      <SparkFrame />
       <GamificationHost enabled={Boolean(auth?.role) && auth.role !== "superadmin"} />
 
       {showWelcome && (

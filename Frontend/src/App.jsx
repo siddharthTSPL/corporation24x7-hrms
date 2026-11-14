@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
 import RouteSeo from "./components/RouteSeo";
@@ -113,10 +113,8 @@ const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
 const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
-const MeetingsPage = lazy(() => import("./pages/meetings/MeetingsPage"));
 const GamificationHub = lazy(() => import("./pages/gamification/GamificationHub"));
 const GamificationAdmin = lazy(() => import("./pages/gamification/GamificationAdmin"));
-const GuestJoinPage = lazy(() => import("./pages/meetings/GuestJoinPage"));
 
 // Pure-CSS fallback: no Lottie player, no loader.json request, no state/effects.
 // The keyframes live in a single <style> so nothing extra is shipped in JS.
@@ -175,6 +173,15 @@ function NotFoundRoute() {
   return <Pagenotfound onLogin={() => navigate("/login")} onContact={() => navigate("/about")} />;
 }
 
+// Full-page redirect to another app on the same domain (e.g. /sync).
+// <Navigate> can't be used: it would prepend the router basename "/talent".
+function ExternalRedirect({ to }) {
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
+  return <PageSkeleton />;
+}
+
 function RoleBasedRedirect() {
   const { data: auth, isLoading } = useAuth();
 
@@ -215,9 +222,6 @@ function App() {
           ))}
           <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
-          {/* Public: outsiders invited to a meeting by email + PIN (no account) */}
-          <Route path="/meeting-guest/:id" element={<GuestJoinPage />} />
-
           {/* Public — opened from a companion sign-in link generated on a
               different, already-logged-in browser. No session required to
               land here; it creates one on THIS browser via the link's
@@ -526,8 +530,9 @@ function App() {
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
             <Route path="/overtime"       element={<Overtime />} />
-            <Route path="/meetings"       element={<MeetingsPage />} />
-            <Route path="/meetings/:id"   element={<MeetingsPage />} />
+            {/* Meetings moved to TorchX Sync. Old links/bookmarks/notifications land there. */}
+            <Route path="/meetings"       element={<ExternalRedirect to="/sync/meetings" />} />
+            <Route path="/meetings/:id"   element={<ExternalRedirect to="/sync/meetings" />} />
             {/* Rewards & Gamification (all roles; SuperAdmin only sees the admin console) */}
             <Route path="/gamification"       element={<ProtectedRoute planFeature="gamification"><GamificationHub /></ProtectedRoute>} />
             <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]} planFeature="gamification"><GamificationAdmin /></ProtectedRoute>} />
