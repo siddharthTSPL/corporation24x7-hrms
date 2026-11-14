@@ -333,7 +333,8 @@ const MyDocumentsSection = () => {
               subtitle="Upload your ID, certificates, or expense receipts to keep them organized here."
             />
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
                   <th className="px-5 py-3 font-medium">Document</th>
@@ -389,6 +390,7 @@ const MyDocumentsSection = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
@@ -512,7 +514,8 @@ const AllDocumentsSection = () => {
               subtitle={`You have not uploaded any ${subTab} documents yet.`}
             />
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
                   <th className="px-5 py-3 font-medium">Document</th>
@@ -560,6 +563,7 @@ const AllDocumentsSection = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

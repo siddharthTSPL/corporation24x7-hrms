@@ -168,7 +168,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
   const handKeys = Object.entries(hands).sort((a, b) => new Date(a[1].raisedAt) - new Date(b[1].raisedAt)).map(([k]) => k);
   const myHand = !!(myKey && hands[myKey]);
   const lobbyCount = (active?.lobby || []).length;
-  const chatAllowed = !guest && !!conversationId;
+  const chatAllowed = !guest;
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
   const shareBlocked = settings.screenShare === "host" && !isHost;
   const handsBlocked = settings.handRaiseEnabled === false && !isHost;
@@ -411,6 +411,16 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
     );
   };
 
+  const quickActions = [
+    { id: "effects", label: "Effects", icon: <FaMagic />, active: panel === "effects", disabled: !hasCameraTrack, onClick: () => openPanel("effects") },
+    { id: "react", label: "React", icon: <FaRegSmile />, disabled: reactionsBlocked, onClick: () => { setMenu(null); setTray(true); } },
+    { id: "view", label: "View", icon: <FaColumns />, active: layout !== "grid" || hideNoVideo || hideSelf, onClick: () => setMenu("view") },
+    { id: "activities", label: "Activities", icon: <FaThLarge />, active: boardOpen, onClick: () => setMenu("activities") },
+    { id: "captions", label: "Captions", icon: <FaClosedCaptioning />, active: captionsOn, onClick: () => onCaptions(!captionsOn) },
+    ...(canShare ? [{ id: "share", label: isPresenting || active.screen ? "Stop share" : "Share", icon: <FaDesktop />, active: isPresenting || active.screen, disabled: shareBlocked, onClick: toggleShare }] : []),
+    ...(isHost ? [{ id: "host", label: "Host", icon: <FaShieldAlt />, active: panel === "host", onClick: () => openPanel("host") }] : []),
+  ];
+
   const panelBody = {
     chat: <ChatPanel onClose={() => setPanel(null)} onSeen={setSeenLastId} />,
     people: <PeoplePanel onClose={() => setPanel(null)} selfPerson={{ name: selfName, photo: self?.photo }} />,
@@ -493,19 +503,19 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
       {isPresenting && <PresentingBanner onStop={run(stopScreenShare)} />}
 
       <footer className="mtg-room-footer mtg-safe-x mtg-safe-b flex justify-center pt-2">
-        <div role="toolbar" aria-label="Meeting controls" className="relative flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[28px] border border-[#2E2E35] bg-[#1B1B20]/95 px-2.5 py-2 shadow-[0_14px_44px_rgba(0,0,0,0.55)] backdrop-blur sm:gap-2 sm:px-3">
+        <div role="toolbar" aria-label="Meeting controls" className="relative flex max-w-full flex-wrap items-center justify-center gap-1 rounded-[28px] border border-[#2E2E35] bg-[#1B1B20]/95 px-2 py-2 shadow-[0_14px_44px_rgba(0,0,0,0.55)] backdrop-blur sm:gap-2 sm:px-3">
           <RoomButton onClick={toggleAudio} active={!active.audio} title={active.audio ? "Mute (M)" : "Unmute (M)"}>
             {active.audio ? <FaMicrophone /> : <FaMicrophoneSlash className="text-red-600" />}
           </RoomButton>
           <RoomButton onClick={run(toggleVideo)} active={!active.video} title={active.video ? "Turn camera off (V)" : "Turn camera on (V)"}>
             {active.video ? <FaVideo /> : <FaVideoSlash className="text-red-600" />}
           </RoomButton>
-          <RoomButton onClick={() => openPanel("effects")} active={panel === "effects" || active.effect?.effect !== "none"} disabled={!hasCameraTrack} title="Backgrounds & effects">
+          <RoomButton onClick={() => openPanel("effects")} active={panel === "effects" || active.effect?.effect !== "none"} disabled={!hasCameraTrack} title="Backgrounds & effects" className="max-sm:hidden">
             <FaMagic />
           </RoomButton>
 
-          <div className="relative">
-            <RoomButton onClick={() => { setMenu(null); setTray((v) => !v); }} active={tray} disabled={reactionsBlocked} title={reactionsBlocked ? "Reactions are off" : "Reactions (R)"}>
+          <div className="contents sm:relative sm:block">
+            <RoomButton onClick={() => { setMenu(null); setTray((v) => !v); }} active={tray} disabled={reactionsBlocked} title={reactionsBlocked ? "Reactions are off" : "Reactions (R)"} className="max-sm:hidden">
               <FaRegSmile />
             </RoomButton>
             {tray && !reactionsBlocked && (
@@ -535,7 +545,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
             </RoomButton>
           )}
           {isHost && (
-            <RoomButton onClick={() => openPanel("host")} active={panel === "host"} title="Host controls">
+            <RoomButton onClick={() => openPanel("host")} active={panel === "host"} title="Host controls" className="max-sm:hidden">
               <FaShieldAlt />
             </RoomButton>
           )}
@@ -544,8 +554,8 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
             <FaClosedCaptioning />
           </RoomButton>
 
-          <div className="relative">
-            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "view" ? null : "view")); }} active={menu === "view" || layout !== "grid" || hideNoVideo || hideSelf} title="Change view (G)">
+          <div className="contents sm:relative sm:block">
+            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "view" ? null : "view")); }} active={menu === "view" || layout !== "grid" || hideNoVideo || hideSelf} title="Change view (G)" className="max-sm:hidden">
               <FaColumns />
             </RoomButton>
             {menu === "view" && (
@@ -563,8 +573,8 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
             )}
           </div>
 
-          <div className="relative">
-            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "activities" ? null : "activities")); }} active={menu === "activities" || boardOpen || ["qa", "polls", "activities", "transcript"].includes(panel)} title="Activities: Q&A, polls, whiteboard">
+          <div className="contents sm:relative sm:block">
+            <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "activities" ? null : "activities")); }} active={menu === "activities" || boardOpen || ["qa", "polls", "activities", "transcript"].includes(panel)} title="Activities: Q&A, polls, whiteboard" className="max-sm:hidden">
               <FaThLarge />
             </RoomButton>
             {menu === "activities" && (
@@ -576,7 +586,7 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
             )}
           </div>
 
-          <div className="relative">
+          <div className="contents sm:relative sm:block">
             <RoomButton onClick={() => { setTray(false); setMenu((m) => (m === "more" ? null : "more")); }} active={menu === "more"} title="More options">
               <FaEllipsisH />
             </RoomButton>
@@ -590,11 +600,12 @@ export default function MeetingRoom({ onMinimize, guest = false, guestName = "" 
                 shareAudio={shareAudio}
                 onShareAudio={setShareAudio}
                 onShortcuts={() => { setMenu(null); setHelp(true); }}
+                quickActions={quickActions}
               />
             )}
           </div>
 
-          <RoomButton onClick={onLeave} danger wide title="Leave meeting" className="ml-1">
+          <RoomButton onClick={onLeave} danger wide title="Leave meeting" className="sm:ml-1">
             <FaPhoneSlash />
             <span className="hidden text-sm font-semibold sm:inline">Leave</span>
           </RoomButton>

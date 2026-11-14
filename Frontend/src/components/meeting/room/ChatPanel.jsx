@@ -70,7 +70,7 @@ export default function ChatPanel({ onClose, onSeen }) {
   const scrollRef = useRef(null);
   const stickRef = useRef(true);
   const fileRef = useRef(null);
-  const disabled = active?.settings?.chatEnabled === false && !isHost;
+  const disabled = (active?.settings?.chatEnabled === false && !isHost) || !conversationId;
 
   const lastId = messages.length ? messages[messages.length - 1].id : null;
 
@@ -139,7 +139,7 @@ export default function ChatPanel({ onClose, onSeen }) {
         ))}
       </div>
 
-      {disabled && <p className="mx-4 mb-2 rounded-lg bg-amber-500/15 px-3 py-2 text-center text-xs text-amber-200">The host has turned chat off for this meeting.</p>}
+      {disabled && <p className="mx-4 mb-2 rounded-lg bg-amber-500/15 px-3 py-2 text-center text-xs text-amber-200">{conversationId ? "The host has turned chat off for this meeting." : "Chat is not available for this meeting yet."}</p>}
 
       {files.length > 0 && (
         <div className="mx-4 mb-2 flex flex-wrap gap-1.5">
@@ -176,7 +176,7 @@ export default function ChatPanel({ onClose, onSeen }) {
           rows={1}
           maxLength={4000}
           placeholder={disabled ? "Chat is turned off" : "Send a message to everyone"}
-          className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-[#CD166E]/50 disabled:opacity-50"
+          className="max-h-28 min-h-10 flex-1 resize-none rounded-2xl bg-white/10 px-4 py-2.5 text-base text-white sm:text-sm placeholder:text-gray-500 outline-none focus:ring-2 focus:ring-[#CD166E]/50 disabled:opacity-50"
         />
         <button type="submit" disabled={disabled || (!text.trim() && !files.length)} title="Send" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#730042] text-white hover:bg-[#8c0050] disabled:opacity-40">
           <FaPaperPlane className="text-sm" />

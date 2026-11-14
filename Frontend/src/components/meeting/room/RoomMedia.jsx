@@ -69,7 +69,7 @@ export function RoomButton({ onClick, active = false, danger = false, disabled =
       aria-pressed={danger || wide ? undefined : active}
       data-active={active || undefined}
       disabled={disabled}
-      className={`relative flex h-11 shrink-0 items-center justify-center gap-2 rounded-full text-[15px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${wide ? "px-5" : "w-11"} ${tone} ${className}`}
+      className={`relative flex h-10 shrink-0 items-center justify-center gap-2 rounded-full text-[15px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:h-11 ${wide ? "px-4 sm:px-5" : "w-10 sm:w-11"} ${tone} ${className}`}
     >
       {children}
       {badge ? (
