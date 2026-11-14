@@ -68,7 +68,7 @@ export default function SparkFrame() {
   // Desktop: floating dock bottom-right. Mobile: full screen.
   const size = expanded
     ? "md:w-[min(960px,calc(100vw-2rem))] md:h-[min(720px,calc(100dvh-5rem))]"
-    : "md:w-[400px] md:h-[min(640px,calc(100dvh-5rem))]";
+    : "md:w-[380px] md:h-[min(560px,calc(100dvh-5rem))]";
 
   return (
     <div
