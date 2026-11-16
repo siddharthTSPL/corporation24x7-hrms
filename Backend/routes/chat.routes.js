@@ -82,6 +82,7 @@ chatRouter.post("/conversations/:id/members", asyncHandler(c.addMembers));
 chatRouter.delete("/conversations/:id/members/:key", asyncHandler(c.removeMember));
 chatRouter.patch("/conversations/:id/members/:key/role", asyncHandler(c.setMemberRole));
 chatRouter.post("/conversations/:id/leave", asyncHandler(c.leaveGroup));
+chatRouter.delete("/conversations/:id", asyncHandler(c.deleteConversation));
 chatRouter.patch("/conversations/:id/mute", asyncHandler(c.setMuted));
 chatRouter.post("/conversations/:id/read", asyncHandler(c.markRead));
 chatRouter.patch("/conversations/:id/pin", asyncHandler(c.setPinned));

@@ -3,6 +3,7 @@ import { FaExpandAlt, FaCompressAlt, FaExternalLinkAlt, FaTimes } from "react-ic
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSparkStore } from "../../auth/store/spark/sparkStore";
 import { SPARK_URL, SPARK_EMBED_URL, SPARK_ORIGIN, SPARK_MSG_SOURCE } from "./sparkConfig";
+import sparkLogo from "../../assets/TorchX SPAEK.png"; // TorchX Spark wordmark
 
 // Zoho-Cliq-style chat dock: Spark (a separate app) shown inside Talent
 // through an <iframe>. The iframe is mounted once after login and then only
@@ -82,7 +83,9 @@ export default function SparkFrame() {
     >
       {/* frame header */}
       <div className="flex items-center justify-between gap-2 px-3 h-11 shrink-0 bg-gradient-to-r from-[#8A0A52] to-[#5C0035] text-white">
-        <span className="text-sm font-semibold tracking-tight">TorchX Spark</span>
+        <span className="inline-flex items-center rounded-md bg-white px-2 py-0.5 shadow-sm">
+          <img src={sparkLogo} alt="TorchX Spark" draggable={false} className="h-6 w-auto select-none" />
+        </span>
         <div className="flex items-center gap-1">
           <button
             type="button"

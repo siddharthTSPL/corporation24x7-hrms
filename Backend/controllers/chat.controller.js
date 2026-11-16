@@ -133,6 +133,11 @@ const leaveGroup = async (req, res) => {
   ok(res, { message: "You left the group." });
 };
 
+const deleteConversation = async (req, res) => {
+  await chat.deleteConversation(actorOf(req), req.params.id);
+  ok(res, { message: "Group deleted." });
+};
+
 const setMuted = async (req, res) => {
   await chat.setMuted(actorOf(req), req.params.id, !!req.body?.muted);
   ok(res, { muted: !!req.body?.muted });
@@ -360,6 +365,7 @@ module.exports = {
   removeMember,
   setMemberRole,
   leaveGroup,
+  deleteConversation,
   setMuted,
   markRead,
   getMessages,
