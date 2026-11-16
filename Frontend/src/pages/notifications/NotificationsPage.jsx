@@ -10,6 +10,7 @@ import {
   useClearReadNotifications,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, TYPE_META } from "../../components/notifications/notificationUtils";
+import { resolveNotificationLink } from "../../components/notifications/notificationLinks";
 import NotificationItem from "../../components/notifications/NotificationItem";
 import FeatureNotificationModal from "../../components/notifications/FeatureNotificationModal";
 

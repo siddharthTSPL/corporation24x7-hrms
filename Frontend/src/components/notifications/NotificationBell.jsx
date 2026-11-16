@@ -11,6 +11,7 @@ import {
   useDeleteNotification,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, getTypeMeta } from "./notificationUtils";
+import { resolveNotificationLink } from "./notificationLinks";
 import NotificationItem from "./NotificationItem";
 import FeatureNotificationModal from "./FeatureNotificationModal";
 import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
