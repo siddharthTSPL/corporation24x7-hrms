@@ -73,6 +73,12 @@ function Login() {
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
+    // Came from Spark / Sync ("Sign in" there sends ?next=/spark/...): go back there, signed in.
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next && /^\/(spark|sync)(\/|$)/.test(next)) {
+      window.location.assign(next);
+      return;
+    }
     if (role === "superadmin" || role === "super_admin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
     else if (role === "manager") navigate("/manager-dashboard", { replace: true });

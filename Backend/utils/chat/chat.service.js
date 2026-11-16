@@ -9,6 +9,9 @@ const callRooms = require("./callRooms");
 const { httpError, personKey, parseKey, resolvePeople, requirePeople } = require("./people.utils");
 const { parseFormatting, stripFormatting, extractUrls } = require("./formatting");
 const linkPreview = require("./linkPreview.service");
+const ChatStar = require("../../Models/chatstar.model");
+const ChatScheduled = require("../../Models/chatscheduled.model");
+const Meeting = require("../../Models/meeting.model");
 const Leave = require("../../Models/leave.model");
 const ManagerLeave = require("../../Models/maleave.model");
 const AdminLeave = require("../../Models/adleave.model");
@@ -935,7 +938,8 @@ const removeMember = async (actor, conversationId, targetKey) => {
 
 const leaveGroup = async (actor, conversationId) => {
   const conv = await loadConversation(actor, conversationId);
-  if (conv.type !== "group") throw httpError("You can only leave group chats.");
+  // Normal groups AND meeting chats can be left (1:1 chats cannot).
+  if (conv.type !== "group" && conv.type !== "meeting") throw httpError("You can only leave group chats.");
   const before = [...conv.participantKeys];
   const people = await resolvePeople(actor.organisation_id, [{ model: actor.model, id: actor.id }]);
 
@@ -949,6 +953,33 @@ const leaveGroup = async (actor, conversationId) => {
   }
   emitToKeys(before, "chat:conversation:updated", { conversationId: String(conv._id), removed: [actor.key] });
   return conv;
+};
+
+// Delete a whole group (or an ended meeting's chat) for everyone. Admins / the meeting host only.
+const deleteConversation = async (actor, conversationId) => {
+  const conv = await loadConversation(actor, conversationId);
+  if (conv.type !== "group" && conv.type !== "meeting") throw httpError("Only groups can be deleted. Use 'Clear chat' for 1:1 chats.", 400);
+  if (!isAdminOf(conv, actor)) throw httpError("Only group admins can delete this group.", 403);
+
+  if (conv.type === "meeting") {
+    const meeting = await Meeting.findOne({ conversation: conv._id }).select("status").lean();
+    if (meeting && (meeting.status === "scheduled" || meeting.status === "live")) {
+      throw httpError("This meeting is still scheduled or live. End or cancel it first, then delete its chat.", 400);
+    }
+    await Meeting.updateOne({ conversation: conv._id }, { $unset: { conversation: 1 } });
+  }
+
+  const keys = [...conv.participantKeys];
+  await Promise.all([
+    ChatMessage.deleteMany({ conversation: conv._id }),
+    ChatStar.deleteMany({ conversation: conv._id }),
+    ChatScheduled.deleteMany({ conversation: conv._id }),
+  ]);
+  await Conversation.deleteOne({ _id: conv._id });
+
+  // Every member's list drops it (same event the "removed from group" flow already uses).
+  emitToKeys(keys, "chat:conversation:updated", { conversationId: String(conv._id), removed: keys });
+  return { id: String(conv._id) };
 };
 
 const setMemberRole = async (actor, conversationId, targetKey, role) => {
@@ -1030,6 +1061,7 @@ module.exports = {
   addMembers,
   removeMember,
   leaveGroup,
+  deleteConversation,
   setMemberRole,
   setMuted,
   syncMeetingConversation,
