@@ -16,6 +16,7 @@ function dpdpMask(req, res, next) {
     getSettings(actor.orgId)
       .then((s) => {
         if (!s || !s.enabled || !s.maskingEnabled || isUnlocked(req, actor, s)) return original(body);
+        res.set('X-Dpdp-Masked', '1'); // visible in DevTools > Network: proves masking ran
         return original(maskTree(JSON.parse(JSON.stringify(body)), actor.id));
       })
       .catch((err) => {

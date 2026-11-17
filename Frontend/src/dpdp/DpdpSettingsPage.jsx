@@ -52,6 +52,18 @@ export default function DpdpSettingsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-semibold">DPDP Compliance</h1>
 
+      {!s.enabled && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          <b>Protection is OFF.</b> Personal data is NOT masked and documents do NOT ask for a PIN right now.
+          {!s.pinConfigured ? " Step 1: set the access PIN below. Step 2: switch on \"DPDP protection ON\"." : " Switch on \"DPDP protection ON\" below to start masking."}
+        </div>
+      )}
+      {s.enabled && (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <b>Protection is ON.</b> Other people's Aadhaar, PAN, bank and phone show masked until the PIN is entered. Your own data is never masked.
+        </div>
+      )}
+
       <section className="rounded-xl border bg-white p-5">
         <h2 className="mb-1 font-semibold">Access PIN</h2>
         <p className="mb-3 text-sm text-gray-600">Share this PIN only with people who must view documents or unmasked data. Changing it signs everyone out of protected data instantly. Status: <b>{s.pinConfigured ? "set" : "not set"}</b>{s.pinSetAt && ` (last changed ${new Date(s.pinSetAt).toLocaleString()})`}</p>
