@@ -20,6 +20,7 @@ const { validatePin } = require("../utils/dpdp.utils");
   s.pinHash = await bcrypt.hash(pin, 12);
   s.pinVersion = (s.pinVersion || 0) + 1;
   s.pinSetAt = new Date();
+  s.usingDefaultPin = false;
   s.enabled = true;
   s.maskingEnabled = true;
   s.pinRequiredForDocuments = true;

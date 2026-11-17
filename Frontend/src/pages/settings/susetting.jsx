@@ -32,6 +32,7 @@ import {
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 import ExternalSsoSettingsCard from "./ExternalSsoSettingsCard";
 import GamificationToggleCard from "./GamificationToggleCard";
+import DpdpSettingsPage from "../../dpdp/DpdpSettingsPage";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -586,6 +587,27 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z"
             stroke="currentColor"
             strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "dpdp",
+      label: "DPDP & Privacy",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M5.8 8l1.6 1.6L10.4 6.4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
@@ -2197,6 +2219,7 @@ export default function SuperAdminSettingsPage() {
               />
             </>
           )}
+          {tab === "dpdp" && <DpdpSettingsPage />}
           {tab === "avatar" && (
             <AvatarTab
               superAdmin={superAdmin}

@@ -33,9 +33,10 @@ const audit = (a, action, meta = {}, target) =>
   logAudit({ organisation_id: a.orgId, module: "dpdp", action, actor: { id: a.id, model: a.model, name: a.name }, target, meta });
 
 const publicSettings = (s) => ({
-  enabled: !!s?.enabled,
-  maskingEnabled: s ? s.maskingEnabled !== false : true,
-  pinRequiredForDocuments: s ? s.pinRequiredForDocuments !== false : true,
+  enabled: true,
+  maskingEnabled: true,
+  pinRequiredForDocuments: true,
+  usingDefaultPin: !!s?.usingDefaultPin,
   pinConfigured: !!s?.pinVersion,
   pinSetAt: s?.pinSetAt || null,
   unlockMinutes: s?.unlockMinutes || 15,
@@ -59,8 +60,9 @@ exports.getStatus = async (req, res) => {
 
 exports.verifyPin = async (req, res) => {
   const a = actorOf(req);
+  await getSettings(a.orgId);
   const s = await DpdpSettings.findOne({ organisation_id: a.orgId }).select("+pinHash");
-  if (!s || !s.enabled || !s.pinHash) return res.status(400).json({ message: "Access PIN is not set up for this organisation. Ask your Super Admin." });
+  if (!s || !s.pinHash) return res.status(400).json({ message: "Access PIN is not available for this organisation. Ask your Super Admin." });
   if (!s.unlockRoles.includes(a.role)) {
     audit(a, "pin.denied_role", { role: a.role });
     return res.status(403).json({ code: "DPDP_ROLE_NOT_ALLOWED", message: "Your role is not allowed to view protected data." });
@@ -108,14 +110,11 @@ exports.lock = async (req, res) => {
 exports.selfTest = async (req, res) => {
   const a = actorOf(req);
   const { maskTree } = require("../utils/dpdp.utils");
-  const s = await DpdpSettings.findOne({ organisation_id: a.orgId }).lean();
+  const s = await getSettings(a.orgId);
   const unlocked = !!s && isUnlocked(req, a, s);
-  const willMask = !!(s && s.enabled && s.maskingEnabled !== false && !unlocked);
+  const willMask = !!(s && !unlocked);
   const reasons = [];
   if (!req.dpdpMaskInstalled) reasons.push("dpdpMask middleware is NOT registered in app.js (or server was not restarted)");
-  if (!s) reasons.push("No DPDP settings found for your organisation. Open the DPDP & Privacy page as Super Admin, set a PIN and switch protection ON");
-  else if (!s.enabled) reasons.push("DPDP protection is OFF for your organisation");
-  else if (s.maskingEnabled === false) reasons.push("'Mask personal identifiers' is switched OFF");
   if (unlocked) reasons.push("You have entered the PIN (unlocked), so real data is shown. Click Lock");
   const sampleOther = { _id: "000000000000000000000000", f_name: "Sample", personal_contact: "9876543210", aadhaar_number: "123412341234", pan_number: "ABCDE1234F", account_number: "123456789012", work_email: "sample@x.com" };
   res.json({
@@ -123,8 +122,9 @@ exports.selfTest = async (req, res) => {
     middlewareRegistered: !!req.dpdpMaskInstalled,
     you: { id: a.id, role: a.role, organisation_id: a.orgId },
     settingsFound: !!s,
-    enabled: !!s?.enabled,
-    maskingEnabled: s ? s.maskingEnabled !== false : null,
+    enabled: true,
+    maskingEnabled: true,
+    usingDefaultPin: !!s?.usingDefaultPin,
     pinConfigured: !!s?.pinVersion,
     unlocked,
     willMaskOtherPeoplesData: willMask,
@@ -213,19 +213,17 @@ exports.exportMyData = async (req, res) => {
 const superActor = (req) => ({ id: String(req.superAdmin._id), role: "super_admin", model: "SuperAdmin", orgId: String(req.superAdmin._id), name: nameOf(req.superAdmin) });
 
 exports.adminGetSettings = async (req, res) => {
-  const s = await DpdpSettings.findOne({ organisation_id: req.superAdmin._id }).lean();
+  const s = await getSettings(req.superAdmin._id);
   res.json({ success: true, settings: publicSettings(s) });
 };
 
 exports.adminUpdateSettings = async (req, res) => {
   const a = superActor(req);
   const b = req.body || {};
-  const s = (await DpdpSettings.findOne({ organisation_id: a.orgId })) || new DpdpSettings({ organisation_id: a.orgId });
+  await getSettings(a.orgId);
+  const s = await DpdpSettings.findOne({ organisation_id: a.orgId });
 
-  if (typeof b.maskingEnabled === "boolean") s.maskingEnabled = b.maskingEnabled;
-  if (typeof b.pinRequiredForDocuments === "boolean") s.pinRequiredForDocuments = b.pinRequiredForDocuments;
   if (b.unlockMinutes != null) s.unlockMinutes = Math.min(120, Math.max(1, Number(b.unlockMinutes) || 15));
-  if (Array.isArray(b.unlockRoles)) s.unlockRoles = b.unlockRoles.filter((r) => ["super_admin", "admin", "senior_admin", "official", "manager", "senior_manager"].includes(r));
   if (b.requestSlaDays != null) s.requestSlaDays = Math.min(90, Math.max(1, Number(b.requestSlaDays) || 30));
   if (b.officer && typeof b.officer === "object") s.officer = { name: String(b.officer.name || "").slice(0, 120), email: String(b.officer.email || "").slice(0, 160), phone: String(b.officer.phone || "").slice(0, 40) };
   if (b.notice && typeof b.notice === "object") {
@@ -234,13 +232,12 @@ exports.adminUpdateSettings = async (req, res) => {
     if (Array.isArray(b.notice.purposes))
       s.notice.purposes = b.notice.purposes.filter((p) => p?.key && p?.label).slice(0, 20).map((p) => ({ key: String(p.key).slice(0, 60), label: String(p.label).slice(0, 200), required: !!p.required }));
   }
-  if (typeof b.enabled === "boolean") {
-    if (b.enabled && !s.pinHash && !s.pinVersion) return res.status(400).json({ message: "Set the access PIN first, then switch DPDP protection on." });
-    s.enabled = b.enabled;
-  }
+  s.enabled = true;
+  s.maskingEnabled = true;
+  s.pinRequiredForDocuments = true;
   await s.save();
   clearSettingsCache(a.orgId);
-  audit(a, "settings.updated", { enabled: s.enabled, maskingEnabled: s.maskingEnabled, pinRequiredForDocuments: s.pinRequiredForDocuments });
+  audit(a, "settings.updated");
   res.json({ success: true, settings: publicSettings(s) });
 };
 
@@ -254,8 +251,10 @@ exports.adminSetPin = async (req, res) => {
     const err = validatePin(pin);
     if (err) return res.status(400).json({ message: err });
   }
-  const s = (await DpdpSettings.findOne({ organisation_id: a.orgId })) || new DpdpSettings({ organisation_id: a.orgId });
+  await getSettings(a.orgId);
+  const s = await DpdpSettings.findOne({ organisation_id: a.orgId });
   s.pinHash = await bcrypt.hash(pin, 12);
+  s.usingDefaultPin = false;
   s.pinVersion = (s.pinVersion || 0) + 1; // invalidates every unlock already issued
   s.pinSetAt = new Date();
   s.pinSetBy = a.id;
@@ -264,7 +263,7 @@ exports.adminSetPin = async (req, res) => {
   await DpdpPinAttempt.deleteMany({ organisation_id: a.orgId });
   audit(a, generate ? "pin.generated" : "pin.changed", { version: s.pinVersion });
   // The PIN is returned ONCE (only when generated) so the Super Admin can hand it over; it is never stored in plain text.
-  res.json({ success: true, pinConfigured: true, pinVersion: s.pinVersion, ...(generate ? { generatedPin: pin } : {}) });
+  res.json({ success: true, pinConfigured: true, usingDefaultPin: false, pinVersion: s.pinVersion, ...(generate ? { generatedPin: pin } : {}) });
 };
 
 exports.adminAccessLog = async (req, res) => {

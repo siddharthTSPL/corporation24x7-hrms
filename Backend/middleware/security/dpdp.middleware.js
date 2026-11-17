@@ -16,14 +16,14 @@ function dpdpMask(req, res, next) {
     if (!actor) return original(body);
     getSettings(actor.orgId)
       .then((s) => {
-        if (!s || !s.enabled || !s.maskingEnabled || isUnlocked(req, actor, s)) return original(body);
+        if (!s || isUnlocked(req, actor, s)) return original(body);
         res.set('X-Dpdp-Masked', '1'); // visible in DevTools > Network: proves masking ran
-        return original(maskTree(JSON.parse(JSON.stringify(body)), actor.id));
+        return original(maskTree(JSON.parse(JSON.stringify(body)), actor.id, false, !!s.unlockRoles?.includes(actor.role)));
       })
       .catch((err) => {
         // Fail closed: if we cannot read the policy, do not leak.
         console.error("[dpdp] mask failed:", err.message);
-        original(maskTree(JSON.parse(JSON.stringify(body)), actor.id));
+        original(maskTree(JSON.parse(JSON.stringify(body)), actor.id, false, true));
       });
     return res;
   };
@@ -37,7 +37,7 @@ async function requireDpdpPin(req, res, next) {
     const actor = getActor(req);
     if (!actor) return res.status(401).json({ message: "Unauthorized" });
     const s = await getSettings(actor.orgId);
-    if (!s || !s.enabled || !s.pinRequiredForDocuments) return next();
+    if (!s) return next();
 
     if (!isUnlocked(req, actor, s)) {
       return res.status(423).json({

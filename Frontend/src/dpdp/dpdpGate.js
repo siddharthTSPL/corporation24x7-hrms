@@ -44,8 +44,56 @@ export const requestPin = () => {
   return pending;
 };
 
+let canUnlockFlag = null;
+export const setDpdpCanUnlock = (v) => { canUnlockFlag = v; };
+
+const digitsOf = (v) => String(v ?? "").replace(/\D/g, "");
+const tailMask = (v, keep = 4) => {
+  const s = String(v ?? "");
+  if (s.length <= keep) return "X".repeat(s.length);
+  return "X".repeat(s.length - keep) + s.slice(-keep);
+};
+const MASKERS = {
+  aadhaar_number: (v) => (digitsOf(v).length < 5 ? tailMask(v) : `XXXX XXXX ${digitsOf(v).slice(-4)}`),
+  pan_number: (v) => {
+    const s = String(v ?? "").toUpperCase();
+    return s.length === 10 ? `XXXXX${s.slice(5, 9)}X` : tailMask(s);
+  },
+  account_number: (v) => tailMask(v, 4),
+  ifsc_code: (v) => {
+    const s = String(v ?? "");
+    return s.length > 4 ? s.slice(0, 4) + "X".repeat(s.length - 4) : tailMask(s, 0);
+  },
+  personal_contact: (v) => tailMask(String(v ?? "").replace(/\s+/g, ""), 4),
+  e_contact: (v) => tailMask(String(v ?? "").replace(/\s+/g, ""), 4),
+};
+const looksMasked = (v) => typeof v === "string" && /[X*•]{3,}/.test(v);
+
+const maskDeep = (node) => {
+  if (Array.isArray(node)) return node.map(maskDeep);
+  if (!node || typeof node !== "object" || Object.prototype.toString.call(node) !== "[object Object]") return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (MASKERS[k] && (typeof v === "string" || typeof v === "number") && v !== "" && !looksMasked(v)) out[k] = MASKERS[k](v);
+    else out[k] = maskDeep(v);
+  }
+  return out;
+};
+
+const stripMasked = (body) => {
+  if (!body || Object.prototype.toString.call(body) !== "[object Object]") return;
+  for (const k of Object.keys(MASKERS)) if (looksMasked(body[k])) delete body[k];
+};
+
+const shouldMask = (cfg) => {
+  if (getDpdpToken() || canUnlockFlag === false) return false;
+  if (cfg?.responseType && cfg.responseType !== "json") return false;
+  return !String(cfg?.url || "").includes("dpdp/");
+};
+
 const attach = (instance) => {
   instance.interceptors.request.use((cfg) => {
+    if (cfg.data && !String(cfg.url || "").includes("dpdp/")) stripMasked(cfg.data);
     const t = getDpdpToken();
     if (t) {
       cfg.headers = cfg.headers || {};
@@ -55,7 +103,10 @@ const attach = (instance) => {
     return cfg;
   });
   instance.interceptors.response.use(
-    (r) => r,
+    (r) => {
+      if (r?.data && typeof r.data === "object" && shouldMask(r.config)) r.data = maskDeep(r.data);
+      return r;
+    },
     async (err) => {
       const cfg = err?.config;
       const d = err?.response?.data;

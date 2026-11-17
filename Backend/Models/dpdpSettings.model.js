@@ -16,13 +16,14 @@ const purposeSchema = new mongoose.Schema(
 const dpdpSettingsSchema = new mongoose.Schema(
   {
     organisation_id: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", required: true, unique: true, index: true },
-    enabled: { type: Boolean, default: false },
+    enabled: { type: Boolean, default: true },
     maskingEnabled: { type: Boolean, default: true },
     pinRequiredForDocuments: { type: Boolean, default: true },
     pinHash: { type: String, default: null, select: false },
     pinVersion: { type: Number, default: 0 },
     pinSetAt: { type: Date, default: null },
     pinSetBy: { type: mongoose.Schema.Types.ObjectId, default: null },
+    usingDefaultPin: { type: Boolean, default: false },
     unlockMinutes: { type: Number, default: 15, min: 1, max: 120 },
     unlockRoles: {
       type: [String],

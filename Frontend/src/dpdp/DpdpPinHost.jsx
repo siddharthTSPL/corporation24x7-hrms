@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FaLock, FaUnlock, FaShieldAlt } from "react-icons/fa";
-import { getDpdpToken, getDpdpExpiry, setDpdpToken } from "./dpdpGate";
+import { useQueryClient } from "@tanstack/react-query";
+import { getDpdpToken, getDpdpExpiry, setDpdpToken, setDpdpCanUnlock } from "./dpdpGate";
 import { useDpdpStatus, useVerifyDpdpPin, useLockDpdp } from "../auth/server-state/dpdp/dpdp.hook";
 
 // Mounted once in main.jsx (inside QueryClientProvider).
@@ -11,6 +12,7 @@ export default function DpdpPinHost() {
   const { data: status } = useDpdpStatus();
   const verify = useVerifyDpdpPin();
   const lock = useLockDpdp();
+  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
@@ -29,6 +31,12 @@ export default function DpdpPinHost() {
       clearInterval(iv);
     };
   }, []);
+
+  useEffect(() => {
+    if (!status) return;
+    setDpdpCanUnlock(!!status.canUnlock);
+    if (!status.canUnlock) qc.invalidateQueries();
+  }, [status?.canUnlock]);
 
   const close = (ok) => {
     setOpen(false);

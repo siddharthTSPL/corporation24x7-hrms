@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const DpdpSettings = require("../Models/dpdpSettings.model");
 
 // ───────────────────────── masking ─────────────────────────
@@ -42,22 +43,23 @@ const PERSON_ONLY = { address: maskAddress, pincode: maskPincode };
 const PERSON_MARKERS = ["aadhaar_number", "pan_number", "account_number", "personal_contact", "work_email", "e_contact"];
 // KYC file links: removed (not masked) until the PIN is entered.
 const LOCK_KEYS = new Set(["aadhaar_card", "pan_card"]);
+const OWN_MASKED = new Set(["aadhaar_number", "pan_number", "account_number", "ifsc_code"]);
 
 const looksMasked = (v) => typeof v === "string" && /[X*•]{3,}/.test(v);
 const isPerson = (o) => PERSON_MARKERS.some((k) => Object.prototype.hasOwnProperty.call(o, k));
 
-function maskTree(node, actorId, inheritedOwn = false) {
-  if (Array.isArray(node)) return node.map((n) => maskTree(n, actorId, inheritedOwn));
+function maskTree(node, actorId, inheritedOwn = false, maskOwn = false) {
+  if (Array.isArray(node)) return node.map((n) => maskTree(n, actorId, inheritedOwn, maskOwn));
   if (!node || typeof node !== "object") return node;
 
   const own = inheritedOwn || String(node._id || node.id || "") === String(actorId);
   const person = isPerson(node);
   const out = {};
   for (const [k, v] of Object.entries(node)) {
-    if (!own && STRONG[k] && (typeof v === "string" || typeof v === "number") && v !== "") out[k] = STRONG[k](v);
+    if ((!own || (maskOwn && OWN_MASKED.has(k))) && STRONG[k] && (typeof v === "string" || typeof v === "number") && v !== "") out[k] = STRONG[k](v);
     else if (!own && person && PERSON_ONLY[k] && typeof v === "string") out[k] = PERSON_ONLY[k](v);
     else if (!own && LOCK_KEYS.has(k) && v) out[k] = null;
-    else out[k] = maskTree(v, actorId, own);
+    else out[k] = maskTree(v, actorId, own, maskOwn);
   }
   if (!own && Object.keys(node).some((k) => LOCK_KEYS.has(k) && node[k])) out.kycLocked = true;
   return out;
@@ -100,7 +102,7 @@ function getActor(req) {
   try {
     const d = jwt.verify(token, process.env.JWT_SECRET);
     const id = d.superadminid || d.adminid || d.managerid || d._id || d.id || d.userId;
-    const orgId = d.role === "super_admin" ? d.superadminid : d.organisation_id;
+    const orgId = d.role === "super_admin" ? d.superadminid : d.organisation_id || req.user?.organisation_id || req.manager?.organisation_id || req.employee?.organisation_id || req.admin?.organisation_id;
     if (!id || !orgId) return null;
     return { id: String(id), role: d.role, orgId: String(orgId), model: MODEL_BY_ROLE[d.role] || "User" };
   } catch {
@@ -134,11 +136,49 @@ function isUnlocked(req, actor, settings) {
 const cache = new Map();
 const TTL = 30 * 1000;
 
+const DEFAULT_PIN = "1212";
+const ALL_UNLOCK_ROLES = ["super_admin", "admin", "senior_admin", "official", "manager", "senior_manager"];
+
+// DPDP protection is always on. The first time an organisation is seen, its
+// settings are created with the default PIN; any older row that was switched
+// off or has no PIN is brought back to the always-on state.
+async function loadSettings(orgId) {
+  let doc = await DpdpSettings.findOne({ organisation_id: orgId }).select("+pinHash");
+  let dirty = false;
+  if (!doc) {
+    doc = new DpdpSettings({ organisation_id: orgId });
+    dirty = true;
+  }
+  if (!doc.enabled) { doc.enabled = true; dirty = true; }
+  if (doc.maskingEnabled === false) { doc.maskingEnabled = true; dirty = true; }
+  if (doc.pinRequiredForDocuments === false) { doc.pinRequiredForDocuments = true; dirty = true; }
+  const roles = doc.unlockRoles || [];
+  if (roles.length !== ALL_UNLOCK_ROLES.length || ALL_UNLOCK_ROLES.some((r) => !roles.includes(r))) { doc.unlockRoles = [...ALL_UNLOCK_ROLES]; dirty = true; }
+  if (!doc.pinHash) {
+    doc.pinHash = await bcrypt.hash(DEFAULT_PIN, 12);
+    doc.pinVersion = (doc.pinVersion || 0) + 1;
+    doc.pinSetAt = new Date();
+    doc.usingDefaultPin = true;
+    dirty = true;
+  }
+  if (dirty) {
+    try {
+      await doc.save();
+    } catch (e) {
+      if (e?.code !== 11000) throw e;
+      doc = await DpdpSettings.findOne({ organisation_id: orgId }).select("+pinHash");
+    }
+  }
+  const value = doc.toObject();
+  delete value.pinHash;
+  return value;
+}
+
 async function getSettings(orgId) {
   const key = String(orgId);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL) return hit.value;
-  const value = await DpdpSettings.findOne({ organisation_id: orgId }).lean();
+  const value = await loadSettings(orgId);
   cache.set(key, { at: Date.now(), value });
   return value;
 }
@@ -156,6 +196,6 @@ const nameOf = (u) => (u ? [u.f_name, u.l_name].filter(Boolean).join(" ") || u.n
 
 module.exports = {
   nameOf, maskTree, stripMaskedWrites, getActor, signUnlockToken, readUnlockToken, isUnlocked,
-  getSettings, clearSettingsCache, validatePin, MODEL_BY_ROLE,
+  getSettings, clearSettingsCache, validatePin, MODEL_BY_ROLE, DEFAULT_PIN,
   maskAadhaar, maskPan, maskPhone, maskAccount, maskIfsc,
 };

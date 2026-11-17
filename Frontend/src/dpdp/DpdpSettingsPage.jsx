@@ -5,7 +5,6 @@ import { useDpdpAdminSettings, useUpdateDpdpSettings, useSetDpdpPin, useDpdpAcce
 const ROLES = ["super_admin", "admin", "senior_admin", "official", "manager", "senior_manager"];
 const err = (e) => e?.response?.data?.message || "Something went wrong";
 
-// Route: /superadmin-dpdp  (Super Admin only)
 export default function DpdpSettingsPage() {
   const { data: sd } = useDpdpAdminSettings();
   const { data: ld } = useDpdpAccessLog({ limit: 25 });
@@ -33,59 +32,65 @@ export default function DpdpSettingsPage() {
   };
 
   if (!s) return <div className="p-6 text-sm text-gray-500">Loading...</div>;
-  const Toggle = ({ k, label, hint }) => (
-    <label className="flex items-start justify-between gap-4 py-2 text-sm">
-      <span><span className="font-medium">{label}</span><span className="block text-xs text-gray-500">{hint}</span></span>
-      <input type="checkbox" checked={!!s[k]} onChange={(e) => save({ [k]: e.target.checked })} className="mt-1 h-4 w-4" />
-    </label>
-  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <h1 className="text-2xl font-semibold">DPDP Compliance</h1>
 
-      {!s.enabled && (
-        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
-          <b>Protection is OFF.</b> Personal data is NOT masked and documents do NOT ask for a PIN right now.
-          {!s.pinConfigured ? " Step 1: set the access PIN below. Step 2: switch on \"DPDP protection ON\"." : " Switch on \"DPDP protection ON\" below to start masking."}
-        </div>
-      )}
-      {s.enabled && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">
-          <b>Protection is ON.</b> Other people's Aadhaar, PAN, bank and phone show masked until the PIN is entered. Your own data is never masked.
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">
+        <b>Protection is always ON.</b> Other people's Aadhaar, PAN, bank and phone show masked until the PIN is entered, and documents ask for the PIN first. Your own data is never masked.
+      </div>
+
+      {s.usingDefaultPin && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <b>Default PIN is active: 1212.</b> Change it below to a PIN only your authorised people know.
         </div>
       )}
 
       <section className="rounded-xl border bg-white p-5">
         <h2 className="mb-1 font-semibold">Access PIN</h2>
-        <p className="mb-3 text-sm text-gray-600">Share this PIN only with people who must view documents or unmasked data. Changing it signs everyone out of protected data instantly. Status: <b>{s.pinConfigured ? "set" : "not set"}</b>{s.pinSetAt && ` (last changed ${new Date(s.pinSetAt).toLocaleString()})`}</p>
+        <p className="mb-3 text-sm text-gray-600">Share this PIN only with people who must view documents or unmasked data. Changing it signs everyone out of protected data instantly. Status: <b>{s.usingDefaultPin ? "default PIN (1212)" : "custom PIN set"}</b>{s.pinSetAt && ` (last changed ${new Date(s.pinSetAt).toLocaleString()})`}</p>
         <div className="flex flex-wrap gap-2">
           <input type="password" inputMode="numeric" maxLength={8} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="New PIN (6-8 digits)" className="rounded-lg border px-3 py-2 text-sm" />
-          <button onClick={() => setPinNow(false)} className="rounded-lg bg-[#730042] px-4 py-2 text-sm text-white">Set PIN</button>
-          <button onClick={() => setPinNow(true)} className="rounded-lg border px-4 py-2 text-sm">Generate random PIN</button>
+          <button onClick={() => setPinNow(false)} disabled={setPinMut.isPending} className="rounded-lg bg-[#730042] px-4 py-2 text-sm text-white disabled:opacity-50">Change PIN</button>
+          <button onClick={() => setPinNow(true)} disabled={setPinMut.isPending} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Generate random PIN</button>
         </div>
         {shown && <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm">New PIN: <b className="font-mono text-lg">{shown}</b> — copy it now, it is never shown again.</div>}
       </section>
 
-      <section className="rounded-xl border bg-white p-5 divide-y">
-        <Toggle k="enabled" label="DPDP protection ON" hint="Master switch. Needs a PIN to be set first." />
-        <Toggle k="maskingEnabled" label="Mask personal identifiers" hint="Aadhaar, PAN, bank, phone, address of other people show as XXXX until PIN is entered." />
-        <Toggle k="pinRequiredForDocuments" label="Require PIN to view documents" hint="Admin, manager and superadmin document screens ask for the PIN first." />
-        <div className="grid gap-3 py-3 sm:grid-cols-2">
-          <label className="text-sm">Stay unlocked (minutes)
-            <input type="number" min={1} max={120} defaultValue={s.unlockMinutes} onBlur={(e) => save({ unlockMinutes: Number(e.target.value) })} className="mt-1 w-full rounded-lg border px-3 py-2" />
+      <section className="rounded-xl border bg-white p-5">
+        <h2 className="mb-1 font-semibold">Unlock rules</h2>
+        <p className="mb-4 text-sm text-gray-600">How long protected data stays visible after the PIN is entered, and how fast privacy requests must be answered.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block rounded-lg border bg-gray-50 p-4 text-sm">
+            <span className="font-medium">Stay unlocked</span>
+            <span className="mt-0.5 block text-xs text-gray-500">After this time, the PIN is asked again.</span>
+            <span className="mt-3 flex items-center gap-2">
+              <input type="number" min={1} max={120} defaultValue={s.unlockMinutes} onBlur={(e) => save({ unlockMinutes: Number(e.target.value) })} className="w-24 rounded-lg border bg-white px-3 py-2 text-base" />
+              <span className="text-gray-600">minutes</span>
+              <span className="ml-auto text-xs text-gray-400">1 – 120</span>
+            </span>
           </label>
-          <label className="text-sm">Request response deadline (days)
-            <input type="number" min={1} max={90} defaultValue={s.requestSlaDays} onBlur={(e) => save({ requestSlaDays: Number(e.target.value) })} className="mt-1 w-full rounded-lg border px-3 py-2" />
+          <label className="block rounded-lg border bg-gray-50 p-4 text-sm">
+            <span className="font-medium">Request response deadline</span>
+            <span className="mt-0.5 block text-xs text-gray-500">Time to resolve an employee's privacy request.</span>
+            <span className="mt-3 flex items-center gap-2">
+              <input type="number" min={1} max={90} defaultValue={s.requestSlaDays} onBlur={(e) => save({ requestSlaDays: Number(e.target.value) })} className="w-24 rounded-lg border bg-white px-3 py-2 text-base" />
+              <span className="text-gray-600">days</span>
+              <span className="ml-auto text-xs text-gray-400">1 – 90</span>
+            </span>
           </label>
         </div>
-        <div className="py-3 text-sm">
-          <div className="mb-1 font-medium">Roles allowed to enter the PIN</div>
-          <div className="flex flex-wrap gap-3">
+
+        <div className="mt-5">
+          <div className="mb-1 text-sm font-medium">Roles allowed to enter the PIN</div>
+          <p className="mb-3 text-xs text-gray-500">These roles can unlock protected data. This is always enabled for all roles and cannot be turned off.</p>
+          <div className="flex flex-wrap gap-2">
             {ROLES.map((r) => (
-              <label key={r} className="flex items-center gap-1">
-                <input type="checkbox" checked={s.unlockRoles.includes(r)} onChange={(e) => save({ unlockRoles: e.target.checked ? [...s.unlockRoles, r] : s.unlockRoles.filter((x) => x !== r) })} /> {r}
-              </label>
+              <span key={r} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.2 3.2L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                {r.replace(/_/g, " ")}
+              </span>
             ))}
           </div>
         </div>
