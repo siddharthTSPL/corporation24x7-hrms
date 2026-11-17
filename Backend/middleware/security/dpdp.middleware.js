@@ -6,6 +6,7 @@ const { logAudit } = require("../../utils/auditLog.utils");
 // someone other than the caller, unless the caller has entered the PIN.
 // It also blocks masked placeholders from being written back on edits.
 function dpdpMask(req, res, next) {
+  req.dpdpMaskInstalled = true; // lets /dpdp/selftest prove this middleware is registered in app.js
   if (["POST", "PUT", "PATCH"].includes(req.method)) stripMaskedWrites(req.body);
 
   const original = res.json.bind(res);

@@ -7,6 +7,7 @@ const c = require("../controllers/dpdp.controller");
 
 // everyone signed in
 router.get("/status", anyRoleAuth, asyncHandler(c.getStatus));
+router.get("/selftest", anyRoleAuth, asyncHandler(c.selfTest));
 router.post("/pin/verify", anyRoleAuth, asyncHandler(c.verifyPin));
 router.post("/pin/lock", anyRoleAuth, asyncHandler(c.lock));
 router.get("/consent/me", anyRoleAuth, asyncHandler(c.getMyConsent));

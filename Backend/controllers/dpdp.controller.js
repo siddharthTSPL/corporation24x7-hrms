@@ -103,6 +103,38 @@ exports.lock = async (req, res) => {
   res.json({ success: true });
 };
 
+// Open /api/dpdp/selftest in the browser while logged in. Tells you exactly why
+// data is (not) masked: middleware registered?, org settings found?, ON?, unlocked?
+exports.selfTest = async (req, res) => {
+  const a = actorOf(req);
+  const { maskTree } = require("../utils/dpdp.utils");
+  const s = await DpdpSettings.findOne({ organisation_id: a.orgId }).lean();
+  const unlocked = !!s && isUnlocked(req, a, s);
+  const willMask = !!(s && s.enabled && s.maskingEnabled !== false && !unlocked);
+  const reasons = [];
+  if (!req.dpdpMaskInstalled) reasons.push("dpdpMask middleware is NOT registered in app.js (or server was not restarted)");
+  if (!s) reasons.push("No DPDP settings found for your organisation. Open the DPDP & Privacy page as Super Admin, set a PIN and switch protection ON");
+  else if (!s.enabled) reasons.push("DPDP protection is OFF for your organisation");
+  else if (s.maskingEnabled === false) reasons.push("'Mask personal identifiers' is switched OFF");
+  if (unlocked) reasons.push("You have entered the PIN (unlocked), so real data is shown. Click Lock");
+  const sampleOther = { _id: "000000000000000000000000", f_name: "Sample", personal_contact: "9876543210", aadhaar_number: "123412341234", pan_number: "ABCDE1234F", account_number: "123456789012", work_email: "sample@x.com" };
+  res.json({
+    success: true,
+    middlewareRegistered: !!req.dpdpMaskInstalled,
+    you: { id: a.id, role: a.role, organisation_id: a.orgId },
+    settingsFound: !!s,
+    enabled: !!s?.enabled,
+    maskingEnabled: s ? s.maskingEnabled !== false : null,
+    pinConfigured: !!s?.pinVersion,
+    unlocked,
+    willMaskOtherPeoplesData: willMask,
+    whyNotMasked: willMask ? [] : reasons,
+    // What another person's record looks like to you right now:
+    sampleAsYouSeeIt: willMask ? maskTree(sampleOther, a.id) : sampleOther,
+    note: "Your OWN profile is never masked. Check lists of other employees.",
+  });
+};
+
 // ───────────── consent ─────────────
 exports.getMyConsent = async (req, res) => {
   const a = actorOf(req);
