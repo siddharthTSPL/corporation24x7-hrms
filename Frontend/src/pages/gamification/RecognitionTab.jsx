@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getDepartmentName } from "../../lib/departmentNames";
 import { ThumbsUp, Sparkles, Heart, Lightbulb, MessageSquare } from "lucide-react";
 import { Card, Avatar, Button, Modal, Field, inputCls, Skeleton, Empty, Pill, Segmented, Icon, timeAgo, fmt } from "../../components/gamification/ui";
 import { useGamKudos, useGamKudosMeta, useGamPeopleSearch, useGiveKudos, useReactKudos, useCommentKudos } from "../../auth/server-state/gamification/gamification.hook";
@@ -19,11 +20,11 @@ function GiveModal({ open, onClose, meta }) {
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="Recognise a colleague" wide>
       <div className="space-y-4">
         {to ? (
-          <div className="flex items-center gap-3 rounded-lg border border-[#ede5e0] p-2.5"><Avatar name={to.name} photo={to.photo} size={34} /><div className="min-w-0 flex-1"><p className="text-[13px] font-medium text-[#2a1a16]">{to.name}</p><p className="text-xs text-[#7a6a64]">{[to.designation, to.department].filter(Boolean).join(" - ")}</p></div><Button variant="ghost" size="sm" onClick={() => setTo(null)}>Change</Button></div>
+          <div className="flex items-center gap-3 rounded-lg border border-[#ede5e0] p-2.5"><Avatar name={to.name} photo={to.photo} size={34} /><div className="min-w-0 flex-1"><p className="text-[13px] font-medium text-[#2a1a16]">{to.name}</p><p className="text-xs text-[#7a6a64]">{[to.designation, getDepartmentName(to.department)].filter(Boolean).join(" - ")}</p></div><Button variant="ghost" size="sm" onClick={() => setTo(null)}>Change</Button></div>
         ) : (
           <Field label="Colleague">
             <input className={inputCls} placeholder="Search by name" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-            {people?.people?.length > 0 && <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#ede5e0] bg-white shadow-sm">{people.people.map((p) => <button key={p.key} onClick={() => setTo(p)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#faf7f5]"><Avatar name={p.name} photo={p.photo} size={26} /><span className="text-[13px] font-medium text-[#2a1a16]">{p.name}</span><span className="text-xs text-[#9c8880]">{p.department}</span></button>)}</div>}
+            {people?.people?.length > 0 && <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-[#ede5e0] bg-white shadow-sm">{people.people.map((p) => <button key={p.key} onClick={() => setTo(p)} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-[#faf7f5]"><Avatar name={p.name} photo={p.photo} size={26} /><span className="text-[13px] font-medium text-[#2a1a16]">{p.name}</span><span className="text-xs text-[#9c8880]">{getDepartmentName(p.department)}</span></button>)}</div>}
           </Field>
         )}
         <Field label="Company value">

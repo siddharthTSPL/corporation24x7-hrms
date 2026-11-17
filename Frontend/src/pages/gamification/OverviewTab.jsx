@@ -1,4 +1,5 @@
 import { Card, SectionTitle, Avatar, LevelChip, XpBar, Pill, Skeleton, ProgressBar, IconTile, Icon, Empty, Button, timeAgo, timeLeft, fmt, TIER_COLORS } from "../../components/gamification/ui";
+import { getDepartmentName } from "../../lib/departmentNames";
 import { useGamFeed, useClaimQuest } from "../../auth/server-state/gamification/gamification.hook";
 import { ChallengeCard } from "./ChallengesTab";
 
@@ -22,7 +23,7 @@ function Summary({ me, season }) {
               <h2 className="truncate text-base font-semibold text-[#2a1a16]">{me.name}</h2>
               <LevelChip level={me.level.level} rank={me.rank.key} />
             </div>
-            <p className="text-xs text-[#7a6a64]">{me.title} - {me.rank.label} tier{me.department ? ` - ${me.department}` : ""}</p>
+            <p className="text-xs text-[#7a6a64]">{me.title} - {me.rank.label} tier{me.department ? ` - ${getDepartmentName(me.department)}` : ""}</p>
             <div className="mt-2.5 max-w-sm"><XpBar level={me.level} /></div>
           </div>
         </div>
@@ -92,7 +93,7 @@ export default function OverviewTab({ hub, loading, goTo }) {
           <Card className="p-4">
             <SectionTitle icon="trophy" title="Top contributors this week" right={<Button variant="ghost" size="sm" onClick={() => goTo("leaderboard")}>Leaderboard</Button>} />
             {rows.length ? <div className="space-y-2.5">{rows.map((r) => (
-              <div key={r.personKey} className="flex items-center gap-2.5"><span className={`w-5 text-center text-xs font-semibold ${r.position <= 3 ? "text-[#730042]" : "text-[#9c8880]"}`}>{r.position}</span><Avatar name={r.name} photo={r.photo} size={28} /><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-medium text-[#2a1a16]">{r.name}</p><p className="truncate text-[11px] text-[#9c8880]">{r.department || r.title}</p></div><span className="text-xs font-semibold text-[#2a1a16]">{fmt(r.xp)}</span></div>))}
+              <div key={r.personKey} className="flex items-center gap-2.5"><span className={`w-5 text-center text-xs font-semibold ${r.position <= 3 ? "text-[#730042]" : "text-[#9c8880]"}`}>{r.position}</span><Avatar name={r.name} photo={r.photo} size={28} /><div className="min-w-0 flex-1"><p className="truncate text-[13px] font-medium text-[#2a1a16]">{r.name}</p><p className="truncate text-[11px] text-[#9c8880]">{getDepartmentName(r.department) || r.title}</p></div><span className="text-xs font-semibold text-[#2a1a16]">{fmt(r.xp)}</span></div>))}
               {weekBoard.me && <p className="border-t border-[#f3efec] pt-2.5 text-center text-xs text-[#7a6a64]">You are ranked <b className="text-[#2a1a16]">#{weekBoard.me.position}</b> of {weekBoard.me.of} with {fmt(weekBoard.me.xp)} XP</p>}</div> : <Empty icon="trophy" title="No activity yet this week" />}
           </Card>
           {recentBadges?.length > 0 && <Card className="p-4"><SectionTitle icon="award" title="Recent achievements" right={<Button variant="ghost" size="sm" onClick={() => goTo("achievements")}>All</Button>} />

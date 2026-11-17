@@ -14,6 +14,7 @@ import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
 import useRealtimeSync from "../realtime/useRealtimeSync";
 import SparkFrame from "../components/spark/SparkFrame";
+import GlobalIncomingCall from "../components/spark/GlobalIncomingCall";
 import GamificationHost from "../components/gamification/GamificationHost";
 
 // Birthdays are matched on the IST calendar - the same clock the backend
@@ -250,6 +251,7 @@ export default function MainLayout() {
       </div>
 
       <SparkFrame />
+      <GlobalIncomingCall />
       <GamificationHost enabled={Boolean(auth?.role) && auth.role !== "superadmin"} />
 
       {showWelcome && (
