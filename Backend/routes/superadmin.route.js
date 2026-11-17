@@ -2,6 +2,7 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const { requireDpdpPin } = require("../middleware/security/dpdp.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
@@ -301,16 +302,19 @@ superAdminRouter.get(
 superAdminRouter.get(
   "/getallpersonaldocuments",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getAllPersonalDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getallexpensedocuments",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getAllExpenseDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getdocumentdetails/:id",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getDocumentDetailsSuperAdmin),
 );
 

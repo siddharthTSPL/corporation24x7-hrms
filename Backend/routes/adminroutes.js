@@ -1,5 +1,6 @@
 const express = require("express");
 const adminrouter = express.Router();
+const { requireDpdpPin } = require("../middleware/security/dpdp.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
@@ -418,18 +419,21 @@ adminrouter.get(
   "/documents/personal",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getAllPersonalDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/expense",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getAllExpenseDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getDocumentDetailsAdmin),
 );
 

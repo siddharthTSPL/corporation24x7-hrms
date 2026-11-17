@@ -75,6 +75,8 @@ const SuperAdminAnnouncements = lazy(() => import("./pages/announcement/suannoun
 const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
 const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
+const PrivacyCenter = lazy(() => import("./dpdp/PrivacyCenter"));
+const DpdpSettingsPage = lazy(() => import("./dpdp/DpdpSettingsPage"));
 const SuperAdminDocuments = lazy(() => import("./pages/document/sudocument"));
 const SuperAdminComplaints = lazy(() => import("./pages/ticketpage/suticket"));
 const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
@@ -272,6 +274,8 @@ function App() {
             <Route path="/file-employee"            element={<ProtectedRoute><Fileem /></ProtectedRoute>} />
             <Route path="/file-manager"             element={<ProtectedRoute><Filema /></ProtectedRoute>} />
             <Route path="/settings"                 element={<Set />} />
+            <Route path="/privacy"                  element={<PrivacyCenter />} />
+            <Route path="/superadmin-dpdp"          element={<DpdpSettingsPage />} />
             <Route path="/settings-employee"        element={<ProtectedRoute permission="navigation.can_view_settings"><Setem /></ProtectedRoute>} />
             <Route path="/settings-manager"         element={<ProtectedRoute permission="navigation.can_view_settings"><Setma /></ProtectedRoute>} />
             <Route path="/organisation"             element={<Organisation />} />
