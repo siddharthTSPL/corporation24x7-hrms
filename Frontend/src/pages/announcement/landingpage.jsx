@@ -1409,8 +1409,22 @@ const featureCategories = [
 ]
 
 const featureItems = [
-  { cat: 'workplace', icon: FiMessageSquare, title: 'TorchX Spark', desc: 'Team chat with voice and video calls, built right into TorchX Talent.' },
-  { cat: 'workplace', icon: FiVideo, title: 'TorchX Sync', desc: 'Schedule and join team meetings, all in sync with your work.' },
+  {
+    cat: 'workplace',
+    icon: FiMessageSquare,
+    title: 'TorchX Spark',
+    desc: 'Chat with your team, call anyone in one click and keep your meetings calendar close, all inside TorchX Talent. No extra app to install and no separate sign-in.',
+    highlights: ['Direct, group & channel chats', 'Voice & video calls with background blur', 'Polls, @mentions & scheduled messages', 'Files, media & read receipts'],
+    featured: true,
+  },
+  {
+    cat: 'workplace',
+    icon: FiVideo,
+    title: 'TorchX Sync',
+    desc: 'Schedule, host and follow up on video meetings. Invite guests with a link, sketch on a live whiteboard and get minutes and action items when the meeting ends.',
+    highlights: ['HD meetings with scheduling & recurrence', 'Guest join links with a join code', 'Live whiteboard, polls & Q&A', 'Captions, minutes & attendance reports'],
+    featured: true,
+  },
   {
     cat: 'hiring',
     icon: HiOutlineSparkles,
