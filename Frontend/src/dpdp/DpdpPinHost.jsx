@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FaLock, FaUnlock, FaShieldAlt } from "react-icons/fa";
+import { FaShieldAlt } from "react-icons/fa";
 import { useQueryClient } from "@tanstack/react-query";
-import { getDpdpToken, getDpdpExpiry, setDpdpToken, setDpdpCanUnlock } from "./dpdpGate";
-import { useDpdpStatus, useVerifyDpdpPin, useLockDpdp } from "../auth/server-state/dpdp/dpdp.hook";
+import { setDpdpToken, setDpdpCanUnlock } from "./dpdpGate";
+import { useDpdpStatus, useVerifyDpdpPin } from "../auth/server-state/dpdp/dpdp.hook";
 
 // Mounted once in main.jsx (inside QueryClientProvider).
 // 1) PIN popup, opened by the axios gate (on 423) or by the chip's Unlock button.
@@ -11,7 +11,6 @@ import { useDpdpStatus, useVerifyDpdpPin, useLockDpdp } from "../auth/server-sta
 export default function DpdpPinHost() {
   const { data: status } = useDpdpStatus();
   const verify = useVerifyDpdpPin();
-  const lock = useLockDpdp();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
@@ -22,10 +21,13 @@ export default function DpdpPinHost() {
   useEffect(() => {
     const onNeed = (e) => { waiters.current.push(e.detail); setPin(""); setErr(""); setOpen(true); };
     const onChange = () => tick((n) => n + 1);
+    const onOpen = () => { setPin(""); setErr(""); setOpen(true); };
+    window.addEventListener("dpdp:open-pin", onOpen);
     window.addEventListener("dpdp:pin-required", onNeed);
     window.addEventListener("dpdp:changed", onChange);
     const iv = setInterval(() => tick((n) => n + 1), 30000);
     return () => {
+      window.removeEventListener("dpdp:open-pin", onOpen);
       window.removeEventListener("dpdp:pin-required", onNeed);
       window.removeEventListener("dpdp:changed", onChange);
       clearInterval(iv);
@@ -58,31 +60,10 @@ export default function DpdpPinHost() {
     });
   };
 
-  const lockNow = () => lock.mutate(undefined, { onSettled: () => setDpdpToken(null) });
 
-  const unlocked = !!getDpdpToken();
-  const exp = getDpdpExpiry();
-  const minsLeft = exp ? Math.max(0, Math.ceil((exp - Date.now()) / 60000)) : 0;
-  const showChip = status?.enabled && status?.canUnlock;
 
   return (
     <>
-      {showChip && (
-        <div className="fixed bottom-4 left-4 z-[60]">
-          {unlocked ? (
-            <button onClick={lockNow} title="Lock protected data now"
-              className="flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-emerald-700">
-              <FaUnlock /> Protected data unlocked · {minsLeft}m · Lock
-            </button>
-          ) : (
-            <button onClick={() => { setPin(""); setErr(""); setOpen(true); }}
-              className="flex items-center gap-2 rounded-full bg-gray-800 px-3 py-1.5 text-xs font-medium text-white shadow-lg hover:bg-gray-900">
-              <FaLock /> Personal data masked · Unlock
-            </button>
-          )}
-        </div>
-      )}
-
       {open && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
           <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">

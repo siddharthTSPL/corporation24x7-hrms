@@ -11,6 +11,8 @@ import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
 import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
+import PrivacyCenter from "../../dpdp/PrivacyCenter";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
@@ -90,6 +92,7 @@ const TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
+  { key: "privacy", label: "Privacy & Data" },
   { key: "avatar", label: "Avatar" },
 ];
 
@@ -2303,6 +2306,12 @@ export default function AdminSettingsPage() {
               {tab === "assets" && <AssetsTab />}
               {tab === "password" && (
                 <PasswordTab onSuccess={showSuccess} onError={showError} />
+              )}
+              {tab === "privacy" && (
+                <div className="space-y-4">
+                  <DpdpLockCard />
+                  <PrivacyCenter />
+                </div>
               )}
               {tab === "avatar" && (
                 <AvatarTab

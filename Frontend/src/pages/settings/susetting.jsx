@@ -33,6 +33,7 @@ import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
 import ExternalSsoSettingsCard from "./ExternalSsoSettingsCard";
 import GamificationToggleCard from "./GamificationToggleCard";
 import DpdpSettingsPage from "../../dpdp/DpdpSettingsPage";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -2219,7 +2220,12 @@ export default function SuperAdminSettingsPage() {
               />
             </>
           )}
-          {tab === "dpdp" && <DpdpSettingsPage />}
+          {tab === "dpdp" && (
+            <>
+              <DpdpLockCard />
+              <DpdpSettingsPage />
+            </>
+          )}
           {tab === "avatar" && (
             <AvatarTab
               superAdmin={superAdmin}

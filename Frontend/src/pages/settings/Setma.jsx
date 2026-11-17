@@ -8,6 +8,8 @@ import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
 import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
+import PrivacyCenter from "../../dpdp/PrivacyCenter";
 
 
 const DEFAULT_COUNTRY_ISO = "IN";
@@ -36,6 +38,7 @@ const SETTINGS_TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
+  { key: "privacy", label: "Privacy & Data" },
   { key: "avatar", label: "Avatar" },
 ];
 
@@ -391,6 +394,9 @@ function Sidebar({ tab, setTab, manager, initials }) {
     )},
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+    )},
+    { key: "privacy", label: "Privacy & Data", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>
     )},
     { key: "avatar", label: "Avatar", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
@@ -1395,6 +1401,7 @@ export default function ManagerSettingsPage() {
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
             {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
+            {tab === "privacy"   && (<div className="space-y-4"><DpdpLockCard /><PrivacyCenter /></div>)}
             {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
 
             <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>
