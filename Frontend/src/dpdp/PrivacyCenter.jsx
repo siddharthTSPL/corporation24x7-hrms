@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { dpdpHttp } from "./dpdpGate";
+import { useMyConsent, useSaveConsent, useMyDpdpRequests, useCreateDpdpRequest, useExportMyData } from "../auth/server-state/dpdp/dpdp.hook";
 
 const TYPES = [
   { v: "access", l: "Get a copy of my data" },
@@ -15,42 +15,40 @@ const err = (e) => e?.response?.data?.message || "Something went wrong";
 
 // Route: /privacy (every role). Consent, rights requests, data download.
 export default function PrivacyCenter() {
-  const [consent, setConsent] = useState(null);
+  const { data: consent } = useMyConsent();
+  const { data: reqData } = useMyDpdpRequests();
+  const saveConsentMut = useSaveConsent();
+  const createReq = useCreateDpdpRequest();
+  const exportMut = useExportMyData();
+  const reqs = reqData?.requests || [];
   const [answers, setAnswers] = useState({});
-  const [reqs, setReqs] = useState([]);
   const [form, setForm] = useState({ type: "access", subject: "", details: "" });
 
-  const load = async () => {
-    try {
-      const [c, r] = await Promise.all([dpdpHttp.get("dpdp/consent/me"), dpdpHttp.get("dpdp/requests/me")]);
-      setConsent(c.data);
-      setAnswers(Object.fromEntries(c.data.purposes.map((p) => [p.key, p.required ? true : p.granted])));
-      setReqs(r.data.requests);
-    } catch (e) { toast.error(err(e)); }
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (consent) setAnswers(Object.fromEntries(consent.purposes.map((p) => [p.key, p.required ? true : p.granted])));
+  }, [consent]);
 
-  const saveConsent = async () => {
-    try {
-      await dpdpHttp.post("dpdp/consent/me", { purposes: Object.entries(answers).map(([key, granted]) => ({ key, granted })) });
-      toast.success("Consent saved"); load();
-    } catch (e) { toast.error(err(e)); }
-  };
-  const submitReq = async (e) => {
+  const saveConsent = () =>
+    saveConsentMut.mutate(Object.entries(answers).map(([key, granted]) => ({ key, granted })), {
+      onSuccess: () => toast.success("Consent saved"),
+      onError: (e) => toast.error(err(e)),
+    });
+  const submitReq = (e) => {
     e.preventDefault();
-    try {
-      await dpdpHttp.post("dpdp/requests", form);
-      toast.success("Request submitted"); setForm({ type: "access", subject: "", details: "" }); load();
-    } catch (x) { toast.error(err(x)); }
+    createReq.mutate(form, {
+      onSuccess: () => { toast.success("Request submitted"); setForm({ type: "access", subject: "", details: "" }); },
+      onError: (x) => toast.error(err(x)),
+    });
   };
-  const download = async () => {
-    try {
-      const { data } = await dpdpHttp.get("dpdp/me/export");
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-      Object.assign(document.createElement("a"), { href: url, download: "my-personal-data.json" }).click();
-      URL.revokeObjectURL(url);
-    } catch (x) { toast.error(err(x)); }
-  };
+  const download = () =>
+    exportMut.mutate(undefined, {
+      onSuccess: (data) => {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+        Object.assign(document.createElement("a"), { href: url, download: "my-personal-data.json" }).click();
+        URL.revokeObjectURL(url);
+      },
+      onError: (x) => toast.error(err(x)),
+    });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">

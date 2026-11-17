@@ -1,43 +1,35 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import toast from "react-hot-toast";
-import { dpdpHttp } from "./dpdpGate";
+import { useDpdpAdminSettings, useUpdateDpdpSettings, useSetDpdpPin, useDpdpAccessLog, useDpdpAdminRequests, useUpdateDpdpRequest } from "../auth/server-state/dpdp/dpdp.hook";
 
 const ROLES = ["super_admin", "admin", "senior_admin", "official", "manager", "senior_manager"];
 const err = (e) => e?.response?.data?.message || "Something went wrong";
 
 // Route: /superadmin-dpdp  (Super Admin only)
 export default function DpdpSettingsPage() {
-  const [s, setS] = useState(null);
+  const { data: sd } = useDpdpAdminSettings();
+  const { data: ld } = useDpdpAccessLog({ limit: 25 });
+  const { data: rd } = useDpdpAdminRequests();
+  const updateSettings = useUpdateDpdpSettings();
+  const setPinMut = useSetDpdpPin();
+  const updateReq = useUpdateDpdpRequest();
+  const s = sd?.settings;
+  const log = ld?.items || [];
+  const reqs = rd?.requests || [];
   const [pin, setPin] = useState("");
   const [shown, setShown] = useState("");
-  const [log, setLog] = useState([]);
-  const [reqs, setReqs] = useState([]);
 
-  const load = async () => {
-    try {
-      const [a, b, c] = await Promise.all([dpdpHttp.get("dpdp/admin/settings"), dpdpHttp.get("dpdp/admin/access-log?limit=25"), dpdpHttp.get("dpdp/admin/requests")]);
-      setS(a.data.settings); setLog(b.data.items); setReqs(c.data.requests);
-    } catch (e) { toast.error(err(e)); }
-  };
-  useEffect(() => { load(); }, []);
-
-  const save = async (patch, ok = "Saved") => {
-    try {
-      const { data } = await dpdpHttp.put("dpdp/admin/settings", patch);
-      setS(data.settings); toast.success(ok);
-    } catch (e) { toast.error(err(e)); }
-  };
-  const setPinNow = async (generate) => {
-    try {
-      const { data } = await dpdpHttp.post("dpdp/admin/pin", generate ? { generate: true } : { pin });
-      setPin(""); setShown(data.generatedPin || ""); toast.success("PIN updated. Everyone must re-enter it.");
-      load();
-    } catch (e) { toast.error(err(e)); }
-  };
-  const handle = async (id, status) => {
+  const save = (patch, ok = "Saved") =>
+    updateSettings.mutate(patch, { onSuccess: () => toast.success(ok), onError: (e) => toast.error(err(e)) });
+  const setPinNow = (generate) =>
+    setPinMut.mutate(generate ? { generate: true } : { pin }, {
+      onSuccess: (data) => { setPin(""); setShown(data.generatedPin || ""); toast.success("PIN updated. Everyone must re-enter it."); },
+      onError: (e) => toast.error(err(e)),
+    });
+  const handle = (id, status) => {
     const resolution = status === "in_progress" ? "" : window.prompt("Response / resolution note");
     if (status !== "in_progress" && !resolution) return;
-    try { await dpdpHttp.patch(`dpdp/admin/requests/${id}`, { status, resolution }); load(); } catch (e) { toast.error(err(e)); }
+    updateReq.mutate({ id, status, resolution }, { onError: (e) => toast.error(err(e)) });
   };
 
   if (!s) return <div className="p-6 text-sm text-gray-500">Loading...</div>;

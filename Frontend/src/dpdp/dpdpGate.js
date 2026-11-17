@@ -83,6 +83,3 @@ if (!axios.__dpdpPatched) {
   };
   attach(axios);
 }
-
-// Client for the DPDP endpoints themselves. Their errors are 400/401/429, never 423, so no popup loop.
-export const dpdpHttp = axios.create({ baseURL: API, withCredentials: true });

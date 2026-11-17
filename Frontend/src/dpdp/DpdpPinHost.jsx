@@ -1,41 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { FaLock, FaUnlock, FaShieldAlt } from "react-icons/fa";
-import { dpdpHttp, getDpdpToken, getDpdpExpiry, setDpdpToken } from "./dpdpGate";
+import { getDpdpToken, getDpdpExpiry, setDpdpToken } from "./dpdpGate";
+import { useDpdpStatus, useVerifyDpdpPin, useLockDpdp } from "../auth/server-state/dpdp/dpdp.hook";
 
 // Mounted once in main.jsx (inside QueryClientProvider).
-// 1) PIN popup, opened by the axios gate (or by a "Unlock" button).
-// 2) small chip: shows locked/unlocked state and lets the user lock again.
+// 1) PIN popup, opened by the axios gate (on 423) or by the chip's Unlock button.
+// 2) chip: shows locked/unlocked state and lets the user lock again.
 export default function DpdpPinHost() {
-  const qc = useQueryClient();
+  const { data: status } = useDpdpStatus();
+  const verify = useVerifyDpdpPin();
+  const lock = useLockDpdp();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState(null);
   const [, tick] = useState(0);
   const waiters = useRef([]);
-
-  const loadStatus = async () => {
-    try {
-      const { data } = await dpdpHttp.get("dpdp/status");
-      setStatus(data);
-    } catch { setStatus(null); }
-  };
 
   useEffect(() => {
     const onNeed = (e) => { waiters.current.push(e.detail); setPin(""); setErr(""); setOpen(true); };
     const onChange = () => tick((n) => n + 1);
     window.addEventListener("dpdp:pin-required", onNeed);
     window.addEventListener("dpdp:changed", onChange);
-    window.addEventListener("focus", loadStatus);
-    loadStatus();
-    const iv = setInterval(() => { loadStatus(); tick((n) => n + 1); }, 60000);
+    const iv = setInterval(() => tick((n) => n + 1), 30000);
     return () => {
       window.removeEventListener("dpdp:pin-required", onNeed);
       window.removeEventListener("dpdp:changed", onChange);
-      window.removeEventListener("focus", loadStatus);
       clearInterval(iv);
     };
   }, []);
@@ -46,28 +36,21 @@ export default function DpdpPinHost() {
     w.forEach((x) => (ok ? x.resolve() : x.reject(new Error("cancelled"))));
   };
 
-  const submit = async (e) => {
+  const submit = (e) => {
     e.preventDefault();
     if (!/^\d{4,12}$/.test(pin)) { setErr("Enter the numeric PIN given by your Super Admin"); return; }
-    setBusy(true); setErr("");
-    try {
-      const { data } = await dpdpHttp.post("dpdp/pin/verify", { pin });
-      setDpdpToken(data.token, data.expiresInMinutes);
-      toast.success(`Protected data unlocked for ${data.expiresInMinutes} min`);
-      close(true);
-      qc.invalidateQueries();
-      loadStatus();
-    } catch (ex) {
-      setErr(ex?.response?.data?.message || "Could not verify PIN");
-    } finally { setBusy(false); }
+    setErr("");
+    verify.mutate(pin, {
+      onSuccess: (data) => {
+        setDpdpToken(data.token, data.expiresInMinutes);
+        toast.success(`Protected data unlocked for ${data.expiresInMinutes} min`);
+        close(true);
+      },
+      onError: (ex) => setErr(ex?.response?.data?.message || "Could not verify PIN"),
+    });
   };
 
-  const lockNow = async () => {
-    try { await dpdpHttp.post("dpdp/pin/lock"); } catch { /* ignore */ }
-    setDpdpToken(null);
-    qc.invalidateQueries();
-    loadStatus();
-  };
+  const lockNow = () => lock.mutate(undefined, { onSettled: () => setDpdpToken(null) });
 
   const unlocked = !!getDpdpToken();
   const exp = getDpdpExpiry();
@@ -109,8 +92,8 @@ export default function DpdpPinHost() {
             {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => close(false)} className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
-              <button disabled={busy} className="rounded-lg bg-[#730042] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
-                {busy ? "Checking..." : "Unlock"}
+              <button disabled={verify.isPending} className="rounded-lg bg-[#730042] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+                {verify.isPending ? "Checking..." : "Unlock"}
               </button>
             </div>
           </form>
