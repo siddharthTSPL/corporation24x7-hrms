@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getDepartmentName } from "../../lib/departmentNames";
 import { Card, Button, ProgressBar, Pill, Modal, Avatar, Skeleton, Empty, IconTile, timeLeft, formatDate, fmt } from "../../components/gamification/ui";
 import { useGamChallenges, useJoinChallenge, useClaimChallenge, useGamChallengeBoard } from "../../auth/server-state/gamification/gamification.hook";
 
@@ -13,7 +14,7 @@ function BoardModal({ c, onClose }) {
           <div key={r.personKey || r.name} className="flex items-center gap-3 py-2.5">
             <span className="w-6 text-center text-xs font-semibold text-[#7a6a64]">{r.position}</span>
             {r.personKey && <Avatar name={r.name} photo={r.photo} size={28} />}
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#2a1a16]">{r.name}{r.department ? <span className="ml-1.5 text-xs font-normal text-[#9c8880]">{r.department}</span> : null}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#2a1a16]">{r.name}{r.department ? <span className="ml-1.5 text-xs font-normal text-[#9c8880]">{getDepartmentName(r.department)}</span> : null}</span>
             <span className="text-[13px] font-semibold text-[#730042]">{fmt(r.value)}</span>
           </div>))}</div>
       )}

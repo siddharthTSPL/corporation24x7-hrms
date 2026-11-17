@@ -11,7 +11,7 @@ import {
   useDeleteNotification,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, getTypeMeta } from "./notificationUtils";
-import { resolveNotificationLink } from "./notificationLinks";
+import useOpenNotification from "./useOpenNotification";
 import NotificationItem from "./NotificationItem";
 import FeatureNotificationModal from "./FeatureNotificationModal";
 import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
@@ -41,6 +41,7 @@ export default function NotificationBell() {
   const [soundOn, setSoundOn] = useState(isSoundEnabled);
   const containerRef = useRef(null);
   const navigate = useNavigate();
+  const openNotification = useOpenNotification();
 
   const { data: unreadData } = useUnreadNotificationCount(true);
   const unreadCount = unreadData?.unreadCount || 0;
@@ -147,9 +148,7 @@ export default function NotificationBell() {
       setSelectedFeature(notification);
       return;
     }
-    if (notification.link) {
-      navigate(notification.link);
-    }
+    openNotification(notification);
   };
 
   const handleDelete = (id) => {

@@ -1,4 +1,5 @@
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, CartesianGrid } from "recharts";
+import { getDepartmentName } from "../../../lib/departmentNames";
 import { Card, Stat, SectionTitle, Skeleton, Pill, Icon, fmt } from "../../../components/gamification/ui";
 import { useAdminAnalytics } from "../../../auth/server-state/gamification/gamification.hook";
 import { exportLeaderboardUrl } from "../../../auth/api/gamification/gamification.api";
@@ -32,7 +33,7 @@ export default function AnalyticsAdmin() {
         <Card className="p-4"><SectionTitle icon="layers" title="Level distribution" />
           <div className="h-48"><ResponsiveContainer><BarChart data={data.levels}><CartesianGrid strokeDasharray="3 3" stroke="#f0eae6" vertical={false} /><XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tick={axis} tickLine={false} axisLine={false} width={30} /><Tooltip /><Bar dataKey="count" fill="#730042" radius={[4, 4, 0, 0]} name="People" /></BarChart></ResponsiveContainer></div></Card>
         <Card className="p-4"><SectionTitle icon="users" title="Departments" sub="XP per person, last 30 days" />
-          <div className="divide-y divide-[#f3efec]">{data.departments.length ? data.departments.map((d) => <div key={d.department} className="flex items-center gap-2 py-2 text-[13px]"><span className="flex-1 truncate text-[#2a1a16]">{d.department}</span><span className="text-[11px] text-[#9c8880]">{d.active}/{d.headcount} active</span><span className="w-14 text-right text-xs font-semibold text-[#730042]">{fmt(d.perHead)}</span></div>) : <p className="py-2 text-sm text-[#9c8880]">No data yet.</p>}</div></Card>
+          <div className="divide-y divide-[#f3efec]">{data.departments.length ? data.departments.map((d) => <div key={d.department} className="flex items-center gap-2 py-2 text-[13px]"><span className="flex-1 truncate text-[#2a1a16]">{getDepartmentName(d.department)}</span><span className="text-[11px] text-[#9c8880]">{d.active}/{d.headcount} active</span><span className="w-14 text-right text-xs font-semibold text-[#730042]">{fmt(d.perHead)}</span></div>) : <p className="py-2 text-sm text-[#9c8880]">No data yet.</p>}</div></Card>
         <Card className="p-4"><SectionTitle icon="gift" title="Popular rewards and most-recognised people" />
           <div className="space-y-1.5">{data.topRewards.map((r) => <p key={r.name} className="flex justify-between text-[13px]"><span className="text-[#2a1a16]">{r.name}</span><b className="text-[#5b4b45]">{r.count}</b></p>)}{!data.topRewards.length && <p className="text-sm text-[#9c8880]">No redemptions yet.</p>}</div>
           <div className="mt-3 space-y-1.5 border-t border-[#f3efec] pt-3">{data.kudos.topReceivers.map((r) => <p key={r.key} className="flex justify-between text-[13px]"><span className="text-[#2a1a16]">{r.name}</span><b className="text-[#5b4b45]">{r.count}</b></p>)}</div></Card>

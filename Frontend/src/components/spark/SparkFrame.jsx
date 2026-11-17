@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaExpandAlt, FaCompressAlt, FaExternalLinkAlt, FaTimes } from "react-icons/fa";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { useSparkStore } from "../../auth/store/spark/sparkStore";
@@ -19,6 +19,10 @@ export default function SparkFrame() {
   const closePanel = useSparkStore((s) => s.closePanel);
   const toggleExpanded = useSparkStore((s) => s.toggleExpanded);
   const setUnread = useSparkStore((s) => s.setUnread);
+  const setIncoming = useSparkStore((s) => s.setIncoming);
+  const command = useSparkStore((s) => s.command);
+  const clearCommand = useSparkStore((s) => s.clearCommand);
+  const iframeRef = useRef(null);
 
   const [mounted, setMounted] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -49,12 +53,29 @@ export default function SparkFrame() {
       if (!msg || msg.source !== SPARK_MSG_SOURCE) return;
 
       if (msg.type === "unread") setUnread(Number(msg.count) || 0);
-      if (msg.type === "open") openPanel();   // e.g. incoming call
+      if (msg.type === "ready") {
+        // Handshake: Spark may skip its own incoming-call card, Talent draws it globally.
+        iframeRef.current?.contentWindow?.postMessage(
+          { source: "torchx-talent", type: "capabilities", globalIncoming: true }, SPARK_ORIGIN);
+      }
+      if (msg.type === "incoming") setIncoming(msg.calls, msg.inCall); // ringing calls -> <GlobalIncomingCall/>
+      if (msg.type === "open") openPanel();   // Spark asked for the dock (e.g. call accepted)
       if (msg.type === "close") closePanel(); // Spark's own close button
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [setUnread, openPanel, closePanel]);
+  }, [setUnread, setIncoming, openPanel, closePanel]);
+
+  // Commands for Spark (open a conversation, accept / decline a call). They wait
+  // here until the iframe has loaded, so a click that arrives before Spark is
+  // ready is delivered as soon as it is.
+  useEffect(() => {
+    if (!command || !loaded) return;
+    const target = iframeRef.current?.contentWindow;
+    if (!target) return;
+    target.postMessage({ source: "torchx-talent", ...command }, SPARK_ORIGIN);
+    clearCommand(command.id);
+  }, [command, loaded, clearCommand]);
 
   // Esc closes the frame.
   useEffect(() => {
@@ -126,6 +147,7 @@ export default function SparkFrame() {
           </div>
         )}
         <iframe
+          ref={iframeRef}
           title="TorchX Spark"
           src={SPARK_EMBED_URL}
           onLoad={() => setLoaded(true)}
