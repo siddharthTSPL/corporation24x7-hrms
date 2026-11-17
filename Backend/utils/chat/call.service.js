@@ -9,6 +9,7 @@ const rooms = require("./callRooms");
 const { getIceServers } = require("./ice.utils");
 const { httpError, parseKey, resolvePeople } = require("./people.utils");
 const controls = require("./meetingControls.service");
+const sfu = require("./sfu.service");
 
 const RING_SECONDS = 45;
 const MEETING_EARLY_JOIN_MIN = 10; // attendees can enter this long before start
@@ -390,6 +391,7 @@ const inviteToGroupCall = async (socket, actor, person, roomKey, keys = []) => {
 // ---------- leave / decline / end / kick ----------
 
 const detachSocket = (socketId, roomKey) => {
+  sfu.removePeer(roomKey, socketId);
   const s = getIO()?.sockets.sockets.get(socketId);
   if (!s) return;
   s.leave(roomOf(roomKey));
@@ -404,6 +406,7 @@ const leaveRoom = async (socket, roomKey, reason = "hangup") => {
   if (!r) return;
   socket.leave(roomOf(roomKey));
   if (socket.data.callRooms) socket.data.callRooms.delete(roomKey);
+  sfu.removePeer(roomKey, socket.id);
 
   io.to(roomOf(roomKey)).emit("call:peer-left", { roomKey, socketId: socket.id, key: r.peer.key, reason });
   if (r.wasPresenter) io.to(roomOf(roomKey)).emit("call:screen-share", { roomKey, socketId: socket.id, key: r.peer.key, sharing: false });
@@ -530,6 +533,7 @@ const finalizeRoom = async (room, reason) => {
   for (const sid of room.peers.keys()) detachSocket(sid, room.roomKey);
   room.peers.clear();
   rooms.remove(room.roomKey);
+  sfu.closeRoom(room.roomKey);
   // everyone who was still inside is free again
   for (const k of inRoomKeys) broadcastCallState(k, room.organisation_id);
 
