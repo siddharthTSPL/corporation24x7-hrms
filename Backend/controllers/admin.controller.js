@@ -4701,15 +4701,14 @@ const getAttendanceHistory = async (req, res, next) => {
 
     const [admin, manager, employee] = await Promise.all([
       teamAdminIds.length
-        ? Adminmodel.findOne({ _id: employeeId, organisation_id, _id: { $in: teamAdminIds } })
+        ? Adminmodel.findOne({ organisation_id, $and: [{ _id: employeeId }, { _id: { $in: teamAdminIds } }] })
             .select("empid f_name l_name work_email role designation department office_location")
             .lean()
         : null,
       teamManagerIds.length
         ? Managermodel.findOne({
-            _id: employeeId,
             organisation_id,
-            _id: { $in: teamManagerIds },
+            $and: [{ _id: employeeId }, { _id: { $in: teamManagerIds } }],
           })
             .select(
               "empid f_name l_name work_email role designation department office_location"

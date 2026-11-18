@@ -149,6 +149,20 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows: input
   const leaveFor = (date) =>
     leaves.find((l) => date >= startOfDay(l.startDate) && date <= startOfDay(l.endDate)) || null;
 
+  const stubIds = new Set(
+    (
+      await Attendance.find({
+        _id: { $in: rows.map((r) => r.id).filter((id) => mongoose.isValidObjectId(id)) },
+        source: "agent",
+        checkIn: null,
+        checkOut: null,
+      })
+        .select("_id")
+        .lean()
+    ).map((a) => String(a._id))
+  );
+  if (stubIds.size) rows = rows.filter((r) => !stubIds.has(String(r.id)));
+
   const byKey = new Map(rows.map((r) => [toISTKey(r.date), r]));
   const out = rows.map((r) => {
     const d = startOfDay(r.date);
