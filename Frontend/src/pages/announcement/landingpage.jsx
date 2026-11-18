@@ -11,7 +11,7 @@ import {
   FiCreditCard, FiMonitor, FiClock, FiRepeat, FiSearch, FiUserPlus, FiFolder,
   FiGitBranch, FiAlertCircle, FiPieChart, FiLock, FiPhoneCall,
   FiKey, FiCode, FiCloud, FiUserCheck, FiGift, FiBell,
-  FiBriefcase, FiAward,
+  FiBriefcase, FiAward, FiMessageSquare, FiVideo,
 } from 'react-icons/fi'
 import { FaXTwitter, FaYoutube } from 'react-icons/fa6'
 import { HiOutlineSparkles } from 'react-icons/hi'
@@ -173,14 +173,20 @@ function SectionBackdrop() {
    NAVBAR
 ========================================================================== */
 const NAV_LINKS = ['Features','Pricing','Testimonials', 'About', 'Calculator']
-const NAV_SECTION_IDS = ['features', 'testimonials', 'pricing']
+// MUST be in the same top-to-bottom order as the sections on the page
+// (Features -> Pricing -> Testimonials); the active-link loop below relies on it.
+const NAV_SECTION_IDS = ['features', 'pricing', 'testimonials']
 
 export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const goToSection = useSectionNav()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [active, setActive] = useState(null)
+  // While a clicked link is smooth-scrolling we keep ITS underline (no flicker through
+  // the sections on the way). Released ~150ms after the scrolling stops.
+  const lockRef = useRef({ on: false, timer: null, cap: null })
   const links = NAV_LINKS
 
   const BEET = '#8B1E4D' // beetroot
@@ -207,20 +213,43 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
         const { id, el } = sections[i]
         if (el && el.getBoundingClientRect().top - rootTop <= 140) current = id
       }
-      setActive(current)
+      if (!lockRef.current.on) setActive(current)
+    }
+
+    const releaseLock = () => {
+      const lock = lockRef.current
+      lock.on = false
+      clearTimeout(lock.timer)
+      clearTimeout(lock.cap)
+      read()
     }
 
     // one layout read per frame instead of one per scroll event
     const onScroll = () => {
+      const lock = lockRef.current
+      if (lock.on) {
+        clearTimeout(lock.timer)
+        lock.timer = setTimeout(releaseLock, 150) // scrolling stopped
+      }
       if (ticking) return
       ticking = true
       requestAnimationFrame(read)
     }
 
+    lockRef.current.release = releaseLock
     read()
     target.addEventListener('scroll', onScroll, { passive: true })
-    return () => target.removeEventListener('scroll', onScroll)
+    return () => {
+      target.removeEventListener('scroll', onScroll)
+      clearTimeout(lockRef.current.timer)
+      clearTimeout(lockRef.current.cap)
+    }
   }, [scrollContainerRef])
+
+  // Only ONE link is ever underlined: About / Calculator on their own pages,
+  // otherwise the section the page is currently on (or the one just clicked).
+  const activeKey =
+    pathname === '/about' ? 'about' : pathname === '/pricing-calculator' ? 'calculator' : active
 
   const handleLinkClick = (e, label) => {
     if (label === 'About') {
@@ -233,8 +262,15 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
       navigate('/pricing-calculator')
       return
     }
-    setActive(label.toLowerCase())
-    goToSection(e, label.toLowerCase())
+    const key = label.toLowerCase()
+    setActive(key)
+    const lock = lockRef.current
+    lock.on = true
+    clearTimeout(lock.timer)
+    clearTimeout(lock.cap)
+    lock.timer = setTimeout(() => lock.release?.(), 250) // if nothing scrolls, release soon
+    lock.cap = setTimeout(() => lock.release?.(), 1800)  // hard safety cap
+    goToSection(e, key)
   }
 
   const hrefFor = (l) => (l === 'About' || l === 'Calculator' ? '#' : `#${l.toLowerCase()}`)
@@ -265,7 +301,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
 
         <div className="hidden lg:flex items-center h-full gap-2">
           {links.map((l) => {
-            const isActive = active === l.toLowerCase()
+            const isActive = activeKey === l.toLowerCase()
             return (
               <a
                 key={l}
@@ -278,7 +314,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
                 {/* bottom bar - navbar ke edge par baithta hai */}
                 <span
                   className={`pointer-events-none absolute bottom-0 left-1/2 h-[4px] w-[46px] -translate-x-1/2 rounded-t-full origin-center transition-transform duration-300 ease-out ${
-                    isActive ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-50'
+                    isActive ? 'scale-x-100' : 'scale-x-0'
                   }`}
                   style={{ background: BEET, boxShadow: `0 0 10px ${BEET}66` }}
                 />
@@ -305,7 +341,7 @@ export function Navbar({ accountLabel, onAccountClick, scrollContainerRef }) {
       {open && (
         <div className="nav-mobile-menu bg-white border-t border-[#EAC7D7] px-5 sm:px-10 lg:px-16 py-5 flex flex-col gap-4.5">
           {links.map((l) => {
-            const isActive = active === l.toLowerCase()
+            const isActive = activeKey === l.toLowerCase()
             return (
               <a
                 key={l}
@@ -345,6 +381,8 @@ const freeForeverFeatures = [
   { text: 'Face Attendance' },
   { text: 'Field Operations'},
   { text: 'Monitoring of Employee Active & Idle Time' },
+  { text: 'TorchX Sync'},
+  { text: 'TorchX Spark'},
   { text: 'Leave management' },
   { text: 'Basic payroll' },
   { text: 'Analytical and Digital Dashboard' },
@@ -1372,6 +1410,22 @@ const featureCategories = [
 
 const featureItems = [
   {
+    cat: 'workplace',
+    icon: FiMessageSquare,
+    title: 'TorchX Spark',
+    desc: 'Chat with your team, call anyone in one click and keep your meetings calendar close, all inside TorchX Talent. No extra app to install and no separate sign-in.',
+    highlights: ['Direct, group & channel chats', 'Voice & video calls with background blur', 'Polls, @mentions & scheduled messages', 'Files, media & read receipts'],
+    featured: true,
+  },
+  {
+    cat: 'workplace',
+    icon: FiVideo,
+    title: 'TorchX Sync',
+    desc: 'Schedule, host and follow up on video meetings. Invite guests with a link, sketch on a live whiteboard and get minutes and action items when the meeting ends.',
+    highlights: ['HD meetings with scheduling & recurrence', 'Guest join links with a join code', 'Live whiteboard, polls & Q&A', 'Captions, minutes & attendance reports'],
+    featured: true,
+  },
+  {
     cat: 'hiring',
     icon: HiOutlineSparkles,
     title: 'AI Recruitment',
@@ -1615,6 +1669,8 @@ const PLANS = [
       'Face Attendance',
       'Field Operations',
       'Monitoring of Employee Active and Idle Time',
+      'TorchX Spark',
+      'TorchX Sync',
       'Leave management',
       'Basic payroll',
       'Analytical and Digital Dashboard',
@@ -1634,7 +1690,7 @@ const PLANS = [
     inherits: null,
     monthlyPrice: 39,
     yearlyPrice: Math.round(39 * 12 * 0.83),
-    features: ['Geo Tag Attendance', 'Face Attendance', 'Field Operations', 'Monitoring of Employee Active and Idle Time', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management','Training Management', 'Telephonic Support (24/7)'],
+    features: ['Geo Tag Attendance', 'Face Attendance', 'Field Operations', 'Monitoring of Employee Active and Idle Time','TorchX Spark','TorchX Sync', 'Leave management', 'Basic payroll', 'Analytical and Digital Dashboard', 'Announcements', 'Team Documentation', 'Employee Self-Service Portal', 'Policy Management', 'Reimbursement', 'Grievance Management', 'Email support (24/7)', 'Live Map Tracking', 'Performance Management', 'Timesheet', 'Custom Workflow', 'Recruitment Management','Training Management', 'Telephonic Support (24/7)'],
     crossFeatures: ['Live Map Tracking', 'Performance Management', 'Recruitment Management', 'Training Management', 'Timesheet', 'Custom Workflow', 'Telephonic Support (24/7)'],
   },
   {
