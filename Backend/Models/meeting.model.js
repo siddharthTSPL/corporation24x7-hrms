@@ -112,6 +112,10 @@ const meetingSchema = new mongoose.Schema(
     notifyMode: { type: String, enum: ["attendees", "attendees_and_me", "none"], default: "attendees" },
 
     visibility: { type: String, enum: ["invite_only", "organisation"], default: "invite_only", index: true },
+    // Who may open the shared meeting link.
+    //   invited      -> only people on the invite list (everyone else sees "not invited")
+    //   organisation -> any signed-in member of this organisation who has the link can join (they are added to the list)
+    linkAccess: { type: String, enum: ["invited", "organisation"], default: "invited" },
     capacity: { type: Number, default: 0, min: 0, max: 5000 },
     interested: { type: [interestSchema], default: [] },
     interestedKeys: { type: [String], default: [], index: true },

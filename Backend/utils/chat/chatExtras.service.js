@@ -70,6 +70,7 @@ const listCounts = async (actor) => {
         all: { $sum: { $cond: ["$live", 1, 0] } },
         unread: { $sum: { $cond: [{ $and: ["$live", "$hasUnread"] }, 1, 0] } },
         groups: { $sum: { $cond: [{ $and: ["$live", { $eq: ["$type", "group"] }] }, 1, 0] } },
+        channels: { $sum: { $cond: [{ $and: ["$live", { $eq: ["$channel.enabled", true] }] }, 1, 0] } },
         direct: { $sum: { $cond: [{ $and: ["$live", { $eq: ["$type", "direct"] }] }, 1, 0] } },
         favourites: { $sum: { $cond: [{ $and: ["$live", { $eq: ["$participants.favourite", true] }] }, 1, 0] } },
         mentions: { $sum: { $cond: [{ $and: ["$live", { $gt: [{ $ifNull: ["$participants.mentionUnread", 0] }, 0] }] }, 1, 0] } },
@@ -77,7 +78,7 @@ const listCounts = async (actor) => {
       },
     },
   ]);
-  return { all: 0, unread: 0, groups: 0, direct: 0, favourites: 0, mentions: 0, archived: 0, ...(r || {}), _id: undefined };
+  return { all: 0, unread: 0, groups: 0, channels: 0, direct: 0, favourites: 0, mentions: 0, archived: 0, ...(r || {}), _id: undefined };
 };
 
 // ---------- drafts ----------

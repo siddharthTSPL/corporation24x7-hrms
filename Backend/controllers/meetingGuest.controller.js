@@ -66,7 +66,7 @@ const invite = async (req, res) => {
     guests.emailGuests([m], host, entries.map((e) => ({ guest: e.doc, pin: e.pin })));
   }
   const fresh2 = await Meeting.findById(m._id).select("guests");
-  ok(res, { added: entries.map((e) => ({ email: e.doc.email, name: e.doc.name })), skipped, guests: fresh2.guests.map(guests.publicGuest) }, 201);
+  ok(res, { added: entries.map((e) => ({ email: e.doc.email, name: e.doc.name, pin: e.pin })), skipped, guests: fresh2.guests.map(guests.publicGuest) }, 201);
 };
 
 // POST /meetings/:id/guests/:guestId/resend   -> brand-new PIN (old one stops working)
@@ -81,9 +81,12 @@ const resend = async (req, res) => {
     { _id: m._id, "guests.guestId": g.guestId },
     { $set: { "guests.$.pinHash": fields.pinHash, "guests.$.pinSalt": fields.pinSalt, "guests.$.pinAttempts": 0, "guests.$.lockedUntil": null } }
   );
-  const host = await hostOf(actor, m);
-  guests.emailGuests([m], host, [{ guest: g, pin }]);
-  ok(res, { message: `A new PIN was emailed to ${g.email}.` });
+  const sendMail = req.body?.sendEmail !== false;
+  if (sendMail) {
+    const host = await hostOf(actor, m);
+    guests.emailGuests([m], host, [{ guest: g, pin }]);
+  }
+  ok(res, { pin, message: sendMail ? `A new PIN was emailed to ${g.email}.` : "New PIN generated." });
 };
 
 // DELETE /meetings/:id/guests/:guestId   -> revoke + remove from the lobby / call

@@ -244,6 +244,8 @@ const instant = async (req, res) => {
     endTime: undefined,
     durationMin: u.clampInt(b.durationMin, 5, 240, 30),
     allowJoinBeforeHost: true,
+    // "Meet now" links work for everyone in the organisation by default (host can switch it off in the room)
+    linkAccess: b.linkAccess === "invited" ? "invited" : "organisation",
     recurrence: undefined,
   };
   return meetingCtrl.createMeeting(req, res);

@@ -7,12 +7,10 @@ module.exports = {
   name: "Employee Master Report",
   category: "hr",
   sensitive: true, // run + export are written to the audit log
-  description: "Employee ID, name, department, designation, joining date, employment status, manager and work location.",
+  description: "Currently working employees: ID, name, department, designation, joining date, status, manager and work location.",
   filters: [
     F.department,
     F.designation,
-    { key: "status", label: "Employment Status", type: "select", default: "all",
-      options: [{ value: "all", label: "All" }, { value: "working", label: "Working" }, { value: "exited", label: "Resigned / Fired / Terminated" }] },
     { key: "manager", label: "Reporting Manager", type: "employee", lookup: "managers" },
     F.employees,
     { key: "joinedFrom", label: "Joined From", type: "date" },
@@ -30,6 +28,7 @@ module.exports = {
     { key: "location", header: "Work Location", type: "text", width: 20 },
   ],
   notes: [
+    "Only employees with working status 'Working' are listed. Resigned, fired and terminated employees are excluded. Employees serving notice are still working, so they appear with status 'On Notice'.",
     "Joining date falls back to the record creation date when no joining date was entered.",
     "Personal identifiers (Aadhaar, PAN, date of birth) and bank details are intentionally excluded.",
   ],
@@ -52,7 +51,7 @@ module.exports = {
     let people = await loadPeople(ctx, {
       department: f.department,
       designation: f.designation,
-      status: f.status && f.status !== "all" ? f.status : undefined,
+      status: "working", // only employees whose working status is "working"; resigned / fired / terminated are never listed
       employeeIds: f.employees,
       managerId: f.manager?.[0],
     });
