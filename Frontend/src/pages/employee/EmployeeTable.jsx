@@ -5102,9 +5102,54 @@ export default function EmployeeTable() {
 
   const inactiveCount = inactiveData?.count ?? 0;
 
+  // ── Header helpers (same export logic as before, just moved out of JSX) ──
+  const handleExportCSV = () => {
+    const managerFullMap = new Map(
+      (managersWithAdmin?.managers ?? []).map((m) => [m._id, m]),
+    );
+    const employeeFullMap = new Map(
+      (employeesFull?.employees ?? []).map((e) => [e._id, e]),
+    );
+
+    const enriched = filtered.map((u) => {
+      const effType =
+        u.type ||
+        (u.role === "manager" || u.role === "senior_manager"
+          ? "manager"
+          : "employee");
+      if (effType === "manager" && managerFullMap.has(u._id)) {
+        return { ...u, ...managerFullMap.get(u._id), type: u.type };
+      }
+      if (effType === "employee" && employeeFullMap.has(u._id)) {
+        return { ...u, ...employeeFullMap.get(u._id), type: u.type };
+      }
+      return u;
+    });
+    exportToCSV(enriched);
+  };
+
+  const headerStats = [
+    { value: activeUsers.length, label: "Active" },
+    { value: filtered.length, label: "Shown" },
+    { value: employeeData?.employees ?? 0, label: "Employees" },
+    { value: employeeData?.managers ?? 0, label: "Managers" },
+    ...(inactiveCount > 0
+      ? [{ value: inactiveCount, label: "Inactive", tone: "muted" }]
+      : []),
+    ...(allowedUsers !== null
+      ? [
+          {
+            value: remainingSlots,
+            label: `User${remainingSlots !== 1 ? "s" : ""} Remaining of ${allowedUsers}`,
+            tone: isLimitReached ? "danger" : "default",
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div
-      className="h-full flex flex-col overflow-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-1 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
+      className="h-full flex flex-col overflow-y-auto overflow-x-hidden pt-3 pr-3 pb-3 pl-1 sm:pt-4 sm:pr-4 sm:pb-4 sm:pl-1 md:pt-6 md:pr-6 md:pb-6 md:pl-3 lg:pt-8 lg:pr-8 lg:pb-8 lg:pl-4 font-['DM_Sans',system-ui,sans-serif]"
       style={{
         background: "#F9F8F2",
         minWidth: "800px",
@@ -5114,175 +5159,163 @@ export default function EmployeeTable() {
       }}
     >
       <div className="max-w-7xl w-full h-full flex flex-col min-h-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 flex-shrink-0">
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#730042] tracking-tight">
+        {/* ───────────── HEADER ───────────── */}
+        <div className="flex flex-col gap-3 mb-4 flex-shrink-0">
+          {/* Row 1: title (left) + action buttons (right) */}
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#730042] tracking-tight leading-tight">
               Employee Directory
             </h1>
-            <p className="text-[11px] sm:text-xs md:text-sm text-[#993556] mt-0.5 break-words">
-              {activeUsers.length} active · {filtered.length} shown ·{" "}
-              {employeeData?.employees ?? 0} employees ·{" "}
-              {employeeData?.managers ?? 0} managers
+
+            <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center md:justify-end">
               {inactiveCount > 0 && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <span className="text-[#6B7280]">
-                    {inactiveCount} inactive
-                  </span>
-                </>
-              )}
-              {allowedUsers !== null && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <span
-                    className={
-                      isLimitReached
-                        ? "text-[#DC2626] font-semibold"
-                        : "text-[#993556]"
-                    }
-                  >
-                    {remainingSlots} User{remainingSlots !== 1 ? "s" : ""}{" "}
-                    remaining of {allowedUsers}
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-            {inactiveCount > 0 && (
-              <button
-                onClick={() => setShowInactive((v) => !v)}
-                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-                style={
-                  showInactive
-                    ? {
-                        borderColor: "#6B7280",
-                        background: "#6B7280",
-                        color: "#fff",
-                      }
-                    : {
-                        borderColor: "#6B7280",
-                        color: "#6B7280",
-                        background: "transparent",
-                      }
-                }
-              >
-                <FaBan size={11} />
-                <span>{showInactive ? "Hide Inactive" : "Show Inactive"}</span>
-                <span
-                  className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                <button
+                  onClick={() => setShowInactive((v) => !v)}
+                  className="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border-2 text-sm font-semibold transition-all whitespace-nowrap"
                   style={
                     showInactive
-                      ? { background: "rgba(255,255,255,0.25)" }
-                      : { background: "#E5E7EB", color: "#374151" }
+                      ? {
+                          borderColor: "#6B7280",
+                          background: "#6B7280",
+                          color: "#fff",
+                        }
+                      : {
+                          borderColor: "#6B7280",
+                          color: "#6B7280",
+                          background: "transparent",
+                        }
                   }
                 >
-                  {inactiveCount}
-                </span>
-              </button>
-            )}
-            <button
-              onClick={() => {
-                const managerFullMap = new Map(
-                  (managersWithAdmin?.managers ?? []).map((m) => [m._id, m]),
-                );
-                const employeeFullMap = new Map(
-                  (employeesFull?.employees ?? []).map((e) => [e._id, e]),
-                );
+                  <FaBan size={13} />
+                  <span>{showInactive ? "Hide Inactive" : "Show Inactive"}</span>
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[11px] font-bold"
+                    style={
+                      showInactive
+                        ? { background: "rgba(255,255,255,0.25)" }
+                        : { background: "#E5E7EB", color: "#374151" }
+                    }
+                  >
+                    {inactiveCount}
+                  </span>
+                </button>
+              )}
 
-                const enriched = filtered.map((u) => {
-                  const effType =
-                    u.type ||
-                    (u.role === "manager" || u.role === "senior_manager"
-                      ? "manager"
-                      : "employee");
-                  if (effType === "manager" && managerFullMap.has(u._id)) {
-                    return { ...u, ...managerFullMap.get(u._id), type: u.type };
-                  }
-                  if (effType === "employee" && employeeFullMap.has(u._id)) {
-                    return {
-                      ...u,
-                      ...employeeFullMap.get(u._id),
-                      type: u.type,
-                    };
-                  }
-                  return u;
-                });
-                exportToCSV(enriched);
-              }}
-              className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-              style={{ borderColor: "#085041", color: "#085041" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#085041";
-                e.currentTarget.style.color = "#fff";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color = "#085041";
-              }}
-            >
-              <FaFileExcel size={12} />
-              <span>Export CSV</span>
-            </button>
-            {isLimitReached ? (
-              <div className="col-span-2 sm:col-span-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 border-[#FCA5A5] bg-[#FFF5F5] text-xs sm:text-sm font-semibold text-[#991B1B]">
-                <FaExclamationTriangle size={12} />
-                <span className="hidden sm:inline">
-                  Limit reached — contact your organization
+              <button
+                onClick={handleExportCSV}
+                className="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border-2 text-sm font-semibold transition-all whitespace-nowrap"
+                style={{ borderColor: "#085041", color: "#085041" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#085041";
+                  e.currentTarget.style.color = "#fff";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#085041";
+                }}
+              >
+                <FaFileExcel size={14} />
+                <span>Export CSV</span>
+              </button>
+
+              {!isLimitReached && (
+                <>
+                  <button
+                    onClick={() => {
+                      setOpenManager(true);
+                      setMgrStep(0);
+                    }}
+                    className="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border-2 text-sm font-semibold transition-all whitespace-nowrap"
+                    style={{ borderColor: "#730042", color: "#730042" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#730042";
+                      e.currentTarget.style.color = "#fff";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "#730042";
+                    }}
+                  >
+                    <FaUserTie size={14} />
+                    <span>Add Manager</span>
+                  </button>
+                  <button
+                    onClick={() => setOpenBulkOnboard(true)}
+                    className="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border-2 text-sm font-semibold transition-all whitespace-nowrap"
+                    style={{ borderColor: "#085041", color: "#085041" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#085041";
+                      e.currentTarget.style.color = "#fff";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "#085041";
+                    }}
+                  >
+                    <FaFileExcel size={14} />
+                    <span>Bulk Onboard</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setOpen(true);
+                      setEmpStep(0);
+                    }}
+                    className="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl border-2 border-[#730042] text-white text-sm font-semibold hover:opacity-90 transition-all whitespace-nowrap"
+                    style={{ background: "#730042" }}
+                  >
+                    <FaUserPlus size={14} />
+                    <span>Add Employee</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: stats (left) + limit warning (right) */}
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-y-1.5 text-sm sm:text-base leading-6 text-[#993556]">
+              {headerStats.map((s, i) => (
+                <span
+                  key={s.label}
+                  className="flex items-center whitespace-nowrap"
+                >
+                  {i > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="mx-3 h-4 w-px bg-[#F4C0D1]"
+                    />
+                  )}
+                  <span
+                    className={
+                      s.tone === "danger"
+                        ? "text-[#DC2626]"
+                        : s.tone === "muted"
+                          ? "text-[#6B7280]"
+                          : "text-[#730042]"
+                    }
+                  >
+                    <strong className="font-bold">{s.value}</strong>
+                    <span
+                      className={`ml-1.5 ${s.tone === "danger" ? "font-semibold" : "font-medium"}`}
+                    >
+                      {s.label}
+                    </span>
+                  </span>
                 </span>
-                <span className="sm:hidden">Limit reached</span>
+              ))}
+            </div>
+
+            {isLimitReached && (
+              <div
+                role="alert"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-[#FCA5A5] bg-[#FFF5F5] text-sm font-semibold text-[#991B1B] w-full md:w-auto flex-shrink-0"
+              >
+                <FaExclamationTriangle
+                  size={13}
+                  className="flex-shrink-0 text-[#DC2626]"
+                />
+                <span>Limit reached — contact your organization</span>
               </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => {
-                    setOpenManager(true);
-                    setMgrStep(0);
-                  }}
-                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-                  style={{ borderColor: "#730042", color: "#730042" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#730042";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#730042";
-                  }}
-                >
-                  <FaUserTie size={12} />
-                  <span>Add Manager</span>
-                </button>
-                <button
-                  onClick={() => setOpenBulkOnboard(true)}
-                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl border-2 text-xs sm:text-sm font-semibold transition-all w-full sm:w-auto"
-                  style={{ borderColor: "#085041", color: "#085041" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#085041";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#085041";
-                  }}
-                >
-                  <FaFileExcel size={12} />
-                  <span>Bulk Onboard</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setOpen(true);
-                    setEmpStep(0);
-                  }}
-                  className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold hover:opacity-90 w-full sm:w-auto"
-                  style={{ background: "#730042" }}
-                >
-                  <FaUserPlus size={12} />
-                  <span>Add Employee</span>
-                </button>
-              </>
             )}
           </div>
         </div>
@@ -5298,7 +5331,7 @@ export default function EmployeeTable() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="bg-white rounded-2xl border border-[#F4C0D1] overflow-hidden flex flex-col flex-1 min-h-[380px]">
           <div
             className="p-3 sm:p-4 border-b border-[#F4C0D1] flex-shrink-0"
             style={{ background: "#F9F8F2" }}

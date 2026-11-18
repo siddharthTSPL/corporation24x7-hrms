@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Avatar, LevelChip, Skeleton, Empty, Pill, Segmented, SectionTitle, Icon, formatDate, fmt } from "../../components/gamification/ui";
 import { useGamLeaderboard, useGamSeasons } from "../../auth/server-state/gamification/gamification.hook";
+import { getDepartmentName } from "../../lib/departmentNames";
 
 const PERIODS = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["season", "Season"], ["all", "All time"]];
 const rankCls = (p) => (p === 1 ? "bg-[#c99700] text-white" : p === 2 ? "bg-[#8793a1] text-white" : p === 3 ? "bg-[#b4763c] text-white" : "text-[#7a6a64]");
@@ -30,7 +31,7 @@ export default function LeaderboardTab({ me }) {
             <table className="w-full min-w-[520px] text-left text-[13px]">
               <thead><tr className="border-b border-[#ede5e0] text-[11px] uppercase tracking-wide text-[#9c8880]"><th className="w-14 px-4 py-2.5 font-medium">Rank</th><th className="px-2 py-2.5 font-medium">Department</th><th className="px-2 py-2.5 font-medium">Active / headcount</th><th className="px-2 py-2.5 text-right font-medium">Total XP</th><th className="px-4 py-2.5 text-right font-medium">XP per person</th></tr></thead>
               <tbody>{data.rows.map((r) => (
-                <tr key={r.department} className="border-b border-[#f3efec] last:border-0"><td className="px-4 py-3"><Rank p={r.position} /></td><td className="px-2 py-3 font-medium text-[#2a1a16]">{r.department}</td><td className="px-2 py-3 text-[#7a6a64]">{r.active} / {r.headcount}</td><td className="px-2 py-3 text-right text-[#5b4b45]">{fmt(r.xp)}</td><td className="px-4 py-3 text-right font-semibold text-[#730042]">{fmt(r.perHead)}</td></tr>))}</tbody>
+                <tr key={r.department} className="border-b border-[#f3efec] last:border-0"><td className="px-4 py-3"><Rank p={r.position} /></td><td className="px-2 py-3 font-medium text-[#2a1a16]">{getDepartmentName(r.department, "-")}</td><td className="px-2 py-3 text-[#7a6a64]">{r.active} / {r.headcount}</td><td className="px-2 py-3 text-right text-[#5b4b45]">{fmt(r.xp)}</td><td className="px-4 py-3 text-right font-semibold text-[#730042]">{fmt(r.perHead)}</td></tr>))}</tbody>
             </table>
           )}
         </Card>
@@ -52,7 +53,7 @@ export default function LeaderboardTab({ me }) {
                     <tr key={r.personKey} className={`border-b border-[#f3efec] last:border-0 ${you ? "bg-[#730042]/[0.04]" : ""}`}>
                       <td className="px-4 py-2.5"><Rank p={r.position} /></td>
                       <td className="px-2 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={r.name} photo={r.photo} size={30} /><div className="min-w-0"><p className="truncate font-medium text-[#2a1a16]">{r.name}{you && <span className="ml-1.5 text-[11px] font-normal text-[#730042]">(You)</span>}</p><p className="truncate text-[11px] text-[#9c8880]">{r.title}</p></div></div></td>
-                      <td className="px-2 py-2.5 text-[#7a6a64]">{r.department || "-"}</td>
+                      <td className="px-2 py-2.5 text-[#7a6a64]">{getDepartmentName(r.department, "-")}</td>
                       <td className="px-2 py-2.5"><LevelChip level={r.level} rank={r.rank} small /></td>
                       <td className="px-4 py-2.5 text-right font-semibold text-[#2a1a16]">{fmt(r.xp)}</td>
                     </tr>);

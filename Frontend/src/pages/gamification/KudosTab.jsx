@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getDepartmentName } from "../../lib/departmentNames";
 import { Card, Avatar, Button, Modal, Field, inputCls, Skeleton, Empty, Pill, timeAgo, fmt } from "../../components/gamification/ui";
 import { useGamKudos, useGamKudosMeta, useGamPeopleSearch, useGiveKudos, useReactKudos, useCommentKudos } from "../../auth/server-state/gamification/gamification.hook";
 
@@ -17,11 +18,11 @@ function GiveModal({ open, onClose, meta }) {
     <Modal open={open} onClose={() => { reset(); onClose(); }} title="👏 Recognise a teammate" wide>
       <div className="space-y-3">
         {to ? (
-          <div className="flex items-center gap-3 rounded-xl bg-pink-50 p-2.5"><Avatar name={to.name} photo={to.photo} size={36} /><div className="flex-1"><p className="text-sm font-bold">{to.name}</p><p className="text-xs text-gray-500">{to.designation} {to.department && `· ${to.department}`}</p></div><button className="text-xs font-semibold text-[#730042]" onClick={() => setTo(null)}>change</button></div>
+          <div className="flex items-center gap-3 rounded-xl bg-pink-50 p-2.5"><Avatar name={to.name} photo={to.photo} size={36} /><div className="flex-1"><p className="text-sm font-bold">{to.name}</p><p className="text-xs text-gray-500">{to.designation} {to.department && `· ${getDepartmentName(to.department)}`}</p></div><button className="text-xs font-semibold text-[#730042]" onClick={() => setTo(null)}>change</button></div>
         ) : (
           <Field label="Who made your day?">
             <input className={inputCls} placeholder="Search a colleague by name…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-            {people?.people?.length > 0 && <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border bg-white shadow">{people.people.map((p) => <button key={p.key} onClick={() => setTo(p)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-pink-50"><Avatar name={p.name} photo={p.photo} size={28} ring={false} /><span className="text-sm font-semibold">{p.name}</span><span className="text-xs text-gray-400">{p.department}</span></button>)}</div>}
+            {people?.people?.length > 0 && <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border bg-white shadow">{people.people.map((p) => <button key={p.key} onClick={() => setTo(p)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-pink-50"><Avatar name={p.name} photo={p.photo} size={28} ring={false} /><span className="text-sm font-semibold">{p.name}</span><span className="text-xs text-gray-400">{getDepartmentName(p.department)}</span></button>)}</div>}
           </Field>
         )}
         <Field label="What did they do well?">

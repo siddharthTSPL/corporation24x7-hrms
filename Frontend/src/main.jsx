@@ -1,4 +1,5 @@
 import './lib/Tabsession'
+import './dpdp/dpdpGate'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import toast, { Toaster, ToastBar } from "react-hot-toast";
 import { FaTimes } from "react-icons/fa";
 import './index.css'
 import App from './App.jsx'
+import DpdpPinHost from './dpdp/DpdpPinHost.jsx'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +37,7 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
+        <DpdpPinHost />
         <Toaster
           position="top-right"
           reverseOrder={false}

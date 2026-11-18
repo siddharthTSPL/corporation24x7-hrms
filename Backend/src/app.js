@@ -5,6 +5,7 @@ const cors = require('cors');
 const compression = require('compression');
 const allowedOrigins = require('../config/allowedOrigins');
 const realtimeEmit = require('../middleware/realtime/realtimeEmit.middleware');
+const { dpdpMask } = require('../middleware/security/dpdp.middleware');
 
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
@@ -75,7 +76,8 @@ const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Tab-Token"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tab-Token", "X-Dpdp-Token"],
+  exposedHeaders: ["X-Dpdp-Masked"],
 };
 
 app.use(cors(corsOptions));
@@ -83,6 +85,7 @@ app.use(cors(corsOptions));
 // Socket.IO: after any successful write, tell the org's connected clients which
 // module changed so their lists refresh live (see middleware/realtime).
 app.use(realtimeEmit);
+app.use(dpdpMask);
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
@@ -122,8 +125,10 @@ const reportsRouter = require('../reports/reports.router');
 const chatRouter = require('../routes/chat.routes');
 const meetingRouter = require('../routes/meeting.routes');
 const gamificationRouter = require('../routes/gamification.route');
+const dpdprouter = require('../routes/dpdp.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
+app.use('/dpdp', dpdprouter);
 app.use('/auth', unifiedauthrouter);
 app.use('/auth/sso', ssoRouter);
 app.use('/admin', adminrouter);

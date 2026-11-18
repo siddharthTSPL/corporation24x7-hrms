@@ -10,6 +10,7 @@ const calls = require("../utils/chat/call.service");
 const rooms = require("../utils/chat/callRooms");
 const controls = require("../utils/chat/meetingControls.service");
 const live = require("../utils/chat/meetingLive.service");
+const sfu = require("../utils/chat/sfu.service");
 const presence = require("../utils/chat/presence");
 const { resolvePeople, personKey } = require("../utils/chat/people.utils");
 const { emitToOrganisation } = require("./socket");
@@ -29,6 +30,7 @@ const allow = (socket, bucket, max, windowMs) => {
 // no inviting, no host controls. Everything else is refused before the handler runs.
 const GUEST_EVENTS = new Set([
   "chat:whoami", "call:join", "call:leave", "call:signal", "call:media-state",
+  "sfu:init", "sfu:ready", "sfu:connect", "sfu:produce", "sfu:producer-close", "sfu:consumer-resume",
   "call:screen-share:start", "call:screen-share:stop",
   "call:hand:raise", "call:hand:lower", "call:reaction",
   "meeting:state", "meeting:lobby-leave",
@@ -185,6 +187,30 @@ const registerChatSocket = (io, socket) => {
       throw Object.assign(new Error("Invalid signal."), { statusCode: 400 });
     }
     io.to(to).emit("call:signal", { roomKey: room.roomKey, from: socket.id, key: actor.key, data });
+  });
+
+  // ----- calls: media server (mediasoup SFU). Audio / video go client <-> server, never peer-to-peer -----
+  const inCall = (roomKey) => {
+    const room = rooms.get(String(roomKey));
+    if (!room || !room.peers.has(socket.id)) throw Object.assign(new Error("You are not in this call."), { statusCode: 403 });
+    return room.roomKey;
+  };
+  const tooMany = () => Object.assign(new Error("Too many requests."), { statusCode: 429 });
+
+  on("sfu:init", async ({ roomKey }) => {
+    if (!allow(socket, "sfuinit", 10, 60000)) throw tooMany();
+    return sfu.init(inCall(roomKey), socket.id);
+  });
+  on("sfu:connect", async (p) => sfu.connectTransport(inCall(p.roomKey), socket.id, { transportId: String(p.transportId || ""), dtlsParameters: p.dtlsParameters }));
+  on("sfu:ready", async (p) => sfu.ready(inCall(p.roomKey), socket.id, { rtpCapabilities: p.rtpCapabilities }));
+  on("sfu:produce", async (p) => {
+    if (!allow(socket, "sfuproduce", 30, 10000)) throw tooMany();
+    return sfu.produce(inCall(p.roomKey), socket.id, { transportId: String(p.transportId || ""), kind: p.kind, rtpParameters: p.rtpParameters, appData: p.appData });
+  });
+  on("sfu:producer-close", async (p) => sfu.closeProducerById(inCall(p.roomKey), socket.id, { producerId: p.producerId }));
+  on("sfu:consumer-resume", async (p) => {
+    if (!allow(socket, "sfuresume", 300, 10000)) throw tooMany();
+    return sfu.resumeConsumer(inCall(p.roomKey), socket.id, { consumerId: p.consumerId });
   });
 
   on("call:media-state", async ({ roomKey, audio, video, screen }) => {

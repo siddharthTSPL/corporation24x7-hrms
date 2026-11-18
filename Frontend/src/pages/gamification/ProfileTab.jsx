@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getDepartmentName } from "../../lib/departmentNames";
 import { Card, Button, Pill, Avatar, LevelChip, XpBar, SectionTitle, Skeleton, Empty, Field, inputCls, timeAgo, fmt } from "../../components/gamification/ui";
 import { useGamHistory, useGamCosmetics, useUpdatePrefs, useGamTeam, useManualAward, useGamMeta } from "../../auth/server-state/gamification/gamification.hook";
 
@@ -93,7 +94,7 @@ export default function ProfileTab({ me, role }) {
         <div className="h-20" style={{ background: me.equipped.theme.css }} />
         <div className="-mt-10 flex flex-wrap items-end gap-4 p-4 pt-0">
           <Avatar name={me.name} photo={me.photo} frame={me.equipped.frame} size={84} />
-          <div className="min-w-0 flex-1 pt-10"><p className="flex items-center gap-2 text-lg font-extrabold text-gray-800">{me.name}<LevelChip level={me.level.level} rank={me.rank.key} /></p><p className="text-sm text-gray-500">{me.equipped.title} · {me.rank.label} rank{me.department ? ` · ${me.department}` : ""}</p></div>
+          <div className="min-w-0 flex-1 pt-10"><p className="flex items-center gap-2 text-lg font-extrabold text-gray-800">{me.name}<LevelChip level={me.level.level} rank={me.rank.key} /></p><p className="text-sm text-gray-500">{me.equipped.title} · {me.rank.label} rank{me.department ? ` · ${getDepartmentName(me.department)}` : ""}</p></div>
         </div>
         <div className="px-4 pb-4"><XpBar level={me.level} /></div>
       </Card>

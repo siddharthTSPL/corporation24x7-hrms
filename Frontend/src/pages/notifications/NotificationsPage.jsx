@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaCheckDouble, FaInbox, FaTrashAlt } from "react-icons/fa";
 import {
@@ -10,6 +9,7 @@ import {
   useClearReadNotifications,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, TYPE_META } from "../../components/notifications/notificationUtils";
+import useOpenNotification from "../../components/notifications/useOpenNotification";
 import NotificationItem from "../../components/notifications/NotificationItem";
 import FeatureNotificationModal from "../../components/notifications/FeatureNotificationModal";
 
@@ -19,7 +19,7 @@ const TABS = [
 ];
 
 export default function NotificationsPage() {
-  const navigate = useNavigate();
+  const openNotification = useOpenNotification();
   const [filter, setFilter] = useState("all");
   const [type, setType] = useState("");
   const [page, setPage] = useState(1);
@@ -43,7 +43,7 @@ export default function NotificationsPage() {
       setSelectedFeature(notification);
       return;
     }
-    if (notification.link) navigate(notification.link);
+    openNotification(notification);
   };
 
   const handleDelete = (id) => {
