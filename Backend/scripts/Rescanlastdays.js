@@ -34,6 +34,7 @@ require("dotenv").config();
 
 const { recomputeLatePenalties } = require("../utils/Laterule.utils");
 const { getLookbackWindow } = require("../utils/Attendancewindow.utils");
+const { getISTDateParts } = require("../utils/Istdate.utils");
 const { recomputeSummaries } = require("./Reconcileattendancesummaryleaveaware");
 
 const argv = process.argv.slice(2);
@@ -51,7 +52,8 @@ const EMPLOYEE = opt("employee");
 (async () => {
   await mongoose.connect(process.env.LINK);
 
-  const win = getLookbackWindow(opt("days"));
+  const scopeDays = flag("today") ? 1 : flag("week") ? 7 : flag("mtd") ? Math.max(1, getISTDateParts(new Date()).day - 1) : null;
+  const win = getLookbackWindow(scopeDays ?? opt("days"));
   console.log(
     `Re-scan last ${win.days} days (from ${win.windowStart.toISOString()}), ` +
     `months rebuilt: ${win.months.join(", ")}\n` +
