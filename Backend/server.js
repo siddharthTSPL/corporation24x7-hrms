@@ -1,3 +1,7 @@
+require('dotenv').config();
+const { installProcessGuard } = require('./utils/Processguard');
+installProcessGuard(); // crash / unhandled-rejection / DB-disconnect alert mails
+
 const app = require('./src/app');
 const db = require('./config/databaseconnect');
 const https = require('https');

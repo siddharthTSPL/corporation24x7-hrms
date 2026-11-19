@@ -6,6 +6,7 @@ const compression = require('compression');
 const allowedOrigins = require('../config/allowedOrigins');
 const realtimeEmit = require('../middleware/realtime/realtimeEmit.middleware');
 const { dpdpMask } = require('../middleware/security/dpdp.middleware');
+const requestMonitor = require('../middleware/errorhandling/requestmonitor.middleware');
 
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
@@ -19,6 +20,7 @@ require('../automatic/Offerlifecycle');
 require('../automatic/Trainingreminders');
 require('../automatic/Featurelaunchnotify');
 require('../automatic/Hourlyleavesync');
+require('../automatic/Healthmonitor'); // health checks + alert mails
 require('../automatic/Meetingreminders');
 require('../automatic/Meetingactionreminders');
 require('../automatic/Chatjobs'); // scheduled chat messages + disappearing messages
@@ -55,6 +57,7 @@ app.use((req, res, next) => {
 });
 
 app.use(morgan("dev"));
+app.use(requestMonitor); // reports every 5xx by mail
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());

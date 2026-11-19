@@ -35,6 +35,8 @@ const errorHandler = (err, req, res, next) => {
     message = "Token expired. Please log in again.";
   }
 
+  if (statusCode >= 500) res.locals.reportedError = err; // picked up by requestmonitor -> alert mail
+
   res.status(statusCode).json({
     success: false,
     message,
