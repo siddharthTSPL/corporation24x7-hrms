@@ -8,6 +8,8 @@ import {
   useGetAllReimbursements,
   useApproveReimbursement,
   useRejectReimbursement,
+  useBulkApproveReimbursements,
+  useBulkRejectReimbursements,
   useMarkReimbursementPaid,
 } from "../../auth/server-state/adminreimbursement/Adminreimbursement.hook";
 
@@ -21,6 +23,8 @@ export default function ReimbursementAdmin() {
   const all = useGetAllReimbursements();
   const approve = useApproveReimbursement();
   const reject = useRejectReimbursement();
+  const bulkApprove = useBulkApproveReimbursements();
+  const bulkReject = useBulkRejectReimbursements();
   const markPaid = useMarkReimbursementPaid();
 
   return (
@@ -31,7 +35,8 @@ export default function ReimbursementAdmin() {
       applyMutation={applyMutation}
       updateMutation={updateMutation}
       deleteMutation={deleteMutation}
-      reviewQueue={{ pending, all, approve, reject, markPaid }}
+      enableBulkActions
+      reviewQueue={{ pending, all, approve, reject, markPaid, bulkApprove, bulkReject }}
     />
   );
 }

@@ -29,11 +29,15 @@ const {
   adminGetAll,
   adminApprove,
   adminReject,
+  adminBulkApprove,
+  adminBulkReject,
   adminMarkPaid,
   superadminGetPending,
   superadminGetAll,
   superadminApprove,
   superadminReject,
+  superadminBulkApprove,
+  superadminBulkReject,
   superadminMarkPaid,
 } = require("../controllers/reimbursement.controller");
 
@@ -112,6 +116,8 @@ reimbursementRouter.get("/admin/pending", adminauthmiddleware, asyncHandler(admi
 reimbursementRouter.get("/admin/all", adminauthmiddleware, asyncHandler(adminGetAll));
 reimbursementRouter.post("/admin/approve", adminauthmiddleware, asyncHandler(adminApprove));
 reimbursementRouter.post("/admin/reject", adminauthmiddleware, asyncHandler(adminReject));
+reimbursementRouter.post("/admin/bulk-approve", adminauthmiddleware, asyncHandler(adminBulkApprove));
+reimbursementRouter.post("/admin/bulk-reject", adminauthmiddleware, asyncHandler(adminBulkReject));
 reimbursementRouter.post("/admin/markPaid", adminauthmiddleware, asyncHandler(adminMarkPaid));
 
 // ---- SuperAdmin ----------------------------------------------------------
@@ -127,6 +133,14 @@ reimbursementRouter.post(
 reimbursementRouter.post(
   "/superadmin/reject",
   superadminmiddleware,  asyncHandler(superadminReject),
+);
+reimbursementRouter.post(
+  "/superadmin/bulk-approve",
+  superadminmiddleware, asyncHandler(superadminBulkApprove),
+);
+reimbursementRouter.post(
+  "/superadmin/bulk-reject",
+  superadminmiddleware, asyncHandler(superadminBulkReject),
 );
 reimbursementRouter.post(
   "/superadmin/markPaid",

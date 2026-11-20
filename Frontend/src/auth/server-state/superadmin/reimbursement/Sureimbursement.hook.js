@@ -2,6 +2,8 @@ import {
   getPendingReimbursements,
   approveReimbursement,
   rejectReimbursement,
+  bulkApproveReimbursements,
+  bulkRejectReimbursements,
   markReimbursementPaid,
   getAllReimbursements,
 } from "../../../api/superadmin/reimbursement/Sureimbursement.api";
@@ -35,6 +37,22 @@ export const useRejectReimbursement = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: rejectReimbursement,
+    onSuccess: () => invalidateAll(queryClient),
+  });
+};
+
+export const useBulkApproveReimbursements = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkApproveReimbursements,
+    onSuccess: () => invalidateAll(queryClient),
+  });
+};
+
+export const useBulkRejectReimbursements = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkRejectReimbursements,
     onSuccess: () => invalidateAll(queryClient),
   });
 };
