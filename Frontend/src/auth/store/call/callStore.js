@@ -1,0 +1,87 @@
+import { create } from "zustand";
+
+// Live call state. Written ONLY by src/realtime/webrtc/callManager.js;
+// components read it through the useCall() hook.
+//
+// active = {
+//   roomKey, callId, kind: "direct"|"group"|"meeting", media: "audio"|"video", title,
+//   conversationId, meetingId, hostKeys: [], mySocketId, status: "connecting"|"ringing"|"connected",
+//   startedAt, localStream, screenStream, audio, video, screen,
+//   presenterSocketId,
+//   peers: { [socketId]: { socketId, key, name, photo, audio, video, screen,
+//                          stream, screenStream, connectionState } }
+// }
+const initial = {
+  incoming: [], // [{ callId, roomKey, kind, media, conversationId, conversationName, from, expiresAt }]
+  active: null,
+  waiting: null, // { meetingId, roomKey, code, startsAt } - waiting for host / early
+  lastEnded: null, // { roomKey, reason, status, durationSec } - lets the UI show "Call ended"
+  error: null,
+  reactionSequence: 0,
+};
+
+export const useCallStore = create((set) => ({
+  ...initial,
+
+  addIncoming: (call) =>
+    set((s) => ({
+      incoming: s.incoming.some((c) => c.roomKey === call.roomKey) ? s.incoming : [...s.incoming, call],
+    })),
+  removeIncoming: (roomKey) => set((s) => ({ incoming: s.incoming.filter((c) => c.roomKey !== roomKey) })),
+
+  setActive: (active) => set({ active }),
+  patchActive: (patch) => set((s) => (s.active ? { active: { ...s.active, ...patch } } : s)),
+  addReaction: (reaction) => set((s) => {
+    if (!s.active) return s;
+    const reactionSequence = s.reactionSequence + 1;
+    return {
+      reactionSequence,
+      active: { ...s.active, reactions: [...(s.active.reactions || []), { ...reaction, id: reactionSequence }] },
+    };
+  }),
+  removeReaction: (id) => set((s) => s.active
+    ? { active: { ...s.active, reactions: (s.active.reactions || []).filter((reaction) => reaction.id !== id) } }
+    : s),
+  setHands: (list) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = {};
+      (list || []).forEach((h) => {
+        hands[h.key] = { raisedAt: h.raisedAt, order: h.order, name: h.name };
+      });
+      return { active: { ...s.active, hands } };
+    }),
+  patchHand: (key, hand) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = { ...(s.active.hands || {}) };
+      if (hand) hands[key] = hand;
+      else delete hands[key];
+      return { active: { ...s.active, hands } };
+    }),
+  clearHands: (keys) =>
+    set((s) => {
+      if (!s.active) return s;
+      const hands = { ...(s.active.hands || {}) };
+      (keys || Object.keys(hands)).forEach((k) => delete hands[k]);
+      return { active: { ...s.active, hands } };
+    }),
+  patchPeer: (socketId, patch) =>
+    set((s) => {
+      if (!s.active) return s;
+      const prev = s.active.peers[socketId] || { socketId };
+      return { active: { ...s.active, peers: { ...s.active.peers, [socketId]: { ...prev, ...patch } } } };
+    }),
+  removePeer: (socketId) =>
+    set((s) => {
+      if (!s.active) return s;
+      const { [socketId]: _gone, ...rest } = s.active.peers;
+      return { active: { ...s.active, peers: rest } };
+    }),
+
+  setWaiting: (waiting) => set({ waiting }),
+  setLastEnded: (lastEnded) => set({ lastEnded }),
+  setError: (error) => set({ error }),
+  clearError: () => set({ error: null }),
+  reset: () => set({ ...initial }),
+}));

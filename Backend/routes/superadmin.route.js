@@ -2,8 +2,11 @@ const express = require("express");
 const superAdminRouter = express.Router();
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const superAdminAuth = require("../middleware/auth/superadmin.middleware");
+const { requireDpdpPin } = require("../middleware/security/dpdp.middleware");
 const { restrictPlanFeature } = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
+const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
+const { uploadProfilePhoto } = require("../controllers/profilePhoto.controller");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -60,6 +63,8 @@ const {
   getAttendanceOverview,
   getAttendanceHistory,
   getOrgInfo,
+  getGamificationToggle,
+  setGamificationToggle,
   getAllPersonalDocumentsSuperAdmin,
   getAllExpenseDocumentsSuperAdmin,
   getDocumentDetailsSuperAdmin,
@@ -104,6 +109,7 @@ superAdminRouter.get(
   asyncHandler(getMe)
 );
 superAdminRouter.put("/update-profile", superAdminAuth, asyncHandler(updateSuperAdmin));
+superAdminRouter.post("/profile-photo", superAdminAuth, profilePhotoUpload, asyncHandler(uploadProfilePhoto));
 superAdminRouter.put(
   "/changepassword",
   superAdminAuth,
@@ -125,6 +131,9 @@ superAdminRouter.get(
   asyncHandler(getKioskPasswordStatus),
 );
 superAdminRouter.get("/getorginfo", superAdminAuth, asyncHandler(getOrgInfo));
+// Rewards & Gamification on/off (SuperAdmin only, default OFF)
+superAdminRouter.get("/gamification-toggle", superAdminAuth, asyncHandler(getGamificationToggle));
+superAdminRouter.put("/gamification-toggle", superAdminAuth, asyncHandler(setGamificationToggle));
 superAdminRouter.get("/storage-usage", superAdminAuth, asyncHandler(getStorageUsage));
 superAdminRouter.get("/storage-usage/files", superAdminAuth, asyncHandler(getStorageFiles));
 
@@ -293,16 +302,19 @@ superAdminRouter.get(
 superAdminRouter.get(
   "/getallpersonaldocuments",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getAllPersonalDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getallexpensedocuments",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getAllExpenseDocumentsSuperAdmin),
 );
 superAdminRouter.get(
   "/getdocumentdetails/:id",
   superAdminAuth,
+  requireDpdpPin,
   asyncHandler(getDocumentDetailsSuperAdmin),
 );
 

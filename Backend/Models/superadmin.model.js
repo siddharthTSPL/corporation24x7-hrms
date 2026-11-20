@@ -105,6 +105,11 @@ const superAdminSchema = new mongoose.Schema(
       default: "",
     },
 
+    date_of_joining: {
+      type: Date,
+      default: null,
+    },
+
     department: {
       type: String,
       trim: true,
@@ -225,6 +230,16 @@ const superAdminSchema = new mongoose.Schema(
 
     },
 
+    // Rewards & Gamification master switch. OFF by default: only the
+    // SuperAdmin of the organisation can turn it on. While off, nothing
+    // is awarded, no jobs run for the org, and every /gamification route
+    // (except /me, which just reports enabled:false) is blocked.
+    gamification: {
+      enabled: { type: Boolean, default: false },
+      enabled_at: { type: Date, default: null },
+      enabled_by: { type: String, default: "" },
+    },
+
     licenses: [licenseSchema],
 
 
@@ -237,6 +252,21 @@ const superAdminSchema = new mongoose.Schema(
         type: String,
         enum: ["strict", "approval"],
         default: "approval",
+      },
+    },
+
+
+    // External SSO ("Sign in with Microsoft / Zoho"). Separate from
+    // singleSignIn above, which is the one-active-device rule. Microsoft is
+    // bound to the org's Entra tenant ID so another tenant can't claim an
+    // employee's email address.
+    externalSso: {
+      microsoft: {
+        enabled: { type: Boolean, default: false },
+        tenantId: { type: String, default: "", trim: true, lowercase: true },
+      },
+      zoho: {
+        enabled: { type: Boolean, default: false },
       },
     },
 

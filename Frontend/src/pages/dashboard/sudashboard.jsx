@@ -3388,12 +3388,13 @@ function SuperAdminDashboard() {
                     </div>
                   )}
                   <div
-                    className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] font-bold text-white mx-auto mb-2 sm:mb-3 ${isNonWorking ? "opacity-60" : ""}`}
+                    className={`relative overflow-hidden w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-[13px] sm:text-[14px] font-bold text-white mx-auto mb-2 sm:mb-3 ${isNonWorking ? "opacity-60" : ""}`}
                     style={{
                       background: `linear-gradient(135deg, ${avaColor(admin.f_name || "")}, #cd166e)`,
                     }}
                   >
                     {initials(name)}
+                    {admin.profile_image && <img src={admin.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
                   </div>
                   <p
                     className={`text-[12px] sm:text-[13px] font-bold text-center truncate ${isNonWorking ? "text-gray-400" : "text-[#0d0209]"}`}
@@ -3553,7 +3554,7 @@ function SuperAdminDashboard() {
                   className="border border-[#e8d5e2] rounded-xl p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 hover:shadow-sm hover:bg-[#fdf5f9] transition-all duration-150"
                 >
                   <div
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[11px] sm:text-[12px] font-bold text-white flex-shrink-0"
+                    className="relative overflow-hidden w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[11px] sm:text-[12px] font-bold text-white flex-shrink-0"
                     style={{
                       background: isManager
                         ? "linear-gradient(135deg,#730042,#cd166e)"
@@ -3561,6 +3562,7 @@ function SuperAdminDashboard() {
                     }}
                   >
                     {initials(name)}
+                    {emp.profile_image && <img src={emp.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
                   </div>
                   <div className="min-w-0">
                     <p className="text-[11px] sm:text-[12px] font-semibold text-[#0d0209] truncate leading-tight">

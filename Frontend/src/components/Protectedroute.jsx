@@ -26,6 +26,19 @@ const AccessDenied = () => (
   </>
 );
 
+const FeatureNotEnabled = ({ title, message }) => (
+  <>
+    <NoIndex />
+    <div className="flex flex-col items-center justify-center min-h-screen gap-3 text-gray-400 bg-gray-50">
+      <div className="bg-[#730042]/10 p-5 rounded-full">
+        <FaLock size={36} className="text-[#730042]" />
+      </div>
+      <p className="text-2xl font-bold text-gray-600">{title}</p>
+      <p className="text-sm text-gray-400 text-center max-w-sm">{message}</p>
+    </div>
+  </>
+);
+
 const UpgradeRequired = () => (
   <>
     <NoIndex />
@@ -54,7 +67,10 @@ const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup, p
   if (allowedRoles && !allowedRoles.includes(data.role))
     return <AccessDenied />;
 
-  const hasPermissionCheck = permission || permissionGroup?.length;
+  // SuperAdmin owns the organisation and always has every permission. Their permission
+  // store is never hydrated (role stays null), so skip the check instead of denying them.
+  const isSuperAdmin = data.role === "superadmin";
+  const hasPermissionCheck = !isSuperAdmin && (permission || permissionGroup?.length);
 
   if (hasPermissionCheck) {
     const permissionsNotYetLoaded = !permRole && data.role !== "superadmin";
@@ -67,7 +83,17 @@ const ProtectedRoute = ({ children, allowedRoles, permission, permissionGroup, p
 
   if (planFeature) {
     if (planLoading) return (<><NoIndex /><p>Loading...</p></>);
-    if (planFeatures?.features?.[planFeature] === false) return <UpgradeRequired />;
+    if (planFeatures?.features?.[planFeature] === false) {
+      // Rewards & Gamification is an on/off switch (SuperAdmin → Settings → Rewards), not a plan upsell.
+      if (planFeature === "gamification")
+        return (
+          <FeatureNotEnabled
+            title="Rewards is not enabled"
+            message="Recognition & Rewards is switched off for your organisation. The owner account can enable it from Settings."
+          />
+        );
+      return <UpgradeRequired />;
+    }
   }
 
   return <>

@@ -7,6 +7,9 @@ import { useUpdateProfile, useUpdatePassword } from "../../auth/server-state/man
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsManager } from "../../auth/server-state/manager/managerasset/managerasset.hook";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
+import PrivacyCenter from "../../dpdp/PrivacyCenter";
 
 
 const DEFAULT_COUNTRY_ISO = "IN";
@@ -35,6 +38,7 @@ const SETTINGS_TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
+  { key: "privacy", label: "Privacy & Data" },
   { key: "avatar", label: "Avatar" },
 ];
 
@@ -391,6 +395,9 @@ function Sidebar({ tab, setTab, manager, initials }) {
     { key: "password", label: "Password", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M6 7V5a2 2 0 0 1 4 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
     )},
+    { key: "privacy", label: "Privacy & Data", icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>
+    )},
     { key: "avatar", label: "Avatar", icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 12.5c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
     )},
@@ -556,7 +563,7 @@ function ContactTab({ manager, onSuccess, onError }) {
     countryIso:       DEFAULT_COUNTRY_ISO,
     stateIso:         "",
     city:             manager?.office_location  || "",
-    date_of_joining:  toDateInputValue(manager?.date_of_joining),
+    date_of_joining:  toDateInputValue(manager?.date_of_joining || manager?.createdAt),
     date_of_birth:    toDateInputValue(manager?.date_of_birth),
   });
 
@@ -592,7 +599,7 @@ useEffect(() => {
       countryIso:       DEFAULT_COUNTRY_ISO,
       stateIso:         "",
       city:             cityName,
-      date_of_joining:  toDateInputValue(manager.date_of_joining),
+      date_of_joining:  toDateInputValue(manager.date_of_joining || manager.createdAt),
       date_of_birth:    toDateInputValue(manager.date_of_birth),
     });
 
@@ -1163,6 +1170,14 @@ function AvatarTab({ manager, onSuccess, onError }) {
 
   const removeAvatar = () => applyAvatar("");
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.setQueryData(["meManager"], old => old ? { ...old, manager: { ...old.manager, profile_image: url } } : old);
+    queryClient.invalidateQueries({ queryKey: ["meManager"] });
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard title="Profile avatar" subtitle="Choose an avatar that represents you" accent={C.blue}>
       <div className="st-avatar-current" style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24, padding: "16px 20px", background: C.page, borderRadius: 12, border: `0.5px solid ${C.border}`, flexWrap: "wrap" }}>
@@ -1182,7 +1197,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 4 }}>Current avatar</div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 10 }}>
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
@@ -1196,6 +1211,7 @@ function AvatarTab({ manager, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="manager" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="st-avatar-grid">
         {AVATAR_STYLES.map((style) => {
@@ -1385,6 +1401,7 @@ export default function ManagerSettingsPage() {
             {tab === "reviews"   && <ReviewsTab   reviews={reviews} />}
             {tab === "assets"    && <AssetsTab />}
             {tab === "password"  && <PasswordTab  onSuccess={showSuccess} onError={showError} />}
+            {tab === "privacy"   && (<div className="space-y-4"><DpdpLockCard /><PrivacyCenter /></div>)}
             {tab === "avatar"    && <AvatarTab    manager={manager} onSuccess={showSuccess} onError={showError} />}
 
             <div style={{ textAlign: "center", fontSize: 12, color: C.mutedMid, marginTop: 8 }}>

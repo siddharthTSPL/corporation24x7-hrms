@@ -129,7 +129,7 @@ const attendanceSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "agent", "face", "field"],
+      enum: ["manual", "agent", "face", "field", "biometric"],
       default: "manual",
     },
     fieldDutySession: {
@@ -174,5 +174,6 @@ attendanceSchema.index(
 // (employee, role, date) combinations already exist in the collection.
 attendanceSchema.index({ employee: 1, role: 1, date: 1 }, { unique: true });
 
+attendanceSchema.plugin(require("../utils/gamification/hooks").attendancePlugin); // gamification
 const Attendance = mongoose.model("Attendance", attendanceSchema);
 module.exports = Attendance;

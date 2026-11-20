@@ -68,7 +68,16 @@ const STATUS_META = {
   absent: { label: "Not Checked In", color: "#DC2626", bg: "#FEE2E2" },
   // Checked in/out but active time was too low to count as present/half-day.
   absent_checked_in: { label: "Absent", color: "#DC2626", bg: "#FEE2E2" },
+  // Approved leave for today - outranks check-in state (never shown as
+  // "Not Checked In" / "On Duty" / "Present" while the person is on leave).
+  on_leave: { label: "On Leave", color: "#6B21A8", bg: "#F3E8FF" },
 };
+
+// "On Leave" / "On Leave · LWP" / "Half Day Leave" label for a Today row.
+const onLeaveLabel = (p) =>
+  p.isHalfDayLeave
+    ? `Half Day Leave${p.isLwpLeave ? " · LWP" : ""}`
+    : `On Leave${p.isLwpLeave ? " · LWP (Unpaid)" : ""}`;
 
 function Avatar({ name, role }) {
   const initials =
@@ -115,6 +124,8 @@ function PersonMeta({ p }) {
 // checked in - so from there we branch on checkOut/status instead of ever
 // falling back to "Not Checked In" again.
 function resolveTodayMeta(p) {
+  // Approved leave wins over everything, even if the person also checked in.
+  if (p.status === "on_leave") return { ...STATUS_META.on_leave, label: onLeaveLabel(p) };
   if (!p.checkIn) return STATUS_META.absent; // truly never checked in
   if (!p.checkOut) return STATUS_META.on_duty; // checked in, still working
   const s = (p.status || "").toLowerCase();
@@ -129,6 +140,7 @@ function resolveTodayMeta(p) {
 // Same branching as resolveTodayMeta, but returns the STATUS_META *key*
 // instead of the display object — used for the Status filter dropdown.
 function resolveTodayStatusKey(p) {
+  if (p.status === "on_leave") return "on_leave";
   if (!p.checkIn) return "absent";
   if (!p.checkOut) return "on_duty";
   const s = (p.status || "").toLowerCase();
@@ -307,6 +319,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   const STATUS_FILTER_OPTIONS = [
     { value: "all", label: "All Status" },
     { value: "present", label: "Present" },
+    { value: "on_leave", label: "On Leave" },
     { value: "on_duty", label: "On Duty" },
     { value: "half_day", label: "Half Day" },
     { value: "absent_checked_in", label: "Absent (Checked In)" },
@@ -345,10 +358,11 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
   // filtered set so the numbers match what's actually visible below.
   const todayStats = useMemo(() => {
     if (tab !== "today") return null;
-    const acc = { present: 0, onDuty: 0, absentCheckedIn: 0, notCheckedIn: 0 };
+    const acc = { present: 0, onDuty: 0, onLeave: 0, absentCheckedIn: 0, notCheckedIn: 0 };
     filtered.forEach((p) => {
       const key = resolveTodayStatusKey(p);
-      if (key === "present" || key === "half_day") acc.present += 1;
+      if (key === "on_leave") acc.onLeave += 1;
+      else if (key === "present" || key === "half_day") acc.present += 1;
       else if (key === "on_duty") acc.onDuty += 1;
       else if (key === "absent_checked_in") acc.absentCheckedIn += 1;
       else acc.notCheckedIn += 1;
@@ -545,6 +559,7 @@ export default function AttendanceDetailsModal({ open, onClose, useOverviewHook,
           <div className="px-4 sm:px-6 py-2.5 flex items-center gap-2 flex-wrap border-b border-gray-100 flex-shrink-0">
             <StatChip icon={<FaCheckCircle size={11} />} label="Present" value={todayStats.present} color="#16A34A" bg="#DCFCE7" />
             <StatChip icon={<FaUserClock size={11} />} label="On Duty" value={todayStats.onDuty} color="#B8760A" bg="#FEF3C7" />
+            <StatChip icon={<FaLayerGroup size={11} />} label="On Leave" value={todayStats.onLeave} color="#6B21A8" bg="#F3E8FF" />
             <StatChip icon={<FaBan size={11} />} label="Absent" value={todayStats.absentCheckedIn} color="#DC2626" bg="#FEE2E2" />
             <StatChip icon={<FaLayerGroup size={11} />} label="Not Checked In" value={todayStats.notCheckedIn} color="#6B7280" bg="#F3F4F6" />
           </div>

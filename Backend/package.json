@@ -22,6 +22,7 @@
     "crypto": "^1.0.1",
     "date-holidays": "^3.26.11",
     "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-validator": "^7.3.1",
     "geoip-lite": "^1.4.10",
@@ -30,6 +31,7 @@
     "ip-range-check": "^0.2.0",
     "jsonwebtoken": "^9.0.3",
     "lru-cache": "^11.5.2",
+    "mediasoup": "^3.32.2",
     "mongoose": "^9.3.3",
     "moongose": "^1.0.0",
     "morgan": "^1.10.1",
@@ -40,6 +42,7 @@
     "otp-generator": "^4.0.1",
     "pdf-lib": "^1.17.1",
     "react-geolocated": "^4.4.0",
+    "socket.io": "^4.8.4",
     "xlsx": "^0.18.5"
   },
   "type": "commonjs"

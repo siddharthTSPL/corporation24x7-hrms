@@ -10,6 +10,8 @@ import {
   useUnifiedVerifyForgotPasswordOtp,
   useUnifiedResetPassword,
 } from "../../auth/store/unifiedauth/Unifiedauth.hook";
+import { useSsoProviders } from "../../auth/server-state/sso/sso.hook";
+import { ssoStartUrl } from "../../auth/api/sso/sso.api";
 import slide1 from "../../assets/slide1.png";
 import slide2 from "../../assets/slide2.png";
 import slide3 from "../../assets/slide3.png";
@@ -22,6 +24,9 @@ import { fetchMyPermissions } from "../../auth/api/permission/permission.api";
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import { setAgentToken } from "../../pages/utils/Desktopagent";
 import { pollChallengeStatus, finalizeApprovedLogin } from "../../auth/api/singleSignIn/singleSignIn.api";
+import WaitingForApprovalPanel from "../../components/Waitingforapprovalpanel";
+// NOTE: adjust this path to wherever you saved AppToast.jsx
+import { showApiError, showErrorToast, showInfoToast } from "../../components/AppToast";
 
 // Prefer the backend's explicit account-type bucket (superadmin/admin/manager/employee).
 // Falls back to normalizing the raw role string for older responses that don't send accountType.
@@ -47,7 +52,7 @@ function Login() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useAuth();
-  const [notice, setNotice] = useState(location.state?.notice || "");
+  const { data: ssoProviders } = useSsoProviders();
 
   const { mutate: loginFn, isPending: isLoggingIn } = useUnifiedLogin();
   const { mutate: sendOtpFn, isPending: isSendingOtp } = useUnifiedSendForgotPasswordOtp();
@@ -56,18 +61,24 @@ function Login() {
 
   const [form, setForm] = useState({ email: "", password: "", otp: "", newPassword: "", confirmPassword: "" });
   const [verifiedAuthPayload, setVerifiedAuthPayload] = useState(null);
+  // errors is now used ONLY to highlight input borders. Messages are shown in popups.
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
   const [animationData, setAnimationData] = useState(null);
   const [showLoader, setShowLoader] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt }
-  const [approvalError, setApprovalError] = useState("");
+  const [approvalChallenge, setApprovalChallenge] = useState(null); // { sessionId, expiresAt, activeDevice }
 
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
+    // Came from Spark / Sync ("Sign in" there sends ?next=/spark/...): go back there, signed in.
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next && /^\/(spark|sync)(\/|$)/.test(next)) {
+      window.location.assign(next);
+      return;
+    }
     if (role === "superadmin" || role === "super_admin") navigate("/superadmin-dashboard", { replace: true });
     else if (role === "admin") navigate("/dashboard", { replace: true });
     else if (role === "manager") navigate("/manager-dashboard", { replace: true });
@@ -78,13 +89,42 @@ function Login() {
     if (!authLoading && authData) navigateByRole(authData.role);
   }, [authData, authLoading]);
 
-  // Clear the router state right after reading it so the notice doesn't
-  // reappear on a refresh or when navigating back to this page later.
+  // Show the router-state notice as a popup, then clear it so it doesn't
+  // reappear on refresh or when navigating back to this page later.
   useEffect(() => {
     if (location.state?.notice) {
+      showInfoToast(location.state.notice);
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handed over from /sso-callback when another device is already signed in
+  // (single-device approval mode): show the same "waiting for approval" step.
+  useEffect(() => {
+    const challenge = location.state?.ssoChallenge;
+    if (!challenge) return;
+    setApprovalChallenge(challenge);
+    setStep("waiting-approval");
+    navigate(location.pathname, { replace: true, state: {} });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Automatic sign-in: if this browser signed in with Microsoft/Zoho before
+  // (and the person hasn't logged out since), try the provider silently. If
+  // they're still signed in there they land in HRMS with no click; if not,
+  // the provider sends them back here (?sso=none) and the normal form shows.
+  // Tried once per tab session so it can never loop.
+  useEffect(() => {
+    if (authLoading || authData || !ssoProviders?.providers?.length) return;
+    if (location.state?.ssoChallenge || location.state?.notice) return;
+    if (new URLSearchParams(location.search).get("sso") === "none") return;
+    const last = localStorage.getItem("sso_last_provider");
+    if (!last || localStorage.getItem("sso_auto_off") === "1") return;
+    if (sessionStorage.getItem("sso_auto_tried") === "1") return;
+    if (!ssoProviders.providers.some((p) => p.key === last)) return;
+    sessionStorage.setItem("sso_auto_tried", "1");
+    setShowLoader(true);
+    window.location.href = ssoStartUrl(last, { silent: true });
+  }, [authLoading, authData, ssoProviders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}loader.json`)
@@ -104,15 +144,23 @@ function Login() {
     setErrors({});
   };
 
-  const getErrorMessage = (err) =>
-    err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
+  // Highlights the field(s) and shows the first message as a popup.
+  const failField = (fieldErrors) => {
+    setErrors(fieldErrors);
+    const firstMessage = Object.values(fieldErrors)[0];
+    if (firstMessage) showErrorToast(firstMessage, "Please check your input");
+  };
 
   const validate = () => {
     const newErrors = {};
     if (!form.email) newErrors.email = "Email is required";
     if (!form.password) newErrors.password = "Password is required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) {
+      failField(newErrors);
+      return false;
+    }
+    setErrors({});
+    return true;
   };
 
   const syncProfileToCache = async (role, fallbackData) => {
@@ -133,10 +181,19 @@ function Login() {
     }
   };
 
+  const finishPostAuth = async (data) => {
+    const role = normalizeRole(data);
+    if (data?.token) {
+      setAgentToken(data.token);
+    }
+    await syncProfileToCache(role, data);
+    setShowLoader(false);
+    navigateByRole(role);
+  };
+
   const handleLogin = () => {
     if (!validate()) return;
     setShowLoader(true);
-    setApprovalError("");
 
     loginFn(
       { email: form.email, password: form.password },
@@ -147,7 +204,11 @@ function Login() {
             // signed in. Wait here instead of logging in — the person
             // approves/denies from that other device.
             setShowLoader(false);
-            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setApprovalChallenge({
+              sessionId: data.sessionId,
+              expiresAt: data.expiresAt,
+              activeDevice: data.activeDevice || null,
+            });
             setStep("waiting-approval");
             return;
           }
@@ -155,7 +216,7 @@ function Login() {
         },
         onError: (err) => {
           setShowLoader(false);
-          setErrors({ general: getErrorMessage(err) });
+          showApiError(err, "Sign in failed"); // storage limit => special popup, others => error popup
         },
       }
     );
@@ -183,10 +244,11 @@ function Login() {
           clearInterval(interval);
           setApprovalChallenge(null);
           setStep("login");
-          setApprovalError(
+          showErrorToast(
             result.reason === "expired"
               ? "The approval request timed out. Please try signing in again."
-              : "Sign-in was denied from your other device."
+              : "Sign-in was denied from your other device.",
+            "Sign in failed"
           );
         }
       } catch (err) {
@@ -208,28 +270,24 @@ function Login() {
 
   const handleSendOtp = () => {
     if (!form.email) {
-      setErrors({ email: "Email is required" });
+      failField({ email: "Email is required" });
       return;
     }
     sendOtpFn(form.email, {
-      onSuccess: () => setStep("otp"),
-      onError: (err) => setErrors({ email: getErrorMessage(err) }),
+      onSuccess: () => {
+        setErrors({});
+        setStep("otp");
+      },
+      onError: (err) => {
+        setErrors({ email: true });
+        showApiError(err, "Could not send OTP");
+      },
     });
-  };
-
-  const finishPostAuth = async (data) => {
-    const role = normalizeRole(data);
-    if (data?.token) {
-      setAgentToken(data.token);
-    }
-    await syncProfileToCache(role, data);
-    setShowLoader(false);
-    navigateByRole(role);
   };
 
   const handleVerifyOtp = () => {
     if (!form.otp) {
-      setErrors({ otp: "OTP is required" });
+      failField({ otp: "OTP is required" });
       return;
     }
 
@@ -241,7 +299,11 @@ function Login() {
             // Same Single Sign-In approval gate as password login — the OTP
             // is verified, but another device holds the active session.
             setErrors({});
-            setApprovalChallenge({ sessionId: data.sessionId, expiresAt: data.expiresAt });
+            setApprovalChallenge({
+              sessionId: data.sessionId,
+              expiresAt: data.expiresAt,
+              activeDevice: data.activeDevice || null,
+            });
             setStep("waiting-approval");
             return;
           }
@@ -252,22 +314,25 @@ function Login() {
           setErrors({});
           setStep("reset");
         },
-        onError: (err) => setErrors({ otp: getErrorMessage(err) }),
+        onError: (err) => {
+          setErrors({ otp: true });
+          showApiError(err, "OTP verification failed");
+        },
       }
     );
   };
 
   const handleSetNewPassword = () => {
     if (!form.newPassword || !form.confirmPassword) {
-      setErrors({ newPassword: "Both password fields are required" });
+      failField({ newPassword: "Both password fields are required" });
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
-      setErrors({ newPassword: "Passwords do not match" });
+      failField({ newPassword: "Passwords do not match" });
       return;
     }
     if (form.newPassword.length < 8) {
-      setErrors({ newPassword: "Password must be at least 8 characters" });
+      failField({ newPassword: "Password must be at least 8 characters" });
       return;
     }
 
@@ -280,7 +345,8 @@ function Login() {
         },
         onError: (err) => {
           setShowLoader(false);
-          setErrors({ newPassword: getErrorMessage(err) });
+          setErrors({ newPassword: true });
+          showApiError(err, "Could not update password");
         },
       }
     );
@@ -290,6 +356,8 @@ function Login() {
     setShowLoader(true);
     await finishPostAuth(verifiedAuthPayload);
   };
+
+  const errBorder = (field) => (errors[field] ? "border-red-400" : "");
 
   return (
     <div
@@ -312,35 +380,14 @@ function Login() {
                 <h2 className="text-2xl font-bold text-[#730042] mb-1">Sign in</h2>
                 <p className="text-gray-500 text-sm mb-4">Access your Talent account</p>
 
-                {notice && (
-                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start justify-between gap-2">
-                    <p className="text-blue-700 text-sm">{notice}</p>
-                    <button
-                      type="button"
-                      onClick={() => setNotice("")}
-                      className="text-blue-400 hover:text-blue-600 text-sm leading-none"
-                      aria-label="Dismiss"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-
-                {(errors.general || approvalError) && (
-                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-red-600 text-sm">{errors.general || approvalError}</p>
-                  </div>
-                )}
-
                 <input
                   type="text"
                   name="email"
                   placeholder="Email address"
                   value={form.email}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-1 p-3 border rounded-lg ${errBorder("email")}`}
                 />
-                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
 
                 <div className="relative mt-2 mb-1">
                   <input
@@ -349,7 +396,7 @@ function Login() {
                     placeholder="Password"
                     value={form.password}
                     onChange={handleChange}
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042]"
+                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[#730042] ${errBorder("password")}`}
                   />
                   <span
                     onClick={() => setShowPassword(!showPassword)}
@@ -358,7 +405,6 @@ function Login() {
                     {showPassword ? "🙈" : "👁️"}
                   </span>
                 </div>
-                {errors.password && <p className="text-red-500 text-sm mb-2">{errors.password}</p>}
 
                 <button
                   onClick={handleLogin}
@@ -373,11 +419,11 @@ function Login() {
                     Forgot Password?
                   </p>
                   <p
-  onClick={() => (window.location.href = "https://torchxsuite.com/signup")}
-  className="cursor-pointer hover:text-[#730042] ml-auto"
->
-  Sign Up
-</p>
+                    onClick={() => (window.location.href = "https://torchxsuite.com/signup")}
+                    className="cursor-pointer hover:text-[#730042] ml-auto"
+                  >
+                    Sign Up
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3 my-4">
@@ -385,6 +431,31 @@ function Login() {
                   <span className="text-xs text-gray-400 font-medium">OR</span>
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>
+
+                {ssoProviders?.providers?.length > 0 && (
+                  <div className="flex gap-2 mb-3">
+                    {ssoProviders.providers.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => (window.location.href = ssoStartUrl(p.key))}
+                        className="flex-1 flex items-center justify-center gap-2 border border-gray-300 rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        {p.key === "microsoft" ? (
+                          <svg width="16" height="16" viewBox="0 0 21 21" aria-hidden="true">
+                            <rect width="10" height="10" fill="#f25022" />
+                            <rect x="11" width="10" height="10" fill="#7fba00" />
+                            <rect y="11" width="10" height="10" fill="#00a4ef" />
+                            <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
+                          </svg>
+                        ) : (
+                          <span className="w-4 h-4 rounded-sm bg-[#e42527] text-white text-[10px] font-bold flex items-center justify-center">Z</span>
+                        )}
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <button
                   type="button"
@@ -401,19 +472,11 @@ function Login() {
             )}
 
             {step === "waiting-approval" && (
-              <div className="flex flex-col items-center text-center py-8">
-                <div className="w-12 h-12 border-4 border-[#730042]/20 border-t-[#730042] rounded-full animate-spin mb-5" />
-                <h2 className="text-xl font-bold text-[#730042] mb-1">Waiting for approval</h2>
-                <p className="text-gray-500 text-sm mb-6 max-w-xs">
-                  We've sent a sign-in request to your other device. Approve it there to continue — this page checks automatically.
-                </p>
-                <button
-                  onClick={cancelApprovalWait}
-                  className="text-sm text-[#730042] font-medium hover:underline"
-                >
-                  Cancel and go back
-                </button>
-              </div>
+              <WaitingForApprovalPanel
+                activeDevice={approvalChallenge?.activeDevice}
+                expiresAt={approvalChallenge?.expiresAt}
+                onCancel={cancelApprovalWait}
+              />
             )}
 
             {step === "email" && (
@@ -425,9 +488,8 @@ function Login() {
                   placeholder="Enter your email"
                   value={form.email}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-3 p-3 border rounded-lg ${errBorder("email")}`}
                 />
-                {errors.email && <p className="text-red-500 text-sm mb-2">{errors.email}</p>}
                 <button
                   onClick={handleSendOtp}
                   disabled={isSendingOtp}
@@ -453,9 +515,8 @@ function Login() {
                   placeholder="Enter OTP"
                   value={form.otp}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-3 p-3 border rounded-lg ${errBorder("otp")}`}
                 />
-                {errors.otp && <p className="text-red-500 text-sm mb-2">{errors.otp}</p>}
                 <button
                   onClick={handleVerifyOtp}
                   disabled={isVerifyingOtp}
@@ -484,7 +545,7 @@ function Login() {
                   placeholder="New password"
                   value={form.newPassword}
                   onChange={handleChange}
-                  className="w-full mb-1 p-3 border rounded-lg"
+                  className={`w-full mb-1 p-3 border rounded-lg ${errBorder("newPassword")}`}
                 />
                 <input
                   type="password"
@@ -492,9 +553,8 @@ function Login() {
                   placeholder="Confirm new password"
                   value={form.confirmPassword}
                   onChange={handleChange}
-                  className="w-full mt-2 mb-1 p-3 border rounded-lg"
+                  className={`w-full mt-2 mb-1 p-3 border rounded-lg ${errBorder("newPassword")}`}
                 />
-                {errors.newPassword && <p className="text-red-500 text-sm mb-2">{errors.newPassword}</p>}
                 <button
                   onClick={handleSetNewPassword}
                   disabled={isResettingPassword}

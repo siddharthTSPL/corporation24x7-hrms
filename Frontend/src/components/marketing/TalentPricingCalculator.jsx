@@ -36,6 +36,7 @@ const PLANS = [
       "Core HR (employee info, documents, onboarding)",
       "Letters & mail merge",
       "Basic attendance tracking",
+      "Field Operations",
     ],
   },
   {
@@ -51,6 +52,7 @@ const PLANS = [
       "Advanced attendance",
       "Recruitment / ATS",
       "Advanced payroll",
+      "Training Management",
     ],
   },
   {
@@ -76,10 +78,12 @@ const FEATURE_MATRIX = [
   { name: "Core HR (employee info, documents, onboarding)", tier: 0 },
   { name: "Letters & mail merge", tier: 0 },
   { name: "Basic attendance tracking", tier: 0 },
+  { name: "Field Operations", tier: 0 },
   { name: "Shift & roster management", tier: 1 },
   { name: "Advanced attendance", tier: 1 },
   { name: "Recruitment / ATS", tier: 1 },
   { name: "Advanced payroll", tier: 1 },
+  { name: "Training Management", tier: 1 },
   { name: "Custom integrations", tier: 2 },
   { name: "Single sign-on (SSO)", tier: 2 },
   { name: "REST API access", tier: 2 },
@@ -101,11 +105,11 @@ const FAQS = [
   },
   {
     q: 'How is the "compare with another tool" number calculated?',
-    a: "Pick a tool from the dropdown (or enter a custom quote), confirm the employee count, then press Run Comparison. We line that up against your TorchX estimate for the same headcount.",
+    a: "Pick a tool from the dropdown (or enter a custom quote), confirm the employee count, then press Run Comparison. We line that up against your TorchX estimate for the same headcount. If Yearly billing is selected, the 17% yearly discount is applied to your TorchX estimate.",
   },
   {
     q: "Where do the competitor prices in the dropdown come from?",
-    a: "Where possible (greytHR), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, Zoho People), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
+    a: "Where possible (greytHR, Tankhwa Patra, Pocket HRMS, Zoho People), we've verified these directly against the vendor's official pricing page. Where a vendor doesn't publish exact numbers (Keka, WeekMate), we've used the most consistent figures we could find from recent partner quotes and pricing trackers — treat those as estimates. Vendors revise pricing often, so always confirm with the provider directly, or overwrite the field with your own quote for an exact comparison.",
   },
 ];
 
@@ -142,15 +146,15 @@ const COMPETITORS = [
     id: "zoho-essential",
     name: "Zoho People Essential",
     description:
-      "Indicative from Zoho's published India pricing: roughly ₹50 per employee/month (annual billing), no bundled headcount tier.",
-    calculate: (count) => 50 * count,
+      "Zoho's published India pricing: ₹48 per employee/month on annual billing (₹60 if billed monthly), no bundled headcount tier.",
+    calculate: (count) => 48 * count,
   },
   {
     id: "zoho-professional",
     name: "Zoho People Professional",
     description:
-      "Indicative from Zoho's published India pricing: roughly ₹120 per employee/month (annual billing).",
-    calculate: (count) => 120 * count,
+      "Zoho's published India pricing: ₹96 per employee/month on annual billing (₹120 if billed monthly).",
+    calculate: (count) => 96 * count,
   },
   {
     id: "pocket-hrms-standard",
@@ -163,8 +167,48 @@ const COMPETITORS = [
     id: "razorpayx-payroll",
     name: "RazorpayX Payroll",
     description:
-      "Indicative from RazorpayX published pricing: roughly ₹100 per user/month. Offers 100% automated direct salary disbursement & tax filings.",
-    calculate: (count) => 100 * count,
+      "RazorpayX current plans (annual billing): Prime ₹2,499/month up to 20 employees; Elite ₹5,499/month for 50 employees, then ₹100 per additional employee/month. Offers automated salary disbursement & tax filings.",
+    calculate: (count) =>
+      count <= 20
+        ? 2499
+        : count <= 50
+          ? 5499
+          : 5499 + (count - 50) * 100,
+  },
+  {
+    id: "weekmate",
+    name: "WeekMate HRMS",
+    description:
+      "Based on Capterra's listed pricing: starts at ₹80 per user/month. Confirm the live number with WeekMate directly.",
+    calculate: (count) => 80 * count,
+  },
+  {
+    id: "tankhwa-patra-dreamer",
+    name: "Tankhwa Patra — Dreamer",
+    description:
+      "Verified on Tankhwa Patra's official pricing page: ₹600 per user/year (≈ ₹50 per user/month). Attendance, shift, leave, payroll, overtime and PF/ESIC.",
+    calculate: (count) => Math.round((600 / 12) * count),
+  },
+  {
+    id: "tankhwa-patra-performer",
+    name: "Tankhwa Patra — Performer",
+    description:
+      "Verified on Tankhwa Patra's official pricing page: ₹960 per user/year (≈ ₹80 per user/month). Dreamer plus onboarding, visit & expense management.",
+    calculate: (count) => Math.round((960 / 12) * count),
+  },
+  {
+    id: "tankhwa-patra-achiever",
+    name: "Tankhwa Patra — Achiever",
+    description:
+      "Verified on Tankhwa Patra's official pricing page: ₹1,320 per user/year (≈ ₹110 per user/month). Performer plus task, performance & asset management.",
+    calculate: (count) => Math.round((1320 / 12) * count),
+  },
+  {
+    id: "attendo-petpooja",
+    name: "Attendo (Petpooja Payroll)",
+    description:
+      "Flat-fee pricing, no per-user fee: ₹7,000–₹8,750 in Year 1 (calculated here at ₹7,000 ÷ 12 ≈ ₹583/month), then ₹4,000/year renewal from Year 2. Confirm the live number with Petpooja directly.",
+    calculate: () => Math.round(7000 / 12),
   },
 ];
 
@@ -194,7 +238,8 @@ const pageFontStyles = `
 function ComparePanel({
   plan,
   employees,
-  monthlyTotal,
+  monthlyTotal: listMonthlyTotal,
+  billing,
   competitorId,
   onCompetitorSelect,
   competitorName,
@@ -206,6 +251,12 @@ function ComparePanel({
   onReset,
 }) {
   const [hasRun, setHasRun] = useState(false);
+
+  // When yearly billing is selected, TorchX gets the yearly discount.
+  const monthlyTotal =
+    listMonthlyTotal !== null && billing === "yearly"
+      ? listMonthlyTotal * (1 - YEARLY_DISCOUNT_PERCENT / 100)
+      : listMonthlyTotal;
 
   const competitorMonthly = Number(competitorCost);
 
@@ -405,7 +456,11 @@ function ComparePanel({
 
               <p className="mt-1 font-body text-xs text-white/80">
                 Comparison uses your selected {plan.name} plan and {employees}{" "}
-                TorchX employees.
+                TorchX employees
+                {billing === "yearly"
+                  ? ` (yearly billing, ${YEARLY_DISCOUNT_PERCENT}% off applied)`
+                  : ""}
+                .
               </p>
             </div>
 
@@ -430,6 +485,9 @@ function ComparePanel({
 
                 <p className="font-body text-xs text-[#ead1de]">
                   {plan.name} · {employees} employees · per month
+                  {billing === "yearly"
+                    ? ` · ${YEARLY_DISCOUNT_PERCENT}% yearly off`
+                    : ""}
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-1">
@@ -510,8 +568,16 @@ export default function TalentPricingCalculator() {
         : monthlyPerEmployee
       : null;
 
+  // Monthly figure used for comparisons (17% off when yearly is selected)
+  const comparableMonthly =
+    monthlyTotal === null
+      ? null
+      : billing === "yearly"
+        ? monthlyTotal * (1 - YEARLY_DISCOUNT_PERCENT / 100)
+        : monthlyTotal;
+
   const bestSavings = (() => {
-    if (monthlyTotal === null) return null;
+    if (comparableMonthly === null) return null;
 
     let best = null;
 
@@ -520,7 +586,7 @@ export default function TalentPricingCalculator() {
 
       const competitorMonthly = competitor.calculate(employees);
 
-      const diff = competitorMonthly - monthlyTotal;
+      const diff = competitorMonthly - comparableMonthly;
 
       if (diff > 0 && (!best || diff > best.diff)) {
         best = {
@@ -663,6 +729,7 @@ export default function TalentPricingCalculator() {
           plan={plan}
           employees={employees}
           monthlyTotal={monthlyTotal}
+          billing={billing}
           competitorId={competitorId}
           onCompetitorSelect={selectCompetitor}
           competitorName={competitorName}
@@ -780,7 +847,7 @@ export default function TalentPricingCalculator() {
                     )}
 
                     <ul
-                      className={`space-y-1.5 font-body text-xs text-[#4f3e47] ${
+                      className={`flex-1 space-y-1.5 font-body text-xs text-[#4f3e47] ${
                         inheritedFrom ? "mt-2" : "mt-4"
                       }`}
                     >

@@ -97,6 +97,26 @@ export const getOfferMeta = async () => {
   return res.data;
 };
 
+export const getSalaryConfig = async () => {
+  const res = await api.get("recruitment/admin/salary-config");
+  return res.data;
+};
+
+export const saveSalaryConfig = async (data) => {
+  const res = await api.put("recruitment/admin/salary-config", data);
+  return res.data;
+};
+
+export const resetSalaryConfig = async () => {
+  const res = await api.delete("recruitment/admin/salary-config");
+  return res.data;
+};
+
+export const previewSalaryConfig = async (data) => {
+  const res = await api.post("recruitment/admin/salary-config/preview", data);
+  return res.data;
+};
+
 export const previewCtc = async (data) => {
   const res = await api.post("recruitment/admin/offer/ctc-preview", data);
   return res.data;

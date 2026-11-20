@@ -281,3 +281,13 @@ export const getTimesheetDetailedReport = async (params) => {
   const res = await api.get("timesheet/admin/timesheet-report", { params });
   return res.data;
 };
+
+export const getTimesheetNotificationSettings = async () => {
+  const res = await api.get("timesheet/admin/notification-settings");
+  return res.data;
+};
+
+export const updateTimesheetNotificationSettings = async (data) => {
+  const res = await api.put("timesheet/admin/notification-settings", data);
+  return res.data;
+};

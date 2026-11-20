@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useMeetingDays } from "../../auth/server-state/meeting/meeting.hook";
 import { useLocation } from "react-router-dom";
 import { useGetMeAdmin } from "../../auth/server-state/adminauth/adminauth.hook";
 import { useGetMyTeamOverview, useGetTodayCheckins, useGetAttendanceHistory, useGetEmployeeAttendanceHistory, useGetAttendanceOverview } from "../../auth/server-state/adminother/adminother.hook";
@@ -191,6 +192,7 @@ function SegBar({ segments }) {
 }
 
 function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=[], approvedWFH=[], holidays=[], weekOffDates=[], todayShiftEnd=null }) {
+  const meetingDays=useMeetingDays(month, new Date().getFullYear());
   const year=new Date().getFullYear();
   const firstDay=new Date(year,month,1).getDay();
   const daysInMo=new Date(year,month+1,0).getDate();
@@ -296,10 +298,11 @@ function Calendar({ month, joiningDate, attendanceMap=new Map(), approvedLeaves=
           return (
             <div
               key={i}
-              title={cell ? (cell.label ? `Holiday: ${cell.label}` : cell.status.replace(/_/g," ")) : ""}
-              className={`aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
+              title={cell ? ([cell.label ? `Holiday: ${cell.label}` : cell.status.replace(/_/g," "), ...(meetingDays.get(cell.day)||[]).map(m=>`Meeting: ${m.title}`)].join(" · ")) : ""}
+              className={`relative aspect-square flex items-center justify-center rounded text-[10px] font-sans transition-transform hover:scale-110 cursor-default ${s.bg} ${s.text} ${cell?.isToday?"outline outline-[1.5px] outline-[#730042] outline-offset-[-1.5px]":""}`}
             >
               {cell?.day}
+              {cell && meetingDays.has(cell.day) && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-[#730042]" />}
             </div>
           );
         })}

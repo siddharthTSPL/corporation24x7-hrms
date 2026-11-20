@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import * as XLSX from "xlsx";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { downloadCsv } from "../dashboard/Exportcsv";
 import { DEPT_FULL_FORMS } from "../employee/EmployeeTable";
@@ -13,8 +14,8 @@ const C = {
   brandLight: "rgba(205,22,110,0.08)",
   green: "#1D9E75",
   greenBg: "#e8f5e9",
-  blue: "#378ADD",
-  blueBg: "#e6f1fb",
+  purple: "#6D28D9",
+  purpleBg: "#EDE9FE",
   amber: "#BA7517",
   amberBg: "#faeeda",
   red: "#E24B4A",
@@ -35,7 +36,7 @@ const PAYMENT_METHODS = ["Bank Transfer", "UPI", "Cash", "Cheque"];
 const STATUS_META = {
   draft: { label: "Draft", bg: C.slateBg, color: C.slate },
   submitted: { label: "Pending Review", bg: C.amberBg, color: C.amber },
-  approved: { label: "Approved", bg: C.blueBg, color: C.blue },
+  approved: { label: "Approved", bg: C.purpleBg, color: C.purple },
   rejected: { label: "Rejected", bg: C.redBg, color: C.red },
   paid: { label: "Paid", bg: C.greenBg, color: C.green },
 };
@@ -56,6 +57,16 @@ function fmtMoney(n, currency = "INR") {
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function toLocalDateInput(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function getErrorMessage(e) {
@@ -92,6 +103,7 @@ const CLAIM_CSV_COLUMNS = [
   { key: "department", label: "Department" },
   { key: "designation", label: "Designation" },
   { key: "reimbursementType", label: "Reimbursement Type" },
+  { key: "description", label: "Description" },
   { key: "expenseDate", label: "Expense Date" },
   { key: "amountClaimed", label: "Amount Claimed" },
   { key: "currency", label: "Currency" },
@@ -624,7 +636,7 @@ function ClaimForm({ onSubmit, submitting, initial, onCancel, bankDetailsAvailab
         </Field>
         <Field label="Supporting Documents">
           {existingSupportingDocuments.length > 0 && (
-            <AttachmentChipList items={existingSupportingDocuments} color={C.blue} bg={C.blueBg} onRemove={removeExistingSupportingDocument} />
+            <AttachmentChipList items={existingSupportingDocuments} color={C.purple} bg={C.purpleBg} onRemove={removeExistingSupportingDocument} />
           )}
           <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style={inputStyle} onChange={(e) => setSupportingDocuments(Array.from(e.target.files || []))} />
           {supportingDocuments.length > 0 && <span style={{ fontSize: 12, color: C.muted }}>{supportingDocuments.length} new file(s) to add</span>}
@@ -708,7 +720,7 @@ function ClaimDetail({ claim }) {
           <div style={{ color: C.muted, fontSize: 13, marginBottom: 6 }}>Supporting Documents</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {claim.supportingDocuments.map((r, i) => (
-              <a key={i} href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.blue, background: C.blueBg, padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
+              <a key={i} href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.purple, background: C.purpleBg, padding: "4px 10px", borderRadius: 6, textDecoration: "none" }}>
                 📎 {r.originalName || `Document ${i + 1}`}
               </a>
             ))}
@@ -726,7 +738,7 @@ function ClaimDetail({ claim }) {
 // ---------------------------------------------------------------------------
 // Claims table
 // ---------------------------------------------------------------------------
-function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyText }) {
+function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, showSerial = false, startIndex = 0, emptyText, selectable = false, selectedIds = [], onToggleClaim, onToggleAll }) {
   if (!claims?.length) {
     return (
       <div style={{ padding: "48px 16px", textAlign: "center", color: C.muted, fontSize: 14 }}>
@@ -738,10 +750,13 @@ function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyTex
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
-          <tr style={{ textAlign: "left", color: C.muted, borderBottom: `1px solid ${C.border}` }}>
+          <tr style={{ textAlign: "left", color: C.brandDark, borderBottom: `1px solid ${C.border}`, background: "#F2EDFF" }}>
+            {selectable && <th style={{ padding: "10px 12px" }}><input type="checkbox" aria-label="Select all visible claims" checked={claims.length > 0 && claims.every((claim) => selectedIds.includes(claim._id))} onChange={onToggleAll} /></th>}
+            {showSerial && <th style={{ padding: "10px 12px" }}>S.No</th>}
             <th style={{ padding: "10px 12px" }}>Claim #</th>
             {showSubmitter && <th style={{ padding: "10px 12px" }}>Submitted By</th>}
             <th style={{ padding: "10px 12px" }}>Type</th>
+            <th style={{ padding: "10px 12px", minWidth: 240 }}>Description</th>
             <th style={{ padding: "10px 12px" }}>Expense Date</th>
             <th style={{ padding: "10px 12px" }}>Amount</th>
             <th style={{ padding: "10px 12px" }}>Status</th>
@@ -749,8 +764,10 @@ function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyTex
           </tr>
         </thead>
         <tbody>
-          {claims.map((c) => (
-            <tr key={c._id} style={{ borderBottom: `1px solid ${C.border}` }}>
+          {claims.map((c, rowIndex) => (
+            <tr key={c._id} style={{ borderBottom: `1px solid ${C.border}`, background: rowIndex % 2 ? "#fbfaff" : "#fff" }}>
+              {selectable && <td style={{ padding: "10px 12px" }}><input type="checkbox" aria-label={`Select claim ${c.claimNumber}`} checked={selectedIds.includes(c._id)} onChange={() => onToggleClaim(c._id)} /></td>}
+              {showSerial && <td style={{ padding: "10px 12px", color: C.muted }}>{startIndex + rowIndex + 1}</td>}
               <td style={{ padding: "10px 12px", fontWeight: 600, color: C.brandDark }}>{c.claimNumber}</td>
               {showSubmitter && (
                 <td style={{ padding: "10px 12px" }}>
@@ -759,6 +776,7 @@ function ClaimsTable({ claims, onView, onEdit, onDelete, showSubmitter, emptyTex
                 </td>
               )}
               <td style={{ padding: "10px 12px" }}>{c.reimbursementType}</td>
+              <td style={{ padding: "10px 12px", minWidth: 240, maxWidth: 360, whiteSpace: "normal", lineHeight: 1.45, color: C.text }}>{c.description || "—"}</td>
               <td style={{ padding: "10px 12px" }}>{fmtDate(c.expenseDate)}</td>
               <td style={{ padding: "10px 12px", fontWeight: 600 }}>{fmtMoney(c.amountClaimed, c.currency)}</td>
               <td style={{ padding: "10px 12px" }}><StatusBadge status={c.status} /></td>
@@ -960,6 +978,7 @@ function DecisionModal({ claim, mode, onClose, onApprove, onReject, onMarkPaid, 
               variant="green"
               loading={deciding === "approve"}
               onClick={() => run(() => onApprove({ id: claim._id, comments }))}
+              style={{ background: C.brandDark, border: `1px solid ${C.brandDark}` }}
             >
               Approve
             </Btn>
@@ -1001,6 +1020,7 @@ export default function ReimbursementBase({
   applyMutation,
   updateMutation,
   deleteMutation,
+  enableBulkActions = false,
   reviewQueue,   // { pending: {data, isLoading}, all: {data, isLoading}, approve, reject, markPaid }
 }) {
   const [tab, setTab] = useState(canApply ? "apply" : "review");
@@ -1009,6 +1029,10 @@ export default function ReimbursementBase({
   const [editClaim, setEditClaim] = useState(null);
   const [submitting, setSubmitting] = useState(null);
   const [deciding, setDeciding] = useState(null);
+  const [bulkDecision, setBulkDecision] = useState(null);
+  const [bulkReason, setBulkReason] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState(null);
+  const [selectedClaimIds, setSelectedClaimIds] = useState([]);
   const [reviewFilter, setReviewFilter] = useState("submitted");
   const [banner, setBanner] = useState(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
@@ -1016,6 +1040,9 @@ export default function ReimbursementBase({
   // independently, so clearing one shouldn't reset the other.
   const [reviewQueueFilters, setReviewQueueFilters] = useState(DEFAULT_CLAIM_FILTERS);
   const [allClaimsFilters, setAllClaimsFilters] = useState(DEFAULT_CLAIM_FILTERS);
+  const [myClaimsFilters, setMyClaimsFilters] = useState({ status: "", dateFrom: "", dateTo: "", search: "" });
+  const [myClaimsPage, setMyClaimsPage] = useState(1);
+  const [myClaimsPageSize, setMyClaimsPageSize] = useState(10);
 
   const { data: authData } = useAuth();
   const person =
@@ -1033,6 +1060,39 @@ export default function ReimbursementBase({
   const my = myClaims?.data?.reimbursements || [];
   const pending = reviewQueue?.pending?.data?.reimbursements || [];
   const all = reviewQueue?.all?.data?.reimbursements || [];
+
+  const filteredMyClaims = useMemo(() => {
+    const { status, dateFrom, dateTo, search } = myClaimsFilters;
+    return my
+      .filter((claim) => {
+        if (status && claim.status !== status) return false;
+        if (search) {
+          const query = search.trim().toLowerCase();
+          const haystack = `${claim.claimNumber || ""} ${claim.reimbursementType || ""}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
+        const expenseDate = toLocalDateInput(claim.expenseDate);
+        if (dateFrom && (!expenseDate || expenseDate < dateFrom)) return false;
+        if (dateTo && (!expenseDate || expenseDate > dateTo)) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.expenseDate || b.createdAt || 0) - new Date(a.expenseDate || a.createdAt || 0));
+  }, [my, myClaimsFilters]);
+  const effectiveMyClaimsPageSize = myClaimsPageSize === "all"
+    ? Math.max(filteredMyClaims.length, 1)
+    : myClaimsPageSize;
+  const myClaimsPageCount = Math.max(1, Math.ceil(filteredMyClaims.length / effectiveMyClaimsPageSize));
+  const safeMyClaimsPage = Math.min(myClaimsPage, myClaimsPageCount);
+  const visibleMyClaims = filteredMyClaims.slice(
+    (safeMyClaimsPage - 1) * effectiveMyClaimsPageSize,
+    safeMyClaimsPage * effectiveMyClaimsPageSize,
+  );
+  const visibleMyClaimPageNumbers = Array.from(
+    { length: Math.min(myClaimsPageCount, 5) },
+    (_, index) => Math.max(1, Math.min(safeMyClaimsPage - 2, myClaimsPageCount - 4)) + index,
+  );
+  const myClaimsPendingCount = my.filter((claim) => claim.status === "submitted").length;
+  const myClaimsApprovedCount = my.filter((claim) => claim.status === "approved").length;
 
   const flash = (msg) => {
     setBanner(msg);
@@ -1063,9 +1123,18 @@ export default function ReimbursementBase({
   };
 
   const handleDelete = async (claim) => {
-    if (!window.confirm(`Delete claim ${claim.claimNumber}?`)) return;
-    await deleteMutation.mutateAsync(claim._id);
-    flash("Claim deleted.");
+    setDeleteConfirmation(claim);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmation) return;
+    try {
+      await deleteMutation.mutateAsync(deleteConfirmation._id);
+      flash("Claim deleted.");
+      setDeleteConfirmation(null);
+    } catch (error) {
+      flash(getErrorMessage(error));
+    }
   };
 
   const statusFilteredAll = useMemo(() => {
@@ -1092,6 +1161,34 @@ export default function ReimbursementBase({
     () => applyClaimFilters(pending, reviewQueueFilters),
     [pending, reviewQueueFilters]
   );
+
+  const toggleClaimSelection = (id) => setSelectedClaimIds((current) =>
+    current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
+  );
+  const toggleAllVisibleClaims = () => {
+    const visibleIds = filteredPending.map((claim) => claim._id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedClaimIds.includes(id));
+    setSelectedClaimIds((current) => allSelected
+      ? current.filter((id) => !visibleIds.includes(id))
+      : [...new Set([...current, ...visibleIds])]
+    );
+  };
+  const handleBulkDecision = async (decision, reason = "") => {
+    if (!selectedClaimIds.length) return;
+    const verb = decision === "approve" ? "approve" : "reject";
+    setDeciding(`bulk-${decision}`);
+    try {
+      const mutation = decision === "approve" ? reviewQueue.bulkApprove : reviewQueue.bulkReject;
+      const result = await mutation.mutateAsync({ ids: selectedClaimIds, ...(decision === "reject" ? { reason } : {}) });
+      flash(result.message || `${selectedClaimIds.length} claims ${verb === "approve" ? "approved" : "rejected"}.`);
+      setSelectedClaimIds((result.results || []).filter((item) => !item.success).map((item) => item.id));
+      setBulkDecision(null);
+    } catch (error) {
+      flash(error?.message || `Unable to ${verb} selected claims.`);
+    } finally {
+      setDeciding(null);
+    }
+  };
 
   const reviewBuckets = useMemo(
     () =>
@@ -1127,6 +1224,22 @@ export default function ReimbursementBase({
     const filename = `reimbursements-${safeLabel}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadCsv(filename, CLAIM_CSV_COLUMNS, buildClaimCsvRows(claims));
     flash(`${label} exported.`);
+  };
+
+  const handleExportMyClaims = () => {
+    if (!filteredMyClaims.length) return;
+    const exportRows = buildClaimCsvRows(filteredMyClaims);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      CLAIM_CSV_COLUMNS.map((column) => column.label),
+      ...exportRows.map((row) => CLAIM_CSV_COLUMNS.map((column) => row[column.key] ?? "")),
+    ]);
+    worksheet["!cols"] = CLAIM_CSV_COLUMNS.map((column) => ({ wch: Math.max(14, column.label.length + 2) }));
+    worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "My Claims");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `my-reimbursements-${dateStamp}.xlsx`);
+    flash(`${filteredMyClaims.length} filtered claim${filteredMyClaims.length === 1 ? "" : "s"} exported.`);
   };
 
   const tabBtn = (key, label) => (
@@ -1182,24 +1295,140 @@ export default function ReimbursementBase({
               <div style={{ padding: 40, textAlign: "center", color: C.muted }}>Loading…</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {my.length > 0 && (
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 8 }}>
+                  {[
+                    { label: "Total Claims", value: my.length, icon: "▤", tint: "#F2EDFF", accent: "#6D28D9" },
+                    { label: "Pending / In Review", value: myClaimsPendingCount, icon: "◷", tint: "#FFF5E8", accent: "#B45309" },
+                    { label: "Approved", value: myClaimsApprovedCount, icon: "✓", tint: "#EAF8F0", accent: "#16804A" },
+                    { label: "Total Amount", value: claimAmountSummary(my), icon: "₹", tint: "#F5EEFF", accent: C.brandDark },
+                  ].map((card) => (
+                    <div key={card.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 13, border: `1px solid ${card.accent}22`, background: card.tint, minHeight: 72 }}>
+                      <span style={{ width: 42, height: 42, borderRadius: 50, display: "grid", placeItems: "center", flexShrink: 0, background: "#ffffffbb", color: card.accent, fontSize: 22, fontWeight: 800 }}>{card.icon}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 12, color: C.muted }}>{card.label}</span>
+                        <strong style={{ display: "block", marginTop: 3, color: C.text, fontSize: card.label === "Total Amount" ? 16 : 20, overflowWrap: "anywhere" }}>{card.value}</strong>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 10, flexWrap: "wrap", padding: 14, border: `1px solid ${C.border}`, borderRadius: 13, background: "#FCFAFF" }}>
+                  <Field label="Status">
+                    <select
+                      style={{ ...inputStyle, width: 180, cursor: "pointer" }}
+                      value={myClaimsFilters.status}
+                      onChange={(e) => {
+                        setMyClaimsFilters((current) => ({ ...current, status: e.target.value }));
+                        setMyClaimsPage(1);
+                      }}
+                    >
+                      <option value="">All Statuses</option>
+                      {Object.entries(STATUS_META).map(([status, meta]) => (
+                        <option key={status} value={status}>{meta.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Expense From">
+                    <input
+                      type="date"
+                      style={{ ...inputStyle, width: 160 }}
+                      value={myClaimsFilters.dateFrom}
+                      onChange={(e) => {
+                        setMyClaimsFilters((current) => ({ ...current, dateFrom: e.target.value }));
+                        setMyClaimsPage(1);
+                      }}
+                    />
+                  </Field>
+                  <Field label="Expense To">
+                    <input
+                      type="date"
+                      style={{ ...inputStyle, width: 160 }}
+                      value={myClaimsFilters.dateTo}
+                      onChange={(e) => {
+                        setMyClaimsFilters((current) => ({ ...current, dateTo: e.target.value }));
+                        setMyClaimsPage(1);
+                      }}
+                    />
+                  </Field>
+                  <Btn
+                    variant="ghost"
+                    disabled={!myClaimsFilters.status && !myClaimsFilters.dateFrom && !myClaimsFilters.dateTo && !myClaimsFilters.search}
+                    onClick={() => {
+                      setMyClaimsFilters({ status: "", dateFrom: "", dateTo: "", search: "" });
+                      setMyClaimsPage(1);
+                    }}
+                    style={{ height: 38 }}
+                  >
+                    Clear Filters
+                  </Btn>
+                  <input
+                    type="search"
+                    aria-label="Search by claim number or type"
+                    placeholder="Search by claim no., type..."
+                    style={{ ...inputStyle, width: 230, height: 38, marginLeft: "auto" }}
+                    value={myClaimsFilters.search}
+                    onChange={(e) => {
+                      setMyClaimsFilters((current) => ({ ...current, search: e.target.value }));
+                      setMyClaimsPage(1);
+                    }}
+                  />
+                  <div style={{ marginLeft: "auto" }}>
                     <Btn
                       variant="outline"
-                      onClick={() => handleExportClaims(my, "my-claims")}
+                      onClick={handleExportMyClaims}
+                      disabled={!filteredMyClaims.length}
                       style={{ background: "#fff", color: C.brand }}
                     >
-                      Export CSV
+                      Export Excel
                     </Btn>
                   </div>
-                )}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>
+                  Showing {filteredMyClaims.length ? (safeMyClaimsPage - 1) * effectiveMyClaimsPageSize + 1 : 0}
+                  {filteredMyClaims.length ? `–${Math.min(safeMyClaimsPage * effectiveMyClaimsPageSize, filteredMyClaims.length)}` : ""}
+                  {` of ${filteredMyClaims.length} filtered claim${filteredMyClaims.length === 1 ? "" : "s"}`}
+                </div>
                 <ClaimsTable
-                  claims={my}
+                  claims={visibleMyClaims}
+                  showSerial
+                  startIndex={(safeMyClaimsPage - 1) * effectiveMyClaimsPageSize}
                   onView={(c) => { setViewClaim(c); setViewIsReview(false); }}
                   onEdit={(c) => setEditClaim(c)}
                   onDelete={handleDelete}
-                  emptyText="You haven't submitted any claims yet."
+                  emptyText={my.length ? "No claims match your filters." : "You haven't submitted any claims yet."}
                 />
+                {filteredMyClaims.length > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: C.muted }}>
+                      Rows per page
+                      <select
+                        style={{ ...inputStyle, width: 82, padding: "6px 8px" }}
+                        value={myClaimsPageSize}
+                        onChange={(e) => {
+                          setMyClaimsPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
+                          setMyClaimsPage(1);
+                        }}
+                      >
+                        {[10, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+                        <option value="all">All</option>
+                      </select>
+                    </label>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, color: C.muted }}>Page {safeMyClaimsPage} of {myClaimsPageCount}</span>
+                      <Btn variant="ghost" disabled={safeMyClaimsPage <= 1} onClick={() => setMyClaimsPage((page) => Math.max(1, page - 1))} style={{ padding: "6px 10px" }}>Previous</Btn>
+                      {visibleMyClaimPageNumbers.map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setMyClaimsPage(page)}
+                          aria-current={safeMyClaimsPage === page ? "page" : undefined}
+                          style={{ minWidth: 32, height: 32, borderRadius: 8, border: `1px solid ${safeMyClaimsPage === page ? C.brandDark : C.border}`, color: safeMyClaimsPage === page ? "#fff" : C.text, background: safeMyClaimsPage === page ? C.brandDark : "#fff", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <Btn variant="ghost" disabled={safeMyClaimsPage >= myClaimsPageCount} onClick={() => setMyClaimsPage((page) => Math.min(myClaimsPageCount, page + 1))} style={{ padding: "6px 10px" }}>Next</Btn>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -1224,8 +1453,14 @@ export default function ReimbursementBase({
                     Export CSV
                   </Btn>
                 </div>
-                <FilterBar claims={pending} filters={reviewQueueFilters} onChange={setReviewQueueFilters} />
-                <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." />
+                <FilterBar claims={pending} filters={reviewQueueFilters} onChange={(filters) => { setReviewQueueFilters(filters); setSelectedClaimIds([]); }} />
+                {enableBulkActions && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.muted }}>{selectedClaimIds.length} selected</span>
+                  <Btn disabled={selectedClaimIds.length < 2 || !!deciding} onClick={() => { setBulkReason(""); setBulkDecision("approve"); }} style={{ background: C.brandDark, border: `1px solid ${C.brandDark}` }}>Bulk Approve</Btn>
+                  <Btn variant="red" disabled={selectedClaimIds.length < 2 || !!deciding} onClick={() => { setBulkReason(""); setBulkDecision("reject"); }}>Bulk Reject</Btn>
+                  {selectedClaimIds.length > 0 && <Btn variant="ghost" onClick={() => setSelectedClaimIds([])}>Clear selection</Btn>}
+                </div>}
+                <ClaimsTable claims={filteredPending} onView={(c) => { setViewClaim(c); setViewIsReview(true); }} showSubmitter emptyText="Nothing pending review right now." selectable={enableBulkActions} selectedIds={selectedClaimIds} onToggleClaim={toggleClaimSelection} onToggleAll={toggleAllVisibleClaims} />
               </div>
             )}
           </>
@@ -1324,6 +1559,43 @@ export default function ReimbursementBase({
               <Btn variant="outline" onClick={() => { setEditClaim(viewClaim); setViewClaim(null); }}>Edit &amp; Submit</Btn>
             </div>
           )}
+        </Modal>
+      )}
+
+      {deleteConfirmation && (
+        <Modal title="Delete reimbursement claim?" onClose={() => setDeleteConfirmation(null)} width={440}>
+          <p style={{ margin: "0 0 20px", color: C.text, fontSize: 14, lineHeight: 1.5 }}>
+            Delete claim <strong>{deleteConfirmation.claimNumber}</strong>? This action cannot be undone.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Btn variant="ghost" onClick={() => setDeleteConfirmation(null)}>Cancel</Btn>
+            <Btn variant="red" loading={deleteMutation?.isPending} onClick={confirmDelete}>Delete Claim</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {bulkDecision && (
+        <Modal
+          title={bulkDecision === "approve" ? "Approve selected claims?" : "Reject selected claims?"}
+          onClose={() => { if (!deciding) setBulkDecision(null); }}
+          width={460}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ margin: 0, color: C.text, fontSize: 14, lineHeight: 1.5 }}>
+              {bulkDecision === "approve" ? "Approve" : "Reject"} {selectedClaimIds.length} selected claim{selectedClaimIds.length === 1 ? "" : "s"}?
+            </p>
+            {bulkDecision === "reject" && (
+              <Field label="Rejection reason (optional)">
+                <textarea style={{ ...inputStyle, minHeight: 82, resize: "vertical" }} value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} placeholder="This reason will be added to each selected claim." />
+              </Field>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Btn variant="ghost" disabled={!!deciding} onClick={() => setBulkDecision(null)}>Cancel</Btn>
+              <Btn variant={bulkDecision === "approve" ? "green" : "red"} loading={deciding === `bulk-${bulkDecision}`} onClick={() => handleBulkDecision(bulkDecision, bulkReason)} style={bulkDecision === "approve" ? { background: C.brandDark, border: `1px solid ${C.brandDark}` } : undefined}>
+                {bulkDecision === "approve" ? "Approve Claims" : "Reject Claims"}
+              </Btn>
+            </div>
+          </div>
         </Modal>
       )}
 

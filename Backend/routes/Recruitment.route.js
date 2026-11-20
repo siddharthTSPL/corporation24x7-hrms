@@ -74,6 +74,8 @@ const {
   getPublicAppointmentPdf,
 } = require("../controllers/Offer.controller");
 
+const { getSalaryConfig, saveSalaryConfig, resetSalaryConfig, previewSalaryConfig } = require("../controllers/SalaryStructure.controller");
+
 recruitmentrouter.post("/manager/create", managermiddleware, recruitmentPlanGate, checkPermission("recruitment.can_create_hiring_requisition"), asyncHandler(createRequisition));
 recruitmentrouter.get("/manager/my-requests", managermiddleware, recruitmentPlanGate, checkPermission("recruitment.can_view_hiring_requisitions"), asyncHandler(getMyRequisitions));
 
@@ -108,6 +110,11 @@ recruitmentrouter.get("/approvals/pending-count", adminOrSuperAdminAuth, recruit
 recruitmentrouter.get("/approvals/:kind/:id/preview", adminOrSuperAdminAuth, recruitmentPlanGate, asyncHandler(previewForApprover));
 recruitmentrouter.patch("/approvals/:kind/:id/approve", adminOrSuperAdminAuth, recruitmentPlanGate, offerAssetsUpload, asyncHandler(approveLetter));
 recruitmentrouter.patch("/approvals/:kind/:id/reject", adminOrSuperAdminAuth, recruitmentPlanGate, asyncHandler(rejectLetter));
+
+recruitmentrouter.get("/admin/salary-config", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_view_candidates"), asyncHandler(getSalaryConfig));
+recruitmentrouter.put("/admin/salary-config", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(saveSalaryConfig));
+recruitmentrouter.delete("/admin/salary-config", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(resetSalaryConfig));
+recruitmentrouter.post("/admin/salary-config/preview", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(previewSalaryConfig));
 
 recruitmentrouter.get("/admin/offer/meta", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_view_candidates"), asyncHandler(getTemplatesMeta));
 recruitmentrouter.post("/admin/offer/ctc-preview", adminOrSuperAdminAuth, recruitmentPlanGate, checkPermission("recruitment.can_add_candidate"), asyncHandler(previewCtc));

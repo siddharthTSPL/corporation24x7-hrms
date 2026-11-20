@@ -11,6 +11,7 @@ import {
   getTeamWorkloadHeatmap, getOverrunRiskJobs, getIdleJobs, getMyProductivitySummary,
   getOrgAllTimeLogs, getOrgAllTimesheets, getOrgAllJobs, getJobTimeline,
   getTimesheetDetailedReport,
+  getTimesheetNotificationSettings, updateTimesheetNotificationSettings,
 } from "../../api/timesheet/timesheet.api";
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -484,3 +485,21 @@ export const useTimesheetDetailedReport = (params = {}) =>
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+
+export const useTimesheetNotificationSettings = () =>
+  useQuery({
+    queryKey: ["tsNotificationSettings"],
+    queryFn: getTimesheetNotificationSettings,
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
+export const useUpdateTimesheetNotificationSettings = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateTimesheetNotificationSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tsNotificationSettings"] });
+    },
+  });
+};

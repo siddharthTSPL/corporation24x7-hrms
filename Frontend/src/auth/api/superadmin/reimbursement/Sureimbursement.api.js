@@ -32,6 +32,16 @@ export const rejectReimbursement = async ({ id, reason }) => {
   return res.data;
 };
 
+export const bulkApproveReimbursements = async ({ ids, comments }) => {
+  const res = await api.post("reimbursement/superadmin/bulk-approve", { ids, comments });
+  return res.data;
+};
+
+export const bulkRejectReimbursements = async ({ ids, reason }) => {
+  const res = await api.post("reimbursement/superadmin/bulk-reject", { ids, reason });
+  return res.data;
+};
+
 export const markReimbursementPaid = async ({ id, paymentReference, financeNotes }) => {
   const res = await api.post("reimbursement/superadmin/markPaid", { id, paymentReference, financeNotes });
   return res.data;

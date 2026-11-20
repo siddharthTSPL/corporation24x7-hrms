@@ -186,4 +186,5 @@ reviewSchema.index({ reviewer: 1, reviewee: 1, monthYear: 1 }, { unique: true })
 reviewSchema.index({ reviewee: 1, createdAt: -1 });
 reviewSchema.index({ organisation_id: 1, "hrAcknowledgement.status": 1 });
 
+reviewSchema.plugin(require("../utils/gamification/hooks").reviewPlugin); // gamification
 module.exports = mongoose.model("Review", reviewSchema);

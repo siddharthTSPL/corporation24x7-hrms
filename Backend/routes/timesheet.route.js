@@ -175,6 +175,11 @@ const {
 } = require("../controllers/timesheet.controller");
 
 const {
+  getNotificationSettings,
+  updateNotificationSettings,
+} = require("../controllers/Timesheetnotification.controller");
+
+const {
   getTeamWorkloadHeatmap,
   getOverrunRiskJobs,
   getIdleJobs,
@@ -334,6 +339,17 @@ timesheetRouter.get(
   "/admin/timesheet-report",
   saAdminOrManager,
   asyncHandler(getTimesheetDetailedReport),
+);
+
+timesheetRouter.get(
+  "/admin/notification-settings",
+  saOrAdmin,
+  asyncHandler(getNotificationSettings),
+);
+timesheetRouter.put(
+  "/admin/notification-settings",
+  saOrAdmin,
+  asyncHandler(updateNotificationSettings),
 );
 
 module.exports = timesheetRouter;

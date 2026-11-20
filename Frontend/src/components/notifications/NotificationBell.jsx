@@ -11,10 +11,12 @@ import {
   useDeleteNotification,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, getTypeMeta } from "./notificationUtils";
+import useOpenNotification from "./useOpenNotification";
 import NotificationItem from "./NotificationItem";
+import FeatureNotificationModal from "./FeatureNotificationModal";
 import { playNotificationSound, isSoundEnabled, setSoundEnabled } from "./Notificationsound";
 
-const LIVE_POLL_MS = 20000;
+const LIVE_POLL_MS = 60000; // fallback only; Socket.IO pushes new items instantly
 
 function BellSkeleton() {
   return (
@@ -35,9 +37,11 @@ function BellSkeleton() {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const [soundOn, setSoundOn] = useState(isSoundEnabled);
   const containerRef = useRef(null);
   const navigate = useNavigate();
+  const openNotification = useOpenNotification();
 
   const { data: unreadData } = useUnreadNotificationCount(true);
   const unreadCount = unreadData?.unreadCount || 0;
@@ -140,9 +144,11 @@ export default function NotificationBell() {
       markAsRead.mutate(notification._id);
     }
     setOpen(false);
-    if (notification.link) {
-      navigate(notification.link);
+    if (notification.meta?.featureLaunchId) {
+      setSelectedFeature(notification);
+      return;
     }
+    openNotification(notification);
   };
 
   const handleDelete = (id) => {
@@ -161,6 +167,7 @@ export default function NotificationBell() {
 
   return (
     <div className="relative" ref={containerRef}>
+      <FeatureNotificationModal notification={selectedFeature} onClose={() => setSelectedFeature(null)} />
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"

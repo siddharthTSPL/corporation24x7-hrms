@@ -3,16 +3,28 @@ const cookieparser = require('cookie-parser');
 const morgan = require('morgan');
 const cors = require('cors');
 const compression = require('compression');
+const allowedOrigins = require('../config/allowedOrigins');
+const realtimeEmit = require('../middleware/realtime/realtimeEmit.middleware');
+const { dpdpMask } = require('../middleware/security/dpdp.middleware');
+const requestMonitor = require('../middleware/errorhandling/requestmonitor.middleware');
 
 require('../automatic/autoelcredit');
 require('../automatic/timerautopause');
 require('../automatic/Timesheetescalation');
+require('../automatic/Timesheetreminders');
 require('../automatic/Birthdaynotify');
 require('../automatic/Noticeperiodautoexit');
 require('../automatic/fieldOperationsRetention');
 require('../automatic/Subscriptionexpiryreminder');
 require('../automatic/Offerlifecycle');
 require('../automatic/Trainingreminders');
+require('../automatic/Featurelaunchnotify');
+require('../automatic/Hourlyleavesync');
+require('../automatic/Healthmonitor'); // health checks + alert mails
+require('../automatic/Meetingreminders');
+require('../automatic/Meetingactionreminders');
+require('../automatic/Chatjobs'); // scheduled chat messages + disappearing messages
+require('../automatic/Gamificationjobs'); // rewards: seasons, celebrations, weekly/monthly winners
 const { catchUpMissedRuns } = require('../automatic/Marknoshowabsent');
 catchUpMissedRuns().catch((err) =>
   console.error('[Startup] catchUpMissedRuns failed:', err.message)
@@ -45,30 +57,38 @@ app.use((req, res, next) => {
 });
 
 app.use(morgan("dev"));
+app.use(requestMonitor); // reports every 5xx by mail
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieparser());
+// Per-tab sessions: a browser tab may send its OWN login token in X-Tab-Token.
+// It wins over the shared "token" cookie, so two accounts can be logged in at
+// the same time in different tabs of one browser (every auth middleware reads
+// req.cookies.token, so this single line covers all of them).
+app.use((req, _res, next) => {
+  const tabToken = req.headers["x-tab-token"];
+  if (typeof tabToken === "string" && tabToken.length > 20 && tabToken.length < 4096) {
+    req.cookies = req.cookies || {};
+    req.cookies.token = tabToken;
+  }
+  next();
+});
 app.use(compression());
 
 const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://torchx-talent.techtorch.solutions",
-    "http://torchx-talent.techtorch.solutions",
-    "https://www.torchx-talent.techtorch.solutions",
-    "http://talent.techtorch.solutions",
-    "https://talent.techtorch.solutions",
-    "https://corporation24x7-hrms.onrender.com",
-    "https://torchxsuite.com/talent",
-    "http://torchxsuite.com/talent/",
-  ],
+  origin: allowedOrigins,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tab-Token", "X-Dpdp-Token"],
+  exposedHeaders: ["X-Dpdp-Masked"],
 };
 
 app.use(cors(corsOptions));
+
+// Socket.IO: after any successful write, tell the org's connected clients which
+// module changed so their lists refresh live (see middleware/realtime).
+app.use(realtimeEmit);
+app.use(dpdpMask);
 
 const adminrouter = require('../routes/adminroutes');
 const managerrouter = require('../routes/managerroutes');
@@ -98,14 +118,22 @@ const planFeatureRouter = require('../routes/planFeature.route');
 const selfServiceRouter = require('../routes/selfService.route');
 const fieldOperationsRouter = require('../routes/fieldOperations.route');
 const singleSignInRouter = require('../routes/SingleSignIn.routes');
+const ssoRouter = require('../routes/Sso.routes');
 const attendanceSettingsRouter = require('../routes/AttendanceSettings.routes');
 const policyrouter = require('../routes/policy.route');
 const trainingRouter = require('../routes/training.routes');
 const overtimeRouter = require('../routes/overtime.routes');
 const orgTeamRouter = require('../routes/orgteam.routes');
+const reportsRouter = require('../reports/reports.router');
+const chatRouter = require('../routes/chat.routes');
+const meetingRouter = require('../routes/meeting.routes');
+const gamificationRouter = require('../routes/gamification.route');
+const dpdprouter = require('../routes/dpdp.route');
 const errorhandler = require('../middleware/errorhandling/errorhandling.middleware');
 
+app.use('/dpdp', dpdprouter);
 app.use('/auth', unifiedauthrouter);
+app.use('/auth/sso', ssoRouter);
 app.use('/admin', adminrouter);
 app.use('/manager', managerrouter);
 app.use('/user', userrouter);
@@ -148,6 +176,14 @@ app.use('/policy', policyrouter);
 app.use('/training', trainingRouter);
 app.use('/overtime', overtimeRouter);
 app.use('/org-teams', orgTeamRouter);
+// Reports & Analytics (see reports/). Auth + permission + tenant scope are enforced inside the router.
+app.use('/reports', reportsRouter);
+// Chat (1:1 + groups), voice/video call history + ICE config, and meeting scheduling.
+// Live messaging and call signalling run over Socket.IO (config/chatSocket.js).
+app.use('/chat', chatRouter);
+app.use('/meetings', meetingRouter);
+// Rewards & Gamification: XP, levels, badges, quests, streaks, leaderboards, kudos, store, seasons.
+app.use('/gamification', gamificationRouter);
 
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 

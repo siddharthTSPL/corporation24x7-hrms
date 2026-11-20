@@ -4,6 +4,8 @@ import {
   useGetAllReimbursements,
   useApproveReimbursement,
   useRejectReimbursement,
+  useBulkApproveReimbursements,
+  useBulkRejectReimbursements,
   useMarkReimbursementPaid,
 } from "../../auth/server-state/superadmin/reimbursement/Sureimbursement.hook";
 
@@ -12,13 +14,16 @@ export default function ReimbursementSuperadmin() {
   const all = useGetAllReimbursements();
   const approve = useApproveReimbursement();
   const reject = useRejectReimbursement();
+  const bulkApprove = useBulkApproveReimbursements();
+  const bulkReject = useBulkRejectReimbursements();
   const markPaid = useMarkReimbursementPaid();
 
   return (
     <ReimbursementBase
       roleLabel="Review claims raised by Admins, and see every claim across your organisation — employees, managers, and admins."
       canApply={false}
-      reviewQueue={{ pending, all, approve, reject, markPaid }}
+      enableBulkActions
+      reviewQueue={{ pending, all, approve, reject, markPaid, bulkApprove, bulkReject }}
     />
   );
 }

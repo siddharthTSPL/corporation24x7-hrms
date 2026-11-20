@@ -13,6 +13,7 @@ import {
   useGetStorageFiles,
 } from "../../auth/server-state/superadmin/other/suother.hook";
 import { useQueryClient } from "@tanstack/react-query";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
 import {
   ResponsiveContainer,
   PieChart,
@@ -29,6 +30,10 @@ import {
   Search,
 } from "lucide-react";
 import SingleSignInSecurityTab from "./SingleSignInSecurityTab";
+import ExternalSsoSettingsCard from "./ExternalSsoSettingsCard";
+import GamificationToggleCard from "./GamificationToggleCard";
+import DpdpSettingsPage from "../../dpdp/DpdpSettingsPage";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
 
 const AVATAR_STYLES = [
   "avataaars",
@@ -81,6 +86,12 @@ function formatDate(dateStr) {
     month: "long",
     year: "numeric",
   });
+}
+
+function toDateInputValue(date) {
+  if (!date) return "";
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
 }
 
 function formatRole(role) {
@@ -558,6 +569,17 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
       ),
     },
     {
+      key: "rewards",
+      label: "Rewards",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path d="M5 2h6v4a3 3 0 01-6 0V2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M5 3.5H2.5V5a2 2 0 002 2M11 3.5h2.5V5a2 2 0 01-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M8 9v3M5.5 14h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
       key: "security",
       label: "Security",
       icon: (
@@ -566,6 +588,27 @@ function Sidebar({ tab, setTab, superAdmin, initials }) {
             d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z"
             stroke="currentColor"
             strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "dpdp",
+      label: "DPDP & Privacy",
+      icon: (
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M8 1.5l5 2v4c0 3.5-2.2 5.8-5 7-2.8-1.2-5-3.5-5-7v-4l5-2z"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M5.8 8l1.6 1.6L10.4 6.4"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
@@ -711,6 +754,10 @@ function OverviewTab({ superAdmin }) {
           <ReadonlyField label="Email address" value={superAdmin?.email} />
           <ReadonlyField label="Employee ID" value={superAdmin?.empid} />
           <ReadonlyField label="Designation" value={superAdmin?.designation} />
+          <ReadonlyField
+            label="Date of joining"
+            value={formatDate(superAdmin?.date_of_joining || superAdmin?.createdAt)}
+          />
           <ReadonlyField label="Department" value={superAdmin?.department} />
           <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
           <div className="mb-4">
@@ -864,6 +911,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
     l_name: superAdmin?.l_name || "",
     empid: superAdmin?.empid || "",
     designation: superAdmin?.designation || "",
+    date_of_joining: toDateInputValue(superAdmin?.date_of_joining || superAdmin?.createdAt),
     department: superAdmin?.department || "",
   });
 
@@ -874,6 +922,7 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         l_name: superAdmin.l_name || "",
         empid: superAdmin.empid || "",
         designation: superAdmin.designation || "",
+        date_of_joining: toDateInputValue(superAdmin.date_of_joining || superAdmin.createdAt),
         department: superAdmin.department || "",
       });
     }
@@ -938,6 +987,13 @@ function ProfileTab({ superAdmin, onSuccess, onError }) {
         value={form.department}
         onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
         placeholder="e.g. Management"
+      />
+      <InputField
+        label="Date of joining"
+        type="date"
+        value={form.date_of_joining}
+        onChange={(e) => setForm((p) => ({ ...p, date_of_joining: e.target.value }))}
+        hint="Defaults to your account creation date when no joining date is recorded."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-0">
         <ReadonlyField label="Role" value={formatRole(superAdmin?.role)} />
@@ -1492,6 +1548,13 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
 
   const removeAvatar = () => applyAvatar("");
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.invalidateQueries({ queryKey: ["superadmin-profile"] });
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard
       title="Profile avatar"
@@ -1523,7 +1586,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
             Current avatar
           </div>
           <div className="text-xs text-[#b0948a] mb-2.5">
-            {currentImg ? "DiceBear avatar" : "Initials avatar (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials avatar (default)"}
           </div>
           {currentImg && (
             <button
@@ -1537,6 +1600,7 @@ function AvatarTab({ superAdmin, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="superadmin" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 gap-2 sm:gap-3">
         {AVATAR_STYLES.map((style) => {
@@ -2124,6 +2188,9 @@ export default function SuperAdminSettingsPage() {
             />
           )}
           {tab === "storage" && <StorageTab />}
+          {tab === "rewards" && (
+            <GamificationToggleCard onSuccess={showSuccess} onError={showError} />
+          )}
           {tab === "banking" && (
             <BankingTab
               superAdmin={superAdmin}
@@ -2142,10 +2209,22 @@ export default function SuperAdminSettingsPage() {
             />
           )}
           {tab === "security" && (
-            <SingleSignInSecurityTab
-              onSuccess={showSuccess}
-              onError={showError}
-            />
+            <>
+              <SingleSignInSecurityTab
+                onSuccess={showSuccess}
+                onError={showError}
+              />
+              <ExternalSsoSettingsCard
+                onSuccess={showSuccess}
+                onError={showError}
+              />
+            </>
+          )}
+          {tab === "dpdp" && (
+            <>
+              <DpdpLockCard />
+              <DpdpSettingsPage />
+            </>
           )}
           {tab === "avatar" && (
             <AvatarTab

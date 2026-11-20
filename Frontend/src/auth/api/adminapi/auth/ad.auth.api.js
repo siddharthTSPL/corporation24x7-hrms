@@ -37,6 +37,7 @@ export const loginAdmin = async (data) => {
 };
 
 export const logoutAdmin = async () => {
+  localStorage.setItem("sso_auto_off", "1"); // stay logged out; no auto SSO sign-in
   const res = await api.post('admin/logout');
   return res.data;
 };

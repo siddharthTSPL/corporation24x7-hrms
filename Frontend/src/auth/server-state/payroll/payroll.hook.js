@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getPayrollPolicy,
   setPayrollPolicy,
+  uploadPayslipLogo,
   resetPayrollPolicy,
   addPayrollAllowance,
   updatePayrollAllowance,
@@ -51,9 +52,14 @@ export const useSetPayrollPolicy = () => {
     mutationFn: setPayrollPolicy,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payroll-policy"] });
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payslip"] });
+      queryClient.invalidateQueries({ queryKey: ["my-payslips"] });
     },
   });
 };
+
+export const useUploadPayslipLogo = () => useMutation({ mutationFn: uploadPayslipLogo });
 
 export const useResetPayrollPolicy = () => {
   const queryClient = useQueryClient();
@@ -232,10 +238,11 @@ export const useGetPayslip = (params, enabled) => {
 
 // Self-service: logged-in Employee/Manager/Admin's OWN paid payslips.
 // Available on every plan (Basic included).
-export const useMyPayslips = (enabled = true) => {
+export const useMyPayslips = ({ enabled = true, role, page = 1, pageSize = 5, year, month } = {}) => {
+  const params = { page, pageSize, ...(year ? { year } : {}), ...(month ? { month } : {}) };
   return useQuery({
-    queryKey: ["my-payslips"],
-    queryFn: () => getMyPayslips(),
+    queryKey: ["my-payslips", role, params],
+    queryFn: () => getMyPayslips(params, role),
     enabled,
     staleTime: 0,
   });

@@ -12,14 +12,46 @@ import SingleSignInApprovalBanner from "../components/SingleSignInApprovalBanner
 import StorageLimitBanner from "../components/StorageLimitBanner";
 import PolicyGateScreen from "../components/policy/PolicyGateScreen";
 import { useGateStatus } from "../auth/server-state/policy/policy.hook";
+import useRealtimeSync from "../realtime/useRealtimeSync";
+import SparkFrame from "../components/spark/SparkFrame";
+import GlobalIncomingCall from "../components/spark/GlobalIncomingCall";
+import GamificationHost from "../components/gamification/GamificationHost";
 
-// True when `dob` (any year) falls on today's month/day.
+// Birthdays are matched on the IST calendar - the same clock the backend
+// birthday cron uses - so the popup, the bell notification and the reminder
+// emails always agree on which day is "the birthday", whatever timezone the
+// browser happens to be in. (Reading the DOB with local getMonth()/getDate()
+// can land on the previous day for browsers west of UTC, because dates are
+// stored as midnight UTC.)
+const IST_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+});
+
+function istParts(date) {
+  const out = {};
+  IST_FMT.formatToParts(date).forEach((p) => {
+    if (p.type !== "literal") out[p.type] = Number(p.value);
+  });
+  return out; // { year, month, day }
+}
+
+const isLeapYear = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+// True when `dob` (any year) falls on today's month/day (IST). A 29 Feb
+// birthday is celebrated on 28 Feb in non-leap years, same as the backend.
 function isBirthdayToday(dob) {
   if (!dob) return false;
   const d = new Date(dob);
   if (Number.isNaN(d.getTime())) return false;
-  const today = new Date();
-  return d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  const b = istParts(d);
+  const t = istParts(new Date());
+  if (b.month === 2 && b.day === 29 && !isLeapYear(t.year)) {
+    return t.month === 2 && t.day === 28;
+  }
+  return b.month === t.month && b.day === t.day;
 }
 
 export default function MainLayout() {
@@ -32,6 +64,9 @@ export default function MainLayout() {
   const { mutate: dismissBirthday, isPending: isDismissingBirthday } = useDismissBirthdayWish();
 
   usePermissionsSync();
+
+  // Socket.IO: live notifications + auto-refresh of request lists (no page reload).
+  useRealtimeSync(Boolean(auth?.role));
 
   // TorchX Policy — Access Gate. While any mandatory policy assigned to
   // this person is unacknowledged, render ONLY PolicyGateScreen below —
@@ -55,16 +90,19 @@ export default function MainLayout() {
 
   const account = getAccount();
   const shouldShowWelcome = !!account?.isFirstLogin;
+  // Admin accounts carry f_name / l_name / work_email (not organisation_name /
+  // name / email), so reading those first made the greeting "Happy Birthday,
+  // there!" for every admin. Use the person's own name for every role.
   const displayName =
-    auth?.role === "admin"
-      ? account?.organisation_name || account?.name || account?.email || "there"
-      : `${account?.f_name || ""} ${account?.l_name || ""}`.trim() ||
-        account?.name ||
-        account?.email ||
-        "there";
+    `${account?.f_name || ""} ${account?.l_name || ""}`.trim() ||
+    account?.name ||
+    account?.organisation_name ||
+    account?.work_email ||
+    account?.email ||
+    "there";
   const professionLabel = account?.designation || roleLabels[auth?.role] || "";
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = istParts(new Date()).year;
   const shouldShowBirthday =
     !shouldShowWelcome &&
     isBirthdayToday(account?.date_of_birth) &&
@@ -153,7 +191,7 @@ export default function MainLayout() {
   const markBirthdayAsSeenInCache = () => {
     queryClient.setQueryData(["auth"], (current) => {
       if (!current?.data) return current;
-      const year = new Date().getFullYear();
+      const year = istParts(new Date()).year;
 
       const roleKey =
         current.role === "superadmin" ? "superAdmin"
@@ -200,17 +238,21 @@ export default function MainLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-(--background)">
+    <div className="flex h-dvh flex-col bg-(--background) md:flex-row">
       <SingleSignInApprovalBanner />
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         <Navbar collapsed={collapsed} setCollapsed={setCollapsed} />
         <StorageLimitBanner role={auth?.role} />
-        <div className="p-6 overflow-auto flex-1">
+        <div className="p-3 sm:p-6 overflow-auto flex-1 min-h-0 min-w-0">
   <Outlet />
 </div>
       </div>
+
+      <SparkFrame />
+      <GlobalIncomingCall />
+      <GamificationHost enabled={Boolean(auth?.role) && auth.role !== "superadmin"} />
 
       {showWelcome && (
         <WelcomeModal

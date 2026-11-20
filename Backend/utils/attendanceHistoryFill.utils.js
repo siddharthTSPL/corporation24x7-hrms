@@ -6,6 +6,7 @@ const AdminLeave = require("../Models/adleave.model");
 const User = require("../Models/user.model");
 const Manager = require("../Models/manager.model");
 const Admin = require("../Models/Admin.model");
+const Fnf = require("../Models/Fnf.model");
 const { classifyNonWorkingDay, startOfDay } = require("../automatic/weekoffcalendar");
 const { toISTKey } = require("./Istdate.utils");
 const TimeLog = require("../Models/Timelog.model");
@@ -35,6 +36,88 @@ const ROLE_CONFIG = {
 
 const DAY = 24 * 60 * 60 * 1000;
 
+const isHalfDayLeaveType = (t) => typeof t === "string" && t.startsWith("half_day");
+
+/**
+ * Approved leave ALWAYS wins over the check-in based status - no matter when
+ * the leave was approved (before, during or after the person checked in/out):
+ *   - full-day leave (el/sl/ml/pl/lwp) -> status "leave" (paid or LWP is then
+ *     decided by isLwpDay). Check-in/out times stay visible for reference but
+ *     the day is counted as the leave, never as Present.
+ *   - half-day leave (half_day_el/sl)  -> a "present" day becomes "half_day"
+ *     (0.5 leave + 0.5 worked); isLwpDay says whether the leave half is unpaid.
+ *   - comp_off                         -> counts as a present (paid) day.
+ * Returns a NEW row; the input is not mutated.
+ */
+const applyLeaveToRow = (r, leave, date) => {
+  // isLwpDay: balance (EL/SL) ran out for this day, so the leave is unpaid.
+  const isLwpDay = leave.leaveType === "lwp" || isDateInLwpPortion(leave, date);
+  const base = { ...r, leaveType: leave.leaveType, isLwpDay };
+  if (leave.leaveType === "comp_off") return { ...base, status: "present", isLwpDay: false };
+  if (isHalfDayLeaveType(leave.leaveType)) {
+    return { ...base, status: r.status === "present" ? "half_day" : r.status };
+  }
+  return { ...base, status: "leave" };
+};
+
+/**
+ * Who is on an APPROVED leave on `date` (default today)?
+ * people: [{ id, roleKey: "admin" | "manager" | "employee" }]
+ * returns Map(personId -> { leaveType, isLwp, isHalfDay })
+ * comp_off is skipped on purpose - it is a present (worked-equivalent) day.
+ */
+const fetchLeaveMapForDate = async ({ organisation_id, people, date = new Date() }) => {
+  const d = startOfDay(date);
+  const out = new Map();
+  for (const roleKey of Object.keys(ROLE_CONFIG)) {
+    const ids = people.filter((p) => p.roleKey === roleKey).map((p) => p.id);
+    if (!ids.length) continue;
+    const cfg = ROLE_CONFIG[roleKey];
+    const leaves = await cfg.LeaveModel.find({
+      organisation_id,
+      [cfg.leaveField]: { $in: ids },
+      status: { $in: cfg.approved },
+      // widened by a day each side, exact check is done below with startOfDay
+      startDate: { $lte: new Date(d.getTime() + DAY) },
+      endDate: { $gte: new Date(d.getTime() - DAY) },
+    })
+      .select(`${cfg.leaveField} startDate endDate leaveType lwpDays`)
+      .lean();
+    for (const l of leaves) {
+      if (l.leaveType === "comp_off") continue;
+      if (d < startOfDay(l.startDate) || d > startOfDay(l.endDate)) continue;
+      const id = String(l[cfg.leaveField]);
+      const entry = {
+        leaveType: l.leaveType,
+        isLwp: l.leaveType === "lwp" || isDateInLwpPortion(l, d),
+        isHalfDay: isHalfDayLeaveType(l.leaveType),
+      };
+      // if two leaves overlap, a full-day one wins over a half-day one
+      if (!out.has(id) || (out.get(id).isHalfDay && !entry.isHalfDay)) out.set(id, entry);
+    }
+  }
+  return out;
+};
+
+/**
+ * Last day (IST start-of-day) of the month in which a leaver's exit falls.
+ * Attendance is shown up to and including that month and never after it.
+ * Returns null while the person is still working, or when the exit date is
+ * unknown (no notice-period last working day and no Full & Final record) -
+ * we cannot place them in a month, so nothing is hidden for them.
+ */
+const exitMonthCutoff = async ({ organisation_id, personId, emp }) => {
+  if (!emp || !emp.working_status || emp.working_status === "working") return null;
+  let exitDate = emp.noticePeriod && emp.noticePeriod.lastWorkingDay ? emp.noticePeriod.lastWorkingDay : null;
+  if (!exitDate) {
+    const fnf = await Fnf.findOne({ organisation_id, employee: personId }).select("dateOfLeaving").lean();
+    exitDate = fnf && fnf.dateOfLeaving ? fnf.dateOfLeaving : null;
+  }
+  if (!exitDate) return null;
+  const [y, m] = toISTKey(exitDate).split("-").map(Number); // m is 1-12
+  return startOfDay(new Date(y, m, 0)); // day 0 of next month = last day of exit month
+};
+
 /**
  * The admin/superadmin "Attendance History" only listed days that have an
  * Attendance record, so week-offs, holidays, approved-leave days and no-show
@@ -45,11 +128,12 @@ const DAY = 24 * 60 * 60 * 1000;
  * Today is only filled when it is already a known week-off/holiday/leave
  * (the person may still check in later, so it is never marked absent).
  */
-const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, rangeStart, rangeEnd, standardMinutes }) => {
+const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows: inputRows, rangeStart, rangeEnd, standardMinutes }) => {
+  let rows = inputRows;
   const cfg = ROLE_CONFIG[roleKey] || ROLE_CONFIG.employee;
 
   const [emp, leaves] = await Promise.all([
-    cfg.Model.findById(personId).select("date_of_joining createdAt").lean(),
+    cfg.Model.findById(personId).select("date_of_joining createdAt working_status noticePeriod.lastWorkingDay").lean(),
     cfg.LeaveModel.find({
       [cfg.leaveField]: personId,
       status: { $in: cfg.approved },
@@ -59,23 +143,38 @@ const fillHistoryGaps = async ({ organisation_id, personId, roleKey, rows, range
   ]);
 
   const joinDate = emp ? startOfDay(emp.date_of_joining || emp.createdAt || 0) : null;
+  // Resigned / fired / terminated: nothing after the exit month (see exitMonthCutoff).
+  const cutoff = await exitMonthCutoff({ organisation_id, personId, emp });
+  if (cutoff) rows = rows.filter((r) => startOfDay(r.date) <= cutoff);
   const leaveFor = (date) =>
     leaves.find((l) => date >= startOfDay(l.startDate) && date <= startOfDay(l.endDate)) || null;
+
+  const stubIds = new Set(
+    (
+      await Attendance.find({
+        _id: { $in: rows.map((r) => r.id).filter((id) => mongoose.isValidObjectId(id)) },
+        source: "agent",
+        checkIn: null,
+        checkOut: null,
+      })
+        .select("_id")
+        .lean()
+    ).map((a) => String(a._id))
+  );
+  if (stubIds.size) rows = rows.filter((r) => !stubIds.has(String(r.id)));
 
   const byKey = new Map(rows.map((r) => [toISTKey(r.date), r]));
   const out = rows.map((r) => {
     const d = startOfDay(r.date);
     const l = leaveFor(d);
-    // isLwpDay: balance (EL/SL) ran out for this day, so the leave is unpaid.
-    // Without this flag a half_day_sl / half_day_el with NO balance left was
-    // still shown (and counted) as a fully paid day.
-    return l
-      ? { ...r, leaveType: l.leaveType, isLwpDay: l.leaveType === "lwp" || isDateInLwpPortion(l, d) }
-      : r;
+    // An APPROVED leave always outranks whatever check-in/check-out produced.
+    // See applyLeaveToRow - this is what stops "Present - LWP" rows.
+    return l ? applyLeaveToRow(r, l, d) : r;
   });
 
   const today = startOfDay(new Date());
-  const last = startOfDay(rangeEnd) < today ? startOfDay(rangeEnd) : today;
+  let last = startOfDay(rangeEnd) < today ? startOfDay(rangeEnd) : today;
+  if (cutoff && cutoff < last) last = cutoff;
 
   for (let cursor = startOfDay(rangeStart); cursor <= last; cursor = new Date(cursor.getTime() + DAY)) {
     const key = toISTKey(cursor);
@@ -218,7 +317,6 @@ const applyTimesheetFallback = async ({ organisation_id, personId, onModel, rows
 //   - no check-in at all       -> only the leave half can be paid -> 0.5 / 0
 // Late penalty (4th+ late check-in of the month) is a plain half_day row
 // with no leave -> 0.5.
-const isHalfDayLeaveType = (t) => typeof t === "string" && t.startsWith("half_day");
 const dayPaidValue = (r) => {
   const paidLeave = !!r.leaveType && r.leaveType !== "lwp" && !r.isLwpDay;
   if (r.status === "present") return 1;
@@ -285,4 +383,4 @@ const computeMonthPaidDays = async ({ organisation_id, people, month, year }) =>
   return result;
 };
 
-module.exports = { fillHistoryGaps, computeMonthPaidDays, dayPaidValue };
+module.exports = { exitMonthCutoff, fillHistoryGaps, computeMonthPaidDays, dayPaidValue, fetchLeaveMapForDate, applyLeaveToRow };

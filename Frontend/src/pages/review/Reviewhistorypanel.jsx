@@ -22,6 +22,16 @@ function getEmail(p) {
   return p?.work_email ?? p?.email ?? "";
 }
 
+function ReviewAvatar({ person }) {
+  const initials = `${person?.f_name?.[0] || ""}${person?.l_name?.[0] || ""}`.toUpperCase() || "?";
+  return (
+    <span className="relative inline-flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8B1A4A] text-[9px] font-bold text-white">
+      {initials}
+      {person?.profile_image && <img src={person.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
+    </span>
+  );
+}
+
 function ratingColor(rating) {
   if (rating === "Excellent" || rating === "Very Good") return "#1E7A3D";
   if (rating === "Good") return BRAND.pink;
@@ -216,12 +226,17 @@ export default function ReviewHistoryPanel({
                     <React.Fragment key={r._id}>
                       <tr className="border-b" style={{ borderColor: BRAND.cardBorder }}>
                         <td className="py-2.5 px-3">
-                          <p className="m-0 font-medium truncate max-w-[160px]" style={{ color: BRAND.textPrimary }}>
-                            {getFullName(r.reviewee)}
-                          </p>
-                          <p className="m-0 text-[11px] truncate max-w-[160px]" style={{ color: BRAND.mutedText }}>
-                            {getEmail(r.reviewee)}
-                          </p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ReviewAvatar person={r.reviewee} />
+                            <div className="min-w-0">
+                              <p className="m-0 font-medium truncate max-w-[160px]" style={{ color: BRAND.textPrimary }}>
+                                {getFullName(r.reviewee)}
+                              </p>
+                              <p className="m-0 text-[11px] truncate max-w-[160px]" style={{ color: BRAND.mutedText }}>
+                                {getEmail(r.reviewee)}
+                              </p>
+                            </div>
+                          </div>
                         </td>
                         <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
                           {r.monthYear}
@@ -243,7 +258,10 @@ export default function ReviewHistoryPanel({
                           {r.recommendation ?? "—"}
                         </td>
                         <td className="py-2.5 px-3" style={{ color: BRAND.textPrimary }}>
-                          {getFullName(r.reviewer)}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ReviewAvatar person={r.reviewer} />
+                            <span className="truncate">{getFullName(r.reviewer)}</span>
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap" style={{ color: BRAND.mutedText }}>
                           {formatDate(r.createdAt)}

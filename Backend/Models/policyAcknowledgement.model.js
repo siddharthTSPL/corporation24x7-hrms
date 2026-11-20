@@ -76,6 +76,7 @@ policyAcknowledgementSchema.index(
 policyAcknowledgementSchema.index({ employee: 1, employeeModel: 1, status: 1 });
 policyAcknowledgementSchema.index({ organisation_id: 1, policyId: 1, status: 1 });
 
+policyAcknowledgementSchema.plugin(require("../utils/gamification/hooks").policyAckPlugin); // gamification
 module.exports =
   mongoose.models.PolicyAcknowledgement ||
   mongoose.model("PolicyAcknowledgement", policyAcknowledgementSchema);

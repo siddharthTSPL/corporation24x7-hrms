@@ -625,7 +625,7 @@ const autoCheckoutAll = async () => {
       checkOut: { $exists: false },
       // Already handled once while the org had auto check-out OFF.
       checkoutRemark: { $ne: "missed_checkout" },
-    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn isLate lateMinutes latePenalty").lean();
+    }).select("_id activeMinutes idleMinutes source organisation_id shift employee role date checkIn isLate lateMinutes latePenalty lateCountInMonth").lean();
 
     if (!openSessions.length) return;
 
@@ -687,7 +687,10 @@ const autoCheckoutAll = async () => {
       const activeMinutesUpdate =
         a.source === "face" ? { activeMinutes: Math.round(elapsedSessionMinutes) } : {};
 
-      if (autoCheckoutByOrg.get(String(a.organisation_id)) === false) {
+      const orgAutoOn = autoCheckoutByOrg.get(String(a.organisation_id)) !== false;
+      console.log(`[AutoCheckout] session=${a._id} org=${a.organisation_id} autoCheckoutEnabled=${orgAutoOn} -> ${orgAutoOn ? "CHECK OUT" : "HALF DAY (no checkout)"}`);
+
+      if (!orgAutoOn) {
         // Auto check-out is OFF for this org: do NOT write a checkOut time.
         // The member forgot to check out, so the day is just marked Half Day
         // + "missed_checkout" and the session stays without a checkOut.

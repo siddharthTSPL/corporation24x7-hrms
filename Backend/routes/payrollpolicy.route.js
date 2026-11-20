@@ -1,11 +1,18 @@
 const express = require("express");
 const payrollpolicyrouter = express.Router();
+const multer = require("multer");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const payrollManagementAuth = require("../middleware/auth/payrollManagement.middleware");
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 const {
   getPolicy,
   setPolicy,
+  uploadPayslipLogo,
   addAllowance,
   updateAllowance,
   removeAllowance,
@@ -18,6 +25,7 @@ const {
 // Professional Tax enable+amount, TDS enable
 payrollpolicyrouter.get("/policy", payrollManagementAuth, asyncHandler(getPolicy));
 payrollpolicyrouter.put("/policy", payrollManagementAuth, asyncHandler(setPolicy));
+payrollpolicyrouter.post("/policy/payslip-logo", payrollManagementAuth, logoUpload.single("logo"), asyncHandler(uploadPayslipLogo));
 payrollpolicyrouter.post("/policy/reset", payrollManagementAuth, asyncHandler(resetToStandard));
 
 // Salary Components (Zoho-style): Earnings, Deductions, Benefits and

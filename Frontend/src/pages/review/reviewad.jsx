@@ -58,7 +58,7 @@ function ManagerCard({ manager, selected, onClick }) {
       }}
     >
       <div
-        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold shrink-0 border"
+        className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-bold shrink-0 border overflow-hidden"
         style={{
           background: isSelected
             ? `linear-gradient(135deg, ${BRAND.maroon}, ${BRAND.pink})`
@@ -68,6 +68,7 @@ function ManagerCard({ manager, selected, onClick }) {
         }}
       >
         {getInitials(manager)}
+        {manager.profile_image && <img src={manager.profile_image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
       </div>
       <div className="text-left min-w-0 flex-1">
         <p className="m-0 text-sm font-semibold text-[#2D0A1A] truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
