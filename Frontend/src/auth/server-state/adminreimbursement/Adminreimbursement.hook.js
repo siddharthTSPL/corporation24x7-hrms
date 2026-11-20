@@ -7,6 +7,8 @@ import {
   getAllReimbursements,
   approveReimbursement,
   rejectReimbursement,
+  bulkApproveReimbursements,
+  bulkRejectReimbursements,
   markReimbursementPaid,
 } from "../../api/adminapi/reimbursement/Adminreimbursement.api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -90,6 +92,22 @@ export const useRejectReimbursement = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: rejectReimbursement,
+    onSuccess: () => invalidateReviewQueues(queryClient),
+  });
+};
+
+export const useBulkApproveReimbursements = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkApproveReimbursements,
+    onSuccess: () => invalidateReviewQueues(queryClient),
+  });
+};
+
+export const useBulkRejectReimbursements = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkRejectReimbursements,
     onSuccess: () => invalidateReviewQueues(queryClient),
   });
 };
