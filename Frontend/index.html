@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -37,7 +37,7 @@
     <meta property="og:site_name" content="TorchX Suite" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content="en_IN" />
     <meta name="twitter:card" content="summary_large_image" />
 
     <!-- Favicons -->
@@ -65,28 +65,23 @@
     </noscript>
     <link rel="dns-prefetch" href="https://api.torchxsuite.com" />
 
-    <!-- Structured data: Organization + product (site-wide) -->
+    <!-- Structured data: Organization (site-wide). The TorchX Talent SoftwareApplication is
+         added ONLY on the home page by seoRoutes.js (jsonLdFor "/"), not on every page.
+         Same @id as the Suite site so Google merges both into one organisation. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://torchxsuite.com/#org",
-            "name": "TechTorch Solutions Private Limited",
-            "url": "https://torchxsuite.com",
-            "logo": "https://torchxsuite.com/talent/og-image.png"
-          },
-          {
-            "@type": "SoftwareApplication",
-            "@id": "https://torchxsuite.com/talent/#app",
-            "name": "TorchX Talent",
-            "applicationCategory": "BusinessApplication",
-            "operatingSystem": "Web",
-            "url": "https://torchxsuite.com/talent/",
-            "description": "TorchX Talent is an HRMS platform for employee management, attendance, leave, timesheets, payroll and recruitment.",
-            "publisher": { "@id": "https://torchxsuite.com/#org" }
-          }
+        "@type": "Organization",
+        "@id": "https://torchxsuite.com/#org",
+        "name": "TechTorch Solutions Private Limited",
+        "alternateName": ["TechTorch", "TorchX Suite"],
+        "url": "https://torchxsuite.com/",
+        "logo": "https://torchxsuite.com/talent/apple-touch-icon.png",
+        "sameAs": [
+          "https://www.linkedin.com/company/techtorch_sol/",
+          "https://www.instagram.com/techtorch_sol",
+          "https://www.youtube.com/@techtorch_sol",
+          "https://techtorch.solutions"
         ]
       }
     </script>

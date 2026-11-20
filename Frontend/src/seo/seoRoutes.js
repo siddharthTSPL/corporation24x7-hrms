@@ -7,34 +7,34 @@ import { articles } from "./articles.js";
 export const SITE = "https://torchxsuite.com";
 export const BASE = "/talent";
 export const OG_IMAGE = `${SITE}${BASE}/og-image.png`;
-export const SITE_UPDATED = "2026-11-13"; // fallback <lastmod>; bump when site content changes
+export const SITE_UPDATED = "2026-11-19"; // fallback <lastmod>; bump when site content changes
 export const ORG_ID = `${SITE}/#org`;
 
 const core = {
   "/": {
     crumb: "TorchX Talent",
-    title: "TorchX Talent — HRMS Software for Attendance, Payroll & Recruitment",
-    description: "TorchX Talent is an all-in-one HRMS for employee management, attendance, leave, payroll, timesheets, recruitment and performance reviews. Start a free 14-day trial.",
+    title: "TorchX Talent | HRMS for Attendance, Payroll & Recruitment",
+    description: "TorchX Talent is an all-in-one HRMS for attendance, leave, payroll, timesheets, recruitment and reviews. Start a free 14-day trial.",
     h1: "Manage Your Workforce With Smart HR Solutions",
     intro: "TorchX Talent is a complete Human Resource Management System (HRMS) covering hiring, attendance, leave, timesheets, payroll, reimbursements and employee self-service.",
   },
   "/about": {
     crumb: "About",
-    title: "About TorchX Talent — Intelligent HRMS by TechTorch Solutions",
+    title: "About TorchX Talent | HRMS by TechTorch Solutions",
     description: "Learn about TorchX Talent and TechTorch Solutions Private Limited — the team building an intelligent HRMS for modern, growing organisations.",
     h1: "Empowering Modern Workforces Through Intelligent HR Solutions",
     intro: "TorchX Talent is built by TechTorch Solutions Private Limited.",
   },
   "/platform-features": {
     crumb: "Platform features",
-    title: "HRMS Features — Attendance, Payroll, Recruitment | TorchX Talent",
+    title: "HRMS Features: Attendance, Payroll, Hiring | TorchX Talent",
     description: "Explore TorchX Talent features: attendance and face check-in, leave management, payroll, timesheets, recruitment, reviews, assets, documents and reports.",
     h1: "Unified Human Capital HRMS Built for Enterprise Velocity",
     intro: "Attendance, leave, payroll, timesheets, recruitment, performance reviews, assets, documents and analytics in one platform.",
   },
   "/solutions": {
     crumb: "Solutions",
-    title: "HR Software Solutions — Attendance, Leave, Payroll | TorchX Talent",
+    title: "HR Software Solutions | TorchX Talent",
     description: "Browse TorchX Talent HR software solutions: attendance, leave, timesheets, payroll, recruitment, field force, reimbursements and workflow automation.",
     h1: "HR software solutions for every part of people operations",
     intro: "Pick the area you want to improve. Each solution works on its own and connects to the rest of TorchX Talent.",
@@ -64,7 +64,7 @@ const core = {
   },
   "/pricing-calculator": {
     crumb: "Pricing calculator",
-    title: "HRMS Pricing Calculator — Per-Employee Pricing | TorchX Talent",
+    title: "HRMS Pricing Calculator | TorchX Talent",
     description: "Estimate your TorchX Talent cost per employee per month and compare plans with our HRMS pricing calculator.",
     h1: "TorchX Talent Pricing Calculator",
     intro: "Pricing is per employee per month. Prices are exclusive of GST.",
@@ -168,6 +168,28 @@ export const jsonLdFor = (path) => {
       "@context": "https://schema.org",
       "@type": "FAQPage",
       mainEntity: e.faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+    });
+  }
+  if (path === "/") {
+    // Product schema lives ONLY on the home page (it used to be hard-coded in index.html, i.e. on every page).
+    // Every item in featureList is a feature that has its own page / section on the site.
+    out.push({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": `${SITE}${BASE}/#app`,
+      name: "TorchX Talent",
+      alternateName: ["Talent", "TorchX HRMS"],
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: canonicalFor("/"),
+      description: e.description,
+      featureList: [
+        "Attendance management", "Face recognition attendance", "Leave management", "Timesheet management",
+        "Payroll", "Recruitment", "Employee self-service", "Field force management",
+        "Reimbursement management", "HR workflow automation",
+      ],
+      publisher: { "@id": ORG_ID },
+      isPartOf: { "@type": "SoftwareApplication", "@id": `${SITE}/#suite`, name: "TorchX Suite", url: `${SITE}/` },
     });
   }
   if (e.kind === "article") {
