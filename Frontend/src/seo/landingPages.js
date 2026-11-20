@@ -129,7 +129,7 @@ export const landingPages = [
     nav: "Leave Management",
     card: "Apply, approve and track leave balances with flexible approval flows.",
     title: "Leave Management Software | TorchX Talent",
-    description: "Manage leave requests, approvals and balances online. Choose who approves, keep holidays and week-offs in sync, and feed approved leave to attendance and payroll.",
+    description: "Manage leave requests, approvals and balances online. Choose who approves, sync holidays and week-offs, and feed approved leave to attendance and payroll.",
     h1: "Leave management software with approval flows you control",
     intro: "Employees apply in a few clicks, approvers respond from their dashboard, and balances stay accurate without a spreadsheet.",
     overview: "Leave goes wrong when balances are tracked by hand and approvals happen over chat. TorchX Talent keeps requests, balances and decisions in one place. Approved leave is reflected in attendance and payroll, so an employee on approved leave is not shown as absent.",

@@ -2290,15 +2290,17 @@ export default function LandingPage() {
           onAccountClick={handleAccountClick}
           scrollContainerRef={scrollContainerRef}
         />
-        <Hero
-          onOpenCalculator={() => navigate('/pricing-calculator')}
-        />
-        <Divider />
-        <Features />
-        <Divider />
-        <Pricing />
-        <Divider />
-        <Testimonials />
+        <main>
+          <Hero
+            onOpenCalculator={() => navigate('/pricing-calculator')}
+          />
+          <Divider />
+          <Features />
+          <Divider />
+          <Pricing />
+          <Divider />
+          <Testimonials />
+        </main>
         <Footer />
       </div>
     </LazyMotion>
