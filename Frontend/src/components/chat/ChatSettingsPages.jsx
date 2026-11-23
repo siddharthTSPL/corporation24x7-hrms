@@ -70,7 +70,7 @@ export function ProfilePage({ onBack, self }) {
               value={about}
               onChange={(e) => setAbout(e.target.value.slice(0, 140))}
               rows={2}
-              placeholder="Hey there! I am using TorchX Spark"
+              placeholder="Hey there! I am using TorchX Convs"
               className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#730042]"
             />
             <div className="mt-1 flex items-center justify-between">
@@ -572,7 +572,7 @@ export function AboutPage({ onBack }) {
       <Header title="Help & about" onBack={onBack} />
       <PageBody>
         <section className="bg-white px-5 py-6 text-center">
-          <p className="text-lg font-bold text-[#730042]">TorchX Spark</p>
+          <p className="text-lg font-bold text-[#730042]">TorchX Convs</p>
           <p className="text-xs text-gray-500">{data ? `${data.app} · v${data.version}` : "from TorchX Talent"}</p>
         </section>
         <Section title="Keyboard shortcuts">

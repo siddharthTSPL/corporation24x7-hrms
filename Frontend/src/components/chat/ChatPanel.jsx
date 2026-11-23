@@ -36,7 +36,7 @@ function EmptyThread({ onNew }) {
         </span>
       </div>
 
-      <h3 className="text-lg font-semibold tracking-tight text-gray-900">Welcome to TorchX Spark</h3>
+      <h3 className="text-lg font-semibold tracking-tight text-gray-900">Welcome to TorchX Convs</h3>
       <p className="text-sm text-gray-500 mt-1.5 max-w-[260px] leading-relaxed">
         Select a conversation from the list, or start a new one with anyone in your organisation.
       </p>

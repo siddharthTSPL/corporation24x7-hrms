@@ -73,9 +73,9 @@ function Login() {
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
-    // Came from Spark / Sync ("Sign in" there sends ?next=/spark/...): go back there, signed in.
+    // Came from Convs / Peple ("Sign in" there sends ?next=/convs/...): go back there, signed in.
     const next = new URLSearchParams(window.location.search).get("next");
-    if (next && /^\/(spark|sync)(\/|$)/.test(next)) {
+    if (next && /^\/(convs|peple)(\/|$)/.test(next)) {
       window.location.assign(next);
       return;
     }
