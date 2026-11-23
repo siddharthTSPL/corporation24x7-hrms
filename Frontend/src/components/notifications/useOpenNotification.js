@@ -2,13 +2,13 @@ import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../auth/store/getmeauth/getmeauth";
-import { useSparkStore } from "../../auth/store/spark/sparkStore";
+import { useConvsStore } from "../../auth/store/convs/convsStore";
 import { resolveNotificationAction } from "./notificationLinks";
 
 // One click handler for every place a notification can be clicked
 // (bell dropdown, live toast, /notifications page).
-//   chat / call / group / contact -> opens the Spark dock (on that conversation when known)
-//   other apps (Sync)             -> full page load
+//   chat / call / group / contact -> opens the Convs dock (on that conversation when known)
+//   other apps (Peple)             -> full page load
 //   everything else               -> a Talent route that really exists
 export default function useOpenNotification() {
   const navigate = useNavigate();
@@ -20,8 +20,8 @@ export default function useOpenNotification() {
       if (!notification) return;
       try {
         const action = resolveNotificationAction(notification, role);
-        if (action.kind === "spark") {
-          useSparkStore.getState().sendCommand({
+        if (action.kind === "convs") {
+          useConvsStore.getState().sendCommand({
             type: "open-conversation",
             conversationId: action.conversationId,
             view: action.view,

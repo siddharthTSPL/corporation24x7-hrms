@@ -96,7 +96,7 @@ export default function ChatSettingsSheet({ onClose }) {
         </Section>
 
         <div className="px-5 py-8 text-center">
-          <p className="text-sm font-semibold tracking-tight text-[#730042]">TorchX Spark</p>
+          <p className="text-sm font-semibold tracking-tight text-[#730042]">TorchX Convs</p>
           <p className="text-xs text-gray-400">from TorchX Talent</p>
         </div>
       </PageBody>

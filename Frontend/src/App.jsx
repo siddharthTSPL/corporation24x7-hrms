@@ -175,7 +175,7 @@ function NotFoundRoute() {
   return <Pagenotfound onLogin={() => navigate("/login")} onContact={() => navigate("/about")} />;
 }
 
-// Full-page redirect to another app on the same domain (e.g. /sync).
+// Full-page redirect to another app on the same domain (e.g. /peple).
 // <Navigate> can't be used: it would prepend the router basename "/talent".
 function ExternalRedirect({ to }) {
   useEffect(() => {
@@ -534,9 +534,9 @@ function App() {
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
             <Route path="/overtime"       element={<Overtime />} />
-            {/* Meetings moved to TorchX Sync. Old links/bookmarks/notifications land there. */}
-            <Route path="/meetings"       element={<ExternalRedirect to="/sync/meetings" />} />
-            <Route path="/meetings/:id"   element={<ExternalRedirect to="/sync/meetings" />} />
+            {/* Meetings moved to TorchX Peple. Old links/bookmarks/notifications land there. */}
+            <Route path="/meetings"       element={<ExternalRedirect to="/peple/meetings" />} />
+            <Route path="/meetings/:id"   element={<ExternalRedirect to="/peple/meetings" />} />
             {/* Rewards & Gamification (all roles; SuperAdmin only sees the admin console) */}
             <Route path="/gamification"       element={<ProtectedRoute planFeature="gamification"><GamificationHub /></ProtectedRoute>} />
             <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]} planFeature="gamification"><GamificationAdmin /></ProtectedRoute>} />

@@ -91,7 +91,7 @@ Storage.prototype.removeItem = function (key) {
   return nativeRemove.call(this, key);
 };
 
-// ---- login / logout sync across tabs AND apps (Talent, Spark, Sync share one origin) ----
+// ---- login / logout sync across tabs AND apps (Talent, Convs, Peple share one origin) ----
 // Logout in any tab/app -> every other tab/app of this browser signs out right away.
 // Login in any tab/app  -> other tabs that are waiting on a sign-in screen pick it up.
 // (Cookie is shared by all three apps; this just makes the screens follow it live.)
@@ -207,7 +207,7 @@ XMLHttpRequest.prototype.send = function (body) {
         if (/\/logout(\?|$)/.test(url) && ((this.status >= 200 && this.status < 300) || this.status === 401)) {
           clearTabSession();
           everSignedIn = false;
-          announceAuth("logout"); // sign out every other tab / app (Talent, Spark, Sync)
+          announceAuth("logout"); // sign out every other tab / app (Talent, Convs, Peple)
           return;
         }
         // our token is no longer valid: fall back to the cookie instead of looping on a dead token
