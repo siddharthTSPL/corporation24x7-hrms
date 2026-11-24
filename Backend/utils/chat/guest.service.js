@@ -148,12 +148,14 @@ const prepareGuests = async (actor, raw, { existing = [] } = {}) => {
 // ---------- email ----------
 
 const FRONTEND_URL = () => (process.env.FRONTEND_URL || "").replace(/\/$/, "");
-const SYNC_URL = () => {
-  if (process.env.SYNC_URL) return process.env.SYNC_URL.replace(/\/+$/, "");
+const PEOPLE_URL = () => {
+  if (process.env.SYNC_URL) {
+    return process.env.SYNC_URL.replace(/\/+$/, "").replace(/\/sync$/i, "/peple");
+  }
   const base = (process.env.BASE_URL || FRONTEND_URL()).replace(/\/talent\/?$/, "").replace(/\/+$/, "");
-  return base ? `${base}/sync` : "";
+  return base ? `${base}/peple` : "";
 };
-const guestJoinUrl = (meetingId) => (SYNC_URL() ? `${SYNC_URL()}${process.env.MEETING_GUEST_JOIN_PATH || "/meeting-guest"}/${meetingId}` : "");
+const guestJoinUrl = (meetingId) => (PEOPLE_URL() ? `${PEOPLE_URL()}${process.env.MEETING_GUEST_JOIN_PATH || "/meeting-guest"}/${meetingId}` : "");
 
 const validTz = (tz) => { try { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } catch { return "Asia/Kolkata"; } };
 const fmtWhen = (d, tz) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: validTz(tz) }).format(new Date(d));
