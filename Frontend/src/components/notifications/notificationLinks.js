@@ -378,11 +378,8 @@ export const resolveNotificationAction = (notification, role) => {
   // 2) Links that belong to another app on this domain (Peple meetings ...)
   if (parts && !BROKEN_SEGMENT.test(parts.path)) {
     const hit = EXTERNAL_PREFIXES.find((p) => parts.path === p || parts.path.startsWith(`${p}/`));
-<<<<<<< HEAD
-    if (hit && hit !== "/spark" && hit !== "/convs") {
-=======
+
     if (hit && hit !== "/convs") {
->>>>>>> origin/Ashish
       return { kind: "external", href: parts.path + parts.query };
     }
   }
