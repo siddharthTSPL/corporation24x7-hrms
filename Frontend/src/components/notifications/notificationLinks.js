@@ -314,8 +314,8 @@ export const resolveNotificationLink = (notification, role) => {
 // ---------------------------------------------------------------------------
 
 const SPARK_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|spark|conversation|mention)/i;
-const SPARK_PATH_RE = /^\/(spark|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
-const EXTERNAL_PREFIXES = ["/sync", "/spark"];
+const SPARK_PATH_RE = /^\/(convs|spark|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
+const EXTERNAL_PREFIXES = ["/sync", "/spark", "/convs"];
 
 const firstString = (...values) => {
   for (const v of values) {
@@ -373,7 +373,7 @@ export const resolveNotificationAction = (notification, role) => {
   // 2) Links that belong to another app on this domain (Sync meetings ...)
   if (parts && !BROKEN_SEGMENT.test(parts.path)) {
     const hit = EXTERNAL_PREFIXES.find((p) => parts.path === p || parts.path.startsWith(`${p}/`));
-    if (hit && hit !== "/spark") {
+    if (hit && hit !== "/spark" && hit !== "/convs") {
       return { kind: "external", href: parts.path + parts.query };
     }
   }

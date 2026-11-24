@@ -8,7 +8,7 @@ const ALLOWED_CHAT_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
-  "application/zip",
+  "application/zip", "application/x-zip-compressed",
   "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg", "audio/wav", // voice notes
   "video/mp4", "video/webm",
 ]);
@@ -21,7 +21,8 @@ const chatUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
   fileFilter: (req, file, cb) => {
-    if (!ALLOWED_CHAT_TYPES.has(file.mimetype)) {
+    // ZIP MIME types vary by browser/OS; accept the .zip extension too.
+    if (!ALLOWED_CHAT_TYPES.has(file.mimetype) && !/\.zip$/i.test(file.originalname || "")) {
       return cb(Object.assign(new Error(`Unsupported file type: ${file.originalname}`), { statusCode: 400 }));
     }
     cb(null, true);

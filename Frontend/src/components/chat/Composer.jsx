@@ -6,7 +6,7 @@ import EmojiStickerPicker from "./EmojiStickerPicker";
 import ScheduleMessage from "./ScheduleMessage";
 import { useScheduledMessages } from "../../auth/server-state/chat/chatExtras.hook";
 import { getChatPrefs } from "./chatPrefs";
-import { ACCEPT_ATTR, ALLOWED_MIME, MAX_FILES, MAX_FILE_BYTES, formatSize } from "./chatUtils";
+import { ACCEPT_ATTR, isAllowedChatFile, MAX_FILES, MAX_FILE_BYTES, formatSize } from "./chatUtils";
 
 const MAX_VOICE_SECONDS = 5 * 60;
 const VOICE_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus", "audio/ogg"];
@@ -61,7 +61,7 @@ export default function Composer({ conversationId, replyTo, editing, initialText
         toast.error(`You can attach up to ${MAX_FILES} files at a time.`);
         break;
       }
-      if (!ALLOWED_MIME.includes(f.type)) {
+      if (!isAllowedChatFile(f)) {
         toast.error(`${f.name}: this file type isn't supported.`);
         continue;
       }
