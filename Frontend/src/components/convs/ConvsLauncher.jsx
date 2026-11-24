@@ -1,4 +1,4 @@
-import { FaCommentDots } from "react-icons/fa";
+import ConvsIcon from "./ConvsIcon";
 import { useChatUnreadCount } from "../../auth/server-state/chat/chat.hook";
 import { useConvsStore } from "../../auth/store/convs/convsStore";
 
@@ -23,7 +23,7 @@ export default function ConvsLauncher() {
         open ? "bg-[#730042] text-white shadow-md shadow-[#730042]/30" : "text-gray-600 hover:bg-gray-100"
       }`}
     >
-      <FaCommentDots className="text-lg" />
+      <ConvsIcon size={22} />
       {unread > 0 && (
         <span
           key={unread}

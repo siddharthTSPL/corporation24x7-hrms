@@ -149,8 +149,8 @@ function calculateSalaryBreakup(ctc, policy) {
   if (pfEnabled) {
     const pfWage =
       policy?.pf?.applyWageCeiling && policy?.pf?.wageCeiling
-        ? Math.min(basic, policy.pf.wageCeiling)
-        : basic;
+        ? Math.min(statutoryWage(basic, monthlyGross), policy.pf.wageCeiling)
+        : statutoryWage(basic, monthlyGross);
     employerPF = round2(((policy?.pf?.employerPercent ?? 12) / 100) * pfWage);
   }
 
@@ -246,10 +246,11 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
   const pfEnabled = policy?.pf?.enabled !== false;
   const pfWage =
     pfEnabled && policy?.pf?.applyWageCeiling && policy?.pf?.wageCeiling
-      ? Math.min(earnedBasic, policy.pf.wageCeiling)
-      : earnedBasic;
+      ? Math.min(statutoryWage(earnedBasic, earnedGross), policy.pf.wageCeiling)
+      : statutoryWage(earnedBasic, earnedGross);
   const employeePF = pfEnabled ? round2(((policy?.pf?.employeePercent ?? 12) / 100) * pfWage) : 0;
   const employerPF = pfEnabled ? round2(((policy?.pf?.employerPercent ?? 12) / 100) * pfWage) : 0;
+  const employerPFAdmin = pfEnabled ? round2(((policy?.pf?.adminChargePercent ?? 0.5) / 100) * pfWage) : 0;
 
   const esiEligible = monthlyGross <= (policy?.esi?.wageThreshold ?? 21000);
   const esiEnabled = policy?.esi?.enabled === true && esiEligible;
@@ -266,8 +267,10 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
   const employerLwf = lwfEnabled ? round2(policy?.lwf?.employerAmount || 0) : 0;
 
   const statutoryBonusEnabled = policy?.statutoryBonus?.enabled === true;
-  const statutoryBonus = statutoryBonusEnabled
-    ? round2(((policy?.statutoryBonus?.percentOfBasic ?? 8.33) / 100) * earnedBasic)
+  const bonusEligible = statutoryWage(basic, monthlyGross) <= (policy?.statutoryBonus?.eligibilityLimit ?? 21000);
+  const bonusWage = Math.min(statutoryWage(earnedBasic, earnedGross), policy?.statutoryBonus?.calculationCeiling ?? 7000);
+  const statutoryBonus = statutoryBonusEnabled && bonusEligible
+    ? round2(((policy?.statutoryBonus?.percentOfBasic ?? 8.33) / 100) * bonusWage)
     : 0;
 
   // Custom Deduction / Benefit / Reimbursement Salary Components — flat
@@ -356,9 +359,13 @@ function calculatePayrollForMonth({ structure, policy, attendanceSummary, month,
       components: deductionComponentsTotal,
       totalDeductions,
     },
-    employerContribution: { pf: employerPF, esi: employerESI, gratuity, lwf: employerLwf, statutoryBonus },
+    employerContribution: { pf: employerPF, pfAdmin: employerPFAdmin, esi: employerESI, gratuity, lwf: employerLwf, statutoryBonus },
     netSalary,
   };
+}
+
+function statutoryWage(basic, gross) {
+  return Math.max(Number(basic) || 0, round2((Number(gross) || 0) * 0.5));
 }
 
 function round2(n) {

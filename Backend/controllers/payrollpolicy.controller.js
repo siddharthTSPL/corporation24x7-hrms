@@ -18,12 +18,12 @@ const STANDARD_DEFAULTS = {
     // calculationType is picked for it is actually used every payroll run.
     { name: "Fixed Allowance", percentOfBasic: 0, flatAmount: 0, enabled: true, isBalancing: false },
   ],
-  pf: { enabled: true, employeePercent: 12, employerPercent: 12, applyWageCeiling: false, wageCeiling: 15000 },
+  pf: { enabled: true, employeePercent: 12, employerPercent: 12, applyWageCeiling: false, wageCeiling: 25000, adminChargePercent: 0.5 },
   esi: { enabled: false, employeePercent: 0.75, employerPercent: 3.25, wageThreshold: 21000 },
   professionalTax: { enabled: true, monthlyAmount: 200 },
   tds: { enabled: false },
   lwf: { enabled: false, employeeAmount: 0, employerAmount: 0 },
-  statutoryBonus: { enabled: false, percentOfBasic: 8.33 },
+  statutoryBonus: { enabled: false, percentOfBasic: 8.33, calculationCeiling: 7000, eligibilityLimit: 21000 },
 };
 
 // Every payroll calculation needs a policy to read from — this creates one
@@ -104,6 +104,11 @@ const setPolicy = async (req, res) => {
     if (typeof pf.employerPercent === "number") policy.pf.employerPercent = pf.employerPercent;
     if (typeof pf.applyWageCeiling === "boolean") policy.pf.applyWageCeiling = pf.applyWageCeiling;
     if (typeof pf.wageCeiling === "number") policy.pf.wageCeiling = pf.wageCeiling;
+    if (typeof pf.adminChargePercent === "number") {
+      if (pf.adminChargePercent < 0 || pf.adminChargePercent > 5)
+        return res.status(400).json({ success: false, message: "pf.adminChargePercent must be between 0 and 5" });
+      policy.pf.adminChargePercent = pf.adminChargePercent;
+    }
   }
 
   if (esi) {
@@ -130,13 +135,15 @@ const setPolicy = async (req, res) => {
   if (statutoryBonus) {
     if (typeof statutoryBonus.enabled === "boolean") policy.statutoryBonus.enabled = statutoryBonus.enabled;
     if (typeof statutoryBonus.percentOfBasic === "number") policy.statutoryBonus.percentOfBasic = statutoryBonus.percentOfBasic;
+    if (typeof statutoryBonus.calculationCeiling === "number" && statutoryBonus.calculationCeiling >= 0) policy.statutoryBonus.calculationCeiling = statutoryBonus.calculationCeiling;
+    if (typeof statutoryBonus.eligibilityLimit === "number" && statutoryBonus.eligibilityLimit >= 0) policy.statutoryBonus.eligibilityLimit = statutoryBonus.eligibilityLimit;
   }
 
   if (timesheetSync) {
     if (timesheetSync.overtimeMultiplier !== undefined) {
       const m = Number(timesheetSync.overtimeMultiplier);
-      if (!Number.isFinite(m) || m < 0.1 || m > 10)
-        return res.status(400).json({ success: false, message: "timesheetSync.overtimeMultiplier must be between 0.1 and 10" });
+      if (!Number.isFinite(m) || m < 2 || m > 10)
+        return res.status(400).json({ success: false, message: "timesheetSync.overtimeMultiplier must be between 2 and 10 (statutory overtime is not less than 2x normal wages)" });
     }
     if (timesheetSync.standardHoursPerDay !== undefined) {
       const h = Number(timesheetSync.standardHoursPerDay);

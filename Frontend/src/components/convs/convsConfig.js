@@ -1,7 +1,7 @@
 // Where Convs lives. Same domain in production (torchxsuite.com/convs), so the
 // login cookie / tab session is shared with Talent.
 // For local dev set VITE_CONVS_URL=http://localhost:5174/convs in .env.local
-const RAW = import.meta.env.VITE_CONVS_URL || "/convs";
+const RAW = import.meta.env.VITE_CONVS_URL || "https://torchxsuite.com/convs/";
 
 const toAbsolute = (u) => new URL(u, window.location.origin);
 
