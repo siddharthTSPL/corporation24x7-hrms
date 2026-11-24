@@ -73,9 +73,9 @@ function Login() {
   const images = [slide1, slide2, slide3];
 
   const navigateByRole = (role) => {
-    // Came from Spark / Sync ("Sign in" there sends ?next=/convs/...): go back there, signed in.
+    // Came from Convs / Peple ("Sign in" there sends ?next=/convs/...): go back there, signed in.
     const next = new URLSearchParams(window.location.search).get("next");
-    if (next && /^\/(convs|spark|sync)(\/|$)/.test(next)) {
+    if (next && /^\/(convs|peple)(\/|$)/.test(next)) {
       window.location.assign(next);
       return;
     }
@@ -449,16 +449,16 @@ function Login() {
                             <rect x="11" y="11" width="10" height="10" fill="#ffb900" />
                           </svg>
                         ) : (
-                          <svg width="52" height="16" viewBox="0 0 88 24" aria-label="Zoho" role="img">
-                            <g fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="15" textAnchor="middle" fill="#fff">
-                              <g transform="rotate(-6 10 12)"><rect x="1" y="2" width="19" height="19" rx="3" fill="#e42527" /><text x="10.5" y="17">Z</text></g>
-                              <g transform="rotate(4 32 12)"><rect x="23" y="2" width="19" height="19" rx="3" fill="#089949" /><text x="32.5" y="17">O</text></g>
-                              <g transform="rotate(-4 54 12)"><rect x="45" y="2" width="19" height="19" rx="3" fill="#226db4" /><text x="54.5" y="17">H</text></g>
-                              <g transform="rotate(6 76 12)"><rect x="67" y="2" width="19" height="19" rx="3" fill="#f9b21d" /><text x="76.5" y="17">O</text></g>
+                          <svg width="18" height="18" viewBox="0 0 22 22" aria-hidden="true">
+                            <g fontFamily="Arial, Helvetica, sans-serif" fontWeight="700" fontSize="8" textAnchor="middle" fill="#fff">
+                              <rect x="0" y="0" width="10" height="10" rx="2" fill="#e42527" /><text x="5" y="7.6">Z</text>
+                              <rect x="12" y="0" width="10" height="10" rx="2" fill="#089949" /><text x="17" y="7.6">O</text>
+                              <rect x="0" y="12" width="10" height="10" rx="2" fill="#226db4" /><text x="5" y="19.6">H</text>
+                              <rect x="12" y="12" width="10" height="10" rx="2" fill="#f9b21d" /><text x="17" y="19.6">O</text>
                             </g>
                           </svg>
                         )}
-                        {p.key === "microsoft" ? p.label : <span className="sr-only">{p.label}</span>}
+                        {p.label}
                       </button>
                     ))}
                   </div>
