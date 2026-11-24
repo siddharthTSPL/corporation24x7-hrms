@@ -313,15 +313,14 @@ export const resolveNotificationLink = (notification, role) => {
 // and never returns anything that would render the 404 page.
 // ---------------------------------------------------------------------------
 
-<<<<<<< HEAD
+
 const SPARK_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|spark|conversation|mention)/i;
 const SPARK_PATH_RE = /^\/(convs|spark|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
-const EXTERNAL_PREFIXES = ["/sync", "/spark", "/convs"];
-=======
 const CONVS_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|convs|conversation|mention)/i;
 const CONVS_PATH_RE = /^\/(convs|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
 const EXTERNAL_PREFIXES = ["/peple", "/convs"];
->>>>>>> origin/Ashish
+
+
 
 const firstString = (...values) => {
   for (const v of values) {
