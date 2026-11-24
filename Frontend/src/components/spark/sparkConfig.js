@@ -1,7 +1,7 @@
-// Where Spark lives. Same domain in production (torchxsuite.com/spark), so the
+// Where Spark lives. Same domain in production (torchxsuite.com/convs), so the
 // login cookie / tab session is shared with Talent.
-// For local dev set VITE_SPARK_URL=http://localhost:5174/spark in .env.local
-const RAW = import.meta.env.VITE_SPARK_URL || "/spark";
+// For local dev set VITE_SPARK_URL=http://localhost:5174/convs in .env.local
+const RAW = import.meta.env.VITE_SPARK_URL || "/convs";
 
 const toAbsolute = (u) => new URL(u, window.location.origin);
 

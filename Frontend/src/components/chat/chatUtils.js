@@ -104,6 +104,7 @@ export const ALLOWED_MIME = [
   "application/vnd.ms-excel",
   "application/vnd.ms-powerpoint",
   "application/zip",
+  "application/x-zip-compressed",
   "audio/mpeg",
   "audio/mp4",
   "audio/webm",
@@ -113,7 +114,11 @@ export const ALLOWED_MIME = [
   "video/webm",
 ];
 
-export const ACCEPT_ATTR = ALLOWED_MIME.join(",");
+// Browsers and operating systems report ZIP files with different MIME types,
+// so include the extension in the picker and validate ZIPs by filename too.
+export const ACCEPT_ATTR = `${ALLOWED_MIME.join(",")},.zip`;
+export const isAllowedChatFile = (file) =>
+  ALLOWED_MIME.includes(file.type) || /\.zip$/i.test(file.name || "");
 
 export const personOf = (m) => ({ model: m.model, id: m.id });
 

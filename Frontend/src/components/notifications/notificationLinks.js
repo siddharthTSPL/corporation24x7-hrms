@@ -313,9 +313,14 @@ export const resolveNotificationLink = (notification, role) => {
 // and never returns anything that would render the 404 page.
 // ---------------------------------------------------------------------------
 
+
+const SPARK_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|spark|conversation|mention)/i;
+const SPARK_PATH_RE = /^\/(convs|spark|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
 const CONVS_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|convs|conversation|mention)/i;
 const CONVS_PATH_RE = /^\/(convs|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
 const EXTERNAL_PREFIXES = ["/peple", "/convs"];
+
+
 
 const firstString = (...values) => {
   for (const v of values) {
@@ -373,6 +378,7 @@ export const resolveNotificationAction = (notification, role) => {
   // 2) Links that belong to another app on this domain (Peple meetings ...)
   if (parts && !BROKEN_SEGMENT.test(parts.path)) {
     const hit = EXTERNAL_PREFIXES.find((p) => parts.path === p || parts.path.startsWith(`${p}/`));
+
     if (hit && hit !== "/convs") {
       return { kind: "external", href: parts.path + parts.query };
     }
