@@ -109,6 +109,7 @@ const payrollSchema = new mongoose.Schema(
 
     employerContribution: {
       pf: { type: Number, default: 0 },
+      pfAdmin: { type: Number, default: 0 },
       esi: { type: Number, default: 0 },
       gratuity: { type: Number, default: 0 }, // informational estimate, not deducted from employee
       lwf: { type: Number, default: 0 },

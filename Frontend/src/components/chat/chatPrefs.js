@@ -1,4 +1,4 @@
-const KEY = "torchx_spark_prefs";
+const KEY = "torchx_convs_prefs";
 const DEFAULTS = { enterIsSend: true };
 
 export const getChatPrefs = () => {

@@ -4,7 +4,7 @@ const { istDateFromYMD } = require("./Istdate.utils");
 const { round2 } = require("./payroll.utils");
 const { buildRequestOvertime } = require("./Overtimerequest.utils");
 
-const DEFAULT_MULTIPLIER = 1.5;
+const DEFAULT_MULTIPLIER = 2;
 const DEFAULT_STANDARD_HOURS_PER_DAY = 9;
 
 // Payroll's employeeModel -> Timesheet / TimeLog owner model. The org owner
@@ -17,7 +17,7 @@ const shapeSyncConfig = (policy) => {
   const hours = Number(s.standardHoursPerDay);
   return {
     enabled: s.enabled === true,
-    overtimeMultiplier: Number.isFinite(multiplier) && multiplier > 0 ? multiplier : DEFAULT_MULTIPLIER,
+    overtimeMultiplier: Number.isFinite(multiplier) && multiplier > 0 ? Math.max(multiplier, DEFAULT_MULTIPLIER) : DEFAULT_MULTIPLIER,
     standardHoursPerDay: Number.isFinite(hours) && hours > 0 ? hours : DEFAULT_STANDARD_HOURS_PER_DAY,
   };
 };

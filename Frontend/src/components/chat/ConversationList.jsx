@@ -328,7 +328,7 @@ export default function ConversationList({ selectedId, onSelect, onNew, expanded
     <div className="flex flex-col h-full min-h-0 bg-white">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl leading-none font-semibold tracking-tight text-gray-900">TorchX Spark</h2>
+          <h2 className="text-xl leading-none font-semibold tracking-tight text-gray-900">TorchX Convs</h2>
           <RealtimeStatus />
         </div>
         <div className="flex items-center gap-0.5">

@@ -64,6 +64,7 @@ function unpivot(doc) {
 
   // ---- Employer side - separate type, NOT part of net pay ----
   add("Provident Fund (Employer)", T.employer, ec.pf);
+  add("PF Admin Charges (Employer)", T.employer, ec.pfAdmin);
   add("ESI (Employer)", T.employer, ec.esi);
   add("Labour Welfare Fund (Employer)", T.employer, ec.lwf);
   add("Gratuity (estimate)", T.employer, ec.gratuity);

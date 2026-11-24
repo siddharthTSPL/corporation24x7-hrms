@@ -97,25 +97,25 @@ const CATEGORIES = [
     ],
   },
 
-  // --------------------------------------------------- TorchX Spark --
+  // --------------------------------------------------- TorchX Convs --
   {
-    id: "spark",
-    label: "TorchX Spark",
+    id: "convs",
+    label: "TorchX Convs",
     icon: FaComments,
     articles: [
       {
-        title: "What TorchX Spark is and how to open it",
+        title: "What TorchX Convs is and how to open it",
         blocks: [
           {
             type: "p",
-            text: "TorchX Spark is the team chat built into TorchX Talent. You can message colleagues, create groups and channels, and call anyone with voice or video, without installing another app or leaving the page you are working on.",
+            text: "TorchX Convs is the team chat built into TorchX Talent. You can message colleagues, create groups and channels, and call anyone with voice or video, without installing another app or leaving the page you are working on.",
           },
           {
             type: "steps",
-            title: "Opening Spark",
+            title: "Opening Convs",
             items: [
-              "Click the Spark (chat bubble) button in the top navigation bar of TorchX Talent.",
-              "The Spark panel slides open on top of your current page. Click the same button again, or press Esc, to close it.",
+              "Click the Convs (chat bubble) button in the top navigation bar of TorchX Talent.",
+              "The Convs panel slides open on top of your current page. Click the same button again, or press Esc, to close it.",
               "A badge on the button shows how many unread messages you have, so you can see new activity even when the panel is closed.",
               "Open any conversation from the list to start reading and replying.",
             ],
@@ -123,7 +123,7 @@ const CATEGORIES = [
           {
             type: "note",
             tone: "info",
-            text: "Spark and Sync are included in every plan, including Free Forever, and use the same sign-in as TorchX Talent.",
+            text: "Convs and Peple are included in every plan, including Free Forever, and use the same sign-in as TorchX Talent.",
           },
         ],
       },
@@ -211,13 +211,13 @@ const CATEGORIES = [
             items: [
               "The Calls tab keeps a history of your calls, including missed ones, so you can call back with one tap.",
               "Call notes can be captured from a call so decisions and follow-ups are not lost. You can add action items to your own follow-up list.",
-              "In Spark settings you can pick or upload your own ringtone, and the app tells you if your browser is blocking call sounds.",
+              "In Convs settings you can pick or upload your own ringtone, and the app tells you if your browser is blocking call sounds.",
             ],
           },
           {
             type: "note",
             tone: "warning",
-            text: "If you do not hear the ringtone, check that your browser allows sound for the page, and that Do Not Disturb is not active in your Spark settings.",
+            text: "If you do not hear the ringtone, check that your browser allows sound for the page, and that Do Not Disturb is not active in your Convs settings.",
           },
         ],
       },
@@ -226,7 +226,7 @@ const CATEGORIES = [
         blocks: [
           {
             type: "p",
-            text: "Open Settings from the gear icon at the top of the conversation list to personalise Spark.",
+            text: "Open Settings from the gear icon at the top of the conversation list to personalise Convs.",
           },
           {
             type: "list",
@@ -242,16 +242,16 @@ const CATEGORIES = [
           {
             type: "note",
             tone: "info",
-            text: "While Do Not Disturb is active, calls and notifications inside Spark stay quiet until your quiet hours end.",
+            text: "While Do Not Disturb is active, calls and notifications inside Convs stay quiet until your quiet hours end.",
           },
         ],
       },
       {
-        title: "Spark AI helpers",
+        title: "Convs AI helpers",
         blocks: [
           {
             type: "p",
-            text: "When AI is available for your workspace, Spark can help you write and catch up faster. Your text is processed through your organisation's own server, not sent straight from the browser to a third party.",
+            text: "When AI is available for your workspace, Convs can help you write and catch up faster. Your text is processed through your organisation's own server, not sent straight from the browser to a third party.",
           },
           {
             type: "list",
@@ -274,18 +274,18 @@ const CATEGORIES = [
     ],
   },
 
-  // ---------------------------------------------------- TorchX Sync --
+  // ---------------------------------------------------- TorchX Peple --
   {
-    id: "sync",
-    label: "TorchX Sync",
+    id: "peple",
+    label: "TorchX Peple",
     icon: FaVideo,
     articles: [
       {
-        title: "What TorchX Sync is",
+        title: "What TorchX Peple is",
         blocks: [
           {
             type: "p",
-            text: "TorchX Sync is the meetings app for your team. You can schedule, host and join video meetings from any browser, and follow up afterwards with minutes, action items and attendance reports. It is connected to TorchX Talent and TorchX Spark, so your meetings and your chats stay in one place.",
+            text: "TorchX Peple is the meetings app for your team. You can schedule, host and join video meetings from any browser, and follow up afterwards with minutes, action items and attendance reports. It is connected to TorchX Talent and TorchX Convs, so your meetings and your chats stay in one place.",
           },
           {
             type: "list",
@@ -301,7 +301,7 @@ const CATEGORIES = [
           {
             type: "note",
             tone: "info",
-            text: "Spark also shows your meetings calendar, so you can jump straight from a chat into a Sync meeting.",
+            text: "Convs also shows your meetings calendar, so you can jump straight from a chat into a Peple meeting.",
           },
         ],
       },
@@ -312,7 +312,7 @@ const CATEGORIES = [
             type: "steps",
             title: "Scheduling",
             items: [
-              "Open Sync and choose to schedule a new meeting, or start an instant meeting if you need one right now.",
+              "Open Peple and choose to schedule a new meeting, or start an instant meeting if you need one right now.",
               "Enter the title, date and time, and add the people you want to invite.",
               "To repeat the meeting, set it to recur daily, weekly or monthly.",
               "Save. Invitees are notified, and reminders go out before the meeting starts. Conflict checks warn you if someone already has something at that time.",
@@ -1445,8 +1445,8 @@ const CATEGORIES = [
 // the full article content is never touched by this UI change.
 // =====================================================================
 const CATEGORY_SUMMARIES = {
-  "spark": "Team chat built into Talent: direct messages, groups and channels, calls, polls, scheduled messages, AI helpers and personal settings.",
-  "sync": "Video meetings for your team: scheduling and calendar, guest links, whiteboard and captions, plus minutes, action items and attendance reports.",
+  "convs": "Team chat built into Talent: direct messages, groups and channels, calls, polls, scheduled messages, AI helpers and personal settings.",
+  "peple": "Video meetings for your team: scheduling and calendar, guest links, whiteboard and captions, plus minutes, action items and attendance reports.",
   "getting-started": "Sign-up, organisation setup, role-based login, and Companion Login for continuing your session on another device.",
   "face-attendance": "Kiosk face check-in/checkout, the 10-minute checkout cooldown, auto-checkout, and troubleshooting failed scans.",
   "system-attendance": "Manual check-in and checkout from the app, and how your daily attendance status gets classified.",

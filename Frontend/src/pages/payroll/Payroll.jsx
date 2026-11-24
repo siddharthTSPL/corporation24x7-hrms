@@ -847,10 +847,13 @@ function StatutoryTab({ notify }) {
             <Field label="Employer Contribution (%)">
               <TextInput type="number" min={0} max={100} disabled={!form.pf?.enabled} value={form.pf?.employerPercent ?? 0} onChange={(e) => set("pf.employerPercent", Number(e.target.value))} />
             </Field>
+            <Field label="Admin Charges (%)" hint="Employer cost; set as per the EPFO notification in force">
+              <TextInput type="number" step="0.01" min={0} max={5} disabled={!form.pf?.enabled} value={form.pf?.adminChargePercent ?? 0.5} onChange={(e) => set("pf.adminChargePercent", Number(e.target.value))} />
+            </Field>
           </div>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <Toggle checked={!!form.pf?.applyWageCeiling} onChange={(v) => set("pf.applyWageCeiling", v)} disabled={!form.pf?.enabled} />
-            <span style={{ fontSize: 12.5, color: C.muted }}>Apply statutory wage ceiling</span>
+            <span style={{ fontSize: 12.5, color: C.muted }}>Apply statutory wage ceiling (₹25,000 w.e.f. 17 Sep 2026)</span>
             <TextInput type="number" min={0} disabled={!form.pf?.enabled || !form.pf?.applyWageCeiling} value={form.pf?.wageCeiling ?? 0} onChange={(e) => set("pf.wageCeiling", Number(e.target.value))} style={{ maxWidth: 120 }} />
           </div>
         </div>
@@ -859,7 +862,7 @@ function StatutoryTab({ notify }) {
       {sub === "esi" && (
         <div>
           <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
-            Employee State Insurance (ESI) applies only to employees whose monthly gross is at or below the wage threshold set by the government.
+            Employee State Insurance (ESI) applies to establishments with 10 or more persons and only to employees whose monthly gross is at or below the wage threshold. Keep "Registered for ESI" in line with the actual registration and headcount; no ESI is calculated while it is off.
           </p>
           <div className="flex items-center gap-3 flex-wrap mb-3">
             <Toggle checked={!!form.esi?.enabled} onChange={(v) => set("esi.enabled", v)} />
@@ -923,9 +926,17 @@ function StatutoryTab({ notify }) {
             <Toggle checked={!!form.statutoryBonus?.enabled} onChange={(v) => set("statutoryBonus.enabled", v)} />
             <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Applicable</span>
           </div>
-          <Field label="% of Basic" hint="8.33 – 20">
-            <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} style={{ maxWidth: 160 }} />
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field label="% of Basic" hint="8.33 – 20">
+              <TextInput type="number" step="0.01" min={0} max={20} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.percentOfBasic ?? 0} onChange={(e) => set("statutoryBonus.percentOfBasic", Number(e.target.value))} />
+            </Field>
+            <Field label="Calculation ceiling (₹/month)" hint="Higher of ₹7,000 or minimum wage">
+              <TextInput type="number" min={0} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.calculationCeiling ?? 7000} onChange={(e) => set("statutoryBonus.calculationCeiling", Number(e.target.value))} />
+            </Field>
+            <Field label="Eligibility limit (₹/month)" hint="Wages above this are not eligible">
+              <TextInput type="number" min={0} disabled={!form.statutoryBonus?.enabled} value={form.statutoryBonus?.eligibilityLimit ?? 21000} onChange={(e) => set("statutoryBonus.eligibilityLimit", Number(e.target.value))} />
+            </Field>
+          </div>
         </div>
       )}
 
@@ -941,8 +952,8 @@ function StatutoryTab({ notify }) {
             <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Sync approved timesheet overtime to payroll</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ maxWidth: 420 }}>
-            <Field label="Overtime rate multiplier" hint="e.g. 1.5 = time-and-a-half">
-              <TextInput type="number" step="0.1" min={0.1} max={10} value={form.timesheetSync?.overtimeMultiplier ?? 1.5} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
+            <Field label="Overtime rate multiplier" hint="Statutory minimum 2 = double rate">
+              <TextInput type="number" step="0.1" min={2} max={10} value={form.timesheetSync?.overtimeMultiplier ?? 2} onChange={(e) => set("timesheetSync.overtimeMultiplier", Number(e.target.value))} />
             </Field>
             <Field label="Standard hours per day" hint="Used for the hourly rate and for timesheet-basis day rules">
               <TextInput type="number" step="0.5" min={1} max={24} value={form.timesheetSync?.standardHoursPerDay ?? 9} onChange={(e) => set("timesheetSync.standardHoursPerDay", Number(e.target.value))} />
@@ -1915,7 +1926,7 @@ const DEDUCTIONS_LABELS = {
   advance: "Advance",
   other: "Other Deduction",
 };
-const EMPLOYER_LABELS = { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
+const EMPLOYER_LABELS = { pf: "Employer PF", pfAdmin: "Employer PF Admin Charges", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" };
 
 
 const EARNINGS_EXCLUDE = ["gross", "benefits", "reimbursementComponents", "totalEarnings"];

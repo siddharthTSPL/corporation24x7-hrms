@@ -3,7 +3,7 @@ import { FaBars, FaSearch } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import NotificationBell from "./notifications/NotificationBell";
 import XpChip from "./gamification/XpChip";
-import SparkLauncher from "./spark/SparkLauncher";
+import ConvsLauncher from "./convs/ConvsLauncher";
 
 function Navbar({ collapsed, setCollapsed, data = [] }) {
   const { data: auth } = useAuth();
@@ -111,7 +111,7 @@ function Navbar({ collapsed, setCollapsed, data = [] }) {
 
         <XpChip />
 
-        <SparkLauncher />
+        <ConvsLauncher />
 
         <NotificationBell />
 

@@ -100,7 +100,7 @@ export function getPayslipLineItems(payroll) {
     ...(breakup.deductionComponents || []).map((c) => ({ label: c.name, amount: c.amount })),
   ];
 
-  const employerContribution = dynamicRows(payroll.employerContribution, [], { pf: "Employer PF", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" });
+  const employerContribution = dynamicRows(payroll.employerContribution, [], { pf: "Employer PF", pfAdmin: "Employer PF Admin Charges", esi: "Employer ESI", lwf: "Employer LWF", statutoryBonus: "Statutory Bonus" });
 
   return { earnings, deductions, employerContribution };
 }

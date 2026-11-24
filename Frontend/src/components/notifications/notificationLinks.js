@@ -302,20 +302,26 @@ export const resolveNotificationLink = (notification, role) => {
 };
 
 // ---------------------------------------------------------------------------
-// Chat / call / group / contact notifications live in TorchX Spark (a separate
-// app shown in the Spark dock), not in a Talent route. Sending those through
+// Chat / call / group / contact notifications live in TorchX Convs (a separate
+// app shown in the Convs dock), not in a Talent route. Sending those through
 // navigate() is what produced the 404 page (e.g. "/chat/123", "/talent/chat",
-// "/calls", "/spark/..." do not exist under the /talent router).
+// "/calls", "/convs/..." do not exist under the /talent router).
 // resolveNotificationAction() decides what a click should DO:
-//   { kind: "spark", conversationId|null, view }  -> open the Spark dock
+//   { kind: "convs", conversationId|null, view }  -> open the Convs dock
 //   { kind: "route", to }                         -> in-app navigate(to)
 //   { kind: "external", href }                    -> full page load (other app)
 // and never returns anything that would render the 404 page.
 // ---------------------------------------------------------------------------
 
+<<<<<<< HEAD
 const SPARK_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|spark|conversation|mention)/i;
 const SPARK_PATH_RE = /^\/(convs|spark|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
 const EXTERNAL_PREFIXES = ["/sync", "/spark", "/convs"];
+=======
+const CONVS_TYPE_RE = /(chat|message|msg|call|missed|group|channel|invite|invitation|contact|friend|convs|conversation|mention)/i;
+const CONVS_PATH_RE = /^\/(convs|chat|chats|messages?|conversations?|calls?|call-history|channels?|groups?|contacts?|friends?|invites?|invitations?)(\/|$)/i;
+const EXTERNAL_PREFIXES = ["/peple", "/convs"];
+>>>>>>> origin/Ashish
 
 const firstString = (...values) => {
   for (const v of values) {
@@ -339,20 +345,20 @@ const conversationIdOf = (notification, parts) => {
     const q = new URLSearchParams(parts.query.replace(/^\?/, "").split("#")[0]);
     id = firstString(q.get("c"), q.get("conversationId"), q.get("chatId"), q.get("conversation"));
     if (!isUsableId(id)) {
-      const seg = parts.path.match(/^\/(?:spark\/)?(?:chat|chats|messages?|conversations?|groups?|channels?)\/([^/]+)$/i);
+      const seg = parts.path.match(/^\/(?:convs\/)?(?:chat|chats|messages?|conversations?|groups?|channels?)\/([^/]+)$/i);
       id = seg ? decodeURIComponent(seg[1]) : null;
     }
   }
   return isUsableId(id) ? id : null;
 };
 
-export const isSparkNotification = (notification) => {
+export const isConvsNotification = (notification) => {
   const t = String(notification?.type || "");
-  if (SPARK_TYPE_RE.test(t) && !/^(meeting|announcement|gamification)/i.test(t)) return true;
+  if (CONVS_TYPE_RE.test(t) && !/^(meeting|announcement|gamification)/i.test(t)) return true;
   const raw = notification?.link;
   if (typeof raw === "string" && raw.trim()) {
     const parts = splitPath(raw);
-    if (parts && SPARK_PATH_RE.test(parts.path)) return true;
+    if (parts && CONVS_PATH_RE.test(parts.path)) return true;
   }
   return !!(notification?.meta?.conversationId || notification?.meta?.chatId);
 };
@@ -361,19 +367,23 @@ export const resolveNotificationAction = (notification, role) => {
   const raw = notification?.link;
   const parts = typeof raw === "string" && raw.trim() ? splitPath(raw) : null;
 
-  // 1) Chat / call / group / contact -> Spark dock (never a Talent route)
-  if (isSparkNotification(notification)) {
+  // 1) Chat / call / group / contact -> Convs dock (never a Talent route)
+  if (isConvsNotification(notification)) {
     return {
-      kind: "spark",
+      kind: "convs",
       conversationId: conversationIdOf(notification, parts),
       view: /call/i.test(String(notification?.type || "")) ? "calls" : "chats",
     };
   }
 
-  // 2) Links that belong to another app on this domain (Sync meetings ...)
+  // 2) Links that belong to another app on this domain (Peple meetings ...)
   if (parts && !BROKEN_SEGMENT.test(parts.path)) {
     const hit = EXTERNAL_PREFIXES.find((p) => parts.path === p || parts.path.startsWith(`${p}/`));
+<<<<<<< HEAD
     if (hit && hit !== "/spark" && hit !== "/convs") {
+=======
+    if (hit && hit !== "/convs") {
+>>>>>>> origin/Ashish
       return { kind: "external", href: parts.path + parts.query };
     }
   }

@@ -41,7 +41,7 @@ export const TYPE_META = {
   timesheet: { icon: FaClock, color: "#F59E0B", bg: "#FEF3E2" },
   holiday: { icon: FaUmbrellaBeach, color: "#00A8E8", bg: "#E6F6FD" },
   birthday: { icon: FaBirthdayCake, color: "#EC4899", bg: "#FDE7F3" },
-  // Spark (chat / calls) - shown with their own icon instead of the generic bell
+  // Convs (chat / calls) - shown with their own icon instead of the generic bell
   missed_call: { icon: FaPhoneSlash, color: "#EB5757", bg: "#FDEBEB" },
   call: { icon: FaPhoneAlt, color: "#16A34A", bg: "#E7F7EC" },
   call_history: { icon: FaPhoneAlt, color: "#6B7280", bg: "#F1F2F4" },
