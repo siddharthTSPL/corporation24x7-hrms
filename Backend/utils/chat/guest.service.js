@@ -151,7 +151,7 @@ const FRONTEND_URL = () => (process.env.FRONTEND_URL || "").replace(/\/$/, "");
 const SYNC_URL = () => {
   if (process.env.SYNC_URL) return process.env.SYNC_URL.replace(/\/+$/, "");
   const base = (process.env.BASE_URL || FRONTEND_URL()).replace(/\/talent\/?$/, "").replace(/\/+$/, "");
-  return base ? `${base}/sync` : "";
+  return base ? `${base}/peple` : "";
 };
 const guestJoinUrl = (meetingId) => (SYNC_URL() ? `${SYNC_URL()}${process.env.MEETING_GUEST_JOIN_PATH || "/meeting-guest"}/${meetingId}` : "");
 
