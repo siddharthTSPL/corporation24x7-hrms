@@ -58,6 +58,16 @@ export const rejectReimbursement = async ({ id, reason }) => {
   return res.data;
 };
 
+export const bulkApproveReimbursements = async ({ ids, comments }) => {
+  const res = await api.post("reimbursement/admin/bulk-approve", { ids, comments });
+  return res.data;
+};
+
+export const bulkRejectReimbursements = async ({ ids, reason }) => {
+  const res = await api.post("reimbursement/admin/bulk-reject", { ids, reason });
+  return res.data;
+};
+
 export const markReimbursementPaid = async ({ id, paymentReference, financeNotes }) => {
   const res = await api.post("reimbursement/admin/markPaid", { id, paymentReference, financeNotes });
   return res.data;

@@ -9,6 +9,8 @@ const {
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
 const multer = require("multer");
 const leaveDocumentUpload = require("../middleware/upload/Leavedocument.middleware");
+const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
+const { uploadProfilePhoto } = require("../controllers/profilePhoto.controller");
 
 // Performance Management (Review) and TorchX Voice are plan-gated features:
 // fully locked on the Basic plan, fully open on Advance/enterprise (or
@@ -90,6 +92,7 @@ userrouter.post(
   asyncHandler(respondToMyReview),
 );
 userrouter.put("/updateprofile", employeemiddleware, asyncHandler(editprofile));
+userrouter.post("/profile-photo", employeemiddleware, profilePhotoUpload, asyncHandler(uploadProfilePhoto));
 userrouter.put(
   "/changepassword",
   employeemiddleware,

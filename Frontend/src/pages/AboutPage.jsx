@@ -11,8 +11,30 @@ import { FiStar, FiUsers } from 'react-icons/fi'
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
 import { fadeUp, stagger, cardVariant } from "./announcement/animations";
-import slideWhiteOffice from '../assets/Office-meeting.png'
-import slideTeam from '../assets/Team-work.jpg'
+import slideWhiteOffice from '../assets/Office-meeting.webp'
+import slideTeam from '../assets/Team-work.webp'
+
+/* ------------------------------------------------------------------ */
+/* StaticImage: no fade-in or opacity hiding.                          */
+/* Images are requested eagerly and decoded asynchronously.           */
+/* Note: the browser still needs to download each image at least once. */
+/* ------------------------------------------------------------------ */
+function StaticImage({ src, alt, className = '', priority = false }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={1200}
+      height={900}
+      loading="eager"
+      fetchPriority={priority ? 'high' : 'auto'}
+      decoding="async"
+      draggable={false}
+      className={`block w-full h-full object-cover ${className}`}
+      style={{ display: 'block', backgroundColor: '#F8F5F7' }}
+    />
+  )
+}
 
 function HeroBadge({ children }) {
   return (
@@ -24,7 +46,7 @@ function HeroBadge({ children }) {
 }
 
 function AboutHero({ onExplore }) {
- 
+
   return (
     <section className="bg-white pt-24 pb-12 overflow-hidden">
       <Wrap>
@@ -54,18 +76,13 @@ function AboutHero({ onExplore }) {
             </div>
           </motion.div>
 
-          <motion.div
-            variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.15 }}
-            className="relative"
-          >
+          {/* Image block: plain div (no animation), so the picture is simply there from the first paint */}
+          <div className="relative">
             <div className="rounded-3xl overflow-hidden border border-[#EAC7D7] shadow-[0_24px_64px_rgba(115,0,66,0.16)] aspect-[4/3]">
-              <img
+              <StaticImage
                 src={slideWhiteOffice}
                 alt="TorchX Talent workforce analytics"
-                className="w-full h-full object-cover"
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
+                priority
               />
             </div>
 
@@ -91,7 +108,7 @@ function AboutHero({ onExplore }) {
                 <div className="text-[12px] font-display font-bold text-[#111]">ISO 27001 &amp; SOC 2 Ready</div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </Wrap>
     </section>
@@ -151,15 +168,13 @@ function OriginStory({ scrollContainerRef }) {
     <section className="bg-[#F8F5F7] py-12">
       <Wrap>
         <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-10 items-center">
-         
+
           <div className="relative">
             <div className="rounded-2xl overflow-hidden border border-[#EAC7D7] shadow-[0_16px_48px_rgba(115,0,66,0.12)] aspect-[4/3]">
-              <img
+              <StaticImage
                 src={slideTeam}
-                alt="TorchX Talent engineering lab"
-                className="w-full h-full object-cover"
-                loading="eager"
-                decoding="async"
+                alt="TorchX Talent engineering lab" loading="lazy" decoding="async"
+                priority
               />
             </div>
             <div className="flex items-center justify-between mt-3 px-1">

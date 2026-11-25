@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaCheckDouble, FaInbox, FaTrashAlt } from "react-icons/fa";
 import {
@@ -10,7 +9,9 @@ import {
   useClearReadNotifications,
 } from "../../auth/server-state/notification/notification.hook";
 import { groupByDay, TYPE_META } from "../../components/notifications/notificationUtils";
+import useOpenNotification from "../../components/notifications/useOpenNotification";
 import NotificationItem from "../../components/notifications/NotificationItem";
+import FeatureNotificationModal from "../../components/notifications/FeatureNotificationModal";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -18,10 +19,11 @@ const TABS = [
 ];
 
 export default function NotificationsPage() {
-  const navigate = useNavigate();
+  const openNotification = useOpenNotification();
   const [filter, setFilter] = useState("all");
   const [type, setType] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const limit = 15;
 
   const { data, isLoading, isFetching, isError } = useNotifications({ page, limit, filter, type: type || undefined });
@@ -37,7 +39,11 @@ export default function NotificationsPage() {
 
   const handleOpenNotification = (notification) => {
     if (!notification.isRead) markAsRead.mutate(notification._id);
-    if (notification.link) navigate(notification.link);
+    if (notification.meta?.featureLaunchId) {
+      setSelectedFeature(notification);
+      return;
+    }
+    openNotification(notification);
   };
 
   const handleDelete = (id) => {
@@ -63,6 +69,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      <FeatureNotificationModal notification={selectedFeature} onClose={() => setSelectedFeature(null)} />
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Notifications</h1>

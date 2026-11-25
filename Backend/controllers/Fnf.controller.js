@@ -26,22 +26,22 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
   if (!Model) return { name: "", employeeId: "", department: "", designation: "", pan: "", bankAccountNumber: "", bankName: "", dateOfJoining: null };
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
+    const person = await Model.findById(employeeId).select("f_name l_name empid designation organisation_name bank_name account_number date_of_joining createdAt").lean();
     if (!person) return { name: "", employeeId: "", department: "", designation: "", pan: "", bankAccountNumber: "", bankName: "", dateOfJoining: null };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
-      employeeId: "OWNER",
+      employeeId: person.empid || "OWNER",
       department: "Management",
-      designation: "Super Admin",
+      designation: person.designation || "",
       pan: "",
       bankAccountNumber: person.account_number || "",
       bankName: person.bank_name || "",
-      dateOfJoining: null,
+      dateOfJoining: person.date_of_joining || person.createdAt || null,
     };
   }
 
   const person = await Model.findById(employeeId)
-    .select("f_name l_name empid uid department designation pan_number account_number bank_name date_of_joining")
+    .select("f_name l_name empid uid department designation pan_number account_number bank_name date_of_joining createdAt")
     .lean();
   if (!person) return { name: "", employeeId: "", department: "", designation: "", pan: "", bankAccountNumber: "", bankName: "", dateOfJoining: null };
   return {
@@ -52,7 +52,7 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
     pan: person.pan_number || "",
     bankAccountNumber: person.account_number || "",
     bankName: person.bank_name || "",
-    dateOfJoining: person.date_of_joining || null,
+    dateOfJoining: person.date_of_joining || person.createdAt || null,
   };
 };
 

@@ -270,7 +270,7 @@ const OfferTab = ({ candidate, canAct }) => {
   const bundle = data?.data;
   const offer = bundle?.offer;
   const appointment = bundle?.appointment;
-  const meta = bundle ? { templates: bundle.templates, placeholders: bundle.placeholders } : null;
+  const meta = bundle ? { templates: bundle.templates, placeholders: bundle.placeholders, salary_config: bundle.salary_config } : null;
   const joined = candidate.current_stage === "JOINED";
 
   const run = async (fn, ok) => {

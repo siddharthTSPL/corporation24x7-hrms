@@ -1,10 +1,19 @@
+require('dotenv').config();
+const { installProcessGuard } = require('./utils/Processguard');
+installProcessGuard(); // crash / unhandled-rejection / DB-disconnect alert mails
+
 const app = require('./src/app');
 const db = require('./config/databaseconnect');
 const https = require('https');
+const http = require('http');
+const { initSocket } = require('./config/socket');
 
 db();
 
-app.listen(5000, '0.0.0.0', () => {
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(5000, '0.0.0.0', () => {
   console.log('server is running on port 5000');
 });
 

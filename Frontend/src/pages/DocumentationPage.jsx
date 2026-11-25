@@ -5,6 +5,7 @@ import {
   FaUsers, FaBoxes, FaShieldAlt, FaLaptop, FaExclamationTriangle, FaInfoCircle, FaCheckCircle,
   FaMoneyBillWave, FaReceipt, FaAward, FaCommentDots, FaFolderOpen, FaBullhorn,
   FaSitemap, FaBell, FaUserCog, FaSignInAlt, FaCalendarCheck,
+  FaComments, FaVideo,
 } from "react-icons/fa";
 
 
@@ -90,6 +91,319 @@ const CATEGORIES = [
             type: "note",
             tone: "warning",
             text: "Because the link signs in without a password, only share it the same way you'd share a password — and generate a fresh one if it expires or you're unsure it's still valid.",
+          },
+        ],
+      },
+    ],
+  },
+
+  // --------------------------------------------------- TorchX Convs --
+  {
+    id: "convs",
+    label: "TorchX Convs",
+    icon: FaComments,
+    articles: [
+      {
+        title: "What TorchX Convs is and how to open it",
+        blocks: [
+          {
+            type: "p",
+            text: "TorchX Convs is the team chat built into TorchX Talent. You can message colleagues, create groups and channels, and call anyone with voice or video, without installing another app or leaving the page you are working on.",
+          },
+          {
+            type: "steps",
+            title: "Opening Convs",
+            items: [
+              "Click the Convs (chat bubble) button in the top navigation bar of TorchX Talent.",
+              "The Convs panel slides open on top of your current page. Click the same button again, or press Esc, to close it.",
+              "A badge on the button shows how many unread messages you have, so you can see new activity even when the panel is closed.",
+              "Open any conversation from the list to start reading and replying.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "info",
+            text: "Convs and Peple are included in every plan, including Free Forever, and use the same sign-in as TorchX Talent.",
+          },
+        ],
+      },
+      {
+        title: "Starting chats: direct messages, groups and channels",
+        blocks: [
+          {
+            type: "p",
+            text: "The conversation list is organised into tabs so you can find people and teams quickly: All, Direct, Groups, Channels and Calls.",
+          },
+          {
+            type: "steps",
+            title: "Starting a new conversation",
+            items: [
+              "Tap New chat at the top of the conversation list.",
+              "Choose Direct message to talk to one person, or New group to bring several people together.",
+              "Pick the people and, for a group, give it a name.",
+              "Send your first message. The conversation now appears in your list.",
+            ],
+          },
+          {
+            type: "list",
+            title: "Group controls",
+            items: [
+              "Groups have roles and admin controls. Admins can add members, make other members admins, and restrict who can send messages (\"Only admins can send messages\").",
+              "Groups can be joined through an invite link, which is handy for people who have chosen not to be added directly.",
+              "You can mute any conversation so it stops notifying you, without leaving it.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Messages: mentions, replies, polls, files and scheduled messages",
+        blocks: [
+          {
+            type: "list",
+            title: "What you can do in a conversation",
+            items: [
+              "@mention a teammate to get their attention in a group, and reply to a specific message to keep the thread clear.",
+              "React to messages with emoji, and use stickers and emoji from the picker next to the message box.",
+              "Edit a message after sending it, or forward it to another conversation.",
+              "Create a poll in the chat to collect votes without leaving the thread.",
+              "Share documents, images and links. Links show a preview, and shared media is collected in a gallery for each conversation.",
+              "Pin important messages and star the ones you want to find again quickly.",
+              "See read receipts and live typing indicators, so you know who has seen a message and who is replying.",
+            ],
+          },
+          {
+            type: "steps",
+            title: "Scheduling a message to send later",
+            items: [
+              "Write your message as usual in the message box.",
+              "Choose the schedule option instead of Send, then pick the date and time.",
+              "Confirm. The message is sent automatically at that time.",
+              "Unsent drafts are kept safe while you switch between chats.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "info",
+            text: "Disappearing messages let you set a conversation to clear itself after a time you choose.",
+          },
+        ],
+      },
+      {
+        title: "Voice and video calls",
+        blocks: [
+          {
+            type: "p",
+            text: "You can call any colleague straight from your chat with them, or start a call in a group. Calls run in the browser, with noise suppression and background blur available during the call.",
+          },
+          {
+            type: "steps",
+            title: "Making and receiving a call",
+            items: [
+              "Open the conversation with the person or group you want to call.",
+              "Choose the voice call or video call button at the top of the chat.",
+              "When someone calls you, an incoming call card appears with Accept and Reject buttons. Accept to join, or Reject to decline.",
+              "Use the on-screen controls to mute, turn your camera on or off, and end the call.",
+            ],
+          },
+          {
+            type: "list",
+            title: "Call history, notes and ringtone",
+            items: [
+              "The Calls tab keeps a history of your calls, including missed ones, so you can call back with one tap.",
+              "Call notes can be captured from a call so decisions and follow-ups are not lost. You can add action items to your own follow-up list.",
+              "In Convs settings you can pick or upload your own ringtone, and the app tells you if your browser is blocking call sounds.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "warning",
+            text: "If you do not hear the ringtone, check that your browser allows sound for the page, and that Do Not Disturb is not active in your Convs settings.",
+          },
+        ],
+      },
+      {
+        title: "Profile, status, privacy and notification settings",
+        blocks: [
+          {
+            type: "p",
+            text: "Open Settings from the gear icon at the top of the conversation list to personalise Convs.",
+          },
+          {
+            type: "list",
+            title: "What you can change",
+            items: [
+              "Profile & status: set your status to Available, Busy, In a meeting, On leave, or a custom message, and choose how long it lasts (1 hour, Today, 7 days or Never).",
+              "Auto-reply: pick a template or write your own message, and choose when it should turn off automatically.",
+              "Privacy: hide your online status, turn the typing indicator on or off, and decide who can add you to groups (Everyone or Nobody).",
+              "Appearance: choose Light, Dark or System theme, text size (S, M or L), Compact mode and an accent colour.",
+              "Do not disturb & alerts: schedule quiet hours, and choose whether to get group notifications and message previews.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "info",
+            text: "While Do Not Disturb is active, calls and notifications inside Convs stay quiet until your quiet hours end.",
+          },
+        ],
+      },
+      {
+        title: "Convs AI helpers",
+        blocks: [
+          {
+            type: "p",
+            text: "When AI is available for your workspace, Convs can help you write and catch up faster. Your text is processed through your organisation's own server, not sent straight from the browser to a third party.",
+          },
+          {
+            type: "list",
+            title: "What the helpers do",
+            items: [
+              "Rewrite: improve the tone or clarity of a message before you send it.",
+              "Smart replies: get quick suggested responses to the last message.",
+              "Translate: translate a message into another language.",
+              "Catch me up: get a short summary of a busy conversation you have been away from.",
+              "Call notes: a summary, decisions, action items and open questions from a call.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "warning",
+            text: "AI suggestions are only drafts. Read them before sending, and edit anything that does not sound right.",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ---------------------------------------------------- TorchX Peple --
+  {
+    id: "peple",
+    label: "TorchX Peple",
+    icon: FaVideo,
+    articles: [
+      {
+        title: "What TorchX Peple is",
+        blocks: [
+          {
+            type: "p",
+            text: "TorchX Peple is the meetings app for your team. You can schedule, host and join video meetings from any browser, and follow up afterwards with minutes, action items and attendance reports. It is connected to TorchX Talent and TorchX Convs, so your meetings and your chats stay in one place.",
+          },
+          {
+            type: "list",
+            title: "At a glance",
+            items: [
+              "HD video and audio meetings, started instantly or scheduled ahead.",
+              "A shared calendar for every meeting.",
+              "Guest join links for people outside your company.",
+              "A live whiteboard, polls, Q&A and captions inside the meeting.",
+              "Minutes, action items and attendance reports after the meeting.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "info",
+            text: "Convs also shows your meetings calendar, so you can jump straight from a chat into a Peple meeting.",
+          },
+        ],
+      },
+      {
+        title: "Scheduling a meeting and using the calendar",
+        blocks: [
+          {
+            type: "steps",
+            title: "Scheduling",
+            items: [
+              "Open Peple and choose to schedule a new meeting, or start an instant meeting if you need one right now.",
+              "Enter the title, date and time, and add the people you want to invite.",
+              "To repeat the meeting, set it to recur daily, weekly or monthly.",
+              "Save. Invitees are notified, and reminders go out before the meeting starts. Conflict checks warn you if someone already has something at that time.",
+            ],
+          },
+          {
+            type: "list",
+            title: "Calendar",
+            items: [
+              "The shared calendar has a month view and a mini calendar, so you can see your meeting load at a glance.",
+              "Every meeting can be added to your own calendar using an add-to-calendar (.ics) file.",
+              "A banner such as \"Starts in 5 min\" appears shortly before a meeting so you do not miss it.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "Joining a meeting and inviting guests",
+        blocks: [
+          {
+            type: "steps",
+            title: "Joining from TorchX Talent",
+            items: [
+              "Open the meeting from your calendar, the banner, or the notification you received, and click Join.",
+              "Allow camera and microphone access when your browser asks. Check your preview and settings.",
+              "Enter the meeting. If the host has a waiting room, you will wait on a waiting screen until you are let in.",
+            ],
+          },
+          {
+            type: "steps",
+            title: "Inviting someone outside your company",
+            items: [
+              "Open the meeting and use the invite option to copy the guest link and join code.",
+              "Share the link with the person outside your company.",
+              "They open it in their browser, enter their name and the join code if asked, and join without needing a TorchX account.",
+            ],
+          },
+          {
+            type: "note",
+            tone: "warning",
+            text: "Only share guest links and join codes with people you want in the meeting. The host can see who is in the meeting at any time and can remove people.",
+          },
+        ],
+      },
+      {
+        title: "Inside the meeting room",
+        blocks: [
+          {
+            type: "list",
+            title: "What you can use during a meeting",
+            items: [
+              "Video and audio, with the option to blur or replace your background and cut out background noise.",
+              "Screen sharing, with a live whiteboard where everyone can sketch ideas together.",
+              "Reactions and polls, to get a quick vote from the room.",
+              "Q&A and hand raise, so big meetings stay orderly.",
+              "Live captions while people speak, and a transcript you can review later.",
+              "People panel and meeting chat, to see who is in the room and message without interrupting.",
+            ],
+          },
+          {
+            type: "list",
+            title: "Host controls",
+            items: [
+              "Mute everyone.",
+              "Choose who can present and share their screen.",
+              "Adjust meeting settings, such as who is allowed to do what.",
+              "Host controls are visible only to hosts and co-hosts.",
+            ],
+          },
+        ],
+      },
+      {
+        title: "After the meeting: minutes, action items and reports",
+        blocks: [
+          {
+            type: "steps",
+            title: "Following up",
+            items: [
+              "When the meeting ends, a post-meeting screen asks \"How was this meeting?\" so you can rate it.",
+              "Open the minutes to see the notes and decisions. You can download them as a .md file or copy them.",
+              "Review the action items, assign them to people, and track them until they are done.",
+              "Download or share the transcript if you need a full record.",
+            ],
+          },
+          {
+            type: "list",
+            title: "Reports and insights",
+            items: [
+              "Attendance reports show who joined and for how long, and can be exported to CSV.",
+              "Meeting insights show how much time your team spent in meetings over the last 30 days, which helps you spot meeting overload.",
+            ],
           },
         ],
       },
@@ -1131,6 +1445,8 @@ const CATEGORIES = [
 // the full article content is never touched by this UI change.
 // =====================================================================
 const CATEGORY_SUMMARIES = {
+  "convs": "Team chat built into Talent: direct messages, groups and channels, calls, polls, scheduled messages, AI helpers and personal settings.",
+  "peple": "Video meetings for your team: scheduling and calendar, guest links, whiteboard and captions, plus minutes, action items and attendance reports.",
   "getting-started": "Sign-up, organisation setup, role-based login, and Companion Login for continuing your session on another device.",
   "face-attendance": "Kiosk face check-in/checkout, the 10-minute checkout cooldown, auto-checkout, and troubleshooting failed scans.",
   "system-attendance": "Manual check-in and checkout from the app, and how your daily attendance status gets classified.",

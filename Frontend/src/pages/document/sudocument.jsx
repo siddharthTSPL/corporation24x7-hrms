@@ -59,6 +59,15 @@ function getInitials(name = "") {
     .slice(0, 2);
 }
 
+function PersonAvatar({ name, image, className = "" }) {
+  return (
+    <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#730042] font-semibold text-white ${className}`}>
+      <span>{getInitials(name)}</span>
+      {image && <img src={image} alt="" className="absolute inset-0 h-full w-full rounded-full object-cover" onError={(event) => event.currentTarget.remove()} />}
+    </div>
+  );
+}
+
 function getExt(url = "") {
   const clean = url.split("?")[0];
   const parts = clean.split(".");
@@ -295,9 +304,7 @@ function DetailDrawer({ documentId, docType, onClose }) {
                     Uploaded by
                   </p>
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
-                      {getInitials(doc.uploader.name)}
-                    </div>
+                    <PersonAvatar name={doc.uploader.name} image={doc.uploader.profile_image} className="h-10 w-10 sm:h-11 sm:w-11 text-sm" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[#2a1a16] truncate">{doc.uploader.name}</p>
                       <p className="text-xs text-[#b0948a] mt-0.5 truncate">{doc.uploader.email}</p>
@@ -434,9 +441,7 @@ function UploaderDrawer({ group, personalDocs, expenseDocs, onClose, onOpenDoc }
       <div onClick={onClose} className="absolute inset-0 bg-[#2a1a16]/40 backdrop-blur-[2px]" />
       <div className="relative w-full sm:max-w-md md:max-w-lg h-full bg-white flex flex-col shadow-2xl overflow-hidden">
         <div className="sticky top-0 bg-white z-10 px-4 sm:px-6 py-4 border-b border-[#ede5e0] flex items-center gap-2.5 sm:gap-3 shrink-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-sm font-semibold text-white flex-shrink-0">
-            {getInitials(group.name)}
-          </div>
+          <PersonAvatar name={group.name} image={group.profile_image} className="h-10 w-10 sm:h-11 sm:w-11 text-sm" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-[#2a1a16] truncate">{group.name}</p>
             <p className="text-xs text-[#b0948a] truncate">{group.email}</p>
@@ -526,9 +531,7 @@ function UploaderCard({ group, onClick }) {
       className="flex flex-col sm:flex-row sm:items-center gap-3 p-3.5 sm:p-4 cursor-pointer border-b border-[#ede5e0] hover:bg-[#f9f8f2] transition-colors group"
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#730042] flex items-center justify-center text-xs sm:text-sm font-semibold text-white flex-shrink-0">
-          {getInitials(group.name)}
-        </div>
+        <PersonAvatar name={group.name} image={group.profile_image} className="h-10 w-10 sm:h-11 sm:w-11 text-xs sm:text-sm" />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -588,9 +591,7 @@ function UploaderTableRow({ group, onClick }) {
     <tr onClick={onClick} className="border-b border-[#ede5e0] hover:bg-[#f9f8f2] cursor-pointer transition-colors group">
       <td className="px-3 py-3 overflow-hidden">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-[#730042] flex items-center justify-center text-[10px] font-semibold text-white flex-shrink-0">
-            {getInitials(group.name)}
-          </div>
+          <PersonAvatar name={group.name} image={group.profile_image} className="h-8 w-8 text-[10px]" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-[#2a1a16] truncate max-w-[160px] xl:max-w-xs">{group.name}</p>
             <p className="text-[10px] text-[#b0948a] truncate max-w-[160px] xl:max-w-xs">{group.email}</p>
@@ -664,6 +665,7 @@ export default function SuperAdminDocuments() {
         map.set(uploaderId, {
           id: uploaderId,
           name: doc.uploader?.name || "Unknown uploader",
+          profile_image: doc.uploader?.profile_image || "",
           email: doc.uploader?.email || "—",
           department: doc.uploader?.department || "",
           designation: doc.uploader?.designation || "",

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { OffDayTag, OffDayNotice, isOffDay } from "./OffDayTag";
+import TimesheetNotificationSettings from "./TimesheetNotificationSettings";
 import {
   useMyProjects, useCreateProject, useUpdateProject, useAddProjectMembers, useRemoveProjectMember, useAssignableTargets,
   useCreateJob, useUpdateJob, useJobsCreatedByMe, useUpdateJobStatus,
@@ -187,6 +188,7 @@ const NAV_TABS = [
   { id: "org-sheets", label: "All Timesheets" },
   { id: "analytics",  label: "Analytics"      },
   { id: "report",     label: "Time Sheet Report" },
+  { id: "email-alerts", label: "Email Alerts"   },
 ];
 
 function cn(...args) { return args.filter(Boolean).join(" "); }
@@ -2029,6 +2031,8 @@ export default function SuperAdminTimesheet() {
             </Card>
           </div>
         )}
+
+        {tab === "email-alerts" && <TimesheetNotificationSettings />}
 
         {tab === "report" && (
           <div className="min-w-0">

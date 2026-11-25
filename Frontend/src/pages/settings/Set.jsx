@@ -10,6 +10,9 @@ import { useAuth } from "../../auth/store/getmeauth/getmeauth";
 import { Country, State, City } from "country-state-city";
 import MyAssetsWidget from "../asset/Myassetswidget";
 import { useGetMyAssetsAdmin } from "../../auth/server-state/adminasset/adminasset.hook";
+import ProfilePhotoUpload from "../../components/ProfilePhotoUpload";
+import DpdpLockCard from "../../dpdp/DpdpLockCard";
+import PrivacyCenter from "../../dpdp/PrivacyCenter";
 
 const DEFAULT_COUNTRY_ISO = "IN";
 const AVATAR_STYLES = [
@@ -89,6 +92,7 @@ const TABS = [
   { key: "reviews", label: "Reviews" },
   { key: "assets", label: "My Assets" },
   { key: "password", label: "Password" },
+  { key: "privacy", label: "Privacy & Data" },
   { key: "avatar", label: "Avatar" },
 ];
 
@@ -840,7 +844,7 @@ function ContactTab({ adminData, onSuccess, onError }) {
       countryIso,
       stateIso,
       city: cityName,
-      date_of_joining: toDateInputValue(adminData.date_of_joining),
+      date_of_joining: toDateInputValue(adminData.date_of_joining || adminData.createdAt),
       date_of_birth: toDateInputValue(adminData.date_of_birth),
     });
   }, [adminData]);
@@ -1750,6 +1754,13 @@ function AvatarTab({ adminData, onSuccess, onError }) {
     );
   };
 
+  const handlePhotoUploaded = (url) => {
+    setCurrentImg(url);
+    queryClient.invalidateQueries({ queryKey: ["auth"] });
+    queryClient.invalidateQueries({ queryKey: ["admin"] });
+    onSuccess("Profile photo updated!");
+  };
+
   return (
     <SectionCard
       title="Profile avatar"
@@ -1806,7 +1817,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
             Current avatar
           </div>
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>
-            {currentImg ? "DiceBear avatar" : "Initials (default)"}
+            {currentImg ? (currentImg.includes("api.dicebear.com") ? "DiceBear avatar" : "Uploaded profile photo") : "Initials (default)"}
           </div>
           {currentImg && (
             <button
@@ -1829,6 +1840,7 @@ function AvatarTab({ adminData, onSuccess, onError }) {
         </div>
       </div>
 
+      <ProfilePhotoUpload role="admin" onUploaded={handlePhotoUploaded} onError={onError} />
       <FieldLabel>Choose a style</FieldLabel>
       <div className="grid grid-cols-3 xs:grid-cols-4 gap-2 min-w-0">
         {AVATAR_STYLES.map((style) => {
@@ -2294,6 +2306,12 @@ export default function AdminSettingsPage() {
               {tab === "assets" && <AssetsTab />}
               {tab === "password" && (
                 <PasswordTab onSuccess={showSuccess} onError={showError} />
+              )}
+              {tab === "privacy" && (
+                <div className="space-y-4">
+                  <DpdpLockCard />
+                  <PrivacyCenter />
+                </div>
               )}
               {tab === "avatar" && (
                 <AvatarTab

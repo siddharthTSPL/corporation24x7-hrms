@@ -8,6 +8,7 @@ const {
   ROLE_TO_ACCOUNT_MODEL,
   CHALLENGE_TTL_MS,
   isSingleSignInActive,
+  toActiveDeviceSummary,
 } = require("../utils/singleSignIn.utils");
 
 const cookieOpts = () => {
@@ -87,7 +88,11 @@ const pollChallengeStatus = async (req, res, next) => {
       return res.status(200).json({ success: true, status: "denied", reason: "expired" });
     }
 
-    return res.status(200).json({ success: true, status: session.challenge.status });
+    return res.status(200).json({
+      success: true,
+      status: session.challenge.status,
+      activeDevice: toActiveDeviceSummary(session),
+    });
   } catch (err) {
     next(err);
   }
@@ -118,6 +123,7 @@ const getMyPendingChallenge = async (req, res, next) => {
       success: true,
       pending: true,
       deviceInfo: session.challenge.device_info,
+      requestedAt: session.challenge.requested_at,
       expiresAt: session.challenge.expires_at,
     });
   } catch (err) {

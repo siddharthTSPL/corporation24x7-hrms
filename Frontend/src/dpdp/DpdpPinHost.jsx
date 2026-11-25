@@ -1,0 +1,93 @@
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
+import { FaShieldAlt } from "react-icons/fa";
+import { useQueryClient } from "@tanstack/react-query";
+import { setDpdpToken, setDpdpCanUnlock } from "./dpdpGate";
+import { useDpdpStatus, useVerifyDpdpPin } from "../auth/server-state/dpdp/dpdp.hook";
+
+// Mounted once in main.jsx (inside QueryClientProvider).
+// 1) PIN popup, opened by the axios gate (on 423) or by the chip's Unlock button.
+// 2) chip: shows locked/unlocked state and lets the user lock again.
+export default function DpdpPinHost() {
+  const { data: status } = useDpdpStatus();
+  const verify = useVerifyDpdpPin();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+  const [, tick] = useState(0);
+  const waiters = useRef([]);
+
+  useEffect(() => {
+    const onNeed = (e) => { waiters.current.push(e.detail); setPin(""); setErr(""); setOpen(true); };
+    const onChange = () => tick((n) => n + 1);
+    const onOpen = () => { setPin(""); setErr(""); setOpen(true); };
+    window.addEventListener("dpdp:open-pin", onOpen);
+    window.addEventListener("dpdp:pin-required", onNeed);
+    window.addEventListener("dpdp:changed", onChange);
+    const iv = setInterval(() => tick((n) => n + 1), 30000);
+    return () => {
+      window.removeEventListener("dpdp:open-pin", onOpen);
+      window.removeEventListener("dpdp:pin-required", onNeed);
+      window.removeEventListener("dpdp:changed", onChange);
+      clearInterval(iv);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!status) return;
+    setDpdpCanUnlock(!!status.canUnlock);
+    if (!status.canUnlock) qc.invalidateQueries();
+  }, [status?.canUnlock]);
+
+  const close = (ok) => {
+    setOpen(false);
+    const w = waiters.current; waiters.current = [];
+    w.forEach((x) => (ok ? x.resolve() : x.reject(new Error("cancelled"))));
+  };
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!/^\d{4,12}$/.test(pin)) { setErr("Enter the numeric PIN given by your Super Admin"); return; }
+    setErr("");
+    verify.mutate(pin, {
+      onSuccess: (data) => {
+        setDpdpToken(data.token, data.expiresInMinutes);
+        toast.success(`Protected data unlocked for ${data.expiresInMinutes} min`);
+        close(true);
+      },
+      onError: (ex) => setErr(ex?.response?.data?.message || "Could not verify PIN"),
+    });
+  };
+
+
+
+  return (
+    <>
+      {open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-3 flex items-center gap-2 text-[#730042]">
+              <FaShieldAlt className="text-xl" />
+              <h2 className="text-lg font-semibold">Protected personal data</h2>
+            </div>
+            <p className="mb-4 text-sm text-gray-600">
+              Documents and personal identifiers (Aadhaar, PAN, bank details) are protected under DPDP.
+              Enter the access PIN issued by your organisation's Super Admin. Every access is logged.
+            </p>
+            <input autoFocus type="password" inputMode="numeric" autoComplete="off" maxLength={12} value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="Access PIN"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center text-lg tracking-[0.4em] outline-none focus:border-[#730042]" />
+            {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => close(false)} className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100">Cancel</button>
+              <button disabled={verify.isPending} className="rounded-lg bg-[#730042] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+                {verify.isPending ? "Checking..." : "Unlock"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}

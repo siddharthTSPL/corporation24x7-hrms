@@ -89,7 +89,13 @@ export default function PolicyDocumentViewer({ entry, onAcknowledged, compact = 
         </div>
       )}
 
-      {!alreadyAcknowledged && (
+      {!acknowledgement && (
+        <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">
+          View only — this policy isn't assigned to you, so no acknowledgement is needed.
+        </p>
+      )}
+
+      {acknowledgement && !alreadyAcknowledged && (
         <div className="border-t border-gray-100 pt-4 space-y-3">
           <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
             <input

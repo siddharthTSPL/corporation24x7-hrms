@@ -521,6 +521,62 @@ const superadminReject = async (req, res) => {
   res.status(200).json({ success: true, message: "Reimbursement claim rejected", reimbursement: claim });
 };
 
+const bulkDecide = async ({ req, res, decision, actor, allowedApproverModels }) => {
+  const ids = Array.isArray(req.body.ids) ? [...new Set(req.body.ids)] : [];
+  if (!ids.length) throw err("Select at least one reimbursement claim", 400);
+  if (ids.length > 100) throw err("A maximum of 100 claims can be processed at once", 400);
+
+  const results = [];
+  for (const id of ids) {
+    try {
+      const claim = await decideClaim({
+        organisation_id: actor.organisation_id || actor._id,
+        id,
+        decision,
+        actorId: actor._id,
+        actorModel: actor.model,
+        comments: req.body.comments,
+        reason: req.body.reason,
+        allowedApproverModels,
+      });
+      results.push({ id, success: true, claimNumber: claim.claimNumber });
+    } catch (error) {
+      results.push({ id, success: false, message: error.message || "Unable to process claim" });
+    }
+  }
+
+  const succeeded = results.filter((result) => result.success).length;
+  const failed = results.length - succeeded;
+  res.status(200).json({
+    success: failed === 0,
+    message: `${succeeded} claim${succeeded === 1 ? "" : "s"} ${decision === "approve" ? "approved" : "rejected"}${failed ? `; ${failed} could not be processed` : ""}`,
+    succeeded,
+    failed,
+    results,
+  });
+};
+
+const adminBulkDecide = async (req, res, decision) => bulkDecide({
+  req,
+  res,
+  decision,
+  actor: { _id: req.admin._id, organisation_id: req.admin.organisation_id, model: "Admin" },
+  allowedApproverModels: ["Admin"],
+});
+
+const superadminBulkDecide = async (req, res, decision) => bulkDecide({
+  req,
+  res,
+  decision,
+  actor: { _id: req.superAdmin._id, organisation_id: req.superAdmin._id, model: "SuperAdmin" },
+  allowedApproverModels: ["SuperAdmin", "Admin"],
+});
+
+const adminBulkApprove = async (req, res) => adminBulkDecide(req, res, "approve");
+const adminBulkReject = async (req, res) => adminBulkDecide(req, res, "reject");
+const superadminBulkApprove = async (req, res) => superadminBulkDecide(req, res, "approve");
+const superadminBulkReject = async (req, res) => superadminBulkDecide(req, res, "reject");
+
 const superadminMarkPaid = async (req, res) => {
   const claim = await markPaid({
     organisation_id: req.superAdmin._id,
@@ -551,10 +607,14 @@ module.exports = {
   adminGetAll,
   adminApprove,
   adminReject,
+  adminBulkApprove,
+  adminBulkReject,
   adminMarkPaid,
   superadminGetPending,
   superadminGetAll,
   superadminApprove,
   superadminReject,
+  superadminBulkApprove,
+  superadminBulkReject,
   superadminMarkPaid,
 };

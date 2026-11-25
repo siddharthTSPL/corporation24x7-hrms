@@ -28,6 +28,7 @@ export const getMeSuperAdmin = async () => {
 };
 
 export const logoutSuperAdmin = async () => {
+  localStorage.setItem("sso_auto_off", "1"); // stay logged out; no auto SSO sign-in
   const res = await api.post("superadmin/logout");
   return res.data;
 };

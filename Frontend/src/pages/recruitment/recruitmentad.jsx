@@ -19,6 +19,7 @@ import {
 import { usePermissionStore } from "../../auth/store/permission/permissionStore";
 import OfferTab from "./OfferTab";
 import OfferApprovals from "./OfferApprovals";
+import SalaryStructure from "./SalaryStructure";
 import toast from "react-hot-toast";
 import { useApprovalPendingCount } from "../../auth/server-state/adminrecruitment/adrecruitment.hook";
 import {
@@ -28,7 +29,7 @@ import {
   FaCalendarAlt,
   FaEdit, FaArrowRight,
   FaUserCheck, FaBuilding, FaChartLine,
-  FaFileExcel, FaEnvelope, FaFileSignature,
+  FaFileExcel, FaEnvelope, FaFileSignature, FaMoneyCheckAlt,
 } from "react-icons/fa";
 
 const initials = (name = "") =>
@@ -1406,7 +1407,7 @@ const RecruitmentAdmin = () => {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const mainTab = tabParam === "approvals" ? "approvals" : tabParam === "pending" ? "pending" : "requisitions";
+  const mainTab = tabParam === "approvals" ? "approvals" : tabParam === "pending" ? "pending" : tabParam === "salary" ? "salary" : "requisitions";
   const setMainTab = (t) =>
     setSearchParams(t === "approvals" ? { tab: "approvals" } : t === "pending" ? { tab: "pending" } : {}, { replace: true });
   const { data: approvalCountData } = useApprovalPendingCount();
@@ -1557,6 +1558,7 @@ const RecruitmentAdmin = () => {
         {[
           { key: "requisitions", label: "Requisitions", icon: <FaBriefcase size={11} /> },
           { key: "approvals", label: "Offer Approvals", icon: <FaFileSignature size={11} />, badge: approvalCount },
+          { key: "salary", label: "Salary Structure", icon: <FaMoneyCheckAlt size={11} /> },
           { key: "pending", label: "Pending Requests", icon: <FaExclamationTriangle size={11} />, badge: pendingRequisitions.length },
         ].map((t) => (
           <button
@@ -1570,7 +1572,9 @@ const RecruitmentAdmin = () => {
         ))}
       </div>
 
-      {mainTab === "approvals" ? (
+      {mainTab === "salary" ? (
+        <SalaryStructure canEdit={canAddCandidate} />
+      ) : mainTab === "approvals" ? (
         <OfferApprovals />
       ) : mainTab === "pending" ? (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

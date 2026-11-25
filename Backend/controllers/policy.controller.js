@@ -25,6 +25,14 @@ const getManagementActor = (req) => {
   return { account, actorModel };
 };
 
+// Policies are always stored against the SuperAdmin document's ObjectId.
+// A SuperAdmin's own `organisation_id` field can hold the human-readable
+// "ORG-*" code (not an ObjectId), so for a SuperAdmin caller we must use
+// `_id` directly instead of trusting that field. Admins carry the ObjectId
+// in `organisation_id`.
+const getOrganisationId = (account, actorModel) =>
+  actorModel === "SuperAdmin" ? account._id : account.organisation_id || account._id;
+
 const uploadBufferToImageKit = async (file, folder, organisationId) => {
   const fileBase64 = file.buffer.toString("base64");
   return imagekit.upload({
@@ -148,7 +156,7 @@ const createPolicy = async (req, res) => {
       });
     }
 
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.create({
       organisation_id,
@@ -231,7 +239,7 @@ const addPolicyVersion = async (req, res) => {
     const { account, actorModel } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
     if (policy.status === "archived") {
@@ -284,7 +292,7 @@ const publishPolicyVersion = async (req, res) => {
     const { account, actorModel } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
 
@@ -364,15 +372,40 @@ const listPolicies = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
-    const { status, category, search } = req.query;
+    const { status, category, search, createdBy } = req.query;
     const filter = { organisation_id };
     if (status) filter.status = status;
     if (category) filter.category = category;
     if (search) filter.title = { $regex: search, $options: "i" };
 
+    // Optional creator filter (used by the SuperAdmin page): "me" = policies
+    // created by the logged-in account, "admin" = created by any Admin of the
+    // org, "superadmin" = created by the SuperAdmin. Without it, every policy
+    // of the organisation is returned, no matter who created it.
+    if (createdBy === "me") {
+      filter.createdBy = account._id;
+    } else if (createdBy === "admin") {
+      filter.createdByModel = "Admin";
+    } else if (createdBy === "superadmin") {
+      filter.createdByModel = "SuperAdmin";
+    }
+
     const policies = await Policy.find(filter).populate("currentVersion").sort({ createdAt: -1 }).lean();
+
+    // Resolve "who created this" for the list (Admin vs SuperAdmin).
+    const adminIds = [...new Set(policies.filter((p) => p.createdByModel === "Admin").map((p) => String(p.createdBy)))];
+    const superIds = [...new Set(policies.filter((p) => p.createdByModel === "SuperAdmin").map((p) => String(p.createdBy)))];
+    const [creatorAdmins, creatorSupers] = await Promise.all([
+      adminIds.length ? AdminModel.find({ _id: { $in: adminIds } }).select("f_name l_name").lean() : [],
+      superIds.length ? SuperAdminModel.find({ _id: { $in: superIds } }).select("f_name l_name organisation_name").lean() : [],
+    ]);
+    const creatorName = {};
+    for (const a of creatorAdmins) creatorName[String(a._id)] = `${a.f_name || ""} ${a.l_name || ""}`.trim();
+    for (const a of creatorSupers) {
+      creatorName[String(a._id)] = `${a.f_name || ""} ${a.l_name || ""}`.trim() || a.organisation_name || "Super Admin";
+    }
 
     // Lightweight ack-count summary per policy for the list view.
     const policyIds = policies.map((p) => p._id);
@@ -390,6 +423,8 @@ const listPolicies = async (req, res) => {
     const enriched = policies.map((p) => ({
       ...p,
       ackSummary: countMap[String(p._id)] || {},
+      createdByName: creatorName[String(p.createdBy)] || "",
+      createdByIsMe: String(p.createdBy) === String(account._id),
     }));
 
     return res.status(200).json({ success: true, policies: enriched });
@@ -403,7 +438,7 @@ const getPolicyDetail = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id }).populate("currentVersion").lean();
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
@@ -421,7 +456,7 @@ const updatePolicyMeta = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
@@ -455,7 +490,7 @@ const archivePolicy = async (req, res) => {
   try {
     const { account, actorModel } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOneAndUpdate(
       { _id: req.params.id, organisation_id },
@@ -483,7 +518,7 @@ const deletePolicy = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id });
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
@@ -515,7 +550,7 @@ const getAcknowledgementReport = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id }).populate("currentVersion").lean();
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
@@ -570,7 +605,7 @@ const exportAcknowledgementReportCsv = async (req, res) => {
     // Reuse the same computation by calling the report logic inline.
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const policy = await Policy.findOne({ _id: req.params.id, organisation_id }).populate("currentVersion").lean();
     if (!policy) return res.status(404).json({ success: false, message: "Policy not found" });
@@ -613,7 +648,7 @@ const getDashboardSummary = async (req, res) => {
   try {
     const { account } = getManagementActor(req);
     if (!account) return res.status(401).json({ success: false, message: "Unauthorized" });
-    const organisation_id = account.organisation_id || account._id;
+    const organisation_id = getOrganisationId(account, getManagementActor(req).actorModel);
 
     const [total, published, draft, archived] = await Promise.all([
       Policy.countDocuments({ organisation_id }),

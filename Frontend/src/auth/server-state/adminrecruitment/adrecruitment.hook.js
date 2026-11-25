@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getAllRequisitions, getPendingRequisitions, getRequisitionById, approveRequisition, rejectRequisition, holdRequisition, requestRevision, addCandidate, getCandidatesByRequisition, getCandidateById, updateCandidateStage, scheduleInterview, submitInterviewFeedback, previewCtc, generateOffer, getCandidateOfferBundle, updateOffer, uploadOfferAssets, markOfferReviewDone, finalizeOffer, reopenOffer, sendOfferEmail, sendOfferWhatsapp, resendOffer, extendOfferValidity, joinCandidate, generateAppointment, updateAppointment, uploadAppointmentAssets, finalizeAppointment, sendAppointmentEmail, sendAppointmentWhatsapp, resendInterviewInvite, getInterviewers, getApprovers, submitForApproval, withdrawApproval, getMyApprovals, getApprovalPendingCount, approveLetter, rejectLetter } from "../../api/adminapi/recruitment/recruitment.api";
+import { getAllRequisitions, getPendingRequisitions, getRequisitionById, approveRequisition, rejectRequisition, holdRequisition, requestRevision, addCandidate, getCandidatesByRequisition, getCandidateById, updateCandidateStage, scheduleInterview, submitInterviewFeedback, previewCtc, generateOffer, getCandidateOfferBundle, updateOffer, uploadOfferAssets, markOfferReviewDone, finalizeOffer, reopenOffer, sendOfferEmail, sendOfferWhatsapp, resendOffer, extendOfferValidity, joinCandidate, generateAppointment, updateAppointment, uploadAppointmentAssets, finalizeAppointment, sendAppointmentEmail, sendAppointmentWhatsapp, resendInterviewInvite, getInterviewers, getApprovers, submitForApproval, withdrawApproval, getMyApprovals, getApprovalPendingCount, approveLetter, rejectLetter, getSalaryConfig, saveSalaryConfig, resetSalaryConfig, previewSalaryConfig } from "../../api/adminapi/recruitment/recruitment.api";
 
 export const useGetAllRequisitions = () => {
   return useQuery({
@@ -244,3 +244,26 @@ const useApprovalDecision = (fn) => {
 
 export const useApproveLetter = () => useApprovalDecision(approveLetter);
 export const useRejectLetter = () => useApprovalDecision(rejectLetter);
+
+export const useSalaryConfig = () =>
+  useQuery({
+    queryKey: ["salary-config"],
+    queryFn: getSalaryConfig,
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
+const useSalaryConfigMutation = (fn) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salary-config"] });
+      queryClient.invalidateQueries({ queryKey: ["offer-bundle"] });
+    },
+  });
+};
+
+export const useSaveSalaryConfig = () => useSalaryConfigMutation(saveSalaryConfig);
+export const useResetSalaryConfig = () => useSalaryConfigMutation(resetSalaryConfig);
+export const usePreviewSalaryConfig = () => useMutation({ mutationFn: previewSalaryConfig });

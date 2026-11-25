@@ -14,7 +14,8 @@ export const cardVariant = {
 }
 
 export const fontStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+  /* Fonts (Sora, DM Sans, Instrument Sans) are loaded from index.html with <link>.
+     A runtime @import here was only discovered after JS ran => late fonts + render-blocking chain. */
 
   .font-display { font-family: 'Sora', sans-serif; }
   .font-body { font-family: 'DM Sans', sans-serif; }

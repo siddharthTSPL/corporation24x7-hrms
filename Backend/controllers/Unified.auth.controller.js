@@ -58,6 +58,7 @@ const applySingleSignInGate = async ({ organisation, role, accountId, req, res }
       challenge: true,
       sessionId: result.sessionId,
       expiresAt: result.expiresAt,
+      activeDevice: result.activeDevice || null,
       message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
     });
     return { sid: null, handled: true };
@@ -196,7 +197,7 @@ const buildLoginToken = async (role, account, req) => {
       throw Object.assign(new Error(result.message), { statusCode: 409, code: "ANOTHER_SESSION_ACTIVE" });
     }
     if (result.outcome === "pending") {
-      return { challenge: true, sessionId: result.sessionId, expiresAt: result.expiresAt };
+      return { challenge: true, sessionId: result.sessionId, expiresAt: result.expiresAt, activeDevice: result.activeDevice || null };
     }
     return { sid: result.sessionId };
   };
@@ -480,6 +481,9 @@ const dismissWelcomeMessage = async (req, res, next) => {
   });
 };
 
+const { invalidateUserCache } = require("../middleware/cache/cache.middleware");
+const { getISTDateParts } = require("../utils/Istdate.utils");
+
 // Marks this year's "Happy Birthday" popup as seen — one popup per person per
 // calendar year, regardless of how many times they log in that day.
 const dismissBirthdayWish = async (req, res, next) => {
@@ -487,11 +491,17 @@ const dismissBirthdayWish = async (req, res, next) => {
     return next(Object.assign(new Error("Unauthorized"), { statusCode: 401 }));
   }
 
-  const currentYear = new Date().getFullYear();
+  // IST calendar year - same clock the birthday cron and the popup use, so a
+  // server running in UTC can't disagree with them around New Year.
+  const currentYear = getISTDateParts(new Date()).year;
 
   if ("lastBirthdayWishYear" in req.user && req.user.lastBirthdayWishYear !== currentYear) {
     req.user.lastBirthdayWishYear = currentYear;
     await req.user.save({ validateBeforeSave: false });
+    // getme is cached for 30s per person - without this, a refresh right after
+    // closing the popup is served the old (un-dismissed) profile and the popup
+    // shows again.
+    invalidateUserCache(req.user._id);
   }
 
   return res.status(200).json({
@@ -580,6 +590,7 @@ const unifiedVerifyForgotPasswordOtp = async (req, res, next) => {
       challenge: true,
       sessionId: token.sessionId,
       expiresAt: token.expiresAt,
+      activeDevice: token.activeDevice || null,
       message: "We've sent an approval request to your other device. Approve it there to continue, or wait here — this page checks automatically.",
     });
   }
@@ -766,4 +777,9 @@ module.exports = {
   dismissBirthdayWish,
   generateCompanionLink,
   redeemCompanionLink,
+  // used by the external SSO (Microsoft / Zoho) controller
+  buildLoginToken,
+  findAccountByEmail,
+  cookieOpts,
+  handleLoginGeoCheck,
 };

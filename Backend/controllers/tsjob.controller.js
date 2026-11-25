@@ -12,6 +12,7 @@ const {
   getDirectReportIds,
   httpError,
 } = require("../utils/heirarchy.utils");
+const { notifyJobAssigned } = require("../utils/Timesheetnotify.utils");
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,10 @@ const createJob = async (req, res, next) => {
     work_items: Array.isArray(work_items) ? work_items.map((w) => ({ name: w })) : [],
     tags: Array.isArray(tags) ? tags : [],
   });
+
+  if (!isSelfAssigned) {
+    notifyJobAssigned({ jobId: job._id });
+  }
 
   res.status(201).json({ success: true, message: "Job created", job });
 };

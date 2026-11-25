@@ -1,5 +1,6 @@
 const express = require("express");
 const adminrouter = express.Router();
+const { requireDpdpPin } = require("../middleware/security/dpdp.middleware");
 const asyncHandler = require("../middleware/errorhandling/asynchandler");
 const adminauthmiddleware = require("../middleware/auth/admin.middleware");
 const adminOrSuperAdminAuth = require("../middleware/auth/adminOrSuperadmin.middleware");
@@ -10,6 +11,8 @@ const {
   restrictPlanFeature,
 } = require("../middleware/auth/planFeatureGate.middleware");
 const { cacheRoute } = require("../middleware/cache/cache.middleware");
+const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
+const { uploadProfilePhoto } = require("../controllers/profilePhoto.controller");
 
 // Performance Management (Review), Asset Management, and TorchX Voice are
 // plan-gated features: fully locked on the Basic plan, fully open on
@@ -150,6 +153,7 @@ adminrouter.put(
   adminauthmiddleware,
   asyncHandler(editadminprofile),
 );
+adminrouter.post("/profile-photo", adminauthmiddleware, profilePhotoUpload, asyncHandler(uploadProfilePhoto));
 adminrouter.put(
   "/changepassword",
   adminauthmiddleware,
@@ -302,6 +306,11 @@ adminrouter.put(
   leaveDocumentUpload.single("supportingDocument"),
   asyncHandler(editleaveadmin)
 );
+adminrouter.delete(
+  "/deleteleave/:id",
+  adminauthmiddleware,
+  asyncHandler(deleteleaveadmin),
+);
 adminrouter.get(
   "/getmyleavehistory",
   adminauthmiddleware,
@@ -410,18 +419,21 @@ adminrouter.get(
   "/documents/personal",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getAllPersonalDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/expense",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getAllExpenseDocumentsAdmin),
 );
 adminrouter.get(
   "/documents/:documentId",
   adminauthmiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(getDocumentDetailsAdmin),
 );
 

@@ -1,0 +1,508 @@
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  searchDirectory,
+  getConversations,
+  getConversation,
+  openDirectChat,
+  createGroupChat,
+  updateGroupChat,
+  addGroupMembers,
+  removeGroupMember,
+  setGroupMemberRole,
+  leaveGroupChat,
+  muteConversation,
+  markConversationRead,
+  getMessages,
+  sendMessageRest,
+  editMessage,
+  deleteMessage,
+  reactToMessage,
+  forwardMessage,
+  setWallpaper,
+  uploadWallpaper,
+  setPinnedChat,
+  clearChat,
+  searchMessages,
+  getChatUnreadCount,
+  getIceServers,
+  getActiveCalls,
+  getCallHistory,
+  getPresence,
+} from "../../api/chat/chat.api";
+import { emitAck, emitQuiet } from "../../../realtime/chatSocket";
+import { useChatStore } from "../../store/chat/chatStore";
+import {
+  CHAT_KEYS,
+  flattenMessages,
+  upsertMessage,
+  patchMessage,
+  removeMessage,
+  patchConversation,
+  removeConversation,
+  newClientId,
+  registerSent,
+} from "./chatCache";
+
+export { CHAT_KEYS };
+
+// ---------------------------------------------------------------- utilities
+
+const deriveMyKey = (convs = []) => {
+  for (const c of convs) {
+    if (c.type === "direct" && c.otherPerson && c.participants?.length === 2) {
+      const m = c.participants.find((p) => p.key !== c.otherPerson.key);
+      if (m) return m.key;
+    }
+  }
+  return null;
+};
+
+const syncMyKey = (me) => {
+  if (me && useChatStore.getState().myKey !== me) useChatStore.getState().setMyKey(me);
+};
+
+export const useDebouncedValue = (value, delay = 300) => {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+};
+
+// ---------------------------------------------------------------- directory
+
+// Search everyone in my organisation. Pass the raw input; it is debounced here.
+export const useDirectorySearch = (query = "", { department = "", enabled = true } = {}) => {
+  const q = useDebouncedValue(query.trim(), 250);
+  return useQuery({
+    queryKey: CHAT_KEYS.directory(q, department),
+    queryFn: () => searchDirectory({ q, department, limit: 30 }),
+    enabled,
+    staleTime: 30000,
+    placeholderData: keepPreviousData,
+    select: (d) => d.people,
+  });
+};
+
+// ---------------------------------------------------------------- conversations
+
+// useConversations()                              -> all chats
+// useConversations(true, { filter: "unread" })    -> chip: all|unread|groups|direct|favourites|mentions
+// useConversations(true, { archived: true })      -> archived chats
+export const useConversations = (enabled = true, { filter = "all", archived = false } = {}) =>
+  useQuery({
+    // default list keeps the plain key; variants live under it so cache patches / invalidation reach all of them
+    queryKey: filter === "all" && !archived ? CHAT_KEYS.conversations : [...CHAT_KEYS.conversations, { filter, archived }],
+    queryFn: async () => {
+      const r = await getConversations({ limit: 100, filter, archived });
+      syncMyKey(r?.me || deriveMyKey(r?.conversations));
+      return r;
+    },
+    enabled,
+    staleTime: 15000,
+    refetchOnWindowFocus: true,
+    select: (d) => d.conversations,
+  });
+
+export const useConversation = (id) =>
+  useQuery({
+    queryKey: CHAT_KEYS.conversation(id),
+    queryFn: () => getConversation(id),
+    enabled: !!id,
+    staleTime: 15000,
+    select: (d) => d.conversation,
+  });
+
+// mutate(participant) with participant = { model, id }. Resolves { conversation }.
+export const useOpenDirectChat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: openDirectChat,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+// mutate({ name, description?, members: [{model,id}], settings?: { onlyAdminsCanSend, ... } })
+export const useCreateGroupChat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: createGroupChat,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+const useGroupMutation = (fn) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (res, vars) => {
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversation(vars.id) });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.messages(vars.id) }); // "X added Y" system lines
+    },
+  });
+};
+export const useUpdateGroupChat = () => useGroupMutation(updateGroupChat); // { id, name?, description?, settings? }
+export const useAddGroupMembers = () => useGroupMutation(addGroupMembers); // { id, members }
+export const useRemoveGroupMember = () => useGroupMutation(removeGroupMember); // { id, key }
+export const useSetGroupMemberRole = () => useGroupMutation(setGroupMemberRole); // { id, key, role }
+
+export const useLeaveGroupChat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: leaveGroupChat, // (conversationId)
+    onSuccess: (_r, id) => removeConversation(qc, id),
+  });
+};
+
+export const useMuteConversation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: muteConversation, // { id, muted }
+    onMutate: ({ id, muted }) => patchConversation(qc, id, (c) => ({ ...c, muted })),
+    onError: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+// Call when a chat is opened / a new message arrives while it's visible.
+export const useMarkConversationRead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => {
+      try {
+        await emitAck("chat:read", { conversationId: id }, 5000);
+      } catch {
+        await markConversationRead(id); // socket down -> REST
+      }
+    },
+    onMutate: (id) => {
+      patchConversation(qc, id, (c) => ({ ...c, unread: 0, unreadMentions: 0 }));
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.unread });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.counts }); // chip numbers
+    },
+  });
+};
+
+export const useChatUnreadCount = (enabled = true) =>
+  useQuery({
+    queryKey: CHAT_KEYS.unread,
+    queryFn: getChatUnreadCount, // { unread, unreadChats }
+    enabled,
+    staleTime: 10000,
+    refetchInterval: enabled ? 120000 : false, // live updates come via socket; this is the fallback
+  });
+
+// ---------------------------------------------------------------- messages
+
+// Returns { messages (oldest->newest), loadOlder, hasOlder, isLoadingOlder, ...query }
+export const useChatMessages = (conversationId) => {
+  const q = useInfiniteQuery({
+    queryKey: CHAT_KEYS.messages(conversationId),
+    queryFn: async ({ pageParam }) => {
+      const r = await getMessages({ id: conversationId, before: pageParam, limit: 40 });
+      syncMyKey(r?.me);
+      return r;
+    },
+    initialPageParam: undefined,
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+    enabled: !!conversationId,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
+  });
+  const messages = useMemo(() => flattenMessages(q.data), [q.data]);
+  return {
+    ...q,
+    messages,
+    loadOlder: q.fetchNextPage,
+    hasOlder: !!q.hasNextPage,
+    isLoadingOlder: q.isFetchingNextPage,
+  };
+};
+
+/**
+ * send({ conversationId, text, replyTo?, files?, sticker? })
+ * - plain text goes over the socket (fastest), falling back to REST if offline
+ * - files always go over REST (multipart)
+ * - the message shows instantly as { pending: true } and is replaced when the server confirms;
+ *   on failure it stays with { failed: true } so the UI can offer "retry"
+ * - a clientId makes retries safe: the server never stores the same message twice
+ */
+export const useSendMessage = () => {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async ({ conversationId, text, replyTo, files = [], clientId, sticker, mentions, onUploadProgress }) => {
+      if (!files.length) {
+        try {
+          const res = await emitAck("chat:send", { conversationId, text, replyTo, clientId, sticker, mentions });
+          return res.message;
+        } catch (err) {
+          if (err.code !== "OFFLINE" && err.code !== "TIMEOUT") throw err;
+        }
+      }
+      const res = await sendMessageRest({ id: conversationId, text, replyTo, clientId, sticker, mentions, files, onUploadProgress });
+      return res.message;
+    },
+    onMutate: ({ conversationId, text, replyTo, files = [], clientId, sticker }) => {
+      registerSent(clientId);
+      const cachedConv =
+        qc.getQueryData(CHAT_KEYS.conversation(conversationId))?.conversation ||
+        qc.getQueryData(CHAT_KEYS.conversations)?.conversations?.find((c) => c.id === conversationId);
+      const myKey = useChatStore.getState().myKey || deriveMyKey(cachedConv ? [cachedConv] : []);
+      upsertMessage(qc, conversationId, {
+        id: clientId,
+        clientId,
+        conversationId,
+        type: sticker ? "sticker" : files.length ? "file" : "text",
+        senderKey: myKey || "",
+        sender: null,
+        text: sticker || text || "",
+        reactions: [],
+        deliveredTo: [],
+        attachments: files.map((f) => ({ name: f.name, size: f.size, mime: f.type, url: null, uploading: true })),
+        replyTo: replyTo ? { id: replyTo } : null,
+        meta: {},
+        createdAt: new Date().toISOString(),
+        pending: true,
+      });
+    },
+    onSuccess: (message, vars) => {
+      upsertMessage(qc, vars.conversationId, message);
+      // sending clears the saved draft on the server
+      patchConversation(qc, vars.conversationId, (c) => ({ ...c, draft: null }));
+    },
+    onError: (_e, vars) => patchMessage(qc, vars.conversationId, vars.clientId, { pending: false, failed: true }),
+  });
+
+  const send = useCallback(
+    (vars) => mutation.mutateAsync({ ...vars, clientId: vars.clientId || newClientId() }),
+    [mutation],
+  );
+  return { send, isSending: mutation.isPending, error: mutation.error };
+};
+
+export const useEditMessage = () => { // { messageId, text, mentions? }
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: editMessage, // { messageId, text }
+    onSuccess: ({ message }) => upsertMessage(qc, message.conversationId, message),
+  });
+};
+
+// mutate({ messageId, scope: "everyone" | "me" })
+export const useDeleteMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteMessage,
+    onSuccess: ({ conversationId, messageId, forMe }) => {
+      if (forMe) removeMessage(qc, conversationId, messageId);
+      else patchMessage(qc, conversationId, messageId, { deleted: true, text: "", attachments: [], reactions: [] });
+    },
+  });
+};
+
+// mutate({ messageId, emoji }) - same emoji again removes my reaction. Updates instantly, rolls back on error.
+export const useReactToMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reactToMessage,
+    onMutate: ({ conversationId, messageId, emoji }) => {
+      const myKey = useChatStore.getState().myKey;
+      const snapshot = qc.getQueryData(CHAT_KEYS.messages(conversationId));
+      const mapPagesLocal = (fn) =>
+        qc.setQueryData(CHAT_KEYS.messages(conversationId), (old) =>
+          old ? { ...old, pages: old.pages.map((p) => ({ ...p, messages: p.messages.map(fn) })) } : old,
+        );
+      mapPagesLocal((m) => {
+        if (m.id !== messageId) return m;
+        const mine = (m.reactions || []).find((r) => r.key === myKey);
+        const rest = (m.reactions || []).filter((r) => r.key !== myKey);
+        return { ...m, reactions: mine && mine.emoji === emoji ? rest : [...rest, { key: myKey, emoji }] };
+      });
+      return { snapshot, conversationId };
+    },
+    onError: (_e, _v, ctx) => ctx && qc.setQueryData(CHAT_KEYS.messages(ctx.conversationId), ctx.snapshot),
+    onSuccess: ({ message }) => upsertMessage(qc, message.conversationId, message),
+  });
+};
+
+// mutateAsync({ messageId, conversationIds: [] })
+export const useForwardMessage = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: forwardMessage,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+// ---- per-person chat settings ----
+export const useSetWallpaper = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setWallpaper, // { id, wallpaper }  ("" resets)
+    onMutate: ({ id, wallpaper }) => {
+      patchConversation(qc, id, (c) => ({ ...c, wallpaper }));
+      qc.setQueryData(CHAT_KEYS.conversation(id), (old) => (old ? { ...old, conversation: { ...old.conversation, wallpaper } } : old));
+    },
+    onError: (_e, { id }) => {
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.conversation(id) });
+    },
+  });
+};
+
+export const useUploadWallpaper = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: uploadWallpaper, // { id, file }
+    onSuccess: ({ wallpaper }, { id }) => {
+      patchConversation(qc, id, (c) => ({ ...c, wallpaper }));
+      qc.setQueryData(CHAT_KEYS.conversation(id), (old) => (old ? { ...old, conversation: { ...old.conversation, wallpaper } } : old));
+    },
+  });
+};
+
+export const usePinConversation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: setPinnedChat, // { id, pinned }
+    onMutate: ({ id, pinned }) => patchConversation(qc, id, (c) => ({ ...c, pinned })),
+    onError: () => qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+  });
+};
+
+export const useClearChat = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: clearChat, // (conversationId)
+    onSuccess: (_r, id) => {
+      qc.removeQueries({ queryKey: CHAT_KEYS.messages(id) });
+      qc.invalidateQueries({ queryKey: CHAT_KEYS.messages(id) });
+      patchConversation(qc, id, (c) => ({ ...c, unread: 0 }));
+    },
+  });
+};
+
+// Message search. Pass conversationId to search inside one chat.
+export const useChatSearch = (query = "", conversationId) => {
+  const q = useDebouncedValue(query.trim(), 350);
+  return useQuery({
+    queryKey: CHAT_KEYS.search(q, conversationId),
+    queryFn: () => searchMessages({ q, conversationId }),
+    enabled: q.length >= 2,
+    staleTime: 30000,
+    select: (d) => d.results,
+  });
+};
+
+// ---------------------------------------------------------------- typing + presence
+
+// Typing indicator for the composer:
+//   const { onType, stopTyping } = useTypingEmitter(conversationId)
+//   <input onChange={(e)=>{ setText(e.target.value); onType(); }} onBlur={stopTyping} />
+export const useTypingEmitter = (conversationId) => {
+  const lastSent = useRef(0);
+  const idleTimer = useRef(null);
+
+  const stopTyping = useCallback(() => {
+    clearTimeout(idleTimer.current);
+    if (lastSent.current) {
+      emitQuiet("chat:typing", { conversationId, isTyping: false });
+      lastSent.current = 0;
+    }
+  }, [conversationId]);
+
+  const onType = useCallback(() => {
+    if (!conversationId) return;
+    const now = Date.now();
+    if (now - lastSent.current > 2500) {
+      emitQuiet("chat:typing", { conversationId, isTyping: true });
+      lastSent.current = now;
+    }
+    clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(stopTyping, 3000);
+  }, [conversationId, stopTyping]);
+
+  useEffect(() => stopTyping, [stopTyping]);
+  return { onType, stopTyping };
+};
+
+// Names of people currently typing in a conversation (excluding me).
+export const useTypingNames = (conversationId) => {
+  const room = useChatStore((s) => s.typing[conversationId]);
+  const pruneTyping = useChatStore((s) => s.pruneTyping);
+  useEffect(() => {
+    if (!room || !Object.keys(room).length) return undefined;
+    const t = setInterval(pruneTyping, 1500);
+    return () => clearInterval(t);
+  }, [room, pruneTyping]);
+  return useMemo(() => Object.values(room || {}).map((v) => v.name), [room]);
+};
+
+// Live online state for a person key; falls back to what the API last said.
+export const useIsOnline = (key, fallback = false) =>
+  useChatStore((s) => (key && s.presence[key] ? s.presence[key].online : fallback));
+
+// true while that person is inside a call ("busy on call")
+export const useIsInCall = (key, fallback = false) =>
+  useChatStore((s) => (key && s.presence[key] ? !!s.presence[key].inCall : fallback));
+
+export const useLastSeen = (key, fallback = null) =>
+  useChatStore((s) => (key ? s.presence[key]?.lastSeenAt || fallback || null : null));
+
+const presenceItems = (res) => {
+  const raw = Array.isArray(res) ? res : res?.presence || res?.items || res?.users || res?.data || res;
+  const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? Object.entries(raw).map(([key, v]) => ({ key, ...(v || {}) })) : [];
+  return list
+    .map((p) => ({
+      key: p?.key || p?.userKey,
+      online: !!p?.online,
+      lastSeenAt: p?.lastSeenAt || p?.last_seen_at || null,
+      inCall: !!p?.inCall,
+    }))
+    .filter((p) => p.key);
+};
+
+export const usePresenceSync = (keys) => {
+  const joined = (keys || []).filter(Boolean).sort().join(",");
+  const { data } = useQuery({
+    queryKey: ["chat", "presence", joined],
+    queryFn: () => getPresence(joined.split(",")),
+    enabled: !!joined,
+    staleTime: 15000,
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+  useEffect(() => {
+    if (!data) return;
+    const items = presenceItems(data);
+    if (items.length) useChatStore.getState().setPresenceMany(items);
+  }, [data]);
+};
+
+// ---------------------------------------------------------------- calls (REST side)
+
+export const useIceServers = (enabled = true) =>
+  useQuery({ queryKey: ["chat", "ice"], queryFn: getIceServers, enabled, staleTime: 60 * 60 * 1000 });
+
+export const useActiveCalls = (enabled = true) =>
+  useQuery({
+    queryKey: CHAT_KEYS.activeCalls,
+    queryFn: getActiveCalls,
+    enabled,
+    staleTime: 5000,
+    refetchInterval: enabled ? 5000 : false,
+    select: (d) => d.calls,
+  });
+
+export const useCallHistory = (enabled = true) =>
+  useQuery({
+    queryKey: CHAT_KEYS.callHistory,
+    queryFn: () => getCallHistory({ limit: 50 }),
+    enabled,
+    staleTime: 15000,
+    select: (d) => d.calls,
+  });

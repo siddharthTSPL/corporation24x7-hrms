@@ -18,6 +18,7 @@ export const usePermissionStore = create((set, get) => ({
     if (role === "superadmin") return true;
     if (permissionPath === "payroll.can_manage_payroll" && role === "admin") return true;
     if (permissionPath.startsWith("adminAccess.") && role === "admin") return true;
+    if (permissionPath.startsWith("reports.") && role === "admin") return true; // admins always have report access (payroll reports still checked server-side)
     const value = resolvePath(permissions, permissionPath);
     if (value !== undefined) return !!value;
 

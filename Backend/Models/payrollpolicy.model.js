@@ -73,6 +73,15 @@ const payrollPolicySchema = new mongoose.Schema(
       index: true,
     },
 
+    // Payslip branding is independent of salary structure and payroll math.
+    payslipSettings: {
+      companyName: { type: String, trim: true, maxlength: 160, default: "" },
+      address: { type: String, trim: true, maxlength: 500, default: "" },
+      email: { type: String, trim: true, lowercase: true, maxlength: 254, default: "" },
+      phone: { type: String, trim: true, maxlength: 40, default: "" },
+      logoUrl: { type: String, trim: true, maxlength: 2048, default: "" },
+    },
+
     basic: {
       percentOfGross: { type: Number, default: 40, min: 1, max: 100 },
     },
@@ -102,7 +111,8 @@ const payrollPolicySchema = new mongoose.Schema(
       employeePercent: { type: Number, default: 12, min: 0, max: 100 },
       employerPercent: { type: Number, default: 12, min: 0, max: 100 },
       applyWageCeiling: { type: Boolean, default: false },
-      wageCeiling: { type: Number, default: 15000 }, // PF computed on min(Basic, ceiling) when applyWageCeiling is true
+      adminChargePercent: { type: Number, default: 0.5, min: 0, max: 5 },
+      wageCeiling: { type: Number, default: 25000 }, // PF computed on min(Basic, ceiling) when applyWageCeiling is true
     },
 
     esi: {
@@ -142,6 +152,8 @@ const payrollPolicySchema = new mongoose.Schema(
     statutoryBonus: {
       enabled: { type: Boolean, default: false },
       percentOfBasic: { type: Number, default: 8.33, min: 0, max: 20 },
+      calculationCeiling: { type: Number, default: 7000, min: 0 },
+      eligibilityLimit: { type: Number, default: 21000, min: 0 },
     },
 
     // Timesheet -> Payroll sync. When on, OVERTIME from APPROVED timesheets is
@@ -150,7 +162,7 @@ const payrollPolicySchema = new mongoose.Schema(
     // Off by default so existing orgs' payroll is unchanged.
     timesheetSync: {
       enabled: { type: Boolean, default: false },
-      overtimeMultiplier: { type: Number, default: 1.5, min: 0.1, max: 10 },
+      overtimeMultiplier: { type: Number, default: 2, min: 0.1, max: 10 },
       standardHoursPerDay: { type: Number, default: 9, min: 1, max: 24 },
     },
 

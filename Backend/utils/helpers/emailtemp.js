@@ -517,6 +517,48 @@ function buildSubscriptionExpiringEmail({ recipientName, orgName, licenses = [],
 }
 
 // ---------------------------------------------------------------
+// Birthday reminder - SuperAdmin + Admins, 2 days / 1 day before
+// Deliberately shows month/day only - never the birth year or age.
+// ---------------------------------------------------------------
+
+function buildBirthdayReminderEmail({ recipientName, person = {}, daysUntil, dateLong, portalLink }) {
+  const when = daysUntil === 1 ? "tomorrow" : `in ${daysUntil} days`;
+  const badge = daysUntil === 1 ? "Birthday tomorrow" : `Birthday in ${daysUntil} days`;
+
+  const rows = [
+    detailRow("Name", person.name),
+    detailRow("Role", person.roleLabel),
+    detailRow("Designation", person.designation),
+    detailRow("Birthday", dateLong),
+  ].join("");
+
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      This is a reminder that <strong>${escapeHtml(person.name)}</strong> has a birthday
+      <strong>${escapeHtml(when)}</strong>. You may want to plan a wish or a small celebration with the team.
+    </p>
+    <div style="margin-bottom:20px;">
+      <span style="display:inline-block;padding:6px 18px;border-radius:3px;background:${BRAND.approvedBg};color:${BRAND.approvedText};font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+        ${escapeHtml(badge)}
+      </span>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}</table>
+    <p style="margin:20px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      You are receiving this because you are an administrator of your organisation on ${PRODUCT_NAME}.
+      ${escapeHtml(person.name)} will see a birthday greeting when they sign in on the day.
+    </p>
+    ${plainLink(portalLink)}
+  `;
+
+  return emailShell({
+    preheader: `${person.name}'s birthday is ${when}`,
+    headerTitle: "Upcoming Birthday Reminder",
+    bodyHtml: body,
+  });
+}
+
+// ---------------------------------------------------------------
 // New joiner onboarding - IT team / Accounts team handoff
 // ---------------------------------------------------------------
 
@@ -599,6 +641,33 @@ function buildOnboardingAccountsEmail({ recipientName, joiner = {}, bankDetailsA
   });
 }
 
+function buildFeatureLaunchEmail({ recipientName, featureName, description, hasAttachment = false, portalLink }) {
+  const body = `
+    <p style="margin:0 0 16px;color:${BRAND.text};font-size:15px;line-height:1.6;">
+      Hi ${escapeHtml(recipientName)},<br/><br/>
+      We have just launched a new feature on ${PRODUCT_NAME}.
+    </p>
+    <div style="margin-bottom:20px;">
+      <span style="display:inline-block;padding:6px 18px;border-radius:3px;background:${BRAND.approvedBg};color:${BRAND.approvedText};font-size:12px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;">
+        New feature
+      </span>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${detailRow("Feature", featureName)}</table>
+    <p style="margin:16px 0 0;color:${BRAND.text};font-size:14px;line-height:1.7;white-space:pre-line;">${escapeHtml(description)}</p>
+    ${hasAttachment ? `<p style="margin:16px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">A PDF guide for this feature is attached to this email.</p>` : ""}
+    <p style="margin:20px 0 0;color:${BRAND.muted};font-size:12px;line-height:1.6;">
+      You are receiving this because you are an administrator of your organisation on ${PRODUCT_NAME}.
+    </p>
+    ${plainLink(portalLink)}
+  `;
+
+  return emailShell({
+    preheader: `New feature: ${featureName}`,
+    headerTitle: "New Feature Launched",
+    bodyHtml: body,
+  });
+}
+
 module.exports = {
   buildOnboardingItEmail,
   buildOnboardingAccountsEmail,
@@ -611,6 +680,14 @@ module.exports = {
   buildSupportRequestEmail,
   buildSupportAckEmail,
   buildSubscriptionExpiringEmail,
+  buildBirthdayReminderEmail,
+  buildFeatureLaunchEmail,
   leaveTypeLabel,
   formatDate,
+  emailShell,
+  detailRow,
+  sectionLabel,
+  plainLink,
+  escapeHtml,
+  BRAND,
 };

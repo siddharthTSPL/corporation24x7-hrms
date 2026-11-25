@@ -162,7 +162,7 @@ function HistoryRow({ r }) {
           style={{ color: meta.color, background: meta.bg }}
         >
           {r.status === "leave"
-            ? leaveLabel(r.leaveType)
+            ? `${leaveLabel(r.leaveType)}${r.isLwpDay && r.leaveType !== "lwp" ? " · LWP" : ""}`
             : r.status === "holiday" && r.holidayName
               ? `Holiday · ${r.holidayName}`
               : meta.label}

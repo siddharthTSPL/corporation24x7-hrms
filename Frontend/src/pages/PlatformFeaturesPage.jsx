@@ -10,9 +10,9 @@ import {
 import { Navbar, Footer, Wrap, fontStyles } from './announcement/landingpage'
 import { useAuth } from '../auth/store/getmeauth/getmeauth'
 
-import slideNavyOffice from '../assets/slide_navy_office.png'
-import slideWhiteOffice from '../assets/Office-work.jpg'
-import work from '../assets/work.jpg'
+import slideNavyOffice from '../assets/slide_navy_office.webp'
+import slideWhiteOffice from '../assets/Office-work.webp'
+import work from '../assets/work.webp'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 36 },

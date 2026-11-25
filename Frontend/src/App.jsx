@@ -1,18 +1,27 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { lazy, Suspense, useState, useEffect } from "react";
-import { Player } from "@lottiefiles/react-lottie-player";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "./auth/store/getmeauth/getmeauth";
 import LandingPage from "./pages/announcement/landingpage";
-import Guide from './components/Guide';
+import RouteSeo from "./components/RouteSeo";
+import { landingPages } from "./seo/landingPages";
 
+// Guide is ~57 KB and only used on /guide, so it is split out of the entry bundle.
+const Guide = lazy(() => import("./components/Guide"));
 const AboutPage = lazy(() => import("./pages/AboutPage"));
 const PlatformFeaturesPage = lazy(() => import("./pages/PlatformFeaturesPage"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 const BlogPage = lazy(() => import("./pages/BlogPage"));
 
+// SEO pages (content lives in src/seo/*.js)
+const SEOLandingPage = lazy(() => import("./components/seo/SEOLandingPage"));
+const SolutionsHub = lazy(() => import("./components/seo/SolutionsHub"));
+const GuidesIndex = lazy(() => import("./components/seo/GuidesIndex"));
+const ArticlePage = lazy(() => import("./components/seo/ArticlePage"));
+
 const Login = lazy(() => import("./pages/auth/Login"));
 const Signup = lazy(() => import("./pages/auth/signup"));
 const CompanionLogin = lazy(() => import("./pages/auth/CompanionLogin"));
+const SsoCallback = lazy(() => import("./pages/auth/Ssocallback"));
 const TalentPricingCalculator = lazy(() => import("./components/marketing/TalentPricingCalculator"));
 const FieldOperations = lazy(() => import("./pages/field-operations/FieldOperations"));
 
@@ -66,6 +75,8 @@ const SuperAdminAnnouncements = lazy(() => import("./pages/announcement/suannoun
 const SuperAdminLeaves = lazy(() => import("./pages/leave/suleave"));
 const SuperAdminReviews = lazy(() => import("./pages/review/sureview"));
 const SuperAdminSettings = lazy(() => import("./pages/settings/susetting"));
+const PrivacyCenter = lazy(() => import("./dpdp/PrivacyCenter"));
+const DpdpSettingsPage = lazy(() => import("./dpdp/DpdpSettingsPage"));
 const SuperAdminDocuments = lazy(() => import("./pages/document/sudocument"));
 const SuperAdminComplaints = lazy(() => import("./pages/ticketpage/suticket"));
 const AdminComplaints = lazy(() => import("./pages/ticketpage/adticket"));
@@ -85,6 +96,7 @@ const Pagenotfound = lazy(() => import("./pages/pagenotfound/pagenotfound"));
 const Adminasset = lazy(() => import("./pages/asset/adminasset"));
 const Superadminasset = lazy(() => import("./pages/asset/superadminasset"));
 const Payroll = lazy(() => import("./pages/payroll/Payroll"));
+const Reports = lazy(() => import("./pages/reports/Reports"));
 const ReimbursementEmployee = lazy(() => import("./pages/reimbursement/ReimbursementEmployee"));
 const ReimbursementManager = lazy(() => import("./pages/reimbursement/ReimbursementManager"));
 const ReimbursementAdmin = lazy(() => import("./pages/reimbursement/ReimbursementAdmin"));
@@ -103,19 +115,16 @@ const PolicyManagement = lazy(() => import("./pages/policy/PolicyManagement"));
 const MyPolicies = lazy(() => import("./pages/policy/MyPolicies"));
 const SelfServicePortal = lazy(() => import("./pages/self-service/SelfServicePortal"));
 const TrainingPage = lazy(() => import("./pages/training/TrainingPage"));
+const GamificationHub = lazy(() => import("./pages/gamification/GamificationHub"));
+const GamificationAdmin = lazy(() => import("./pages/gamification/GamificationAdmin"));
 
+// Pure-CSS fallback: no Lottie player, no loader.json request, no state/effects.
+// The keyframes live in a single <style> so nothing extra is shipped in JS.
 function PageSkeleton() {
-  const [animationData, setAnimationData] = useState(null);
-
-  useEffect(() => {
-    fetch("/talent/loader.json")
-      .then((r) => r.json())
-      .then(setAnimationData)
-      .catch(() => setAnimationData(null));
-  }, []);
-
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         position: "fixed",
         inset: 0,
@@ -126,47 +135,53 @@ function PageSkeleton() {
         zIndex: 9999,
       }}
     >
-      {animationData ? (
-        <Player
-          autoplay
-          loop
-          src={animationData}
-          style={{ height: "140px", width: "140px" }}
-        />
-      ) : (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
+            width: 40,
+            height: 40,
+            border: "3px solid rgba(255,255,255,.2)",
+            borderTop: "3px solid #CD166E",
+            borderRadius: "50%",
+            animation: "_spin 0.7s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: 13,
+            color: "rgba(255,255,255,.7)",
+            fontFamily: "sans-serif",
+            letterSpacing: "0.05em",
           }}
         >
-          <style>{`@keyframes _spin { to { transform: rotate(360deg); } }`}</style>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              border: "3px solid rgba(255,255,255,.2)",
-              borderTop: "3px solid #CD166E",
-              borderRadius: "50%",
-              animation: "_spin 0.7s linear infinite",
-            }}
-          />
-          <span
-            style={{
-              fontSize: 13,
-              color: "rgba(255,255,255,.7)",
-              fontFamily: "sans-serif",
-              letterSpacing: "0.05em",
-            }}
-          >
-            Loading…
-          </span>
-        </div>
-      )}
+          Loading…
+        </span>
+      </div>
     </div>
   );
+}
+
+// The 404 page needs working buttons; this wrapper gives it router access.
+function NotFoundRoute() {
+  const navigate = useNavigate();
+  return <Pagenotfound onLogin={() => navigate("/login")} onContact={() => navigate("/about")} />;
+}
+
+// Full-page redirect to another app on the same domain (e.g. /peple).
+// <Navigate> can't be used: it would prepend the router basename "/talent".
+function ExternalRedirect({ to }) {
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
+  return <PageSkeleton />;
 }
 
 function RoleBasedRedirect() {
@@ -183,6 +198,7 @@ function RoleBasedRedirect() {
 function App() {
   return (
     <BrowserRouter basename="/talent">
+      <RouteSeo />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -198,14 +214,22 @@ function App() {
           <Route path="/pricing-calculator" element={<TalentPricingCalculator />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+
+          {/* SEO pages */}
+          <Route path="/solutions" element={<SolutionsHub />} />
+          <Route path="/guides" element={<GuidesIndex />} />
+          <Route path="/guides/:slug" element={<ArticlePage />} />
+          {landingPages.map((p) => (
+            <Route key={p.slug} path={`/${p.slug}`} element={<SEOLandingPage slug={p.slug} />} />
+          ))}
           <Route path="/coming-soon" element={<ComingSoon />} /> 
           <Route path="/redirect" element={<RoleBasedRedirect />} />
-
           {/* Public — opened from a companion sign-in link generated on a
               different, already-logged-in browser. No session required to
               land here; it creates one on THIS browser via the link's
               short-lived token. */}
           <Route path="/companion-login" element={<CompanionLogin />} />
+          <Route path="/sso-callback" element={<SsoCallback />} />
           <Route path="/offer-response/:token" element={<OfferResponse />} />
 
           {/* Public — this is a shared kiosk device, not a logged-in person.
@@ -250,6 +274,8 @@ function App() {
             <Route path="/file-employee"            element={<ProtectedRoute><Fileem /></ProtectedRoute>} />
             <Route path="/file-manager"             element={<ProtectedRoute><Filema /></ProtectedRoute>} />
             <Route path="/settings"                 element={<Set />} />
+            <Route path="/privacy"                  element={<PrivacyCenter />} />
+            <Route path="/superadmin-dpdp"          element={<DpdpSettingsPage />} />
             <Route path="/settings-employee"        element={<ProtectedRoute permission="navigation.can_view_settings"><Setem /></ProtectedRoute>} />
             <Route path="/settings-manager"         element={<ProtectedRoute permission="navigation.can_view_settings"><Setma /></ProtectedRoute>} />
             <Route path="/organisation"             element={<Organisation />} />
@@ -500,14 +526,23 @@ function App() {
             }
           >
             <Route path="/field-operations" element={<ProtectedRoute permission="navigation.can_view_field_operations"><FieldOperations /></ProtectedRoute>} />
+            {/* Reports & Analytics lives in this shared block so SuperAdmin is matched too. UI gate only - the server authorises every report and export. */}
+            <Route path="/reports" element={<ProtectedRoute permission="reports.can_view_reports"><Reports /></ProtectedRoute>} />
+            <Route path="/reports/:key" element={<ProtectedRoute permission="reports.can_view_reports"><Reports /></ProtectedRoute>} />
             <Route path="/help-center"    element={<HelpCenter />} />
             <Route path="/notifications"  element={<NotificationsPage />} />
             <Route path="/self-service"   element={<ProtectedRoute permission="navigation.can_view_self_service"><SelfServicePortal /></ProtectedRoute>} />
             <Route path="/my-policies"    element={<ProtectedRoute permission="navigation.can_view_policies"><MyPolicies /></ProtectedRoute>} />
             <Route path="/overtime"       element={<Overtime />} />
+            {/* Meetings moved to TorchX Peple. Old links/bookmarks/notifications land there. */}
+            <Route path="/meetings"       element={<ExternalRedirect to="/peple/meetings" />} />
+            <Route path="/meetings/:id"   element={<ExternalRedirect to="/peple/meetings" />} />
+            {/* Rewards & Gamification (all roles; SuperAdmin only sees the admin console) */}
+            <Route path="/gamification"       element={<ProtectedRoute planFeature="gamification"><GamificationHub /></ProtectedRoute>} />
+            <Route path="/gamification-admin" element={<ProtectedRoute allowedRoles={["admin", "superadmin"]} planFeature="gamification"><GamificationAdmin /></ProtectedRoute>} />
           </Route>
 
-          <Route path="*" element={<Pagenotfound />} />
+          <Route path="*" element={<NotFoundRoute />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

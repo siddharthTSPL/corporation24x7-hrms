@@ -19,6 +19,7 @@ import {
   Lock,
   Building2,
   LogOut,
+  Fingerprint,
 } from 'lucide-react';
 import {
   useGetAllShiftsSuperAdmin,
@@ -64,6 +65,7 @@ import {
 import ApprovalFlowPanel from './ApprovalFlowPanel';
 import AttendanceSettingsPanel from './AttendanceSettingsPanel';
 import TeamsPanel from './TeamsPanel';
+import BiometricDevicesPanel from './BiometricDevicesPanel';
 import FieldWorkSettingsCard from '../field-operations/FieldWorkSettingsCard';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1725,6 +1727,7 @@ const TABS = [
   { key: 'approval_flow', label: 'Approval Flow', icon: ShieldCheck },
   { key: 'attendance', label: 'Attendance', icon: LogOut },
   { key: 'teams', label: 'Teams', icon: Users },
+  { key: 'biometric', label: 'Biometric', icon: Fingerprint },
 ];
 
 export default function SuperAdminManagement() {
@@ -1774,6 +1777,7 @@ export default function SuperAdminManagement() {
         {tab === 'approval_flow' && <ApprovalFlowPanel notify={notify} />}
         {tab === 'attendance' && <AttendanceSettingsPanel notify={notify} />}
         {tab === 'teams' && <TeamsPanel notify={notify} />}
+        {tab === 'biometric' && <BiometricDevicesPanel notify={notify} />}
       </div>
     </div>
   );

@@ -62,8 +62,25 @@ const formatMonthYear = (month, year) => `${MONTH_NAMES[Number(month) - 1] || "U
 
 
 const getOrganisationSnapshot = async (organisation_id) => {
-  const org = await SuperAdmin.findById(organisation_id).select("organisation_name").lean();
-  return { name: org?.organisation_name || "" };
+  const [org, policy] = await Promise.all([
+    SuperAdmin.findById(organisation_id).select("organisation_name company_address email phone").lean(),
+    getOrCreatePolicy(organisation_id),
+  ]);
+  const settings = policy?.payslipSettings || {};
+  return {
+    name: settings.companyName || org?.organisation_name || "",
+    address: settings.address || org?.company_address || "",
+    email: settings.email || org?.email || "",
+    phone: settings.phone || org?.phone || "",
+    logoUrl: settings.logoUrl || "",
+  };
+};
+
+const applyOrganisationSnapshot = (payroll, snapshot) => {
+  payroll.organisationSnapshot = {
+    ...(payroll.organisationSnapshot || {}),
+    ...snapshot,
+  };
 };
 
 
@@ -75,13 +92,13 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
   if (employeeModel === "SuperAdmin") {
-    const person = await Model.findById(employeeId).select("f_name l_name organisation_name bank_name account_number").lean();
+    const person = await Model.findById(employeeId).select("f_name l_name empid designation organisation_name bank_name account_number").lean();
     if (!person) return { name: "", employeeId: "", department: "", designation: "", bankName: "", accountNumber: "" };
     return {
       name: `${person.f_name || ""} ${person.l_name || ""}`.trim(),
-      employeeId: "OWNER",
+      employeeId: person.empid || "OWNER",
       department: "Management",
-      designation: "Super Admin",
+      designation: person.designation || "",
       bankName: person.bank_name || "",
       accountNumber: person.account_number || "",
     };
@@ -109,6 +126,33 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 
 
 
+// Payrolls generated earlier saved the SuperAdmin's employee id as the literal
+// "OWNER". Show the SuperAdmin's real empid (profile > Employee ID) instead.
+// Same for the designation: older payrolls stored the literal "Super Admin" - show the
+// owner's real designation (profile > Designation) instead.
+const fixOwnerEmpId = async (payrolls) => {
+  const stale = payrolls.filter(
+    (p) =>
+      p.employeeModel === "SuperAdmin" &&
+      (!p.employeeSnapshot?.employeeId ||
+        p.employeeSnapshot.employeeId === "OWNER" ||
+        !p.employeeSnapshot?.designation ||
+        p.employeeSnapshot.designation === "Super Admin")
+  );
+  if (!stale.length) return;
+  const ids = [...new Set(stale.map((p) => String(p.employee)))];
+  const owners = await SuperAdmin.find({ _id: { $in: ids } }).select("empid designation").lean();
+  const byId = new Map(owners.map((o) => [String(o._id), o]));
+  for (const p of stale) {
+    const o = byId.get(String(p.employee));
+    if (!o) continue;
+    const snap = { ...p.employeeSnapshot };
+    if ((!snap.employeeId || snap.employeeId === "OWNER") && o.empid) snap.employeeId = o.empid;
+    if (!snap.designation || snap.designation === "Super Admin") snap.designation = o.designation || "";
+    p.employeeSnapshot = snap;
+  }
+};
+
 // Basic org-owner (SuperAdmin) identity — Admin needs this to see "Super Admin"
 // as a selectable person for CTC/payroll, same as SuperAdmin already can for
 // themself. organisation_id === the SuperAdmin's own _id (see
@@ -116,7 +160,7 @@ const getEmployeeSnapshot = async (employeeModel, employeeId) => {
 const getOrgOwner = async (req, res) => {
   const organisation_id = req.admin.organisation_id;
 
-  const owner = await SuperAdmin.findById(organisation_id).select("f_name l_name organisation_name").lean();
+  const owner = await SuperAdmin.findById(organisation_id).select("f_name l_name empid designation organisation_name").lean();
   if (!owner) return res.status(404).json({ success: false, message: "Organisation owner not found" });
 
   res.status(200).json({
@@ -125,6 +169,8 @@ const getOrgOwner = async (req, res) => {
       _id: owner._id,
       f_name: owner.f_name || "",
       l_name: owner.l_name || "",
+      empid: owner.empid || "",
+      designation: owner.designation || "",
       organisation_name: owner.organisation_name || "",
     },
   });
@@ -417,7 +463,7 @@ const listSalaryStructures = async (req, res) => {
   for (const [model, ids] of Object.entries(idsByModel)) {
     const Model = EMPLOYEE_MODEL_MAP[model];
     if (!Model) continue;
-    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining").lean();
+    const docs = await Model.find({ _id: { $in: ids } }).select("account_number date_of_joining createdAt").lean();
     for (const d of docs) detailsByEmployee.set(String(d._id), d);
   }
 
@@ -426,7 +472,7 @@ const listSalaryStructures = async (req, res) => {
     return {
       ...s,
       missingBankAccount: !details?.account_number,
-      missingDateOfJoining: !details?.date_of_joining,
+      missingDateOfJoining: !getEffectiveJoinDate(details),
     };
   });
 
@@ -1084,12 +1130,8 @@ const listPayrolls = async (req, res) => {
   const payrolls = await Payroll.find(filter).sort({ year: -1, month: -1 }).lean();
 
 
-  if (payrolls.some((p) => !p.organisationSnapshot?.name)) {
-    const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
-    for (const p of payrolls) {
-      if (!p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
-    }
-  }
+  const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
+  for (const p of payrolls) applyOrganisationSnapshot(p, organisationSnapshot);
 
   // Older payrolls (generated before bank details were added to the
   // snapshot) won't have bankName/accountNumber saved — backfill from each
@@ -1111,6 +1153,8 @@ const listPayrolls = async (req, res) => {
     }
   }
 
+  await fixOwnerEmpId(payrolls);
+
   res.status(200).json({ success: true, count: payrolls.length, payrolls });
 };
 
@@ -1125,9 +1169,7 @@ const getPayslip = async (req, res) => {
   if (!payslip) return res.status(404).json({ success: false, message: "Payslip not found for this period" });
 
 
-  if (!payslip.organisationSnapshot?.name) {
-    payslip.organisationSnapshot = await getOrganisationSnapshot(organisation_id);
-  }
+  applyOrganisationSnapshot(payslip, await getOrganisationSnapshot(organisation_id));
 
   // Older payslips (generated before bank details were added to the
   // snapshot) won't have bankName/accountNumber saved — backfill from the
@@ -1137,16 +1179,19 @@ const getPayslip = async (req, res) => {
     payslip.employeeSnapshot = { ...payslip.employeeSnapshot, bankName, accountNumber };
   }
 
+  await fixOwnerEmpId([payslip]);
+
   res.status(200).json({ success: true, payslip });
 };
 
-// Self-service endpoint: lets the logged-in Employee/Manager/Admin see and
+// Self-service endpoint: lets the logged-in SuperAdmin/Employee/Manager/Admin see and
 // download their OWN payslips — but only once payroll has actually been
 // marked "paid". This is deliberately plan-independent (no restrictPlanFeature
 // gate on its route) so it works on every plan, including Basic.
-const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin" };
+const SELF_SERVICE_ROLE_MODEL = { employee: "User", manager: "Manager", admin: "Admin", superadmin: "SuperAdmin" };
 
 const resolveSelfServiceActor = (req) => {
+  if (req.superAdmin) return { actor: req.superAdmin, employeeModel: SELF_SERVICE_ROLE_MODEL.superadmin, organisation_id: req.superAdmin._id };
   if (req.employee) return { actor: req.employee, employeeModel: SELF_SERVICE_ROLE_MODEL.employee, organisation_id: req.employee.organisation_id };
   if (req.manager) return { actor: req.manager, employeeModel: SELF_SERVICE_ROLE_MODEL.manager, organisation_id: req.manager.organisation_id };
   if (req.admin) return { actor: req.admin, employeeModel: SELF_SERVICE_ROLE_MODEL.admin, organisation_id: req.admin.organisation_id };
@@ -1160,31 +1205,53 @@ const getMyPayslips = async (req, res, next) => {
 
     const { actor, employeeModel, organisation_id } = resolved;
 
-    const payslips = await Payroll.find({
+    const filter = {
       organisation_id,
       employee: actor._id,
       employeeModel,
       status: "paid",
-    })
+    };
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    if (req.query.year && Number.isInteger(year)) filter.year = year;
+    if (req.query.month && Number.isInteger(month) && month >= 1 && month <= 12) filter.month = month;
+
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const requestedPageSize = Number.parseInt(req.query.pageSize, 10) || 5;
+    const pageSize = [5, 10, 20].includes(requestedPageSize) ? requestedPageSize : 5;
+    const [total, years] = await Promise.all([
+      Payroll.countDocuments(filter),
+      Payroll.distinct("year", { organisation_id, employee: actor._id, employeeModel, status: "paid" }),
+    ]);
+    const totalPages = Math.ceil(total / pageSize);
+    const payslips = await Payroll.find(filter)
       .sort({ year: -1, month: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
       .lean();
 
     if (payslips.length) {
-      const organisationSnapshot = payslips[0].organisationSnapshot?.name
-        ? null
-        : await getOrganisationSnapshot(organisation_id);
+      const organisationSnapshot = await getOrganisationSnapshot(organisation_id);
       const needsEmployeeSnapshot = !payslips[0].employeeSnapshot?.bankName && !payslips[0].employeeSnapshot?.accountNumber;
       const employeeSnapshot = needsEmployeeSnapshot ? await getEmployeeSnapshot(employeeModel, actor._id) : null;
 
       for (const p of payslips) {
-        if (organisationSnapshot && !p.organisationSnapshot?.name) p.organisationSnapshot = organisationSnapshot;
+        if (organisationSnapshot) applyOrganisationSnapshot(p, organisationSnapshot);
         if (employeeSnapshot && !p.employeeSnapshot?.bankName && !p.employeeSnapshot?.accountNumber) {
           p.employeeSnapshot = { ...p.employeeSnapshot, ...employeeSnapshot };
         }
       }
     }
 
-    res.status(200).json({ success: true, count: payslips.length, payslips });
+    await fixOwnerEmpId(payslips);
+
+    res.status(200).json({
+      success: true,
+      count: total,
+      payslips,
+      pagination: { page, pageSize, total, totalPages },
+      filters: { years: years.sort((a, b) => b - a) },
+    });
   } catch (err) {
     next(err);
   }

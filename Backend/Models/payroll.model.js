@@ -41,6 +41,10 @@ const payrollSchema = new mongoose.Schema(
     // later. Sourced from SuperAdmin.organisation_name automatically.
     organisationSnapshot: {
       name: { type: String, default: "" },
+      address: { type: String, default: "" },
+      email: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      logoUrl: { type: String, default: "" },
     },
 
     ctc: { type: Number, required: true },
@@ -105,6 +109,7 @@ const payrollSchema = new mongoose.Schema(
 
     employerContribution: {
       pf: { type: Number, default: 0 },
+      pfAdmin: { type: Number, default: 0 },
       esi: { type: Number, default: 0 },
       gratuity: { type: Number, default: 0 }, // informational estimate, not deducted from employee
       lwf: { type: Number, default: 0 },

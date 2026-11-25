@@ -56,7 +56,7 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
       log_date: { $gte: monthStart, $lt: nextMonthStart },
       regular_minutes: { $gt: 0 },
     })
-      .select("logged_by log_date regular_minutes timesheet")
+      .select("logged_by log_date regular_minutes timesheet status")
       .lean(),
     Holiday.find({ organisation_id, date: { $gte: monthStart, $lt: nextMonthStart } }).select("date").lean(),
     (async () => {
@@ -80,10 +80,19 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
   const approvedSet = new Set(approved.map((t) => String(t._id)));
 
   const minutesByEmployeeDay = new Map();
+  // Minutes that were logged but are NOT counted yet, split by why, so payroll
+  // can tell "really absent" apart from "filled but not approved / not submitted".
+  const pendingByEmployeeDay = new Map();
+  const unsubmittedByEmployeeDay = new Map();
   for (const log of logs) {
-    if (!log.timesheet || !approvedSet.has(String(log.timesheet))) continue;
     const key = `${String(log.logged_by)}|${toISTKey(log.log_date)}`;
-    minutesByEmployeeDay.set(key, (minutesByEmployeeDay.get(key) || 0) + (log.regular_minutes || 0));
+    if (log.timesheet && approvedSet.has(String(log.timesheet))) {
+      minutesByEmployeeDay.set(key, (minutesByEmployeeDay.get(key) || 0) + (log.regular_minutes || 0));
+    } else if (log.timesheet) {
+      pendingByEmployeeDay.set(key, (pendingByEmployeeDay.get(key) || 0) + (log.regular_minutes || 0));
+    } else {
+      unsubmittedByEmployeeDay.set(key, (unsubmittedByEmployeeDay.get(key) || 0) + (log.regular_minutes || 0));
+    }
   }
 
   const holidayKeys = new Set(holidays.map((h) => toISTKey(h.date)));
@@ -143,7 +152,18 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
         approvedRegularMinutes: dayMinutes,
         standardMinutes,
         percent: standardMinutes > 0 ? Math.round((dayMinutes / standardMinutes) * 1000) / 10 : 0,
-        result: status === "full" ? "full_day" : status === "half" ? "half_day" : "absent_lop",
+        result:
+          status === "full"
+            ? "full_day"
+            : status === "half"
+              ? "half_day"
+              : (pendingByEmployeeDay.get(`${id}|${key}`) || 0) > 0
+                ? "absent_pending_approval"
+                : (unsubmittedByEmployeeDay.get(`${id}|${key}`) || 0) > 0
+                  ? "absent_unsubmitted"
+                  : "absent_lop",
+        pendingApprovalMinutes: pendingByEmployeeDay.get(`${id}|${key}`) || 0,
+        unsubmittedMinutes: unsubmittedByEmployeeDay.get(`${id}|${key}`) || 0,
       });
       if (status === "full") presentDays += 1;
       else if (status === "half") {
@@ -152,7 +172,9 @@ const getTimesheetAttendanceByEmployee = async ({ organisation_id, employeeModel
       } else absentDays += 1;
     }
 
-    result.set(id, { presentDays, halfDays, absentDays, basis: "timesheet", days });
+    const pendingApprovalDays = days.filter((d) => d.result === "absent_pending_approval").length;
+    const unsubmittedDays = days.filter((d) => d.result === "absent_unsubmitted").length;
+    result.set(id, { presentDays, halfDays, absentDays, pendingApprovalDays, unsubmittedDays, basis: "timesheet", days });
   }
 
   return result;

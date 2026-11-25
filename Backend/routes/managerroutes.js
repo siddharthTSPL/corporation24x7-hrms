@@ -1,7 +1,10 @@
 const express = require("express");
 const managerrouter = express.Router();
+const { requireDpdpPin } = require("../middleware/security/dpdp.middleware");
 const managercontroller = require("../controllers/manager.controller");
 const managermiddleware = require("../middleware/auth/manager.middleware");
+const profilePhotoUpload = require("../middleware/upload/ProfilePhoto.middleware");
+const { uploadProfilePhoto } = require("../controllers/profilePhoto.controller");
 const leaveDocumentUpload = require("../middleware/upload/Leavedocument.middleware");
 const {
   requirePolicyAcknowledged,
@@ -77,6 +80,7 @@ managerrouter.put(
   managermiddleware,
   asyncHandler(managercontroller.editprofilemanager),
 );
+managerrouter.post("/profile-photo", managermiddleware, profilePhotoUpload, asyncHandler(uploadProfilePhoto));
 managerrouter.put(
   "/manager/change-password",
   managermiddleware,
@@ -246,18 +250,21 @@ managerrouter.get(
   "/getAllExpenseDocuments",
   managermiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(managercontroller.getAllExpenseDocuments),
 );
 managerrouter.get(
   "/getAllPersonalDocuments",
   managermiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(managercontroller.getAllPersonalDocuments),
 );
 managerrouter.get(
   "/getDocumentDetails/:documentId",
   managermiddleware,
   checkPermission("documents.can_view_all_documents"),
+  requireDpdpPin,
   asyncHandler(managercontroller.getDocumentDetails),
 );
 

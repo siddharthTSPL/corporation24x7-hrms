@@ -3,7 +3,11 @@ const FieldTeam = require("../Models/fieldTeam.model");
 const {
   UNLOCKED_PLANS,
 } = require("../middleware/auth/planFeatureGate.middleware");
-const { getPlanState, peekStorageStatus } = require("../utils/planAccess");
+const {
+  getPlanState,
+  peekStorageStatus,
+  buildStorageMessage,
+} = require("../utils/planAccess");
 
 // Features gated by the org's torchx_talent plan tier. Keep this in sync
 // with middleware/auth/planFeatureGate.middleware.js — that middleware is
@@ -50,7 +54,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
     const organisation = req.superAdmin
       ? req.superAdmin
       : await SuperAdminModel.findById(organisationId).select(
-          "licenses is_trial_active trial_expires_at field_operations storage_used_bytes storage_checked_at organisation_id organisation_name",
+          "licenses is_trial_active trial_expires_at field_operations gamification storage_used_bytes storage_checked_at organisation_id organisation_name",
         );
 
     if (!organisation)
@@ -77,6 +81,8 @@ const getPlanFeatureAccess = async (req, res, next) => {
       return acc;
     }, {});
     features.fieldOperations = organisation.field_operations?.enabled === true;
+    // Rewards & Gamification: org-level opt-in, switched on by the SuperAdmin only.
+    features.gamification = organisation.gamification?.enabled === true;
 
     // Even when the org has Field Operations on, the "Field Duty" nav item
     // should only appear for the employees an admin actually assigned to a
@@ -116,9 +122,7 @@ const getPlanFeatureAccess = async (req, res, next) => {
           ...storageStatus,
           limitReached: storageStatus.exceeded,
           message: storageStatus.exceeded
-            ? isAdminRole
-              ? "Your free trial has ended and your organisation's free storage is full. Please upgrade to the Basic or Advance plan at torchxsuite.com for unlimited storage and to keep using TorchX Talent."
-              : "Your organisation's free storage is full. Please contact your organization."
+            ? buildStorageMessage(storageStatus, isAdminRole)
             : null,
         }
       : null;

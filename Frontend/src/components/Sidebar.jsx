@@ -1,9 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useEffect } from "react";
 import React from "react";
 import talent from "../assets/Talent.png";
 import TechTorchLogo from "../../src/assets/TechTorchLogo.png"
 import {
+  FaTrophy,
+  FaChartBar,
   FaHome,
   FaCalendarAlt,
   FaBullhorn,
@@ -26,6 +29,9 @@ import {
   FaMapMarkedAlt,
   FaFileContract,
   FaBusinessTime,
+  FaUserCheck,      // NEW: Face Attendance icon
+  FaRegFolderOpen,  // NEW: Team Documents icon
+  FaBookOpen,       // NEW: My Policies icon
 } from "react-icons/fa";
 import { useAuth } from "../auth/store/getmeauth/getmeauth";
 import { useAdminLogout } from "../auth/server-state/adminauth/adminauth.hook";
@@ -45,6 +51,7 @@ import {
 } from "../auth/api/fieldOperations/fieldOperations.api";
 
 const superAdminMenu = [
+  { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
 
   { name: "Dashboard",      path: "/superadmin-dashboard",     icon: <FaHome />, blurb: "Overview of every organisation — usage, activity, and platform health." },
   { name: "Organisations",  path: "/superadmin-organisations", icon: <FaBuilding />, blurb: "Onboard organisations and manage their TorchX Talent access." },
@@ -53,22 +60,25 @@ const superAdminMenu = [
   { name: "Leaves",         path: "/superadmin-leaves",        icon: <FaCalendarAlt />, blurb: "See and manage leave requests across every organisation." },
   { name: "Reviews",        path: "/superadmin-reviews",       icon: <FaClipboardCheck />, blurb: "Monitor performance reviews raised across organisations.", planFeature: "review" },
   {name: "Asset Management", path: "/superadmin-asset-management", icon: <FaFolder />, blurb: "Track company assets — assign, revoke, and view history.", planFeature: "asset" },
-  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaFileAlt />, blurb: "Access documents uploaded by teams across organisations." },
+  { name: "Team Documents", path: "/superadmin-documents",     icon: <FaRegFolderOpen />, blurb: "Access documents uploaded by teams across organisations." },
   { name:"Timesheet",       path: "/superadmin-timesheet",     icon: <FaLock />, blurb: "Review logged hours and timesheets, org-wide.", planFeature: "timesheet" },
   { name: "TorchX Management", path: "/superadmin-management", icon: <FaUsersCog />, blurb: "Manage TorchX product access and licensing per organisation." },
   { name: "Payroll",       path: "/superadmin-payroll",       icon: <FaFileInvoiceDollar />, blurb: "Oversee payroll runs across every organisation." },
+  { name: "Reports & Analytics", path: "/reports", icon: <FaChartBar />, blurb: "Generate HR, attendance, leave, payroll, timesheet and expense reports and export them to Excel.", permissionGroup: ["reports.can_view_reports"] },
   { name: "Reimbursements", path: "/superadmin-reimbursement", icon: <FaFileSignature />, blurb: "Review reimbursement claims raised by admins, and see every claim org-wide." },
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "Review overtime requests from your team and send approved hours to payroll." },
   { name: "Recruitment", path: "/superadmin-recruitment", icon: <FaUsersCog />, blurb: "Review hiring requisitions, manage candidates and interviews, and approve offer letters.", planFeature: "recruitment" },
   { name: "TorchX Voice",   path: "/superadmin-complaints",    icon: <FaShieldAlt />, blurb: "Handle support tickets raised by admins, managers, and employees.", planFeature: "tickets" },
   { name: "Settings",       path: "/superadmin-settings",      icon: <FaCog />, blurb: "Configure platform-wide settings and preferences." },
   { name: "Policy Management", path: "/superadmin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies published by your admins." },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies published by your admins." },
     { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Set up field teams and monitor live duty locations and visits.", fieldGate: "admin" },
-     { name: "Training Records", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
+     { name: "Training Management", path: "/superadmin-training", icon: <FaClipboardCheck />, blurb: "Read training assignments, approval history and certificate records for your organisation." },
 ];
 
 const adminMenu = [
+  { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
+  { name: "Rewards Admin", path: "/gamification-admin", gamificationGate: true, icon: <FaTrophy />, blurb: "Configure points, run challenges and seasons, approve reward redemptions and see engagement." },
   
   { name: "Dashboard",     path: "/dashboard",           icon: <FaHome />, blurb: "Your organisation's overview — headcount, attendance, and activity." },
   
@@ -81,26 +91,29 @@ const adminMenu = [
     pageStep: { selector: '[data-tour="leave-tabs"]', title: "Managing leave", content: "Use these tabs to review pending requests, check your own leave balance, or apply for your own leave and WFH." } },
   { name: "Organisation",  path: "/organisation",        icon: <FaBuilding />, blurb: "View your organisation's structure and org chart." },
   { name:"Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", planFeature: "asset" },
-  { name: "Face Attendance", path: "/face-enrollment", icon: <FaShieldAlt />, blurb: "Enroll employee faces for kiosk-based attendance." },
+  { name: "Face Attendance", path: "/face-enrollment", icon: <FaUserCheck />, blurb: "Enroll employee faces for kiosk-based attendance." },
   { name: "Recruitment",   path: "/recruitment-admin",   icon: <FaUsersCog />, blurb: "Post hiring requisitions and track candidates.",
     permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
   { name: "TorchX Voice",  path: "/admin-complaints",    icon: <FaShieldAlt />, blurb: "Raise or resolve support tickets.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
   { name: "Timesheet",     path: "/admin-timesheet",     icon: <FaLock />, blurb: "Review and approve team timesheets.", planFeature: "timesheet" },
   { name: "Payroll",       path: "/payroll",             icon: <FaFileInvoiceDollar />, blurb: "Run payroll and manage payslips." },
+  { name: "Reports & Analytics", path: "/reports", icon: <FaChartBar />, blurb: "Generate HR, attendance, leave, payroll, timesheet and expense reports and export them to Excel.", permissionGroup: ["reports.can_view_reports"] },
   { name: "Reimbursements", path: "/reimbursement-admin", icon: <FaFileSignature />, blurb: "Review claims from employees and managers, and submit your own." },
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File your own overtime, and review team overtime if you are the designated HR." },
   { name: "TorchX Management", path: "/admin-management", icon: <FaUsersCog />, blurb: "Manage your organisation's TorchX product access." },
   { name: "Document",      path: "/document-admin",      icon: <FaFileAlt />, blurb: "Upload and manage your own documents.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
-  { name: "Team Document", path: "/document-admin-team", icon: <FaFileAlt />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "Team Document", path: "/document-admin-team", icon: <FaRegFolderOpen />, blurb: "View documents uploaded by your team.",   permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
+  { name: "Privacy & My Data", path: "/privacy",           icon: <FaShieldAlt />, blurb: "Consent, data download and privacy requests." },
   { name: "Settings",      path: "/settings",            icon: <FaCog />, blurb: "Update your profile and account preferences." },
   { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track acknowledgement of company policies." },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you." },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you." },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Create field teams and monitor live duty locations and visits.", fieldGate: "admin" },
   { name: "Training", path: "/training-admin", icon: <FaClipboardCheck />, blurb: "Assign training, manage stages and approve completion." },
 ];
 
 const managerMenu = [
+  { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
  
   { name: "Dashboard",    path: "/manager-dashboard",    icon: <FaHome />, blurb: "Your team's overview — attendance, leaves, and activity." },
   
@@ -113,18 +126,21 @@ const managerMenu = [
   { name: "Review",       path: "/review-manager",       icon: <FaClipboardCheck />, blurb: "Run performance reviews for your reportees.", permissionGroup: ["review.can_access"], planFeature: "review" },
   { name: "Timesheet",    path: "/manager-timesheet",    icon: <FaLock />, blurb: "Track and approve your team's timesheets.", permissionGroup: ["timesheet.can_access"], planFeature: "timesheet" },
   { name: "Reimbursements", path: "/reimbursement-manager", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims.", permissionGroup: ["reimbursement.can_submit_claim"] },
+  { name: "Reports & Analytics", path: "/reports", icon: <FaChartBar />, blurb: "Generate HR, attendance, leave, payroll, timesheet and expense reports and export them to Excel.", permissionGroup: ["reports.can_view_reports"] },
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File extra hours worked. HR approves, and approved hours are added to payroll." },
   { name: "File",         path: "/file-manager",         icon: <FaFolder />, blurb: "Upload and manage documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "Recruitment",  path: "/recruitment-manager",  icon: <FaUsersCog />, blurb: "Track hiring requisitions and candidates.",  permissionGroup: ["recruitment.can_view_hiring_requisitions", "recruitment.can_create_hiring_requisition", "recruitment.can_view_candidates", "recruitment.can_add_candidate"], planFeature: "recruitment" },
   { name: "TorchX Voice", path: "/manager-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to track ones you've already raised." } },
+  { name: "Privacy & My Data", path: "/privacy",           icon: <FaShieldAlt />, blurb: "Consent, data download and privacy requests." },
   { name: "Settings",     path: "/settings-manager",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
   { name: "Field Operations", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Monitor live locations, visits, and progress for your assigned field teams.", fieldGate: "manager", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "Manage sessions for training assignments where you are the trainer." },
 ];
 
 const employeeMenu = [
+  { name: "Recognition & Rewards", path: "/gamification", gamificationGate: true, icon: <FaTrophy />, blurb: "Track goals and XP, recognise colleagues, see leaderboards and redeem rewards." },
   { name: "Field Duty", path: "/field-operations", icon: <FaMapMarkedAlt />, blurb: "Start field duty, share location during work, and record customer visits.", fieldGate: "employee", permissionGroup: ["navigation.can_view_field_operations"] },
   { name: "Dashboard",    path: "/employee-dashboard",    icon: <FaHome />, blurb: "Your personal overview — attendance, leaves, and updates.", permissionGroup: ["navigation.can_view_dashboard"] },
  
@@ -137,12 +153,14 @@ const employeeMenu = [
   { name: "Review",       path: "/review-employee",       icon: <FaClipboardCheck />, blurb: "See the performance reviews your manager has given you.", permissionGroup: ["review.can_access"], planFeature: "review" },
   { name: "Timesheet",    path: "/employee-timesheet",    icon: <FaLock />, blurb: "Log your hours and track your timesheet.", permissionGroup: ["timesheet.can_access"], planFeature: "timesheet" },
   { name: "Reimbursements", path: "/reimbursement-employee", icon: <FaFileSignature />, blurb: "Submit and track your reimbursement claims.", permissionGroup: ["reimbursement.can_submit_claim"] },
+  { name: "Reports & Analytics", path: "/reports", icon: <FaChartBar />, blurb: "Generate HR, attendance, leave, payroll, timesheet and expense reports and export them to Excel.", permissionGroup: ["reports.can_view_reports"] },
   { name: "Overtime", path: "/overtime", icon: <FaBusinessTime />, blurb: "File extra hours worked. HR approves, and approved hours are added to payroll." },
   { name: "File",         path: "/file-employee",         icon: <FaFolder />, blurb: "Upload and manage your personal documents.",    permissionGroup: ["documents.can_upload_documents", "documents.can_view_all_documents"] },
   { name: "TorchX Voice", path: "/employee-complaints",   icon: <FaShieldAlt />, blurb: "Raise a support ticket for any issue.", permissionGroup: ["tickets.can_raise_ticket", "tickets.can_view_all_tickets", "tickets.can_resolve_ticket", "tickets.can_rate_ticket"], planFeature: "tickets",
     pageStep: { selector: '[data-tour="ticket-tabs"]', title: "Raising a ticket", content: "Switch to \"Submit New\" to raise a ticket, or \"My Tickets\" to check the status of one you've already sent." } },
+  { name: "Privacy & My Data", path: "/privacy",           icon: <FaShieldAlt />, blurb: "Consent, data download and privacy requests." },
   { name: "Settings",     path: "/settings-employee",     icon: <FaCog />, blurb: "Update your profile and account preferences.", permissionGroup: ["navigation.can_view_settings"] },
-  { name: "My Policies", path: "/my-policies", icon: <FaFileContract />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
+  { name: "My Policies", path: "/my-policies", icon: <FaBookOpen />, blurb: "Read and acknowledge policies assigned to you.", permissionGroup: ["navigation.can_view_policies"] },
    { name: "Training", path: "/training", icon: <FaClipboardCheck />, blurb: "View your training assignments, schedules and certificates.", permissionGroup: ["navigation.can_view_training"] },
   { name: "Payroll", path: "/payroll", icon: <FaFileInvoiceDollar />, blurb: "Manage organisation-wide payroll and salary details.", permissionGroup: ["payroll.can_manage_payroll"] },
   { name: "Policy Management", path: "/admin-policy-management", icon: <FaFileContract />, blurb: "Create, publish, and track company policy acknowledgements.", permissionGroup: ["adminAccess.can_manage_policy_management"] },
@@ -151,6 +169,62 @@ const employeeMenu = [
   { name: "Admin Timesheet", path: "/admin-timesheet", icon: <FaLock />, blurb: "Review and approve organisation timesheets.", permissionGroup: ["adminAccess.can_manage_timesheet_admin"], planFeature: "timesheet" },
   { name: "Asset Management", path: "/admin-asset-management", icon: <FaFolder />, blurb: "Assign, revoke, and track company assets.", permissionGroup: ["adminAccess.can_manage_asset_management"], planFeature: "asset" },
 ];
+
+// Sidebar display order. Every role's menu is sorted by this list so the
+// sidebar looks the same everywhere. Items that are not listed here (Onboarding,
+// Face Attendance, TorchX Voice, Policies, Training, ...) are NOT dropped -
+// they keep their original relative order and are placed right after the
+// listed items, just above Settings. Settings is always the last item
+// (Logout is rendered right below it).
+const SIDEBAR_ORDER = [
+  "dashboard",
+  "self service portal",
+  "recruitment",
+  "leave",
+  "field operations",
+  "timesheet",
+  "overtime",
+  "reimbursement",
+  "payroll",
+  "asset management",
+  "team document",
+  "document",
+  "announcement",
+  "review",
+  "torchx management",
+  "organisation",
+  "settings",
+];
+
+// Aliases so role-specific names land on the right slot.
+const SIDEBAR_ALIASES = {
+  "field duty": "field operations",
+  "file": "document",
+  "organization": "organisation",
+};
+
+const sidebarKey = (name = "") => {
+  let k = name.trim().toLowerCase();
+  if (SIDEBAR_ALIASES[k]) return SIDEBAR_ALIASES[k];
+  if (SIDEBAR_ORDER.includes(k)) return k;
+  // plural -> singular (Leaves, Reviews, Documents, Reimbursements ...)
+  if (k === "leaves") return "leave";
+  const singular = k.replace(/s$/, "");
+  return SIDEBAR_ALIASES[singular] ?? singular;
+};
+
+const sortSidebarMenu = (items) => {
+  const settingsRank = SIDEBAR_ORDER.indexOf("settings");
+  const rankOf = (item) => {
+    const idx = SIDEBAR_ORDER.indexOf(sidebarKey(item.name));
+    // unlisted items sit just before Settings
+    return idx === -1 ? settingsRank - 0.5 : idx;
+  };
+  return items
+    .map((item, i) => ({ item, i, r: rankOf(item) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map((x) => x.item);
+};
 
 const menuByRole = {
   superadmin: superAdminMenu,
@@ -169,6 +243,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   const navigate  = useNavigate();
   const { data: auth } = useAuth();
   const role = auth?.role;
+  const profilePerson = role === "superadmin" ? auth?.data?.superAdmin
+    : role === "manager" ? auth?.data?.manager
+      : role === "employee" ? auth?.data?.employee
+        : auth?.data?.user || auth?.data?.admin || auth?.data;
+  const [logoutAvatarFailed, setLogoutAvatarFailed] = useState(false);
+  useEffect(() => setLogoutAvatarFailed(false), [profilePerson?.profile_image]);
   const isCoAdmin = role === "admin" && auth?.data?.user?.reporting_manager_model === "Admin";
 
   const can = usePermissionStore((state) => state.can);
@@ -204,7 +284,11 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // no fieldGate, so it stays visible even when Field Operations is off),
   // so hiding this menu item when disabled does not cause a lockout.
 
+  // Rewards & Gamification is an org-level opt-in switched on by the SuperAdmin
+  // (Settings → Rewards). Until then the Rewards menu items are hidden for every role.
+  // Fail closed: hidden until plan-features has loaded.
   const passesFieldGate = (item) => {
+    if (item.gamificationGate && planFeatures?.features?.gamification !== true) return false;
     if (!item.fieldGate) return true;
     if (!planFeatures?.features?.fieldOperations) return false;
     if (item.fieldGate === "admin") return true;
@@ -238,11 +322,12 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
   // Admins only see items they can open. Employees keep their own menus
   // visible with locks, while delegated admin menus stay hidden unless granted.
   const isDelegatedAdminMenu = (item) => delegatedAdminMenus.includes(item);
-  const menu = role === "admin"
+  const filteredMenu = role === "admin"
     ? roleMenu.filter((item) => isAllowed(item))
     : role === "employee" || role === "manager"
       ? roleMenu.filter((item) => !isDelegatedAdminMenu(item) || isAllowed(item))
       : roleMenu;
+  const menu = sortSidebarMenu(filteredMenu);
 
   // Review / Timesheet / Recruitment / Asset Management / TorchX Voice (tickets)
   // are locked on the Basic plan and open on Advance/enterprise (or during
@@ -473,8 +558,14 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
                 disabled={isPending}
                 className="flex items-center gap-3 p-3 rounded-lg hover:bg-red-100 text-gray-800 transition-colors"
               >
-                <FaSignOutAlt />
-                {!collapsed && (isPending ? "Logging out..." : "Logout")}
+                <span className="text-sm flex-shrink-0">
+                  <FaSignOutAlt />
+                </span>
+                {!collapsed && (
+                  <span className="flex-1 text-left text-sm">
+                    {isPending ? "Logging out..." : "Logout"}
+                  </span>
+                )}
               </button>
             </nav>
           )}
@@ -514,7 +605,16 @@ function Sidebar({ collapsed, setCollapsed, className = "" }) {
           <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-[#F4C0D1] bg-white shadow-2xl">
             <div className="px-6 pt-6 pb-4" style={{ background: "#FBEAF0" }}>
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[#F7C1C1]" style={{ background: "#fff" }}>
-                <FaSignOutAlt className="text-[#730042]" size={16} />
+                {profilePerson?.profile_image && !logoutAvatarFailed ? (
+                  <img
+                    src={profilePerson.profile_image}
+                    alt="Your profile"
+                    className="h-full w-full rounded-full object-cover"
+                    onError={() => setLogoutAvatarFailed(true)}
+                  />
+                ) : (
+                  <FaSignOutAlt className="text-[#730042]" size={16} />
+                )}
               </div>
               <h3 className="text-center text-[15px] font-semibold text-[#730042]">
                 {activeDutySession ? "You have an active field duty" : "Are you sure you want to logout?"}
