@@ -1,7 +1,11 @@
-// Where Convs lives. Same domain in production (torchxsuite.com/convs), so the
-// login cookie / tab session is shared with Talent.
-// For local dev set VITE_CONVS_URL=http://localhost:5174/convs in .env.local
-const RAW = import.meta.env.VITE_CONVS_URL || "https://torchxsuite.com/convs/";
+// Where Convs lives.
+//  - Production: same origin as Talent (torchxsuite.com/convs), so the login session is shared.
+//  - Local dev (npm run dev): the Convs dev server on port 5174, e.g. http://localhost:5174/convs/
+//    ("Open in new tab" and the chat frame both use it; Talent itself has no /convs route).
+// Override anything with VITE_CONVS_URL in .env.local.
+const RAW =
+  import.meta.env.VITE_CONVS_URL ||
+  (import.meta.env.DEV ? `http://${window.location.hostname}:5174/convs/` : "/convs/");
 
 const toAbsolute = (u) => new URL(u, window.location.origin);
 
