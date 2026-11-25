@@ -1,22 +1,5 @@
 const nodemailer = require("nodemailer");
-const path = require("path");
 require("dotenv").config();
-
-const TALENT_LOGO_PATH = path.join(__dirname, "../assets/Talent.png");
-const TALENT_LOGO_CID = "torchx-talent-logo";
-
-const emailBrandHeader = `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-    <tr><td align="center" style="padding:24px 20px 12px;">
-      <img src="cid:${TALENT_LOGO_CID}" alt="TorchX Talent" width="190" style="display:block;width:190px;max-width:100%;height:auto;border:0;" />
-    </td></tr>
-  </table>`;
-
-const addTalentLogo = (html) => {
-  if (typeof html !== "string" || !html) return html;
-  const bodyTag = /<body\b[^>]*>/i;
-  return bodyTag.test(html) ? html.replace(bodyTag, (tag) => `${tag}${emailBrandHeader}`) : `${emailBrandHeader}${html}`;
-};
 
 // Two mailboxes:
 //   "noreply"  — OTPs, password resets, account verification/welcome,
@@ -83,20 +66,14 @@ const getTransporter = (mailbox) => {
  */
 async function sendEmail({ to, subject, html, text, attachments, mailbox = "noreply", replyTo }) {
   const { transporter, from } = getTransporter(mailbox);
-  const brandedHtml = addTalentLogo(html);
 
   const mailOptions = {
     from,
     to,
     subject,
-    html: brandedHtml,
+    html,
     text,
-    ...((attachments?.length || brandedHtml) && {
-      attachments: [
-        ...(attachments || []),
-        ...(brandedHtml ? [{ filename: "Talent.png", path: TALENT_LOGO_PATH, cid: TALENT_LOGO_CID }] : []),
-      ],
-    }),
+    ...(attachments?.length && { attachments }),
     ...(replyTo && { replyTo }),
   };
 
