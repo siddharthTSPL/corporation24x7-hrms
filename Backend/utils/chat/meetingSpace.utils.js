@@ -22,8 +22,12 @@ const validTz = (tz) => {
 
 const fmtWhen = (d, tz) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: validTz(tz) }).format(new Date(d));
 
-const frontendUrl = () => (process.env.FRONTEND_URL || "").replace(/\/$/, "");
-const meetingUrl = (id) => (frontendUrl() ? `${frontendUrl()}${process.env.MEETING_JOIN_PATH || "/meetings"}/${id}` : "");
+const meetingBaseUrl = () => {
+  if (process.env.SYNC_URL) return process.env.SYNC_URL.replace(/\/+$/, "");
+  const base = (process.env.BASE_URL || process.env.FRONTEND_URL || "").replace(/\/talent\/?$/, "").replace(/\/+$/, "");
+  return base ? `${base}/peple` : "";
+};
+const meetingUrl = (id) => (meetingBaseUrl() ? `${meetingBaseUrl()}${process.env.MEETING_JOIN_PATH || "/meetings"}/${id}` : "");
 
 const isModerator = (m, key) => m.hostKey === key || (m.coHostKeys || []).includes(key);
 

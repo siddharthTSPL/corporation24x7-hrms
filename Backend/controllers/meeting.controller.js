@@ -29,8 +29,12 @@ const actorOf = (req) => chat.toActor(req.actor);
 const ok = (res, data = {}, status = 200) => res.status(status).json({ success: true, ...data });
 const escapeHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const FRONTEND_URL = () => (process.env.FRONTEND_URL || "").replace(/\/$/, "");
-const joinUrl = (meetingId) => (FRONTEND_URL() ? `${FRONTEND_URL()}${process.env.MEETING_JOIN_PATH || "/meetings"}/${meetingId}` : "");
+const meetingBaseUrl = () => {
+  if (process.env.SYNC_URL) return process.env.SYNC_URL.replace(/\/+$/, "");
+  const base = (process.env.BASE_URL || process.env.FRONTEND_URL || "").replace(/\/talent\/?$/, "").replace(/\/+$/, "");
+  return base ? `${base}/peple` : "";
+};
+const joinUrl = (meetingId) => (meetingBaseUrl() ? `${meetingBaseUrl()}${process.env.MEETING_JOIN_PATH || "/meetings"}/${meetingId}` : "");
 
 const validTz = (tz) => {
   try { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } catch { return DEFAULT_TZ; }
@@ -198,6 +202,7 @@ const notify = (actor, keys, meeting, { title, message, priority = "medium" }) =
 const emailAttendees = (meeting, host, recipients, method, allPeople, opts = {}) => {
   if (meeting.notifyMode === "none") return;
   const list = recipients.filter((p) => p.email && (opts.includeHost || p.key !== host.key)).slice(0, 200);
+  console.log("[meeting] email recipients:", list.map((p) => p.email), "of", recipients.length, "method:", method, "notifyMode:", meeting.notifyMode);
   if (!list.length) return;
   const url = joinUrl(meeting._id);
   const when = `${fmtWhen(meeting.startTime, meeting.timezone)} – ${fmtWhen(meeting.endTime, meeting.timezone).split(", ").pop()} (${meeting.timezone})`;
@@ -395,6 +400,7 @@ const createMeeting = async (req, res) => {
   const conflicts = await findConflicts(actor, attendeeList.map((p) => p.key), first.startTime, first.endTime, created.map((m) => m._id));
 
   const invitees = attendeeList.filter((p) => p.key !== host.key);
+  console.log("[meeting] create: invitees", invitees.map((p) => p.email), "sendEmail:", b.sendEmail, "notifyMode:", notifyMode);
   const when = fmtWhen(first.startTime, tz);
   notify(actor, invitees.map((p) => p.key), first, {
     title: "Meeting invitation",
