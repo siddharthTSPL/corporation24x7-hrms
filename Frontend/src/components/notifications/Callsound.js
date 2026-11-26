@@ -163,6 +163,10 @@ const PATTERNS = {
       { freq: 1319, start: 0.5, dur: 0.8, gain: 0.26 },
     ],
   },
+  ringback: {
+    cycleMs: 3000,
+    notes: [{ freq: 400, start: 0, dur: 1, gain: 0.24 }],
+  },
 };
 
 const playCycle = (name, volume) => {
@@ -243,6 +247,25 @@ export const startRingtone = () => {
       clearInterval(vib);
       navigator.vibrate?.(0);
     }
+  });
+};
+
+// Plays the caller-side ringback while the other person is being called.
+// It uses the saved call-sound volume, but is independent of incoming-ring settings.
+export const startRingbackTone = () => {
+  const { volume } = getCallSoundSettings();
+  stopActivePlayback();
+  const pattern = PATTERNS.ringback;
+  let stopCycle = null;
+  const run = () => {
+    stopCycle?.();
+    stopCycle = playCycle("ringback", volume);
+  };
+  run();
+  const timer = setInterval(run, pattern.cycleMs);
+  return ownPlayback("ringback", () => {
+    clearInterval(timer);
+    stopCycle?.();
   });
 };
 

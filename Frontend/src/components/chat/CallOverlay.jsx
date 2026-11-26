@@ -25,7 +25,7 @@ import PostMeetingScreen from "../meeting/PostMeetingScreen";
 import MeetingSoonBanner from "../meeting/MeetingSoonBanner";
 import { playSound } from "../meeting/room/live/sounds";
 import { formatDuration } from "./chatUtils";
-import { startRingtone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
+import { startRingtone, startRingbackTone, showIncomingCallAlert, isAudioLocked } from "../notifications/Callsound";
 
 export function MediaView({ stream, muted = false, mirror = false, hidden = false, contain = false, refreshKey = 0 }) {
   const ref = useRef(null);
@@ -191,6 +191,11 @@ function CallScreen() {
 // eslint-disable-next-line react-hooks/set-state-in-effect
     if (active?.callId) setMinimized(false);
   }, [active?.callId]);
+
+  useEffect(() => {
+    if (!active || active.kind === "meeting" || active.status !== "ringing") return undefined;
+    return startRingbackTone();
+  }, [active?.roomKey, active?.kind, active?.status]);
 
   if (!active) return null;
 

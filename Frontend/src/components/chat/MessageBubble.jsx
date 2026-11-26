@@ -16,11 +16,37 @@ import {
   FaCopy,
   FaShare,
   FaChevronDown,
+  FaDownload,
 } from "react-icons/fa";
 import Avatar from "./Avatar";
 import StickerView from "./StickerView";
 import { QUICK_REACTIONS } from "./emojiData";
 import { colorFor, formatClock, formatSize, groupReactions, isAudio, isEmojiOnly, isImage, isVideo, splitLinks } from "./chatUtils";
+
+const downloadAttachmentUrl = (a) => {
+  try {
+    const url = new URL(a.url, window.location.href);
+    url.searchParams.set("ik-attachment", "true");
+    const name = String(a.name || "").replace(/\.[^.]+$/, "").trim();
+    if (name) url.searchParams.set("ik-attachment-filename", name);
+    return url.toString();
+  } catch {
+    return a.url;
+  }
+};
+
+function DownloadAttachmentButton({ a, className = "" }) {
+  return (
+    <a
+      href={downloadAttachmentUrl(a)}
+      title={`Download ${a.name || "file"}`}
+      aria-label={`Download ${a.name || "file"}`}
+      className={`grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-[#730042]/40 ${className}`}
+    >
+      <FaDownload className="text-xs" />
+    </a>
+  );
+}
 
 function Attachment({ a, mine }) {
   if (a.uploading || !a.url) {
@@ -33,30 +59,41 @@ function Attachment({ a, mine }) {
   }
   if (isImage(a.mime)) {
     return (
-      <a href={a.url} target="_blank" rel="noopener noreferrer" className="block">
-        <img src={a.url} alt={a.name} loading="lazy" className="rounded-xl max-h-56 max-w-full object-cover" />
-      </a>
+      <div className="relative w-fit max-w-full">
+        <a href={a.url} target="_blank" rel="noopener noreferrer" className="block">
+          <img src={a.url} alt={a.name} loading="lazy" className="rounded-xl max-h-56 max-w-full object-cover" />
+        </a>
+        <DownloadAttachmentButton a={a} className="absolute right-2 top-2 bg-white/90 text-gray-800 shadow-sm hover:bg-white" />
+      </div>
     );
   }
   if (isAudio(a.mime)) {
-    return <audio controls src={a.url} className="max-w-[230px] h-10" />;
+    return (
+      <div className="flex items-center gap-1">
+        <audio controls src={a.url} className="max-w-[230px] h-10" />
+        <DownloadAttachmentButton a={a} />
+      </div>
+    );
   }
   if (isVideo(a.mime)) {
-    return <video controls src={a.url} className="rounded-xl max-h-56 max-w-full" />;
+    return (
+      <div className="flex items-start gap-1">
+        <video controls src={a.url} className="rounded-xl max-h-56 max-w-full" />
+        <DownloadAttachmentButton a={a} />
+      </div>
+    );
   }
   return (
-    <a
-      href={a.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${mine ? "bg-white/15 hover:bg-white/25" : "bg-gray-50 border border-gray-200 hover:bg-gray-100"} transition-colors`}
-    >
-      <FaFileAlt className="text-base flex-shrink-0 opacity-80" />
-      <div className="min-w-0">
-        <p className="text-xs font-semibold truncate max-w-[180px]">{a.name || "File"}</p>
-        <p className="text-[10px] opacity-70">{formatSize(a.size)}</p>
-      </div>
-    </a>
+    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2 ${mine ? "bg-white/15 hover:bg-white/25" : "bg-gray-50 border border-gray-200 hover:bg-gray-100"} transition-colors`}>
+      <a href={a.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2.5">
+        <FaFileAlt className="text-base flex-shrink-0 opacity-80" />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold truncate max-w-[180px]">{a.name || "File"}</p>
+          <p className="text-[10px] opacity-70">{formatSize(a.size)}</p>
+        </div>
+      </a>
+      <DownloadAttachmentButton a={a} />
+    </div>
   );
 }
 
