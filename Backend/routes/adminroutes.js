@@ -229,11 +229,13 @@ adminrouter.get(
 adminrouter.put(
   "/editemployee/:id",
   onboardingAccess,
+  requireDpdpPin,
   asyncHandler(editemployee),
 );
 adminrouter.put(
   "/editmanager/:id",
   onboardingAccess,
+  requireDpdpPin,
   asyncHandler(editmanager),
 );
 adminrouter.get(

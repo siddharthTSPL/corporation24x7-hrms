@@ -27,6 +27,7 @@ import {
   FaUniversity,
   FaFileAlt,
   FaShieldAlt,
+  FaLock,
   FaToggleOn,
   FaToggleOff,
   FaKey,
@@ -4445,6 +4446,7 @@ export default function EmployeeTable() {
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [editErrors, setEditErrors] = useState({});
+  const [editLockMessage, setEditLockMessage] = useState("");
   const [openEdit, setOpenEdit] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [promoteToMgrTarget, setPromoteToMgrTarget] = useState(null);
@@ -4541,6 +4543,7 @@ export default function EmployeeTable() {
   };
 
   const handleOpenEdit = (user) => {
+    setEditLockMessage("");
     setEditTarget(user);
     setEditForm({
       f_name: user.f_name ?? "",
@@ -4564,6 +4567,15 @@ export default function EmployeeTable() {
   const handleEditChange = (e) =>
     setEditForm({ ...editForm, [e.target.name]: e.target.value });
 
+  const isUnchangedMaskedEditValue = (field) => {
+    const value = editForm[field];
+    return (
+      typeof value === "string" &&
+      /[X*•]{3,}/.test(value) &&
+      value === editTarget?.[field]
+    );
+  };
+
   const validateEdit = () => {
     const err = {};
     if (!editForm.f_name?.trim()) err.f_name = "Required";
@@ -4575,15 +4587,22 @@ export default function EmployeeTable() {
     if (!editForm.department) err.department = "Required";
     if (
       editForm.personal_contact &&
+      !isUnchangedMaskedEditValue("personal_contact") &&
       !PHONE_REGEX.test(editForm.personal_contact)
     )
       err.personal_contact = "Must be a valid 10-digit Indian mobile number";
-    if (editForm.e_contact && !PHONE_REGEX.test(editForm.e_contact))
+    if (
+      editForm.e_contact &&
+      !isUnchangedMaskedEditValue("e_contact") &&
+      !PHONE_REGEX.test(editForm.e_contact)
+    )
       err.e_contact = "Must be a valid 10-digit Indian mobile number";
     else if (
       editForm.personal_contact &&
       editForm.e_contact &&
-      editForm.e_contact === editForm.personal_contact
+      editForm.e_contact === editForm.personal_contact &&
+      !isUnchangedMaskedEditValue("personal_contact") &&
+      !isUnchangedMaskedEditValue("e_contact")
     ) {
       err.e_contact =
         "Emergency contact must be different from personal contact";
@@ -4607,11 +4626,16 @@ export default function EmployeeTable() {
         setEditTarget(null);
         refetchList();
       },
-      onError: (err) =>
+      onError: (err) => {
+        if (err?.response?.data?.code === "DPDP_EDIT_UNLOCK_REQUIRED") {
+          setEditLockMessage(err.response.data.message);
+          return;
+        }
         showPopup(
           "error",
           err?.response?.data?.message || err?.message || "Update failed",
-        ),
+        );
+      },
     });
   };
 
@@ -5830,6 +5854,7 @@ export default function EmployeeTable() {
             setOpenEdit(false);
             setEditTarget(null);
             setEditErrors({});
+            setEditLockMessage("");
           }}
           onSubmit={handleEditSubmit}
           accentColor={
@@ -5962,6 +5987,33 @@ export default function EmployeeTable() {
             />
           </Field>
         </Modal>
+      )}
+
+      {openEdit && editLockMessage && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#730042]/40 p-4 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="employee-edit-lock-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-[#F4C0D1] bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-center gap-3 text-[#730042]">
+              <FaLock className="text-xl" />
+              <h2 id="employee-edit-lock-title" className="text-base font-bold">
+                Employee edit is locked
+              </h2>
+            </div>
+            <p className="text-sm text-[#6B4B58]">{editLockMessage}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setEditLockMessage("")}
+                className="rounded-xl bg-[#730042] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {deleteTarget && (

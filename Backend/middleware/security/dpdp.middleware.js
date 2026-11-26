@@ -38,18 +38,22 @@ async function requireDpdpPin(req, res, next) {
     if (!actor) return res.status(401).json({ message: "Unauthorized" });
     const s = await getSettings(actor.orgId);
     if (!s) return next();
+    const isEmployeeEdit =
+      req.method === "PUT" && /\/edit(?:employee|manager)\//i.test(req.path);
 
     if (!isUnlocked(req, actor, s)) {
       return res.status(423).json({
-        code: "DPDP_PIN_REQUIRED",
-        message: "Enter the organisation access PIN to view documents.",
+        code: isEmployeeEdit ? "DPDP_EDIT_UNLOCK_REQUIRED" : "DPDP_PIN_REQUIRED",
+        message: isEmployeeEdit
+          ? "Employee details are locked. Unlock them in Settings > Privacy before editing."
+          : "Enter the organisation access PIN to view documents.",
         pinConfigured: !!s.pinVersion,
       });
     }
     logAudit({
       organisation_id: actor.orgId,
       module: "dpdp",
-      action: "document.view",
+      action: isEmployeeEdit ? "employee.edit.access" : "document.view",
       actor: { id: actor.id, model: MODEL_BY_ROLE[actor.role] || "User", name: req.user?.name || req.user?.first_name || "" },
       meta: { method: req.method, path: req.originalUrl.split("?")[0], documentId: req.params.documentId || req.params.id || null, ip: req.ip },
     });
