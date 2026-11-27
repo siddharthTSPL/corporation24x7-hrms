@@ -13,8 +13,12 @@ db();
 const server = http.createServer(app);
 initSocket(server);
 
-server.listen(5000, '0.0.0.0', () => {
-  console.log('server is running on port 5000');
+const PORT = Number(process.env.PORT) || 5001;
+// 127.0.0.1 -> only IIS (ARR on this machine) can reach Node. Set HOST=0.0.0.0 in .env only if needed.
+const HOST = process.env.HOST || '127.0.0.1';
+
+server.listen(PORT, HOST, () => {
+  console.log(`server is running on http://${HOST}:${PORT}`);
 });
 
 if (process.env.NODE_ENV === 'production') {

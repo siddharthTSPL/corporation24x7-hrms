@@ -81,8 +81,15 @@ export default defineConfig(({ mode }) => ({
     },
 
     proxy: {
+      // VITE_API_URL=/talent/api  (same path as production IIS rule)
+      '/talent/api': {
+        target: 'http://127.0.0.1:5001',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/talent\/api/, ''),
+      },
       '/api': {
-        target: 'http://146.101.46.205:5001',
+        target: 'http://127.0.0.1:5001',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

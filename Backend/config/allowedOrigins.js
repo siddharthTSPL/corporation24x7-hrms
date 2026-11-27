@@ -15,4 +15,9 @@ module.exports = [
   "https://www.torchxsuite.com",
   "https://torchxsuite.com/talent",
   "http://torchxsuite.com/talent/",
+  "http://torchxsuite.com",
+  "http://160.187.87.80",
+  "https://160.187.87.80",
+  "http://160.187.87.80:62379",
+  "http://10.10.175.180",
 ];

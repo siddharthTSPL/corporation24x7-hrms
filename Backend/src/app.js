@@ -46,10 +46,16 @@ app.enable("trust proxy");
 app.use((req, res, next) => {
   if (
     req.hostname === "localhost" ||
-    req.hostname === "146.101.46.205" ||
+    req.hostname === "127.0.0.1" ||
+    req.hostname === "160.187.87.80" ||
+    req.hostname === "10.10.175.180" ||
     req.method === "OPTIONS" ||
-    
-    req.secure
+    req.secure ||
+    // Request arrives from IIS/ARR on the same machine (http to 127.0.0.1:5001);
+    // IIS already terminated HTTPS, so redirecting here would cause a redirect loop.
+    ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress) ||
+    req.headers["x-arr-ssl"] ||
+    req.headers["x-forwarded-proto"] === "https"
   ) {
     return next();
   }
