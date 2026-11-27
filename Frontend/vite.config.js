@@ -1,10 +1,11 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig(({ mode }) => ({
-  base: '/talent/',
+  base: "/talent/",
 
   plugins: [
     react({
@@ -38,12 +39,6 @@ export default defineConfig(({ mode }) => ({
 
     rollupOptions: {
       output: {
-        // Only React itself gets a pinned chunk (long-term cacheable, tiny).
-        // Everything else is left to the bundler's automatic splitting so that
-        // lazy routes keep their heavy libs (firebase, xlsx, jspdf, recharts,
-        // country-state-city, leaflet...) OUT of the first page load.
-        // The old catch-all "vendor-misc" bucket was ~11 MB and got
-        // modulepreloaded by index.html on every page.
         manualChunks(id) {
           if (
             id.includes("node_modules/react/") ||
@@ -59,21 +54,18 @@ export default defineConfig(({ mode }) => ({
         assetFileNames: "assets/[ext]/[name]-[hash].[ext]",
       },
     },
-
-    esbuildOptions: {
-      legalComments: "none",
-      treeShaking: true,
-    },
   },
 
   server: {
     host: true,
     port: 5173,
     strictPort: false,
+
     watch: {
       usePolling: false,
       ignored: ["**/node_modules/**", "**/dist/**"],
     },
+
     hmr: {
       protocol: "ws",
       host: "localhost",
@@ -81,17 +73,10 @@ export default defineConfig(({ mode }) => ({
     },
 
     proxy: {
-      // VITE_API_URL=/talent/api  (same path as production IIS rule)
-      '/talent/api': {
-        target: 'http://127.0.0.1:5001',
+      "/api": {
+        target: "http://127.0.0.1:5001",
         changeOrigin: true,
-        ws: true,
-        rewrite: (path) => path.replace(/^\/talent\/api/, ''),
-      },
-      '/api': {
-        target: 'http://127.0.0.1:5001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
